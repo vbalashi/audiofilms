@@ -231,4 +231,56 @@ The app is considered **feature complete** when a user can:
 
 If all of these work smoothly, the MVP is **done**.
 
+---
 
+## Subtitle Fetching & Known Issues
+
+During development, we encountered significant challenges with fetching YouTube subtitles due to YouTube's strict IP blocking and rate limiting, particularly when running from cloud/hosting environments.
+
+### What We Tried (and what failed)
+
+1.  **`youtube-transcript` Library**:
+    *   **Method**: Uses YouTube's internal `timedtext` API endpoint.
+    *   **Result**: Returned 0 items. The API request succeeded (HTTP 200 OK) but returned an empty body.
+    *   **Root Cause**: YouTube blocks the `timedtext` endpoint for certain IP ranges (likely data centers, VPS, cloud hosting).
+
+2.  **Direct Scraping (`fetch`/`curl`)**:
+    *   **Method**: Extracted `captionTracks` from the video page HTML and tried fetching the `baseUrl` directly.
+    *   **Attempts**: Tried with various headers (`User-Agent`, `Referer`, `Cookie`, `Accept-Language`), removing IP parameters, and using different formats (`json3`, `vtt`, XML).
+    *   **Result**: Consistently returned HTTP 200 OK with an empty body (0 bytes).
+    *   **Root Cause**: Same IP blocking as above - YouTube validates the request origin.
+
+3.  **`@distube/ytdl-core`**:
+    *   **Method**: A maintained fork of `ytdl-core` that handles signature deciphering and player script parsing.
+    *   **Result**: Successfully fetched video metadata and track lists, but failed to fetch the actual track content (empty body).
+    *   **Root Cause**: Confirms the IP block affects the content delivery specifically, not just the metadata.
+
+4.  **Browser Verification**:
+    *   **Method**: Used a headless browser to visit the `timedtext` URL directly.
+    *   **Result**: Empty page, confirming the block persists even with full browser context.
+
+### Current Solution (Mock Fallback)
+
+To ensure the MVP is demonstrable, we have implemented a **mock fallback** for the demo video (`dQw4w9WgXcQ` - "Never Gonna Give You Up").
+
+*   **Implementation**: The `/api/get-subs` route checks if the video ID matches the demo video when subtitle fetching fails or returns empty results.
+*   **Fallback Data**: Returns a hardcoded set of 12 subtitle phrases synchronized to the song lyrics.
+*   **Code Location**: `app/src/app/api/get-subs/route.ts` (lines 17-38 for empty result case, lines 55-73 for error case).
+
+### Why This Approach Works
+
+The mock fallback works because:
+1. It bypasses YouTube's API entirely for the demo video.
+2. It provides a consistent, reliable experience for testing and demonstration.
+3. It allows the rest of the application logic (phrase navigation, blind mode, etc.) to function correctly.
+
+### Production Considerations
+
+For a production deployment with real subtitle fetching, you would need one of the following:
+
+1.  **Residential Proxies**: Route requests through residential IP addresses to bypass YouTube's datacenter IP blocks.
+2.  **Browser-Based Scraper**: Use Puppeteer/Playwright to simulate a full user session with proper cookies and session state.
+3.  **YouTube Data API v3**: Use the official API (requires OAuth, has quota limits, and doesn't always provide auto-generated captions).
+4.  **User-Side Fetching**: Move subtitle fetching to the client-side browser where YouTube's restrictions are less strict.
+
+**Note**: The current implementation with `youtube-transcript` will work correctly from residential IP addresses (e.g., home internet connections), but fails from most cloud/VPS environments.
