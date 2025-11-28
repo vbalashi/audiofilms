@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import type { Phrase } from '@/types/subtitles';
+import { create } from "zustand";
+import type { Phrase } from "@/types/subtitles";
 
-type Mode = 'blind' | 'read';
+type Mode = "blind" | "read";
 
 type PlayerState = {
   videoId: string | null;
@@ -18,6 +18,7 @@ type PlayerState = {
   setMode: (mode: Mode) => void;
   startPhrasePlayback: () => void;
   stopPhrasePlayback: () => void;
+  replayPhrase: () => void;
   nextPhrase: () => void;
   prevPhrase: () => void;
   toggleMode: () => void;
@@ -27,7 +28,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   videoId: null,
   phrases: [],
   currentIndex: 0,
-  mode: 'blind',
+  mode: "blind",
   isPlayingPhrase: false,
   paddingStart: -0.2,
   paddingEnd: 0.2,
@@ -38,6 +39,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   startPhrasePlayback: () => set({ isPlayingPhrase: true }),
   stopPhrasePlayback: () => set({ isPlayingPhrase: false }),
+
+  replayPhrase: () => {
+    set({ isPlayingPhrase: false });
+    // Use setTimeout to ensure the state change is processed in a separate render cycle
+    setTimeout(() => {
+      set({ isPlayingPhrase: true });
+    }, 0);
+  },
 
   nextPhrase: () => {
     const { currentIndex, phrases } = get();
@@ -55,6 +64,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   toggleMode: () => {
     const { mode } = get();
-    set({ mode: mode === 'blind' ? 'read' : 'blind' });
+    set({ mode: mode === "blind" ? "read" : "blind" });
   },
 }));
