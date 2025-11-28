@@ -20,6 +20,9 @@ export function WatchClient({ videoId }: Props) {
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('auto');
+  const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -30,9 +33,12 @@ export function WatchClient({ videoId }: Props) {
 
     const fetchPhrases = async () => {
       try {
-        const response = await fetch(`/api/get-subs?videoId=${encodeURIComponent(videoId)}`, {
-          cache: 'no-store',
-        });
+        // Fetch subtitles with selected language
+        const langParam = selectedLanguage !== 'auto' ? `&lang=${selectedLanguage}` : '';
+        const response = await fetch(
+          `/api/get-subs?videoId=${encodeURIComponent(videoId)}${langParam}`,
+          { cache: 'no-store' }
+        );
 
         const payload = await response.json().catch(() => ({}));
 
@@ -78,7 +84,26 @@ export function WatchClient({ videoId }: Props) {
     return () => {
       active = false;
     };
-  }, [videoId, setVideoId, setPhrases]);
+  }, [videoId, selectedLanguage, setVideoId, setPhrases]);
+
+  // Fetch available languages when video loads
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        const response = await fetch(`/api/video-info?videoId=${encodeURIComponent(videoId)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.availableLanguages && data.availableLanguages.length > 0) {
+            setAvailableLanguages(data.availableLanguages);
+          }
+        }
+      } catch (error) {
+        console.warn('Could not fetch available languages:', error);
+      }
+    };
+
+    fetchLanguages();
+  }, [videoId]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 py-10">
@@ -106,6 +131,43 @@ export function WatchClient({ videoId }: Props) {
             </Link>
             .
           </p>
+          {availableLanguages.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={() => setShowLanguageSelector(!showLanguageSelector)}
+                className="text-xs text-white/80 underline hover:text-white"
+              >
+                {showLanguageSelector ? 'Hide language options' : 'Try a different language?'}
+              </button>
+              {showLanguageSelector && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button
+                    onClick={() => setSelectedLanguage('auto')}
+                    className={`rounded-lg px-3 py-1 text-xs ${
+                      selectedLanguage === 'auto'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-white/5 text-white/60 hover:bg-white/10'
+                    }`}
+                  >
+                    Auto
+                  </button>
+                  {availableLanguages.map((lang) => (
+                    <button
+                      key={lang}
+                      onClick={() => setSelectedLanguage(lang)}
+                      className={`rounded-lg px-3 py-1 text-xs ${
+                        selectedLanguage === lang
+                          ? 'bg-white/20 text-white'
+                          : 'bg-white/5 text-white/60 hover:bg-white/10'
+                      }`}
+                    >
+                      {lang.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
