@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PlayerLayout } from '@/components/PlayerLayout';
 import { usePlayerStore } from '@/store/playerStore';
-import type { Phrase } from '@/types/subtitles';
+import type { SubtitleResponse, VideoInfoResponse } from '@/types/subtitles';
 
 type Props = {
   videoId: string;
@@ -60,13 +60,17 @@ export function WatchClient({ videoId }: Props) {
           throw new Error(message);
         }
 
-        const data = payload as { phrases: Phrase[] };
+        const data = payload as SubtitleResponse;
         if (!Array.isArray(data?.phrases)) {
           throw new Error('Could not parse subtitles');
         }
 
         if (!active) return;
-        setPhrases(data.phrases);
+        // Use the language returned from the API (actual fetched language)
+        // This is the language the provider actually retrieved, not what user requested
+        const actualLanguage = data.language || selectedLanguage;
+        console.log(`[WatchClient] Loaded ${data.phrases.length} phrases in language: ${actualLanguage}`);
+        setPhrases(data.phrases, actualLanguage === 'auto' ? undefined : actualLanguage);
         setStatus('ready');
       } catch (error) {
         if (!active) return;
@@ -92,7 +96,7 @@ export function WatchClient({ videoId }: Props) {
       try {
         const response = await fetch(`/api/video-info?videoId=${encodeURIComponent(videoId)}`);
         if (response.ok) {
-          const data = await response.json();
+          const data = (await response.json()) as VideoInfoResponse;
           if (data.availableLanguages && data.availableLanguages.length > 0) {
             setAvailableLanguages(data.availableLanguages);
           }

@@ -30,4 +30,6 @@ The current implementation is centered on:
 
 - Start with `AGENTS.md` for repo navigation.
 - Use `ARCHITECTURE.md` for boundaries and validation.
-- Treat the existing root `README.md` and `app/README.md` as historical/product context until they are consolidated.
+- Use `README.md` for repo-level overview and navigation.
+- Use `app/README.md` for setup and local runbook steps.
+- Use `docs/dictionary/index.md` for current dictionary-specific guidance.

@@ -1,95 +1,103 @@
-# AudioFilms
+# AudioFilms App
 
-An interactive web app for watching YouTube videos with synchronized subtitles and word-by-word highlighting.
+Interactive YouTube listening practice with phrase playback, subtitle retrieval, and inline dictionary lookups.
 
-## Features
+This is the canonical setup and local development document for the application.
 
-- YouTube video playback with embedded player
-- Automatic subtitle fetching for any YouTube video
-- Real-time word highlighting synchronized with video playback
-- Click on any word to jump to that timestamp
-- Support for multiple languages (prioritizes Dutch → English → any available)
+## Runtime Defaults
+
+- Subtitle provider default: `supadata`
+- Subtitle fallback provider: `yt-dlp`
+- Dictionary provider default: `openrouter`
+- Dictionary fallback provider: `free-dictionary`
+
+These defaults are defined in the provider factories and mirrored in [`env.example`](/home/khrustal/dev/audiofilms/app/env.example).
 
 ## Prerequisites
 
 - Node.js 20+ and npm
-- **yt-dlp** must be installed on your system
+- A Supadata API key for the default subtitle path
+- An OpenRouter API key for the default dictionary path
 
-### Installing yt-dlp
+`yt-dlp` is optional. Install it only if you want to run the subtitle fallback provider locally.
 
-**Arch Linux:**
+## Setup
 
-```bash
-sudo pacman -S yt-dlp
-```
-
-**macOS:**
-
-```bash
-brew install yt-dlp
-```
-
-**Ubuntu/Debian:**
-
-```bash
-sudo apt install yt-dlp
-```
-
-**Other systems:**
-See [yt-dlp installation guide](https://github.com/yt-dlp/yt-dlp#installation)
-
-## Getting Started
-
-1. Install dependencies:
+1. Install dependencies.
 
 ```bash
 npm install
 ```
 
-2. Run the development server:
+2. Copy the environment template.
+
+```bash
+cp env.example .env.local
+```
+
+3. Fill in at least these values in `.env.local`.
+
+```bash
+SUBTITLE_PROVIDER=supadata
+SUPADATA_API_KEY=...
+DICTIONARY_PROVIDER=openrouter
+OPENROUTER_API_KEY=...
+```
+
+4. Start the dev server.
 
 ```bash
 npm run dev
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser
+5. Validate before or after changes.
 
-4. Enter a YouTube video URL and start watching!
+```bash
+npm run lint
+npm run build
+```
 
-## What Works ✅
+## Optional Local Fallbacks
 
-- ✅ YouTube video playback
-- ✅ Subtitle fetching for videos with available captions
-- ✅ Support for manual and auto-generated subtitles
-- ✅ Word-by-word highlighting synchronized with video
-- ✅ Click-to-seek functionality
-- ✅ Multi-language support (Dutch, English, and 100+ other languages)
+If you want subtitles without Supadata, switch to `yt-dlp`:
 
-## What Doesn't Work ❌
+```bash
+SUBTITLE_PROVIDER=yt-dlp
+YT_DLP_PATH=/usr/bin/yt-dlp
+```
 
-- ❌ Videos without any subtitles/captions
-- ❌ Private or age-restricted videos
-- ❌ Live streams (may have limited subtitle support)
+If you want dictionary lookups without OpenRouter, switch to `free-dictionary`:
 
-## Technical Notes
+```bash
+DICTIONARY_PROVIDER=free-dictionary
+```
 
-- Uses `yt-dlp-wrap` for reliable subtitle fetching
-- YouTube's native caption API has authentication issues, so we use yt-dlp as a workaround
-- Subtitles are fetched in VTT format and parsed server-side
-- The app requires yt-dlp to be installed at `/usr/bin/yt-dlp`
+Note: `free-dictionary` is English-only and should be treated as a fallback, not the default learning path.
 
-## Deployment
+## Current Behavior
 
-For production deployment, ensure:
+- Uses embedded YouTube playback via `react-youtube`
+- Fetches subtitles through the configured provider
+- Preserves the actual subtitle language returned by the provider
+- Supports blind/read playback modes
+- Looks up clicked words through the configured dictionary provider
 
-1. yt-dlp is installed in your production environment
-2. The path to yt-dlp binary is correct in `src/app/api/get-subs/route.ts`
-3. Consider caching subtitle responses to reduce API calls
+## Validation
+
+Run from `/home/khrustal/dev/audiofilms/app`:
+
+```bash
+npm run lint
+npm run build
+```
+
+For architecture and module ownership, use [ARCHITECTURE.md](/home/khrustal/dev/audiofilms/ARCHITECTURE.md) instead of extending this file into a boundary document.
 
 ## Built With
 
 - [Next.js 16](https://nextjs.org/)
 - [React 19](https://react.dev/)
+- [@supadata/js](https://www.npmjs.com/package/@supadata/js)
 - [yt-dlp-wrap](https://github.com/foxesdocode/yt-dlp-wrap)
 - [react-youtube](https://github.com/tjallingt/react-youtube)
-- [Zustand](https://github.com/pmndrs/zustand) for state management
+- [Zustand](https://github.com/pmndrs/zustand)

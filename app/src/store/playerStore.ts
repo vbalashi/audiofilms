@@ -9,12 +9,13 @@ type PlayerState = {
   currentIndex: number;
   mode: Mode;
   isPlayingPhrase: boolean;
+  subtitleLanguage: string | null; // Language of the loaded subtitles
 
   paddingStart: number;
   paddingEnd: number;
 
   setVideoId: (id: string) => void;
-  setPhrases: (phrases: Phrase[]) => void;
+  setPhrases: (phrases: Phrase[], language?: string) => void;
   setMode: (mode: Mode) => void;
   startPhrasePlayback: () => void;
   stopPhrasePlayback: () => void;
@@ -30,11 +31,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentIndex: 0,
   mode: "blind",
   isPlayingPhrase: false,
+  subtitleLanguage: null,
   paddingStart: -0.2,
   paddingEnd: 0.2,
 
   setVideoId: (videoId) => set({ videoId }),
-  setPhrases: (phrases) => set({ phrases, currentIndex: 0 }),
+  setPhrases: (phrases, language) => set({ phrases, currentIndex: 0, subtitleLanguage: language || null }),
   setMode: (mode) => set({ mode }),
 
   startPhrasePlayback: () => set({ isPlayingPhrase: true }),

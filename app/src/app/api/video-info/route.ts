@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { detectVideoLanguage } from "@/lib/youtubeMetadata";
-import { getCachedVideoInfo, setCachedVideoInfo } from "@/lib/videoInfoCache";
+import { loadVideoInfo } from "@/lib/videoInfoService";
 
 /**
  * API endpoint to get video metadata including available subtitle languages
@@ -18,35 +17,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Check cache first
-    const cached = getCachedVideoInfo(videoId);
-    if (cached) {
-      console.log(`[video-info] Returning cached info for ${videoId}`);
-      return NextResponse.json({
-        videoId,
-        originalLanguage: cached.originalLanguage,
-        availableLanguages: cached.availableLanguages,
-        hasManualCaptions: cached.hasManualCaptions,
-        hasAutoCaptions: cached.hasAutoCaptions,
-      });
-    }
-
-    // Cache miss - fetch from API
-    console.log(`[video-info] Cache miss, fetching from yt-dlp`);
-    const languageInfo = await detectVideoLanguage(videoId);
-    
-    // Cache the result
-    setCachedVideoInfo(videoId, languageInfo);
-    
-    console.log(`[video-info] Found languages:`, languageInfo);
-
-    return NextResponse.json({
-      videoId,
-      originalLanguage: languageInfo.originalLanguage,
-      availableLanguages: languageInfo.availableLanguages,
-      hasManualCaptions: languageInfo.hasManualCaptions,
-      hasAutoCaptions: languageInfo.hasAutoCaptions,
-    });
+    const response = await loadVideoInfo(videoId);
+    console.log(`[video-info] Found languages:`, response);
+    return NextResponse.json(response);
   } catch (error) {
     console.error("[video-info] Error fetching video info:", error);
     
@@ -57,4 +30,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

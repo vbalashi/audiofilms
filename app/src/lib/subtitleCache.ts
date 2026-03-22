@@ -132,7 +132,7 @@ export function cleanupExpiredCache(): void {
           fs.unlinkSync(filePath);
           cleaned++;
         }
-      } catch (error) {
+      } catch {
         // If we can't parse it, delete it
         fs.unlinkSync(filePath);
         cleaned++;

@@ -2,16 +2,16 @@
 
 ## Active Debt
 
-### Validation Baseline Is Red
+### Validation Warnings Still Need Cleanup
 
-- `app/npm run lint` currently fails on existing issues in provider code.
-- Until that is fixed, agents cannot treat lint as a clean merge gate.
+- `app/npm run lint` and `app/npm run build` now pass again.
+- The repo still emits non-blocking warnings around `baseline-browser-mapping` freshness and Next.js workspace root detection.
+- These warnings should be cleaned up so validation output stays high-signal.
 
 ### Documentation Drift
 
-- root `README.md` describes an older MVP architecture and setup model.
-- `app/README.md` is closer to the current runtime but is still not the authoritative architecture map.
-- Several top-level `DICTIONARY_*.md` files contain useful history, but they are not organized as stable repo guidance.
+- README roles have now been separated, but the content can still be tightened further.
+- Dictionary history has been archived, but the maintained dictionary docs may still need one more pass after future provider changes.
 
 ### Environment And Provider Complexity
 
@@ -21,6 +21,6 @@
 
 ## Next Good Cleanup Steps
 
-- fix current ESLint errors and warnings so `npm run lint` becomes trustworthy,
-- consolidate README material so one doc explains current setup and one doc explains product context,
-- decide whether the `DICTIONARY_*.md` files should move under `docs/` or be reduced into one maintained document.
+- clean up remaining non-blocking validation warnings so `npm run lint` and `npm run build` stay high-signal,
+- tighten README content so repo overview, setup, and architecture stay concise and non-overlapping,
+- keep archived dictionary notes out of active guidance unless they are intentionally promoted back into maintained docs.

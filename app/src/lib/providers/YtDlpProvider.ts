@@ -1,5 +1,15 @@
 import YTDlpWrap from "yt-dlp-wrap";
-import type { SubtitleProvider, SubtitleFetchOptions, Phrase } from '@/types/subtitles';
+import type { SubtitleProvider, SubtitleFetchOptions, Phrase, SubtitleFetchResult } from '@/types/subtitles';
+
+type YtDlpSubtitleFormat = {
+  ext?: string;
+  url?: string;
+};
+
+type YtDlpVideoInfo = {
+  subtitles?: Record<string, YtDlpSubtitleFormat[]>;
+  automatic_captions?: Record<string, YtDlpSubtitleFormat[]>;
+};
 
 /**
  * YT-DLP subtitle provider implementation (fallback/legacy provider)
@@ -13,7 +23,7 @@ export class YtDlpProvider implements SubtitleProvider {
     this.ytDlpPath = ytDlpPath;
   }
 
-  async fetchSubtitles(videoId: string, options?: SubtitleFetchOptions): Promise<Phrase[]> {
+  async fetchSubtitles(videoId: string, options?: SubtitleFetchOptions): Promise<SubtitleFetchResult> {
     try {
       console.log(`[YtDlpProvider] Fetching subtitles for ${videoId}`);
       
@@ -21,7 +31,7 @@ export class YtDlpProvider implements SubtitleProvider {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
       // Get video info with subtitle URLs
-      const info = await ytDlpWrap.getVideoInfo(videoUrl);
+      const info = await ytDlpWrap.getVideoInfo(videoUrl) as YtDlpVideoInfo;
 
       // Try to get subtitles (prefer manual over auto-generated)
       const subtitles = info.subtitles || {};
@@ -31,14 +41,24 @@ export class YtDlpProvider implements SubtitleProvider {
       const preferredLangs = [options?.language || 'en', 'nl', 'en'];
       
       let subTrack = null;
+      let detectedLang = 'en';
+      
       for (const lang of preferredLangs) {
         subTrack = subtitles[lang] || autoCaptions[lang];
-        if (subTrack && Array.isArray(subTrack)) break;
+        if (subTrack && Array.isArray(subTrack)) {
+          detectedLang = lang;
+          break;
+        }
       }
 
       // Fallback to any available
       if (!subTrack || !Array.isArray(subTrack)) {
-        subTrack = Object.values(subtitles)[0] || Object.values(autoCaptions)[0];
+        // Get first available language
+        const firstLang = Object.keys(subtitles)[0] || Object.keys(autoCaptions)[0];
+        if (firstLang) {
+          detectedLang = firstLang;
+          subTrack = subtitles[firstLang] || autoCaptions[firstLang];
+        }
       }
 
       if (!subTrack || !Array.isArray(subTrack)) {
@@ -46,7 +66,7 @@ export class YtDlpProvider implements SubtitleProvider {
       }
 
       // Get VTT format subtitle
-      const vttSub = subTrack.find((s: any) => s.ext === 'vtt');
+      const vttSub = subTrack.find((subtitle) => subtitle.ext === 'vtt');
       if (!vttSub || !vttSub.url) {
         throw new Error('VTT format not available');
       }
@@ -62,9 +82,9 @@ export class YtDlpProvider implements SubtitleProvider {
 
       // Parse VTT to phrases
       const phrases = this.parseVTT(vttContent);
-      console.log(`[YtDlpProvider] Parsed ${phrases.length} phrases`);
+      console.log(`[YtDlpProvider] Parsed ${phrases.length} phrases in language: ${detectedLang}`);
 
-      return phrases;
+      return { phrases, language: detectedLang };
     } catch (error) {
       console.error(`[YtDlpProvider] Error fetching subtitles:`, error);
       throw new Error(`Failed to fetch subtitles via yt-dlp: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -120,4 +140,3 @@ export class YtDlpProvider implements SubtitleProvider {
     return phrases;
   }
 }
-

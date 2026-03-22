@@ -1,6 +1,6 @@
 # Subtitle Management System
 
-This directory contains the vendor-agnostic subtitle retrieval and caching system.
+This directory contains the vendor-agnostic subtitle retrieval and caching system plus service-layer orchestration used by API routes.
 
 ## Architecture
 
@@ -49,6 +49,14 @@ To switch providers, simply change the `SUBTITLE_PROVIDER` variable:
 SUBTITLE_PROVIDER=yt-dlp
 ```
 
+### Service Layer
+
+Route handlers should orchestrate through service modules instead of owning provider and cache flow directly.
+
+- `subtitleService.ts`: cache lookup, provider execution, and demo fallback for subtitle responses
+- `videoInfoService.ts`: cache lookup plus language metadata shaping for video-info responses
+- `dictionaryLookup.ts`: provider execution plus API-ready success/error payload shaping for dictionary lookups
+
 ### Caching System (`subtitleCache.ts`)
 
 The caching system stores subtitles as JSON files to minimize API requests.
@@ -84,23 +92,9 @@ Add to `.gitignore`:
 ### In API Route
 
 ```typescript
-import { getConfiguredProvider } from "@/lib/providers";
-import { getCachedSubtitles, setCachedSubtitles } from "@/lib/subtitleCache";
+import { loadSubtitles } from "@/lib/subtitleService";
 
-// Check cache first
-const cached = getCachedSubtitles(videoId);
-if (cached) {
-  return cached;
-}
-
-// Fetch from provider
-const provider = getConfiguredProvider();
-const phrases = await provider.fetchSubtitles(videoId, { language: 'en' });
-
-// Cache the result
-const response = { phrases };
-setCachedSubtitles(videoId, response);
-
+const response = await loadSubtitles(videoId, "auto");
 return response;
 ```
 
@@ -167,4 +161,3 @@ SUBTITLE_PROVIDER=my-provider
 - [ ] Multi-language support improvements
 - [ ] Analytics on provider performance
 - [ ] Rate limiting and retry logic
-

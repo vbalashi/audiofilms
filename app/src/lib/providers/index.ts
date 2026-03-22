@@ -7,6 +7,9 @@ import { YtDlpProvider } from './YtDlpProvider';
  */
 export type ProviderType = 'supadata' | 'yt-dlp';
 
+export const DEFAULT_SUBTITLE_PROVIDER: ProviderType = 'supadata';
+export const DEFAULT_YT_DLP_PATH = '/usr/bin/yt-dlp';
+
 /**
  * Configuration for subtitle providers
  */
@@ -41,12 +44,13 @@ export function createSubtitleProvider(config: ProviderConfig): SubtitleProvider
  * This makes it easy to switch providers via environment config
  */
 export function getConfiguredProvider(): SubtitleProvider {
-  const providerType = (process.env.SUBTITLE_PROVIDER || 'supadata') as ProviderType;
+  const providerType = (process.env.SUBTITLE_PROVIDER ||
+    DEFAULT_SUBTITLE_PROVIDER) as ProviderType;
   
   const config: ProviderConfig = {
     type: providerType,
     apiKey: process.env.SUPADATA_API_KEY,
-    ytDlpPath: process.env.YT_DLP_PATH || '/usr/bin/yt-dlp',
+    ytDlpPath: process.env.YT_DLP_PATH || DEFAULT_YT_DLP_PATH,
   };
 
   console.log(`[Provider] Using subtitle provider: ${providerType}`);
@@ -56,4 +60,3 @@ export function getConfiguredProvider(): SubtitleProvider {
 
 // Export providers for direct use if needed
 export { SupadataProvider, YtDlpProvider };
-

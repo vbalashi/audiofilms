@@ -1,127 +1,59 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { useDictionaryLookup } from "@/hooks/useDictionaryLookup";
+import { usePlayerKeyboardControls } from "@/hooks/usePlayerKeyboardControls";
 import { usePlayerStore } from "@/store/playerStore";
 import { YouTubePlayer } from "./YouTubePlayer";
-
-type DictionaryStatus = "idle" | "loading" | "ready" | "error";
-
-type DictionaryEntry = {
-  meanings?: {
-    partOfSpeech?: string;
-    definitions?: { definition?: string }[];
-  }[];
-};
 
 export function PlayerLayout() {
   const {
     phrases,
     currentIndex,
     mode,
-    startPhrasePlayback,
     stopPhrasePlayback,
     replayPhrase,
     nextPhrase,
     prevPhrase,
     isPlayingPhrase,
     setMode,
+    subtitleLanguage,
   } = usePlayerStore();
-
-  const [selectedWord, setSelectedWord] = useState<string | null>(null);
-  const [definitions, setDefinitions] = useState<string[]>([]);
-  const [dictionaryStatus, setDictionaryStatus] =
-    useState<DictionaryStatus>("idle");
-  const [dictionaryError, setDictionaryError] = useState<string | null>(null);
-  const [translateUrl, setTranslateUrl] = useState<string | null>(null);
+  const {
+    status: dictionaryStatus,
+    selectedWord,
+    definitions,
+    error: dictionaryError,
+    translateUrl,
+    lookup,
+    reset: resetDictionaryLookup,
+  } = useDictionaryLookup();
 
   const current = phrases[currentIndex];
 
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        e.preventDefault();
-        if (e.shiftKey) {
-          replayPhrase();
-        } else if (isPlayingPhrase) {
-          stopPhrasePlayback();
-        } else {
-          // When already paused, replay from the start
-          replayPhrase();
-        }
-      }
-      if (e.code === "ArrowRight") nextPhrase();
-      if (e.code === "ArrowLeft") prevPhrase();
-      if (e.code === "ArrowDown") setMode("read");
-      if (e.code === "ArrowUp") setMode("blind");
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [
-    nextPhrase,
-    prevPhrase,
+  usePlayerKeyboardControls({
     isPlayingPhrase,
     replayPhrase,
     stopPhrasePlayback,
+    nextPhrase,
+    prevPhrase,
     setMode,
-  ]);
+  });
+
+  useEffect(() => {
+    resetDictionaryLookup();
+  }, [currentIndex, resetDictionaryLookup]);
 
   const handleWordClick = useCallback(
     async (word: string) => {
       if (mode !== "read" || !word) return;
-      setSelectedWord(word);
-      setDictionaryStatus("loading");
-      setDictionaryError(null);
-      setTranslateUrl(null);
-      setDefinitions([]);
+      const context = current?.text || "";
+      const language = subtitleLanguage || "en";
 
-      try {
-        const response = await fetch(
-          `/api/dict?word=${encodeURIComponent(word)}`
-        );
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          if (payload.translateUrl) {
-            setTranslateUrl(payload.translateUrl);
-          }
-          throw new Error(
-            typeof payload.error === "string" && payload.error.length > 0
-              ? payload.error
-              : "Lookup failed"
-          );
-        }
-
-        const entries = Array.isArray(payload.result)
-          ? (payload.result as DictionaryEntry[])
-          : [];
-        const collected = entries.flatMap((entry) =>
-          Array.isArray(entry.meanings)
-            ? entry.meanings.flatMap((meaning) =>
-                Array.isArray(meaning.definitions)
-                  ? meaning.definitions.map((def) => {
-                      const part = meaning.partOfSpeech
-                        ? `(${meaning.partOfSpeech}) `
-                        : "";
-                      return `${part}${def.definition ?? ""}`.trim();
-                    })
-                  : []
-              )
-            : []
-        );
-
-        setDefinitions(collected.filter(Boolean));
-        setDictionaryStatus("ready");
-      } catch (error) {
-        console.error(error);
-        setDictionaryError(
-          error instanceof Error
-            ? error.message
-            : "Unable to fetch definition right now."
-        );
-        setDictionaryStatus("error");
-      }
+      console.log(`[PlayerLayout] Looking up word "${word}" in language: ${language}`);
+      await lookup({ word, language, context });
     },
-    [mode]
+    [mode, current, subtitleLanguage, lookup]
   );
 
   const maskedText = useMemo(() => {
