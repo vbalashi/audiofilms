@@ -29,10 +29,18 @@ export interface DictionaryResult {
 export interface DictionaryLookupSuccessResponse {
   result: DictionaryResult;
   definitions: string[];
+  meta?: {
+    provider: string;
+    fallbackUsed: boolean;
+    warning?: string;
+  };
 }
 
 export interface DictionaryLookupErrorResponse {
   error: string;
+  code?: 'NOT_FOUND' | 'API_ERROR' | 'RATE_LIMIT' | 'INVALID_INPUT';
+  recoverable?: boolean;
+  suggestedAction?: string;
   translateUrl?: string;
 }
 
@@ -59,4 +67,3 @@ export function splitDictionaryDefinition(definition: string): string[] {
     .map((part) => part.trim())
     .filter(Boolean);
 }
-

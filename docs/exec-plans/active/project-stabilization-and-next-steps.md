@@ -116,13 +116,23 @@ Exit criteria:
 
 Only start after priorities 1-4 are in acceptable shape.
 
-Candidate directions:
+Once priorities 1-4 are complete, the codebase should be stable enough to resume product work instead of continuing platform repair. The next feature choices should favor direct user-facing value and use the service boundaries already established by the stabilization work.
 
-- dictionary result caching,
+Recommended feature directions:
+
+1. `dictionary result caching`
+2. `provider fallback policy and user-facing error states`
+
+Why this order:
+
+- `dictionary result caching` is the fastest product win because the dictionary flow is already normalized behind server-side orchestration and app-facing contracts. Adding cache behavior at `/api/dict` and the service layer improves lookup latency, reduces repeated provider calls, and lowers sensitivity to OpenRouter cost and rate behavior without pushing vendor logic back into UI components.
+- `provider fallback policy and user-facing error states` should follow immediately after. The provider and service structure now exists, but the product-level degradation policy is still implicit. The next step is to make fallback rules explicit across subtitle and dictionary providers and pair them with recoverable, user-readable UI states.
+
+Lower-priority follow-ons after those two items:
+
 - better language selection UX,
 - phrase segmentation and playback quality improvements,
 - keyboard and accessibility polish,
-- provider fallback policy and user-facing error states,
 - persistence or saved sessions if still in scope.
 
 ## Recommended Execution Order

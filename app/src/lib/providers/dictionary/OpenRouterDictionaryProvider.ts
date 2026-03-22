@@ -32,6 +32,7 @@ export class OpenRouterDictionaryProvider implements DictionaryProvider {
   private readonly model: string;
   private readonly promptTemplate: string;
   private readonly baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
+  private readonly timeoutMs: number;
 
   constructor(apiKey: string, model?: string, promptTemplate?: string) {
     if (!apiKey) {
@@ -45,6 +46,7 @@ export class OpenRouterDictionaryProvider implements DictionaryProvider {
     this.promptTemplate =
       promptTemplate ||
       'Define the word "{{word}}" in "{{sourceLanguage}}" using a style similar to a monolingual dictionary for language learners. Context: "{{context}}".\n\nYour answer should be brief, clear, and contain only the definition of target word "{{word}}".\n\nAvoid cognates or translations unless strictly necessary. If the word functions as a part of a phrase, idiom, or collocation, describe its meaning in that phrase as well, indicating both standalone and contextual meanings separately.';
+    this.timeoutMs = Number(process.env.OPENROUTER_TIMEOUT_MS || 8000);
   }
 
   /**
@@ -88,25 +90,34 @@ export class OpenRouterDictionaryProvider implements DictionaryProvider {
     console.log('[OpenRouter Dictionary] =====================================');
 
     try {
-      const response = await fetch(this.baseUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || '',
-          'X-Title': process.env.NEXT_PUBLIC_SITE_NAME || 'AudioFilms',
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          stream: false,
-        }),
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      let response: Response;
+
+      try {
+        response = await fetch(this.baseUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.NEXT_PUBLIC_SITE_URL || '',
+            'X-Title': process.env.NEXT_PUBLIC_SITE_NAME || 'AudioFilms',
+          },
+          body: JSON.stringify({
+            model: this.model,
+            messages: [
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            stream: false,
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (response.status === 429) {
         throw new DictionaryError(
@@ -163,6 +174,13 @@ export class OpenRouterDictionaryProvider implements DictionaryProvider {
         throw error;
       }
 
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new DictionaryError(
+          'Dictionary provider timed out',
+          'API_ERROR',
+        );
+      }
+
       console.error('Error fetching definition from OpenRouter:', error);
       throw new DictionaryError(
         'Failed to fetch definition from OpenRouter',
@@ -171,4 +189,3 @@ export class OpenRouterDictionaryProvider implements DictionaryProvider {
     }
   }
 }
-

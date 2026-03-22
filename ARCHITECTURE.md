@@ -131,7 +131,7 @@ Ownership is:
 - `app/src/hooks/`: client-side orchestration such as keyboard controls and dictionary fetch lifecycle
 - `app/src/store/`: playback/session state only
 - `app/src/app/api/*`: HTTP boundary, input validation, and JSON response wiring
-- `app/src/lib/*Service.ts` and `app/src/lib/dictionaryLookup.ts`: server-side orchestration, cache usage, provider calls, fallback policy, and normalized response shaping
+- `app/src/lib/*Service.ts` and `app/src/lib/dictionaryLookup.ts`: server-side orchestration, cache usage, provider calls, primary/fallback policy, and normalized response shaping including user-facing degraded-state metadata
 - `app/src/lib/providers/**`: vendor-specific integrations only
 - `app/src/types/**`: stable app-facing contracts shared across layers
 
@@ -139,7 +139,7 @@ Ownership is:
 
 - UI no longer needs to understand provider-specific dictionary or subtitle response shapes.
 - Route handlers stay small and are easier to review.
-- Provider swaps or fallback-policy changes stay below the UI and route boundaries.
+- Provider swaps or fallback-policy changes stay below the UI and route boundaries, while UI receives explicit success/error metadata for degraded but recoverable states.
 - Further UI decomposition is optional and should be driven by presentation concerns, not by leaking orchestration.
 
 ## Validation

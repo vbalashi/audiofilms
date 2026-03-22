@@ -25,6 +25,7 @@ interface FreeDictionaryApiResponse {
 export class FreeDictionaryProvider implements DictionaryProvider {
   private readonly baseUrl =
     'https://api.dictionaryapi.dev/api/v2/entries/en/';
+  private readonly timeoutMs = Number(process.env.FREE_DICTIONARY_TIMEOUT_MS || 5000);
 
   async getDefinition(
     word: string,
@@ -44,9 +45,18 @@ export class FreeDictionaryProvider implements DictionaryProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}${encodeURIComponent(word)}`, {
-        next: { revalidate: 3600 },
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      let response: Response;
+
+      try {
+        response = await fetch(`${this.baseUrl}${encodeURIComponent(word)}`, {
+          next: { revalidate: 3600 },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (response.status === 404) {
         throw new DictionaryError(
@@ -93,6 +103,13 @@ export class FreeDictionaryProvider implements DictionaryProvider {
         throw error;
       }
 
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new DictionaryError(
+          'Fallback dictionary provider timed out',
+          'API_ERROR',
+        );
+      }
+
       console.error('Error fetching definition from Free Dictionary:', error);
       throw new DictionaryError(
         'Failed to fetch definition from Free Dictionary',
@@ -101,5 +118,3 @@ export class FreeDictionaryProvider implements DictionaryProvider {
     }
   }
 }
-
-

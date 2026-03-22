@@ -1,5 +1,11 @@
 import YTDlpWrap from "yt-dlp-wrap";
-import type { SubtitleProvider, SubtitleFetchOptions, Phrase, SubtitleFetchResult } from '@/types/subtitles';
+import {
+  SubtitleProviderError,
+  type SubtitleProvider,
+  type SubtitleFetchOptions,
+  type Phrase,
+  type SubtitleFetchResult,
+} from '@/types/subtitles';
 
 type YtDlpSubtitleFormat = {
   ext?: string;
@@ -10,6 +16,35 @@ type YtDlpVideoInfo = {
   subtitles?: Record<string, YtDlpSubtitleFormat[]>;
   automatic_captions?: Record<string, YtDlpSubtitleFormat[]>;
 };
+
+function classifyYtDlpError(error: unknown): SubtitleProviderError {
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : 'yt-dlp failed';
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes('incomplete youtube id') ||
+    normalized.includes('unsupported url') ||
+    normalized.includes('video provider could not be detected')
+  ) {
+    return new SubtitleProviderError(
+      'Invalid YouTube video ID or unsupported video URL.',
+      'INVALID_VIDEO',
+    );
+  }
+
+  if (
+    normalized.includes('no subtitles found') ||
+    normalized.includes('vtt format not available')
+  ) {
+    return new SubtitleProviderError('No subtitles found', 'NOT_FOUND');
+  }
+
+  return new SubtitleProviderError(
+    'Fallback subtitle provider failed.',
+    'PROVIDER_ERROR',
+  );
+}
 
 /**
  * YT-DLP subtitle provider implementation (fallback/legacy provider)
@@ -82,12 +117,10 @@ export class YtDlpProvider implements SubtitleProvider {
 
       // Parse VTT to phrases
       const phrases = this.parseVTT(vttContent);
-      console.log(`[YtDlpProvider] Parsed ${phrases.length} phrases in language: ${detectedLang}`);
 
       return { phrases, language: detectedLang };
     } catch (error) {
-      console.error(`[YtDlpProvider] Error fetching subtitles:`, error);
-      throw new Error(`Failed to fetch subtitles via yt-dlp: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw classifyYtDlpError(error);
     }
   }
 

@@ -8,6 +8,25 @@ The dictionary provider system uses a provider-based architecture similar to the
 
 ## Available Providers
 
+### OpenAI Dictionary Provider
+
+Uses the OpenAI chat completions API for context-aware dictionary-style definitions.
+
+This is useful when you already operate an OpenAI or Azure OpenAI setup elsewhere and want to reuse it here.
+
+**Features:**
+- Multi-language support
+- Context-aware definitions
+- Standard OpenAI and Azure OpenAI support
+- GPT-5 reasoning disabled for faster dictionary lookups
+
+**Configuration:**
+```bash
+DICTIONARY_PROVIDER=openai
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-5.2
+```
+
 ### OpenRouter Dictionary Provider
 
 Uses Large Language Models (LLMs) via OpenRouter API to provide intelligent, context-aware word definitions.
@@ -202,6 +221,6 @@ To test the dictionary provider:
 
 1. **Use context when available** - Provides more accurate definitions
 2. **Cache results** - Implement caching to reduce API calls and costs
-3. **Fallback strategy** - Consider falling back to Free Dictionary for English words
+3. **Fallback strategy** - Prefer `openai` or `openrouter` first, then fall back to Free Dictionary for English words
 4. **Rate limiting** - Implement user-side rate limiting to prevent abuse
 5. **Error handling** - Always handle errors gracefully with user-friendly messages

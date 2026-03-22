@@ -20,6 +20,9 @@ type DictionaryLookupState = {
   definitions: string[];
   error: string | null;
   translateUrl: string | null;
+  warning: string | null;
+  provider: string | null;
+  recoverable: boolean;
 };
 
 const initialState: DictionaryLookupState = {
@@ -28,6 +31,9 @@ const initialState: DictionaryLookupState = {
   definitions: [],
   error: null,
   translateUrl: null,
+  warning: null,
+  provider: null,
+  recoverable: false,
 };
 
 export function useDictionaryLookup() {
@@ -48,6 +54,9 @@ export function useDictionaryLookup() {
       definitions: [],
       error: null,
       translateUrl: null,
+      warning: null,
+      provider: null,
+      recoverable: false,
     });
 
     try {
@@ -79,6 +88,12 @@ export function useDictionaryLookup() {
             "translateUrl" in payload && payload.translateUrl
               ? payload.translateUrl
               : null,
+          warning: null,
+          provider: null,
+          recoverable:
+            "recoverable" in payload && typeof payload.recoverable === "boolean"
+              ? payload.recoverable
+              : false,
         });
         return;
       }
@@ -90,6 +105,11 @@ export function useDictionaryLookup() {
         definitions: definitions.filter(Boolean),
         error: null,
         translateUrl: null,
+        warning:
+          "meta" in payload && payload.meta?.warning ? payload.meta.warning : null,
+        provider:
+          "meta" in payload && payload.meta?.provider ? payload.meta.provider : null,
+        recoverable: false,
       });
     } catch (error) {
       console.error(error);
@@ -102,6 +122,9 @@ export function useDictionaryLookup() {
             ? error.message
             : "Unable to fetch definition right now.",
         translateUrl: null,
+        warning: null,
+        provider: null,
+        recoverable: true,
       });
     }
   }, []);

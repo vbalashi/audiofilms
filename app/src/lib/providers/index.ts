@@ -58,5 +58,40 @@ export function getConfiguredProvider(): SubtitleProvider {
   return createSubtitleProvider(config);
 }
 
+export type SubtitleProviderCandidate = {
+  type: ProviderType;
+  provider: SubtitleProvider;
+};
+
+export function getSubtitleProviderCandidates(): SubtitleProviderCandidate[] {
+  const configuredType = (process.env.SUBTITLE_PROVIDER ||
+    DEFAULT_SUBTITLE_PROVIDER) as ProviderType;
+  const candidates: SubtitleProviderCandidate[] = [];
+  const attempted = new Set<ProviderType>();
+
+  const maybeAdd = (type: ProviderType) => {
+    if (attempted.has(type)) {
+      return;
+    }
+    attempted.add(type);
+
+    try {
+      const config: ProviderConfig = {
+        type,
+        apiKey: process.env.SUPADATA_API_KEY,
+        ytDlpPath: process.env.YT_DLP_PATH || DEFAULT_YT_DLP_PATH,
+      };
+      candidates.push({ type, provider: createSubtitleProvider(config) });
+    } catch (error) {
+      console.warn(`[Provider] Skipping unavailable subtitle provider "${type}":`, error);
+    }
+  };
+
+  maybeAdd(configuredType);
+  maybeAdd(configuredType === 'supadata' ? 'yt-dlp' : 'supadata');
+
+  return candidates;
+}
+
 // Export providers for direct use if needed
 export { SupadataProvider, YtDlpProvider };

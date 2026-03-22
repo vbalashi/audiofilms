@@ -8,6 +8,11 @@ export type Phrase = {
 export type SubtitleResponse = {
   phrases: Phrase[];
   language?: string; // The actual language of the fetched subtitles
+  meta?: {
+    provider: string;
+    fallbackUsed: boolean;
+    warning?: string;
+  };
 };
 
 export type SubtitleLanguagePreference = string | 'auto';
@@ -50,3 +55,17 @@ export type VideoInfoResponse = {
   hasManualCaptions: boolean;
   hasAutoCaptions: boolean;
 };
+
+export class SubtitleProviderError extends Error {
+  constructor(
+    message: string,
+    public readonly code:
+      | 'NOT_FOUND'
+      | 'INVALID_VIDEO'
+      | 'RATE_LIMIT'
+      | 'PROVIDER_ERROR',
+  ) {
+    super(message);
+    this.name = 'SubtitleProviderError';
+  }
+}

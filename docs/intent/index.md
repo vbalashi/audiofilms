@@ -19,6 +19,15 @@ The current implementation is centered on:
 - provider choices must remain swappable through environment configuration,
 - setup requirements must be explicit for humans and agents.
 
+## Next Product Focus
+
+After the current stabilization work, product development should resume in this order:
+
+1. `dictionary result caching` to improve lookup UX and reduce provider cost/latency,
+2. `provider fallback policy and user-facing error states` to make degradation explicit and reliable.
+
+Other feature work should stay secondary until those two areas are in place.
+
 ## Current Non-Goals
 
 - authentication and persistence,

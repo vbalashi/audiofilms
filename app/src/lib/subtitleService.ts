@@ -1,8 +1,9 @@
-import { getConfiguredProvider } from '@/lib/providers';
+import { getSubtitleProviderCandidates } from '@/lib/providers';
 import { getCachedSubtitles, setCachedSubtitles } from '@/lib/subtitleCache';
 import type {
   Phrase,
   SubtitleLanguagePreference,
+  SubtitleProviderError,
   SubtitleResponse,
 } from '@/types/subtitles';
 
@@ -62,32 +63,76 @@ export async function loadSubtitles(
     console.log(`[SubtitleService] Cache miss for ${videoId}`);
   }
 
-  try {
-    const provider = getConfiguredProvider();
-    const result = await provider.fetchSubtitles(videoId, {
-      language: language === 'auto' ? undefined : language,
-    });
+  const candidates = getSubtitleProviderCandidates();
+  let lastError: Error | SubtitleProviderError | null = null;
 
-    if (!result.phrases.length) {
-      throw new Error('No subtitles returned from provider');
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+
+    try {
+      const result = await candidate.provider.fetchSubtitles(videoId, {
+        language: language === 'auto' ? undefined : language,
+      });
+
+      if (!result.phrases.length) {
+        throw new Error('No subtitles returned from provider');
+      }
+
+      const fallbackUsed = index > 0;
+      const response: SubtitleResponse = {
+        phrases: result.phrases,
+        language: result.language,
+        meta: {
+          provider: candidate.type,
+          fallbackUsed,
+          warning: fallbackUsed
+            ? `Primary subtitle provider was unavailable. Loaded captions via ${candidate.type}.`
+            : undefined,
+        },
+      };
+
+      setCachedSubtitles(cacheKey, response);
+      return response;
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === 'SubtitleProviderError' &&
+        'code' in error
+      ) {
+        const providerError = error as SubtitleProviderError;
+        console.warn(
+          `[SubtitleService] ${candidate.type} failed for ${videoId}: ${providerError.code}`,
+        );
+        lastError = providerError;
+
+        if (providerError.code === 'INVALID_VIDEO') {
+          throw providerError;
+        }
+
+        continue;
+      }
+
+      console.warn(
+        `[SubtitleService] ${candidate.type} failed for ${videoId}: unexpected provider error`,
+      );
+      lastError =
+        error instanceof Error ? error : new Error('Failed to fetch subtitles');
     }
-
-    const response: SubtitleResponse = {
-      phrases: result.phrases,
-      language: result.language,
-    };
-
-    setCachedSubtitles(cacheKey, response);
-    return response;
-  } catch (error) {
-    console.error('[SubtitleService] Provider error:', error);
-
-    const demoFallback = getDemoSubtitleFallback(videoId);
-    if (demoFallback) {
-      console.log('[SubtitleService] Using demo fallback subtitles');
-      return demoFallback;
-    }
-
-    throw error;
   }
+
+  const demoFallback = getDemoSubtitleFallback(videoId);
+  if (demoFallback) {
+    console.log('[SubtitleService] Using demo fallback subtitles');
+    return {
+      ...demoFallback,
+      meta: {
+        provider: 'demo-fallback',
+        fallbackUsed: true,
+        warning:
+          'Live subtitle providers were unavailable. Showing the built-in sample transcript.',
+      },
+    };
+  }
+
+  throw lastError || new Error('Failed to fetch subtitles');
 }

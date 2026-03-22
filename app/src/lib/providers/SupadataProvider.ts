@@ -1,5 +1,11 @@
 import { Supadata } from '@supadata/js';
-import type { SubtitleProvider, SubtitleFetchOptions, Phrase, SubtitleFetchResult } from '@/types/subtitles';
+import {
+  SubtitleProviderError,
+  type SubtitleProvider,
+  type SubtitleFetchOptions,
+  type Phrase,
+  type SubtitleFetchResult,
+} from '@/types/subtitles';
 
 type SupadataTranscriptChunk = {
   text: string;
@@ -21,6 +27,44 @@ function isSupadataTranscriptResponse(
     response !== null &&
     'content' in response &&
     'lang' in response
+  );
+}
+
+function classifySupadataError(error: unknown): SubtitleProviderError {
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : 'Supadata failed';
+  const details =
+    typeof error === 'object' && error !== null
+      ? [
+          'error' in error ? String((error as { error?: unknown }).error || '') : '',
+          'details' in error ? String((error as { details?: unknown }).details || '') : '',
+          message,
+        ]
+          .join(' ')
+          .toLowerCase()
+      : message.toLowerCase();
+
+  if (
+    details.includes('invalid-request') ||
+    details.includes('video provider could not be detected') ||
+    details.includes('incorrect url')
+  ) {
+    return new SubtitleProviderError(
+      'Invalid YouTube video ID or unsupported video URL.',
+      'INVALID_VIDEO',
+    );
+  }
+
+  if (details.includes('limit-exceeded') || details.includes('rate limit')) {
+    return new SubtitleProviderError(
+      'Primary subtitle provider is temporarily rate-limited.',
+      'RATE_LIMIT',
+    );
+  }
+
+  return new SubtitleProviderError(
+    'Primary subtitle provider failed.',
+    'PROVIDER_ERROR',
   );
 }
 
@@ -61,10 +105,8 @@ export class SupadataProvider implements SubtitleProvider {
       let phrases = this.transformResponse(response);
       if (phrases.length > 0) {
         const transcriptResponse = isSupadataTranscriptResponse(response) ? response : null;
-        // Supadata returns 'lang' field with the detected/actual language
         const detectedLang = transcriptResponse?.lang || 'en';
-        console.log(`[SupadataProvider] Auto-detected language with native captions: ${detectedLang}`);
-        console.log(`[SupadataProvider] Available languages:`, transcriptResponse?.availableLangs);
+        console.log(`[SupadataProvider] Auto-detected native captions in ${detectedLang}`);
         return { phrases, language: detectedLang };
       }
       
@@ -78,14 +120,19 @@ export class SupadataProvider implements SubtitleProvider {
       phrases = this.transformResponse(response);
       if (phrases.length > 0) {
         const transcriptResponse = isSupadataTranscriptResponse(response) ? response : null;
-        // Supadata returns 'lang' field with the detected/actual language
         const detectedLang = transcriptResponse?.lang || 'en';
-        console.log(`[SupadataProvider] Auto-detected language with auto-generated captions: ${detectedLang}`);
-        console.log(`[SupadataProvider] Available languages:`, transcriptResponse?.availableLangs);
+        console.log(`[SupadataProvider] Auto-detected generated captions in ${detectedLang}`);
         return { phrases, language: detectedLang };
       }
-    } catch {
-      console.log(`[SupadataProvider] Auto-detect failed, trying fallback languages`);
+    } catch (error) {
+      const providerError = classifySupadataError(error);
+      if (providerError.code === 'INVALID_VIDEO') {
+        throw providerError;
+      }
+
+      console.warn(
+        `[SupadataProvider] Auto-detect failed for ${videoId}: ${providerError.code}`,
+      );
     }
     
     // If auto-detect fails, try common languages in order
@@ -93,19 +140,22 @@ export class SupadataProvider implements SubtitleProvider {
     
     for (const lang of fallbackLanguages) {
       try {
-        console.log(`[SupadataProvider] Trying language: ${lang}`);
         const result = await this.fetchWithLanguage(videoUrl, videoId, lang);
         if (result.phrases.length > 0) {
-          console.log(`[SupadataProvider] Success with fallback language: ${lang}, actual language received: ${result.actualLang}`);
+          console.log(
+            `[SupadataProvider] Captions resolved via language fallback ${lang} -> ${result.actualLang}`,
+          );
           return { phrases: result.phrases, language: result.actualLang };
         }
-      } catch {
-        console.log(`[SupadataProvider] Failed with ${lang}, continuing...`);
+      } catch (error) {
+        if (error instanceof SubtitleProviderError && error.code === 'INVALID_VIDEO') {
+          throw error;
+        }
         continue;
       }
     }
-    
-    throw new Error('No subtitles found in any supported language');
+
+    throw new SubtitleProviderError('No subtitles found', 'NOT_FOUND');
   }
   
   /**
@@ -125,7 +175,6 @@ export class SupadataProvider implements SubtitleProvider {
       let phrases = this.transformResponse(response);
       if (phrases.length > 0) {
         const actualLang = isSupadataTranscriptResponse(response) ? response.lang : lang;
-        console.log(`[SupadataProvider] Got ${phrases.length} phrases from native captions (requested: ${lang}, actual: ${actualLang})`);
         return { phrases, actualLang };
       }
       
@@ -141,14 +190,12 @@ export class SupadataProvider implements SubtitleProvider {
       phrases = this.transformResponse(response);
       if (phrases.length > 0) {
         const actualLang = isSupadataTranscriptResponse(response) ? response.lang : lang;
-        console.log(`[SupadataProvider] Got ${phrases.length} phrases from auto-generated captions (requested: ${lang}, actual: ${actualLang})`);
         return { phrases, actualLang };
       }
       
       return { phrases, actualLang: lang };
     } catch (error) {
-      console.error(`[SupadataProvider] Error fetching subtitles for ${lang}:`, error);
-      throw error;
+      throw classifySupadataError(error);
     }
   }
 
@@ -157,30 +204,13 @@ export class SupadataProvider implements SubtitleProvider {
    */
   private transformResponse(response: unknown): Phrase[] {
     const phrases: Phrase[] = [];
-    const responseRecord =
-      typeof response === 'object' && response !== null
-        ? (response as Record<string, unknown>)
-        : null;
-
     if (!isSupadataTranscriptResponse(response)) {
-      console.warn('[SupadataProvider] Transcript response did not include subtitle content:', response);
+      console.warn('[SupadataProvider] Transcript response did not include subtitle content');
       return phrases;
     }
-    
-    console.log(`[SupadataProvider] ===== RAW RESPONSE DEBUG =====`);
-    console.log(`[SupadataProvider] Response type:`, typeof response);
-    console.log(`[SupadataProvider] Response keys:`, Object.keys(response || {}));
-    console.log(`[SupadataProvider] Response.language:`, responseRecord?.language);
-    console.log(`[SupadataProvider] Response.lang:`, response.lang);
-    console.log(`[SupadataProvider] Response.detected_language:`, responseRecord?.detected_language);
-    console.log(`[SupadataProvider] Response.source_language:`, responseRecord?.source_language);
-    console.log(`[SupadataProvider] Response.content length:`, response?.content?.length);
-    console.log(`[SupadataProvider] Full response (first 500 chars):`, JSON.stringify(response).substring(0, 500));
-    console.log(`[SupadataProvider] ===========================`);
-    
-    // Supadata API returns 'content' array with 'offset' and 'duration' in milliseconds
+
     if (!response || !response.content || !Array.isArray(response.content)) {
-      console.warn('[SupadataProvider] No content in response:', response);
+      console.warn('[SupadataProvider] No content in response');
       return phrases;
     }
 
@@ -197,7 +227,6 @@ export class SupadataProvider implements SubtitleProvider {
       });
     });
 
-    console.log(`[SupadataProvider] Transformed ${phrases.length} phrases`);
     return phrases;
   }
 }

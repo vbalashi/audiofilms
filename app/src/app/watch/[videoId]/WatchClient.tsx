@@ -23,6 +23,7 @@ export function WatchClient({ videoId }: Props) {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('auto');
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+  const [subtitleWarning, setSubtitleWarning] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -30,6 +31,7 @@ export function WatchClient({ videoId }: Props) {
     setVideoId(videoId);
     setStatus('loading');
     setErrorMessage(null);
+    setSubtitleWarning(null);
 
     const fetchPhrases = async () => {
       try {
@@ -69,6 +71,7 @@ export function WatchClient({ videoId }: Props) {
         // Use the language returned from the API (actual fetched language)
         // This is the language the provider actually retrieved, not what user requested
         const actualLanguage = data.language || selectedLanguage;
+        setSubtitleWarning(data.meta?.warning || null);
         console.log(`[WatchClient] Loaded ${data.phrases.length} phrases in language: ${actualLanguage}`);
         setPhrases(data.phrases, actualLanguage === 'auto' ? undefined : actualLanguage);
         setStatus('ready');
@@ -186,6 +189,11 @@ export function WatchClient({ videoId }: Props) {
       )}
 
       {status === 'ready' && phrases.length > 0 && <PlayerLayout />}
+      {status === 'ready' && phrases.length > 0 && subtitleWarning && (
+        <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+          {subtitleWarning}
+        </div>
+      )}
     </div>
   );
 }

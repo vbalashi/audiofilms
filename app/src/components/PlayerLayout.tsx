@@ -25,6 +25,9 @@ export function PlayerLayout() {
     definitions,
     error: dictionaryError,
     translateUrl,
+    warning: dictionaryWarning,
+    provider: dictionaryProvider,
+    recoverable: dictionaryRecoverable,
     lookup,
     reset: resetDictionaryLookup,
   } = useDictionaryLookup();
@@ -148,6 +151,11 @@ export function PlayerLayout() {
             <p>
               Couldn&apos;t fetch definition: <strong>{dictionaryError}</strong>
             </p>
+            {dictionaryRecoverable && (
+              <p className="text-xs text-white/60">
+                This looks recoverable. Try another word or retry in a moment.
+              </p>
+            )}
             {translateUrl && (
               <a
                 className="inline-flex items-center gap-1 text-blue-200 underline"
@@ -163,6 +171,12 @@ export function PlayerLayout() {
         {mode === "read" && dictionaryStatus === "ready" && selectedWord && (
           <div className="space-y-2">
             <p className="text-base font-semibold text-white">{selectedWord}</p>
+            {dictionaryWarning && (
+              <p className="text-xs text-amber-200">
+                {dictionaryWarning}
+                {dictionaryProvider ? ` (${dictionaryProvider})` : ""}
+              </p>
+            )}
             {definitions.length > 0 ? (
               <ul className="space-y-1">
                 {definitions.slice(0, 4).map((definition, index) => (
