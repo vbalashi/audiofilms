@@ -103,4 +103,3 @@ For production (Vercel, etc.):
 4. Set `SUPADATA_API_KEY=<your_key>`
 
 The app will automatically use these environment variables.
-

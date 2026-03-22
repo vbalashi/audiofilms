@@ -15,7 +15,6 @@ function ensureCacheDir(): void {
     console.log(`[VideoInfoCache] Created cache directory: ${CACHE_DIR}`);
   }
 }
-
 /**
  * Generate cache file path for a video ID
  */

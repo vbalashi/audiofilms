@@ -65,7 +65,6 @@ export async function detectVideoLanguage(videoId: string): Promise<YouTubeLangu
     };
   }
 }
-
 /**
  * Get a prioritized list of languages to try
  * Priority: original > user preference > common languages

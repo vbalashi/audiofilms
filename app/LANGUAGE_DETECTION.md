@@ -167,4 +167,3 @@ SUPADATA_API_KEY=your_key_here
 - [ ] Show detected language in UI
 - [ ] Add "original audio" badge when detected
 - [ ] Support custom language priority via environment variable
-
