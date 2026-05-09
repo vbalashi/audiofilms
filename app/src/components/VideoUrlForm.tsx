@@ -39,7 +39,7 @@ export function VideoUrlForm() {
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const sampleVideoId = 'dQw4w9WgXcQ';
+  const sampleVideoId = 'iDi5MhglYks';
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -66,7 +66,7 @@ export function VideoUrlForm() {
       <input
         id="video-url"
         type="text"
-        placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        placeholder="https://www.youtube.com/watch?v=iDi5MhglYks"
         className="w-full rounded-xl border-0 bg-white/10 p-4 text-base text-white placeholder-white/40 outline-none ring-1 ring-white/20 focus:ring-2 focus:ring-blue-400"
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -85,7 +85,7 @@ export function VideoUrlForm() {
         className="text-xs uppercase tracking-[0.4em] text-white/60 underline decoration-dotted underline-offset-4"
         onClick={() => router.push(`/watch/${sampleVideoId}`)}
       >
-        Try sample video
+        Try Dutch sample video
       </button>
     </form>
   );

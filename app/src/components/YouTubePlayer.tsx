@@ -54,8 +54,9 @@ export function YouTubePlayer() {
     <YouTube
       videoId={videoId}
       onReady={(e) => (playerRef.current = e.target)}
-      opts={{ playerVars: { controls: 0, rel: 0 } }}
+      opts={{ height: '100%', width: '100%', playerVars: { controls: 0, rel: 0 } }}
       className="h-full w-full"
+      iframeClassName="h-full w-full"
     />
   );
 }

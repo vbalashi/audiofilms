@@ -10,7 +10,7 @@ export default async function WatchPage({ params }: Props) {
   const videoId = decodeURIComponent(rawVideoId);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 px-4 text-white">
+    <main className="min-h-screen bg-[#090a0d] px-4 py-4 text-white">
       <Suspense
         fallback={
           <div className="flex min-h-screen items-center justify-center text-white/70">

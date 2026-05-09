@@ -4,11 +4,62 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PlayerLayout } from '@/components/PlayerLayout';
 import { usePlayerStore } from '@/store/playerStore';
-import type { SubtitleResponse, VideoInfoResponse } from '@/types/subtitles';
+import type { Phrase, SubtitleResponse, VideoInfoResponse } from '@/types/subtitles';
 
 type Props = {
   videoId: string;
 };
+
+const maxWordsPerPracticePhrase = 16;
+
+function wordCount(text: string) {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function normalizePracticePhrases(phrases: Phrase[]) {
+  const normalized: Phrase[] = [];
+  let buffer = '';
+  let bufferStart: number | null = null;
+  let bufferEnd = 0;
+
+  const flush = () => {
+    const text = buffer.trim().replace(/\s+/g, ' ');
+    if (!text) return;
+
+    normalized.push({
+      id: normalized.length,
+      startSec: bufferStart ?? bufferEnd,
+      endSec: bufferEnd,
+      text,
+    });
+    buffer = '';
+    bufferStart = null;
+  };
+
+  for (const phrase of phrases) {
+    const parts = phrase.text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [phrase.text];
+
+    for (const part of parts) {
+      const cleanPart = part.trim();
+      if (!cleanPart) continue;
+
+      if (bufferStart === null) {
+        bufferStart = phrase.startSec;
+      }
+
+      buffer = `${buffer} ${cleanPart}`.trim();
+      bufferEnd = phrase.endSec;
+
+      if (/[.!?]$/.test(cleanPart) || wordCount(buffer) >= maxWordsPerPracticePhrase) {
+        flush();
+      }
+    }
+  }
+
+  flush();
+
+  return normalized.length > 0 ? normalized : phrases;
+}
 
 export function WatchClient({ videoId }: Props) {
   // Select each field separately so Zustand returns stable references.
@@ -72,8 +123,11 @@ export function WatchClient({ videoId }: Props) {
         // This is the language the provider actually retrieved, not what user requested
         const actualLanguage = data.language || selectedLanguage;
         setSubtitleWarning(data.meta?.warning || null);
-        console.log(`[WatchClient] Loaded ${data.phrases.length} phrases in language: ${actualLanguage}`);
-        setPhrases(data.phrases, actualLanguage === 'auto' ? undefined : actualLanguage);
+        const practicePhrases = normalizePracticePhrases(data.phrases);
+        console.log(
+          `[WatchClient] Loaded ${data.phrases.length} captions as ${practicePhrases.length} practice phrases in language: ${actualLanguage}`,
+        );
+        setPhrases(practicePhrases, actualLanguage === 'auto' ? undefined : actualLanguage);
         setStatus('ready');
       } catch (error) {
         if (!active) return;
@@ -112,15 +166,25 @@ export function WatchClient({ videoId }: Props) {
     fetchLanguages();
   }, [videoId]);
 
+  const hasSession = status === 'ready' && phrases.length > 0;
+
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 py-10">
-      <header className="space-y-2 text-center text-white">
-        <p className="text-xs uppercase tracking-[0.3em] text-white/60">Audio Films</p>
-        <h1 className="text-3xl font-semibold">Active Listening Session</h1>
-        <p className="text-sm text-white/70">
-          Loop one phrase at a time, reveal text when you&apos;re ready, and keep your ears sharp.
-        </p>
-      </header>
+    <div
+      className={
+        hasSession
+          ? 'mx-auto flex w-full max-w-7xl flex-col'
+          : 'mx-auto flex w-full max-w-5xl flex-col gap-8 py-10'
+      }
+    >
+      {!hasSession && (
+        <header className="space-y-2 text-center text-white">
+          <p className="text-xs uppercase tracking-[0.3em] text-white/60">Audio Films</p>
+          <h1 className="text-3xl font-semibold">Active Listening Session</h1>
+          <p className="text-sm text-white/70">
+            Loop one phrase at a time, reveal text when you&apos;re ready, and keep your ears sharp.
+          </p>
+        </header>
+      )}
 
       {status === 'loading' && (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-white/70">
@@ -133,7 +197,7 @@ export function WatchClient({ videoId }: Props) {
           <p>{errorMessage}</p>
           <p className="text-xs text-red-100/80">
             Double-check the URL or{' '}
-            <Link className="underline" href="/watch/dQw4w9WgXcQ">
+            <Link className="underline" href="/watch/iDi5MhglYks">
               try our sample video
             </Link>
             .
@@ -181,7 +245,7 @@ export function WatchClient({ videoId }: Props) {
       {status === 'ready' && phrases.length === 0 && (
         <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-6 text-center text-sm text-yellow-100">
           No readable captions were returned for this video. Try a different one or{' '}
-          <Link className="text-white underline" href="/watch/dQw4w9WgXcQ">
+          <Link className="text-white underline" href="/watch/iDi5MhglYks">
             load the sample session
           </Link>
           .
