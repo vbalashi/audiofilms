@@ -13,6 +13,7 @@ Phrase-based listening practice for YouTube videos. The app lets a learner move 
 ## Repo Layout
 
 - `/home/khrustal/dev/audiofilms/app`: Next.js application
+- `/home/khrustal/dev/audiofilms/extensions/youtube-shadowing`: Chrome extension spike for YouTube-page shadowing controls
 - `/home/khrustal/dev/audiofilms/docs/intent`: product intent and scope notes
 - `/home/khrustal/dev/audiofilms/docs/exec-plans`: active and completed execution plans
 - `/home/khrustal/dev/audiofilms/docs/tech-debt`: known cleanup targets
@@ -66,6 +67,7 @@ npm run build
 ## Current Scope
 
 - Embedded YouTube playback
+- Experimental Chrome extension for direct YouTube-page phrase navigation
 - Subtitle retrieval through configurable providers
 - Phrase-based playback and blind/read modes
 - Dictionary lookups through configurable providers

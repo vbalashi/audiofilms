@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "AudioFilms YouTube Shadowing",
+  "version": "0.1.0",
+  "description": "Phrase-by-phrase shadowing controls for YouTube captions.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/watch*",
+        "https://youtube.com/watch*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "css": [
+        "src/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://youtube.com/*"
+  ]
+}

@@ -10,6 +10,7 @@ This repo should be treated as a `light` Harness-mode application project.
 - `app/src/store/`: Zustand player state.
 - `app/src/lib/`: provider implementations, metadata helpers, and file-backed caches.
 - `app/src/types/`: shared runtime contracts for subtitles and dictionary lookups.
+- `extensions/youtube-shadowing/`: Chrome extension spike for phrase navigation directly on YouTube watch pages.
 - `docs/intent/`: current product intent and scope notes for agent work.
 - `docs/exec-plans/active/`: plans for in-flight work.
 - `docs/exec-plans/completed/`: closed plans worth keeping.
@@ -18,6 +19,7 @@ This repo should be treated as a `light` Harness-mode application project.
 ## Working Rules
 
 - Prefer changes inside `app/` unless the task is explicitly about repo-level docs.
+- Keep extension spike work inside `extensions/youtube-shadowing/` unless the task explicitly promotes behavior back into the main app.
 - Keep API route changes aligned with provider interfaces in `app/src/lib/providers/` and `app/src/lib/providers/dictionary/`.
 - Treat `.subtitle-cache/` and `.video-info-cache/` as disposable local artifacts, not source of truth.
 - Do not spread environment assumptions across random markdown files. Add or update canonical setup notes in `ARCHITECTURE.md` or `docs/intent/`.

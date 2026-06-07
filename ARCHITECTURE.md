@@ -17,6 +17,8 @@ Reason:
 
 AudioFilms is a Next.js application for phrase-based listening practice on YouTube videos.
 
+The repo also contains a separate Chrome extension spike under `extensions/youtube-shadowing/`. That spike validates direct YouTube-page caption access and phrase navigation without depending on the Next.js app runtime.
+
 Primary flow:
 
 1. User lands on the app and submits a YouTube URL.
@@ -41,6 +43,14 @@ These files own user interaction, route-level loading/error states, the YouTube 
 - `app/src/store/playerStore.ts`
 
 This is the source of truth for playback mode, current phrase index, video id, and loaded subtitle language. It should not perform network I/O or vendor-specific response shaping.
+
+### Chrome Extension Spike
+
+- `extensions/youtube-shadowing/manifest.json`
+- `extensions/youtube-shadowing/src/content.js`
+- `extensions/youtube-shadowing/src/content.css`
+
+This is an isolated MVP experiment. It may duplicate small pieces of subtitle parsing or phrase-building logic while validating feasibility. Shared contracts or modules should only be extracted after the extension behavior proves useful.
 
 ### Subtitle Retrieval
 

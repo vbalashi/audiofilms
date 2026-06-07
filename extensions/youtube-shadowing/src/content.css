@@ -1,0 +1,102 @@
+#af-shadowing-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 96px;
+  z-index: 2147483647;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.36);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+#af-shadowing-panel * {
+  box-sizing: border-box;
+}
+
+.af-shadowing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.af-shadowing-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.af-shadowing-status {
+  color: #cbd5e1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.af-shadowing-body {
+  padding: 10px;
+}
+
+.af-shadowing-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #cbd5e1;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.af-shadowing-phrase {
+  display: none;
+}
+
+.af-shadowing-phrase.is-hidden {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.af-shadowing-controls {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.af-shadowing-controls button {
+  min-width: 0;
+  padding: 7px 6px;
+  color: #f8fafc;
+  background: #334155;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.af-shadowing-controls button:hover {
+  background: #475569;
+}
+
+.af-shadowing-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.af-shadowing-error {
+  margin-top: 8px;
+  color: #fecaca;
+  font-size: 12px;
+}
+
+html.af-shadowing-hide-transcript ytd-transcript-segment-renderer .segment-text {
+  color: transparent !important;
+  text-shadow: none !important;
+  background: rgba(15, 23, 42, 0.14);
+  border-radius: 4px;
+}
