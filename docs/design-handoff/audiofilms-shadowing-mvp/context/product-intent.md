@@ -42,4 +42,3 @@ Other feature work should stay secondary until those two areas are in place.
 - Use `README.md` for repo-level overview and navigation.
 - Use `app/README.md` for setup and local runbook steps.
 - Use `docs/dictionary/index.md` for current dictionary-specific guidance.
-- Use `docs/intent/subtitle-retrieval-strategy.md` for current subtitle access, manual-vs-auto, and ASR fallback notes.

@@ -16,6 +16,56 @@ function wordCount(text: string) {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function splitLongText(text: string, maxWords: number) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const chunks: string[] = [];
+
+  for (let index = 0; index < words.length; index += maxWords) {
+    chunks.push(words.slice(index, index + maxWords).join(' '));
+  }
+
+  return chunks.length > 0 ? chunks : [text];
+}
+
+function splitPhraseIntoTimedParts(phrase: Phrase): Phrase[] {
+  const text = phrase.text.trim().replace(/\s+/g, ' ');
+  const duration = Math.max(0, phrase.endSec - phrase.startSec);
+  const sentenceParts = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
+  const parts = sentenceParts.flatMap((part) => {
+    const cleanPart = part.trim();
+    if (!cleanPart) return [];
+
+    if (wordCount(cleanPart) <= maxWordsPerPracticePhrase) {
+      return [cleanPart];
+    }
+
+    return splitLongText(cleanPart, maxWordsPerPracticePhrase);
+  });
+
+  const totalChars = parts.reduce((sum, part) => sum + part.length, 0);
+  let elapsed = 0;
+
+  return parts.map((part, index) => {
+    const isLast = index === parts.length - 1;
+    const partDuration = isLast
+      ? duration - elapsed
+      : totalChars > 0
+        ? duration * (part.length / totalChars)
+        : 0;
+    const startSec = phrase.startSec + elapsed;
+    const endSec = isLast ? phrase.endSec : startSec + partDuration;
+
+    elapsed += partDuration;
+
+    return {
+      id: index,
+      startSec,
+      endSec,
+      text: part,
+    };
+  });
+}
+
 function normalizePracticePhrases(phrases: Phrase[]) {
   const normalized: Phrase[] = [];
   let buffer = '';
@@ -37,20 +87,24 @@ function normalizePracticePhrases(phrases: Phrase[]) {
   };
 
   for (const phrase of phrases) {
-    const parts = phrase.text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [phrase.text];
+    const parts = splitPhraseIntoTimedParts(phrase);
 
     for (const part of parts) {
-      const cleanPart = part.trim();
-      if (!cleanPart) continue;
-
-      if (bufferStart === null) {
-        bufferStart = phrase.startSec;
+      if (
+        buffer &&
+        wordCount(buffer) + wordCount(part.text) > maxWordsPerPracticePhrase
+      ) {
+        flush();
       }
 
-      buffer = `${buffer} ${cleanPart}`.trim();
-      bufferEnd = phrase.endSec;
+      if (bufferStart === null) {
+        bufferStart = part.startSec;
+      }
 
-      if (/[.!?]$/.test(cleanPart) || wordCount(buffer) >= maxWordsPerPracticePhrase) {
+      buffer = `${buffer} ${part.text}`.trim();
+      bufferEnd = Math.max(bufferEnd, part.endSec);
+
+      if (/[.!?]$/.test(part.text) || wordCount(buffer) >= maxWordsPerPracticePhrase) {
         flush();
       }
     }
