@@ -17,14 +17,17 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
   - YouTube transcript panel endpoint;
   - opened transcript panel DOM segments.
 - Builds phrase units from timed caption cues.
-- Adds a small control panel to the page.
-- Uses YouTube's own transcript panel as the primary transcript display instead of duplicating phrase text.
+- Adds a custom learning workspace to the YouTube watch page:
+  - bottom transcript ribbon under the player;
+  - phrase controls under the ribbon;
+  - right dictionary/account panel replacing recommendations when possible.
+- Uses YouTube's own transcript panel as a caption extraction fallback and debug fallback, not as the final learning UI.
 - Supports:
   - `Space`: replay current phrase;
   - `ArrowRight`: next phrase;
   - `ArrowLeft`: previous phrase;
-  - `ArrowDown`: show transcript text;
-  - `ArrowUp`: hide transcript text.
+  - `ArrowDown`: show source text;
+  - `ArrowUp`: hide source text.
 
 ## Load Locally
 
@@ -52,7 +55,8 @@ https://www.youtube.com/watch?v=ZNQWWW-vvfM
 ## Current Limits
 
 - No build step.
-- No backend.
+- No 2000NL sign-in flow yet; the right panel exposes the required signed-out state.
+- No backend lookup wiring yet.
 - No translation or dictionary lookup.
 - No word-level alignment.
 - Uses YouTube web-player metadata, which can change.

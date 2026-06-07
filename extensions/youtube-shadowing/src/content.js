@@ -1,5 +1,6 @@
 (function audioFilmsYouTubeShadowing() {
-  const PANEL_ID = "af-shadowing-panel";
+  const DICTIONARY_PANEL_ID = "af-shadowing-dictionary-panel";
+  const RIBBON_PANEL_ID = "af-shadowing-ribbon-panel";
   const TARGET_LANGUAGE = "nl";
   const MAX_PHRASE_DURATION_MS = 12000;
   const LONG_PAUSE_MS = 1000;
@@ -15,6 +16,9 @@
     phrases: [],
     currentIndex: 0,
     textVisible: true,
+    autoPause: true,
+    selectedWord: null,
+    accountStatus: "signed-out",
     playbackTimer: null,
     playbackFrame: null,
     activePlayback: null,
@@ -28,48 +32,146 @@
     return url.searchParams.get("v");
   }
 
-  function ensurePanel() {
-    let panel = document.getElementById(PANEL_ID);
-    if (panel) return panel;
+  function isWatchPage() {
+    return Boolean(getVideoIdFromUrl());
+  }
 
-    panel = document.createElement("div");
-    panel.id = PANEL_ID;
+  function ensureWorkspace() {
+    document.documentElement.classList.add("af-shadowing-workspace");
 
-    const header = appendElement(panel, "div", "af-shadowing-header");
-    const title = appendElement(header, "div", "af-shadowing-title");
-    title.textContent = "AudioFilms Shadowing";
-    const status = appendElement(header, "div", "af-shadowing-status");
-    status.dataset.afStatus = "";
-    status.textContent = "Loading";
+    let dictionaryPanel = document.getElementById(DICTIONARY_PANEL_ID);
+    if (!dictionaryPanel) {
+      dictionaryPanel = createDictionaryPanel();
+    }
 
-    const body = appendElement(panel, "div", "af-shadowing-body");
-    const meta = appendElement(body, "div", "af-shadowing-meta");
-    const track = appendElement(meta, "span");
+    let ribbonPanel = document.getElementById(RIBBON_PANEL_ID);
+    if (!ribbonPanel) {
+      ribbonPanel = createRibbonPanel();
+    }
+
+    mountWorkspace(dictionaryPanel, ribbonPanel);
+    return { dictionaryPanel, ribbonPanel };
+  }
+
+  function createDictionaryPanel() {
+    const panel = document.createElement("aside");
+    panel.id = DICTIONARY_PANEL_ID;
+    panel.setAttribute("aria-label", "AudioFilms dictionary lookup");
+
+    const header = appendElement(panel, "div", "af-dictionary-header");
+    const heading = appendElement(header, "div", "af-dictionary-heading");
+    const title = appendElement(heading, "div", "af-dictionary-title");
+    title.textContent = "Dictionary";
+    const subtitle = appendElement(heading, "div", "af-dictionary-subtitle");
+    subtitle.dataset.afDictionarySubtitle = "";
+    subtitle.textContent = "Contextual Lookup";
+    const account = appendElement(header, "div", "af-dictionary-account");
+    account.dataset.afAccount = "";
+
+    const body = appendElement(panel, "div", "af-dictionary-body");
+    body.dataset.afDictionaryBody = "";
+
+    const footer = appendElement(panel, "div", "af-dictionary-footer");
+    const footerTitle = appendElement(footer, "div", "af-dictionary-footer-title");
+    footerTitle.textContent = "Grade Your Memory";
+    const review = appendElement(footer, "div", "af-review-actions");
+    appendButton(review, "Again", "afAgain");
+    appendButton(review, "Hard", "afHard");
+    appendButton(review, "Good", "afGood");
+    appendButton(review, "Easy", "afEasy");
+
+    document.documentElement.appendChild(panel);
+    return panel;
+  }
+
+  function createRibbonPanel() {
+    const panel = document.createElement("section");
+    panel.id = RIBBON_PANEL_ID;
+    panel.setAttribute("aria-label", "AudioFilms phrase ribbon");
+
+    const meta = appendElement(panel, "div", "af-ribbon-meta");
+    const track = appendElement(meta, "span", "af-ribbon-track");
     track.dataset.afTrack = "";
     track.textContent = "Track: -";
-    const count = appendElement(meta, "span");
+    const count = appendElement(meta, "span", "af-ribbon-count");
     count.dataset.afCount = "";
     count.textContent = "0 / 0";
 
-    const phrase = appendElement(body, "div", "af-shadowing-phrase");
-    phrase.dataset.afPhrase = "";
-    phrase.textContent = "";
+    const list = appendElement(panel, "div", "af-ribbon-list");
+    list.dataset.afRibbonList = "";
 
-    const controls = appendElement(body, "div", "af-shadowing-controls");
-    appendButton(controls, "Prev", "afPrev");
-    appendButton(controls, "Replay", "afReplay");
-    appendButton(controls, "Hide text", "afToggle");
-    appendButton(controls, "Next", "afNext");
-
-    const error = appendElement(body, "div", "af-shadowing-error");
+    const error = appendElement(panel, "div", "af-ribbon-error");
     error.dataset.afError = "";
+
+    const controls = appendElement(panel, "div", "af-ribbon-controls");
+    appendButton(controls, "Prev Phrase", "afPrev");
+    appendButton(controls, "Replay", "afReplay");
+    appendButton(controls, "Hide Source", "afToggle");
+    appendButton(controls, "Next Phrase", "afNext");
+    appendButton(controls, "Auto-Pause On", "afAutoPause");
 
     document.documentElement.appendChild(panel);
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
     panel.querySelector("[data-af-replay]").addEventListener("click", replayCurrentPhrase);
     panel.querySelector("[data-af-toggle]").addEventListener("click", toggleText);
     panel.querySelector("[data-af-next]").addEventListener("click", nextPhrase);
+    panel.querySelector("[data-af-auto-pause]").addEventListener("click", toggleAutoPause);
     return panel;
+  }
+
+  function mountWorkspace(dictionaryPanel, ribbonPanel) {
+    // YouTube's DOM changes often. Keep selectors scoped and fall back to fixed panels.
+    const rightColumn = findFirstElement([
+      "ytd-watch-flexy #secondary",
+      "#secondary",
+    ]);
+    if (rightColumn) {
+      dictionaryPanel.classList.remove("af-is-fixed");
+      if (dictionaryPanel.parentElement !== rightColumn) {
+        rightColumn.prepend(dictionaryPanel);
+      }
+    } else {
+      dictionaryPanel.classList.add("af-is-fixed");
+      if (dictionaryPanel.parentElement !== document.documentElement) {
+        document.documentElement.appendChild(dictionaryPanel);
+      }
+    }
+
+    const playerAnchor = findFirstElement([
+      "ytd-watch-flexy #primary-inner #player",
+      "ytd-watch-flexy #player",
+      "#player-container-outer",
+      "#player",
+    ]);
+    if (playerAnchor?.parentElement) {
+      ribbonPanel.classList.remove("af-is-fixed");
+      if (ribbonPanel.previousElementSibling !== playerAnchor) {
+        playerAnchor.insertAdjacentElement("afterend", ribbonPanel);
+      }
+    } else {
+      ribbonPanel.classList.add("af-is-fixed");
+      if (ribbonPanel.parentElement !== document.documentElement) {
+        document.documentElement.appendChild(ribbonPanel);
+      }
+    }
+  }
+
+  function findFirstElement(selectors) {
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element instanceof HTMLElement) return element;
+    }
+    return null;
+  }
+
+  function removeWorkspace() {
+    document.documentElement.classList.remove(
+      "af-shadowing-workspace",
+      "af-shadowing-cover-secondary",
+      "af-shadowing-hide-transcript",
+    );
+    document.getElementById(DICTIONARY_PANEL_ID)?.remove();
+    document.getElementById(RIBBON_PANEL_ID)?.remove();
   }
 
   function appendElement(parent, tagName, className = "") {
@@ -88,30 +190,219 @@
   }
 
   function render() {
-    const panel = ensurePanel();
-    const status = panel.querySelector("[data-af-status]");
+    const { dictionaryPanel, ribbonPanel } = ensureWorkspace();
+    renderRibbon(ribbonPanel);
+    renderDictionary(dictionaryPanel);
+    document.documentElement.classList.toggle("af-shadowing-cover-secondary", !state.loading);
+    document.documentElement.classList.toggle("af-shadowing-hide-transcript", !state.textVisible);
+  }
+
+  function renderRibbon(panel) {
     const track = panel.querySelector("[data-af-track]");
     const count = panel.querySelector("[data-af-count]");
-    const phraseEl = panel.querySelector("[data-af-phrase]");
+    const list = panel.querySelector("[data-af-ribbon-list]");
     const error = panel.querySelector("[data-af-error]");
     const toggle = panel.querySelector("[data-af-toggle]");
+    const autoPause = panel.querySelector("[data-af-auto-pause]");
     const buttons = panel.querySelectorAll("button");
 
-    status.textContent = state.loading ? "Loading" : state.phrases.length ? "Ready" : "No captions";
     track.textContent = state.selectedTrack
-      ? `Track: ${describeTrack(state.selectedTrack)}${state.cueSource ? ` via ${state.cueSource}` : ""}`
+      ? `${describeTrack(state.selectedTrack)}${state.cueSource ? ` via ${state.cueSource}` : ""}`
       : "Track: -";
     count.textContent = state.phrases.length
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
-      : "0 / 0";
-
-    phraseEl.textContent = "";
-    toggle.textContent = state.textVisible ? "Hide text" : "Show text";
-    document.documentElement.classList.toggle("af-shadowing-hide-transcript", !state.textVisible);
+      : state.loading ? "Loading" : "0 / 0";
+    toggle.textContent = state.textVisible ? "Hide Source" : "Show Source";
+    autoPause.textContent = state.autoPause ? "Auto-Pause On" : "Auto-Pause Off";
     error.textContent = state.error;
+
     buttons.forEach((button) => {
       button.disabled = state.loading || !state.phrases.length;
     });
+    autoPause.disabled = state.loading;
+
+    clearElement(list);
+    if (state.loading) {
+      appendRibbonMessage(list, "Loading captions...");
+      return;
+    }
+    if (!state.phrases.length) {
+      appendRibbonMessage(list, "No timed phrases available.");
+      return;
+    }
+
+    const start = Math.max(0, state.currentIndex - 2);
+    const end = Math.min(state.phrases.length - 1, state.currentIndex + 3);
+    for (let index = start; index <= end; index += 1) {
+      appendPhraseRow(list, state.phrases[index], index);
+    }
+  }
+
+  function appendRibbonMessage(parent, text) {
+    const message = appendElement(parent, "div", "af-ribbon-message");
+    message.textContent = text;
+  }
+
+  function appendPhraseRow(parent, phrase, index) {
+    const row = appendElement(parent, "div", "af-ribbon-row");
+    row.classList.toggle("is-current", index === state.currentIndex);
+    row.classList.toggle("is-past", index < state.currentIndex);
+    row.classList.toggle("is-future", index > state.currentIndex);
+
+    const time = appendElement(row, "div", "af-ribbon-time");
+    time.textContent = formatTimestamp(phrase.startMs);
+
+    const text = appendElement(row, "div", "af-ribbon-text");
+    if (!state.textVisible && index === state.currentIndex) {
+      appendElement(text, "span", "af-ribbon-mask");
+      return;
+    }
+    renderClickablePhraseText(text, phrase.text, index);
+  }
+
+  function renderClickablePhraseText(parent, text, phraseIndex) {
+    const tokens = text.split(/(\s+)/);
+    for (const token of tokens) {
+      if (!token) continue;
+      if (/^\s+$/.test(token)) {
+        parent.appendChild(document.createTextNode(token));
+        continue;
+      }
+
+      const lookupWord = normalizeLookupWord(token);
+      if (!lookupWord) {
+        parent.appendChild(document.createTextNode(token));
+        continue;
+      }
+
+      const word = appendElement(parent, "button", "af-ribbon-word");
+      word.type = "button";
+      word.textContent = token;
+      word.dataset.afLookupWord = lookupWord;
+      word.classList.toggle(
+        "is-selected",
+        state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, lookupWord),
+      );
+      word.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectLookupWord(lookupWord, phraseIndex);
+      });
+    }
+  }
+
+  function renderDictionary(panel) {
+    const subtitle = panel.querySelector("[data-af-dictionary-subtitle]");
+    const account = panel.querySelector("[data-af-account]");
+    const body = panel.querySelector("[data-af-dictionary-body]");
+    const reviewButtons = panel.querySelectorAll(".af-review-actions button");
+
+    subtitle.textContent = state.selectedTrack
+      ? describeTrack(state.selectedTrack)
+      : "Contextual Lookup";
+    account.textContent = accountStatusLabel();
+
+    reviewButtons.forEach((button) => {
+      button.disabled = state.accountStatus !== "signed-in" || !state.selectedWord;
+    });
+
+    clearElement(body);
+    if (state.selectedWord) {
+      renderSelectedWordCard(body);
+    } else {
+      renderAccountCard(body);
+    }
+  }
+
+  function renderAccountCard(parent) {
+    const card = appendElement(parent, "div", "af-dictionary-card");
+    const eyebrow = appendElement(card, "div", "af-dictionary-eyebrow");
+    eyebrow.textContent = "2000NL account";
+    const title = appendElement(card, "div", "af-dictionary-card-title");
+    title.textContent = state.accountStatus === "signed-in" ? "Ready for lookup" : "Sign in to 2000NL";
+    const copy = appendElement(card, "p", "af-dictionary-copy");
+    copy.textContent = state.accountStatus === "signed-in"
+      ? "Click a word in the transcript ribbon to inspect dictionary matches."
+      : "Phrase navigation works locally. Dictionary lookup and review progress require your 2000NL account.";
+    const action = appendButton(card, "Sign in to 2000NL", "afSignIn");
+    action.className = "af-signin-button";
+    action.disabled = true;
+  }
+
+  function renderSelectedWordCard(parent) {
+    const phrase = state.phrases[state.selectedWord.phraseIndex] || state.phrases[state.currentIndex];
+    const card = appendElement(parent, "div", "af-dictionary-card af-dictionary-card-selected");
+    const header = appendElement(card, "div", "af-word-card-header");
+    const title = appendElement(header, "div", "af-word-title");
+    title.textContent = state.selectedWord.word;
+    const menu = appendElement(header, "button", "af-word-menu");
+    menu.type = "button";
+    menu.textContent = "...";
+    menu.setAttribute("aria-label", "More word actions");
+
+    const status = appendElement(card, "div", "af-word-status");
+    status.textContent = state.accountStatus === "signed-in"
+      ? "Lookup ready"
+      : "Sign in to 2000NL to lookup and review this word.";
+
+    if (state.accountStatus !== "signed-in") {
+      const action = appendButton(card, "Sign in to 2000NL", "afSignIn");
+      action.className = "af-signin-button";
+      action.disabled = true;
+    }
+
+    if (phrase) {
+      const context = appendElement(card, "div", "af-context-block");
+      const label = appendElement(context, "div", "af-context-label");
+      label.textContent = "Current Context";
+      const text = appendElement(context, "div", "af-context-text");
+      renderClickablePhraseText(text, phrase.text, phrase.index);
+    }
+
+    const placeholder = appendElement(card, "div", "af-lookup-placeholder");
+    placeholder.textContent = state.accountStatus === "signed-in"
+      ? "Dictionary API wiring will load definitions here."
+      : "No lookup request is sent until the 2000NL session is connected.";
+  }
+
+  function selectLookupWord(word, phraseIndex) {
+    state.selectedWord = { word, phraseIndex };
+    state.currentIndex = phraseIndex;
+    render();
+  }
+
+  function accountStatusLabel() {
+    if (state.accountStatus === "signed-in") return "2000NL connected";
+    if (state.accountStatus === "expired") return "Reconnect 2000NL";
+    return "Sign in required";
+  }
+
+  function clearElement(element) {
+    while (element.firstChild) {
+      element.removeChild(element.firstChild);
+    }
+  }
+
+  function normalizeLookupWord(token) {
+    return token
+      .replace(/^[^\p{L}\p{N}]+/gu, "")
+      .replace(/[^\p{L}\p{N}]+$/gu, "");
+  }
+
+  function wordsEqual(left, right) {
+    return left.localeCompare(right, undefined, { sensitivity: "accent" }) === 0;
+  }
+
+  function formatTimestamp(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const seconds = totalSeconds % 60;
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const minutes = totalMinutes % 60;
+    const hours = Math.floor(totalMinutes / 60);
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
   }
 
   function describeTrack(track) {
@@ -132,6 +423,7 @@
     state.phrases = [];
     state.currentIndex = 0;
     state.textVisible = true;
+    state.selectedWord = null;
     state.error = "";
     state.loading = true;
     stopPlaybackTimer();
@@ -581,7 +873,7 @@
   function parseTranscriptPanelCues() {
     const segments = Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"));
     const rawCues = segments
-      .map((segment) => {
+      .map((segment, segmentIndex) => {
         const timestampEl = segment.querySelector(".segment-timestamp, .segment-start-offset, [class*='timestamp']");
         const textEls = Array.from(segment.querySelectorAll(".segment-text, [class*='segment-text']"));
         const timestampText = timestampEl?.textContent?.trim() || "";
@@ -596,6 +888,7 @@
           startMs,
           endMs: startMs,
           text,
+          segmentIndex,
         };
       })
       .filter((cue) => Number.isFinite(cue.startMs) && cue.text)
@@ -745,6 +1038,7 @@
     if (!state.phrases.length) return;
     syncIndexToCurrentTime();
     state.currentIndex = Math.min(state.currentIndex + 1, state.phrases.length - 1);
+    state.selectedWord = null;
     render();
     playPhrase(state.currentIndex);
   }
@@ -753,12 +1047,18 @@
     if (!state.phrases.length) return;
     syncIndexToCurrentTime();
     state.currentIndex = Math.max(state.currentIndex - 1, 0);
+    state.selectedWord = null;
     render();
     playPhrase(state.currentIndex);
   }
 
   function toggleText() {
     state.textVisible = !state.textVisible;
+    render();
+  }
+
+  function toggleAutoPause() {
+    state.autoPause = !state.autoPause;
     render();
   }
 
@@ -804,13 +1104,20 @@
     stopPlaybackTimer();
     const startSeconds = Math.max(0, phrase.startMs - PRE_ROLL_MS) / 1000;
     const endSeconds = (phrase.endMs + POST_ROLL_MS) / 1000;
+    markCurrentTranscriptSegment(phrase);
+    video.currentTime = startSeconds;
+    video.play().catch(() => {});
+
+    if (!state.autoPause) {
+      render();
+      return;
+    }
+
     state.activePlayback = {
       index,
       endSeconds,
       holdSeconds: Math.max(0, phrase.startMs / 1000),
     };
-    video.currentTime = startSeconds;
-    video.play().catch(() => {});
 
     state.playbackTimer = window.setInterval(() => {
       enforcePhraseEnd(video);
@@ -848,14 +1155,34 @@
     if (!state.activePlayback || !video) return;
 
     if (video.currentTime >= state.activePlayback.endSeconds) {
+      const phrase = state.phrases[state.activePlayback.index];
       video.pause();
       video.currentTime = state.activePlayback.holdSeconds;
+      markCurrentTranscriptSegment(phrase);
       stopPlaybackTimer();
       render();
     }
   }
 
+  function markCurrentTranscriptSegment(phrase) {
+    const segmentIndex = phrase?.cues?.[0]?.segmentIndex;
+    const segments = Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"));
+
+    segments.forEach((segment) => {
+      delete segment.dataset.afCurrent;
+    });
+
+    if (typeof segmentIndex !== "number") return;
+
+    const segment = segments[segmentIndex];
+    if (!segment) return;
+
+    segment.dataset.afCurrent = "true";
+    segment.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
   function onKeyboardEvent(event) {
+    if (!isWatchPage()) return;
     if (shouldIgnoreKeyEvent(event)) return;
 
     if (isSpaceKey(event)) {
@@ -911,13 +1238,30 @@
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
         state.videoId = null;
-        initializeForCurrentVideo();
+        handleCurrentLocation();
       }
     }, 500);
   }
 
-  ensurePanel();
-  render();
+  function watchWorkspaceMount() {
+    window.setInterval(() => {
+      if (isWatchPage()) {
+        ensureWorkspace();
+      }
+    }, 2000);
+  }
+
+  function handleCurrentLocation() {
+    if (!isWatchPage()) {
+      stopPlaybackTimer();
+      removeWorkspace();
+      return;
+    }
+    ensureWorkspace();
+    render();
+    initializeForCurrentVideo();
+  }
+
   document.addEventListener("keydown", onKeyboardEvent, true);
   document.addEventListener("keypress", onKeyboardEvent, true);
   document.addEventListener("keyup", onKeyboardEvent, true);
@@ -925,5 +1269,6 @@
   window.addEventListener("keypress", onKeyboardEvent, true);
   window.addEventListener("keyup", onKeyboardEvent, true);
   watchYouTubeNavigation();
-  initializeForCurrentVideo();
+  watchWorkspaceMount();
+  handleCurrentLocation();
 })();
