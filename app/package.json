@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "subtitle:shootout": "node scripts/subtitle-source-shootout.mjs",
+    "subtitle:shootout:supadata": "node scripts/subtitle-source-shootout.mjs --include-supadata"
   },
   "dependencies": {
     "@supadata/js": "^1.3.2",
