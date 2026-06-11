@@ -18,6 +18,8 @@ This repo should be treated as a `light` Harness-mode application project.
 
 For YouTube extension continuation, read `docs/intent/youtube-extension-agent-runbook.md` before changing or validating `extensions/youtube-shadowing/`. It records the local Chrome extension id, reload flow, smoke commands, diagnostics, and expert-review zip policy.
 
+For subtitle provider ordering, quota control, rolling captions, and clean-text/ASR timing experiments, read `docs/exec-plans/active/subtitle-source-quality-shootout.md`.
+
 ## Working Rules
 
 - Prefer changes inside `app/` unless the task is explicitly about repo-level docs.
