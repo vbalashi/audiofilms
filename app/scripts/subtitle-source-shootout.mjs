@@ -7,6 +7,7 @@ import path from "node:path";
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const appRoot = path.join(repoRoot, "app");
 const cacheDir = path.join(appRoot, ".subtitle-source-shootout-cache");
+const maxWordDurationSec = 1.2;
 
 const fixtures = [
   {
@@ -93,6 +94,7 @@ for (const fixture of selectedFixtures) {
   }
 
   row.recommendation = recommendFixtureSource(row);
+  row.alignment = analyzeAlignmentFeasibility(row);
   report.fixtures.push(row);
 }
 
@@ -182,6 +184,7 @@ async function inspectYtDlpSource(fixture, videoInfo, sourceKind) {
       rawCueCount: cues.length,
       normalizedCueCount: normalized.length,
       quality: analyzeCueQuality(normalized),
+      normalizedCues: normalized,
       sample: normalized.slice(0, 5).map(compactCue),
       rawSample: cues.slice(0, 5).map(compactCue),
     };
@@ -253,6 +256,7 @@ async function inspectBackendApiSource(fixture, sourceKind) {
       rawCueCount: cues.length,
       normalizedCueCount: cues.length,
       quality: analyzeCueQuality(cues),
+      normalizedCues: cues,
       sample: cues.slice(0, 5).map(compactCue),
       meta: payload.meta || null,
     };
@@ -354,9 +358,10 @@ function normalizeRollingCues(cues) {
       if (!timing) continue;
       const normalized = normalizeToken(displayToken);
       if (normalized) {
+        const boundedTiming = boundWordTiming(timing);
         words.push({
-          start: timing.start,
-          end: timing.end,
+          start: boundedTiming.start,
+          end: boundedTiming.end,
           text: displayToken,
           normalized,
         });
@@ -371,7 +376,7 @@ function normalizeRollingCues(cues) {
     return dedupeRollingCueText(cues);
   }
 
-  return makeNonOverlapping(buildPhrasesFromWords(words));
+  return dropConsecutiveDuplicatePhrases(makeNonOverlapping(buildPhrasesFromWords(words)));
 }
 
 function tokenizeDisplayText(text) {
@@ -407,6 +412,18 @@ function normalizeToken(text) {
   return cleanText(text).toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 
+function boundWordTiming(timing) {
+  const start = Number(timing.start);
+  const end = Number(timing.end);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return timing;
+  }
+  return {
+    ...timing,
+    end: Math.min(end, start + maxWordDurationSec),
+  };
+}
+
 function buildPhrasesFromWords(words) {
   const phrases = [];
   let current = null;
@@ -432,6 +449,23 @@ function buildPhrasesFromWords(words) {
   }
   if (current) phrases.push(current);
   return phrases.map((phrase) => ({ ...phrase, text: cleanText(phrase.text) })).filter((phrase) => phrase.text && phrase.end > phrase.start);
+}
+
+function dropConsecutiveDuplicatePhrases(cues) {
+  const result = [];
+  for (const cue of cues) {
+    const previous = result[result.length - 1];
+    if (previous && normalizePhrase(previous.text) === normalizePhrase(cue.text)) {
+      previous.end = Math.max(previous.end, cue.end);
+      continue;
+    }
+    result.push(cue);
+  }
+  return result;
+}
+
+function normalizePhrase(text) {
+  return tokenizeDisplayText(text).map(normalizeToken).filter(Boolean).join(" ");
 }
 
 function makeNonOverlapping(cues) {
@@ -486,12 +520,16 @@ function analyzeCueQuality(cues) {
   let duplicateTextCount = 0;
   let totalDuration = 0;
   let maxDurationSec = 0;
+  let longestCue = null;
   const seen = new Set();
   for (let index = 0; index < cues.length; index += 1) {
     const cue = cues[index];
     const duration = cue.end - cue.start;
     totalDuration += duration;
-    maxDurationSec = Math.max(maxDurationSec, duration);
+    if (duration > maxDurationSec) {
+      maxDurationSec = duration;
+      longestCue = cue;
+    }
     if (duration > 12) longCueCount += 1;
     if (index > 0 && cue.start < cues[index - 1].end - 0.02) overlapCount += 1;
     const normalized = cue.text.toLowerCase();
@@ -509,6 +547,7 @@ function analyzeCueQuality(cues) {
     duplicateTextCount,
     maxDurationSec: round(maxDurationSec),
     avgDurationSec: round(totalDuration / cues.length),
+    longestCue: longestCue ? compactCue(longestCue) : null,
     flags,
   };
 }
@@ -565,6 +604,86 @@ function recommendFixtureSource(fixture) {
     confidence: "low",
     reason: "Only automatic captions are available, and normalization is not yet clean enough to treat this as a solved product path.",
   };
+}
+
+function analyzeAlignmentFeasibility(fixture) {
+  const manual = bestSource(fixture.sources.filter((source) => source.status === "ok" && source.sourceKind === "manual" && source.normalizedCueCount > 0));
+  const auto = bestSource(fixture.sources.filter((source) => source.status === "ok" && source.sourceKind === "auto" && source.normalizedCueCount > 0));
+  if (!manual || !auto) {
+    return {
+      status: "not-applicable",
+      confidence: "none",
+      reason: "Clean-text/ASR-timing alignment needs both manual and automatic captions.",
+    };
+  }
+
+  const manualTokens = tokenizeForAlignment(manual.normalizedCues || []);
+  const autoTokens = tokenizeForAlignment(auto.normalizedCues || []);
+  if (!manualTokens.length || !autoTokens.length) {
+    return {
+      status: "not-applicable",
+      confidence: "none",
+      reason: "One source has no usable text tokens after normalization.",
+    };
+  }
+
+  const matchCount = countAlignedTokens(manualTokens, autoTokens);
+  const manualCoverage = matchCount / manualTokens.length;
+  const autoCoverage = matchCount / autoTokens.length;
+  const balancedCoverage = Math.min(manualCoverage, autoCoverage);
+  if (balancedCoverage >= 0.72) {
+    return {
+      status: "candidate",
+      confidence: "high",
+      manualTokens: manualTokens.length,
+      autoTokens: autoTokens.length,
+      manualCoverage: round(manualCoverage),
+      autoCoverage: round(autoCoverage),
+      reason: "Manual and ASR text are close enough for a lightweight token-alignment experiment.",
+    };
+  }
+  if (balancedCoverage >= 0.5) {
+    return {
+      status: "candidate",
+      confidence: "medium",
+      manualTokens: manualTokens.length,
+      autoTokens: autoTokens.length,
+      manualCoverage: round(manualCoverage),
+      autoCoverage: round(autoCoverage),
+      reason: "Manual and ASR text partially match; alignment may work only after better normalization and local-window matching.",
+    };
+  }
+  return {
+    status: "poor-match",
+    confidence: "low",
+    manualTokens: manualTokens.length,
+    autoTokens: autoTokens.length,
+    manualCoverage: round(manualCoverage),
+    autoCoverage: round(autoCoverage),
+    reason: "Manual and ASR text diverge too much for a simple browser-side alignment pass.",
+  };
+}
+
+function tokenizeForAlignment(cues) {
+  return cues
+    .flatMap((cue) => tokenizeDisplayText(cue.text))
+    .map(normalizeToken)
+    .filter((token) => token.length > 1 && !/^\d+$/.test(token));
+}
+
+function countAlignedTokens(leftTokens, rightTokens) {
+  const previous = new Uint16Array(rightTokens.length + 1);
+  const current = new Uint16Array(rightTokens.length + 1);
+  for (let leftIndex = 1; leftIndex <= leftTokens.length; leftIndex += 1) {
+    for (let rightIndex = 1; rightIndex <= rightTokens.length; rightIndex += 1) {
+      current[rightIndex] = leftTokens[leftIndex - 1] === rightTokens[rightIndex - 1]
+        ? previous[rightIndex - 1] + 1
+        : Math.max(previous[rightIndex], current[rightIndex - 1]);
+    }
+    previous.set(current);
+    current.fill(0);
+  }
+  return previous[rightTokens.length];
 }
 
 function bestSource(sources) {
@@ -628,10 +747,25 @@ function renderMarkdown(data) {
     ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
   }
   lines.push("");
+  lines.push("## Clean Text + ASR Timing Feasibility");
+  lines.push("");
+  lines.push("| Fixture | Status | Confidence | Manual coverage | ASR coverage | Why |");
+  lines.push("| --- | --- | --- | ---: | ---: | --- |");
+  for (const fixture of data.fixtures) {
+    lines.push([
+      `${fixture.label} (${fixture.id})`,
+      fixture.alignment?.status || "",
+      fixture.alignment?.confidence || "",
+      String(fixture.alignment?.manualCoverage ?? ""),
+      String(fixture.alignment?.autoCoverage ?? ""),
+      (fixture.alignment?.reason || "").replace(/\|/g, "\\|"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
+  }
+  lines.push("");
   lines.push("## Raw Measurements");
   lines.push("");
-  lines.push("| Fixture | Source | Status | Provider | Track | Raw | Normalized | Flags | Max cue | Sample |");
-  lines.push("| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | --- |");
+  lines.push("| Fixture | Source | Status | Provider | Track | Raw | Normalized | Flags | Max cue | Longest cue | Sample |");
+  lines.push("| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | --- | --- |");
   for (const fixture of data.fixtures) {
     for (const source of fixture.sources) {
       lines.push([
@@ -644,6 +778,7 @@ function renderMarkdown(data) {
         String(source.normalizedCueCount || 0),
         source.quality?.flags?.join(", ") || "",
         String(source.quality?.maxDurationSec ?? ""),
+        source.quality?.longestCue?.text?.replace(/\|/g, "\\|") || "",
         source.sample?.[0]?.text?.replace(/\|/g, "\\|") || source.error || "",
       ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
     }

@@ -244,6 +244,12 @@ Exit criteria:
 
 Treat this as a separate product-quality project, not a quick patch in the extension.
 
+Detailed plan:
+
+```text
+docs/exec-plans/active/rolling-caption-alignment-quality.md
+```
+
 Working hypothesis:
 
 - For many videos, manual captions are the best display text.
