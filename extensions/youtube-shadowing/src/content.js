@@ -36,7 +36,11 @@
     transcriptResult: null,
     debugVisible: false,
     debugCopied: false,
+    issueCopied: false,
     debugEvents: [],
+    navigationEvents: [],
+    lastIssueReport: null,
+    navigationEventSeq: 0,
     cues: [],
     phrases: [],
     currentIndex: 0,
@@ -243,6 +247,7 @@
     appendButton(controls, "Auto-Pause", "afAutoPause");
     appendButton(controls, "Debug", "afDebugToggle");
     appendButton(controls, "Copy", "afDebugCopy");
+    appendButton(controls, "Mark Issue", "afMarkIssue");
 
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
     panel.querySelector("[data-af-replay]").addEventListener("click", replayCurrentPhrase);
@@ -252,6 +257,7 @@
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
+    panel.querySelector("[data-af-mark-issue]").addEventListener("click", markIssue);
     return panel;
   }
 
@@ -322,6 +328,7 @@
     const autoPause = panel.querySelector("[data-af-auto-pause]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
     const debugCopy = panel.querySelector("[data-af-debug-copy]");
+    const markIssue = panel.querySelector("[data-af-mark-issue]");
     const playbackButtons = [
       panel.querySelector("[data-af-prev]"),
       panel.querySelector("[data-af-replay]"),
@@ -342,6 +349,7 @@
     autoPause.textContent = state.autoPause ? "Auto-Pause On" : "Auto-Pause Off";
     debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
+    markIssue.textContent = state.issueCopied ? "Issue Copied" : "Mark Issue";
     error.textContent = state.error;
     debug.textContent = state.debugVisible ? formatDebugState() : "";
 
@@ -351,6 +359,7 @@
     });
     autoPause.hidden = isEmpty;
     autoPause.disabled = state.loading || !hasPhrases;
+    markIssue.disabled = state.loading;
 
     clearElement(list);
     if (state.loading) {
@@ -391,6 +400,30 @@
     }, 1200);
   }
 
+  function markIssue() {
+    const report = formatIssueReport();
+    recordDebugEvent("issue-marked", {
+      navigationEventId: state.navigationEvents.at(-1)?.id || null,
+      currentIndex: state.currentIndex,
+    });
+    state.lastIssueReport = report;
+    state.issueCopied = true;
+    render();
+    copyIssueReport(report);
+    window.setTimeout(() => {
+      state.issueCopied = false;
+      render();
+    }, 1500);
+  }
+
+  function copyIssueReport(report) {
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(report))
+      .catch(() => {
+        copyTextWithFallback(report);
+      });
+  }
+
   function copyTextWithFallback(text) {
     const textarea = document.createElement("textarea");
     textarea.value = text;
@@ -412,8 +445,11 @@
       cueSource: state.cueSource,
       transcriptResult: state.transcriptResult ? summarizeTranscriptResult(state.transcriptResult) : null,
       phrases: state.phrases.length,
+      currentPhrase: describePhraseAtIndex(state.currentIndex),
       error: state.error,
       sources: state.practiceSources.map(captionTrackApi.formatSourceDebug),
+      navigationEvents: state.navigationEvents.slice(-12),
+      lastIssueReport: state.lastIssueReport,
       events: state.debugEvents.slice(-8),
     }, null, 2);
   }
@@ -427,6 +463,87 @@
     if (state.debugEvents.length > 30) {
       state.debugEvents.splice(0, state.debugEvents.length - 30);
     }
+  }
+
+  function recordNavigationEvent(type, detail = {}) {
+    const event = {
+      id: `nav-${state.navigationEventSeq += 1}`,
+      at: new Date().toISOString(),
+      type,
+      ...detail,
+    };
+    state.navigationEvents.push(event);
+    if (state.navigationEvents.length > 40) {
+      state.navigationEvents.splice(0, state.navigationEvents.length - 40);
+    }
+    return event;
+  }
+
+  function formatIssueReport() {
+    const selectedSource = getSelectedPracticeSource();
+    return JSON.stringify({
+      kind: "audiofilms-youtube-navigation-issue",
+      capturedAt: new Date().toISOString(),
+      page: {
+        url: window.location.href,
+        videoId: state.videoId,
+      },
+      selectedSource: selectedSource ? captionTrackApi.formatSourceDebug(selectedSource) : null,
+      mode: {
+        guidedMode: state.guidedMode,
+        autoPause: state.autoPause,
+        textVisible: state.textVisible,
+      },
+      playback: getPlaybackSnapshot(),
+      currentPhrase: describePhraseAtIndex(state.currentIndex),
+      visibleState: {
+        count: state.phrases.length ? `${state.currentIndex + 1} / ${state.phrases.length}` : "0 / 0",
+        error: state.error,
+      },
+      navigationEvents: state.navigationEvents.slice(-20),
+      debugEvents: state.debugEvents.slice(-12),
+    }, null, 2);
+  }
+
+  function getPlaybackSnapshot() {
+    const video = getVideoElement();
+    if (!video) {
+      return { videoPresent: false };
+    }
+
+    return {
+      videoPresent: true,
+      currentTime: roundTime(video.currentTime),
+      duration: roundTime(video.duration),
+      paused: video.paused,
+      ended: video.ended,
+      readyState: video.readyState,
+      playbackRate: video.playbackRate,
+    };
+  }
+
+  function describePhraseAtIndex(index) {
+    const phrase = state.phrases[index];
+    if (!phrase) {
+      return {
+        index,
+        count: state.phrases.length,
+        present: false,
+      };
+    }
+
+    return {
+      index,
+      ordinal: index + 1,
+      count: state.phrases.length,
+      startSec: roundTime(phrase.startMs / 1000),
+      endSec: roundTime(phrase.endMs / 1000),
+      text: phrase.text,
+    };
+  }
+
+  function roundTime(value) {
+    return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
   }
 
   function renderSourceSelector(track, sourceToggle, sourceMenu) {
@@ -1024,30 +1141,44 @@
   }
 
   function replayCurrentPhrase() {
-    syncIndexToCurrentTime({ keepCurrentIfJustEnded: true });
-    enterGuidedMode();
-    render();
-    playPhrase(state.currentIndex);
+    if (!state.phrases.length) return;
+    navigateToPhrase("replay", state.currentIndex);
   }
 
   function nextPhrase() {
     if (!state.phrases.length) return;
-    syncIndexToCurrentTime();
-    state.currentIndex = Math.min(state.currentIndex + 1, state.phrases.length - 1);
-    state.selectedWord = null;
-    enterGuidedMode();
-    render();
-    playPhrase(state.currentIndex);
+    navigateToPhrase("next", Math.min(state.currentIndex + 1, state.phrases.length - 1));
   }
 
   function previousPhrase() {
     if (!state.phrases.length) return;
-    syncIndexToCurrentTime();
-    state.currentIndex = Math.max(state.currentIndex - 1, 0);
+    navigateToPhrase("previous", Math.max(state.currentIndex - 1, 0));
+  }
+
+  function navigateToPhrase(command, targetIndex) {
+    const fromIndex = state.currentIndex;
+    const before = getPlaybackSnapshot();
+    const navigationEvent = recordNavigationEvent("command-start", {
+      command,
+      fromPhrase: describePhraseAtIndex(fromIndex),
+      targetPhrase: describePhraseAtIndex(targetIndex),
+      playbackBefore: before,
+    });
+    state.currentIndex = targetIndex;
     state.selectedWord = null;
     enterGuidedMode();
     render();
-    playPhrase(state.currentIndex);
+    const playResult = playPhrase(state.currentIndex, { command, navigationEventId: navigationEvent.id });
+    recordNavigationEvent("command-dispatched", {
+      command,
+      navigationEventId: navigationEvent.id,
+      fromIndex,
+      targetIndex,
+      playResult,
+      playbackAfterDispatch: getPlaybackSnapshot(),
+    });
+    scheduleNavigationObservation(navigationEvent.id, command, targetIndex, 250);
+    scheduleNavigationObservation(navigationEvent.id, command, targetIndex, 750);
   }
 
   function toggleText() {
@@ -1058,6 +1189,12 @@
   function toggleAutoPause() {
     state.autoPause = !state.autoPause;
     state.guidedMode = state.autoPause ? true : false;
+    recordNavigationEvent("auto-pause-toggle", {
+      autoPause: state.autoPause,
+      guidedMode: state.guidedMode,
+      playback: getPlaybackSnapshot(),
+      currentPhrase: describePhraseAtIndex(state.currentIndex),
+    });
     render();
   }
 
@@ -1099,10 +1236,12 @@
     return currentMs >= phrase.startMs && currentMs <= phrase.endMs + replayGraceMs;
   }
 
-  function playPhrase(index) {
+  function playPhrase(index, options = {}) {
     const phrase = state.phrases[index];
     const video = getVideoElement();
-    if (!phrase || !video) return;
+    if (!phrase || !video) {
+      return { ok: false, reason: !phrase ? "missing-phrase" : "missing-video" };
+    }
 
     stopPlaybackTimer();
     const startSeconds = Math.max(0, phrase.startMs - PRE_ROLL_MS) / 1000;
@@ -1110,10 +1249,23 @@
     markCurrentTranscriptSegment(phrase);
     video.currentTime = startSeconds;
     video.play().catch(() => {});
+    recordNavigationEvent("seek-started", {
+      command: options.command || "unknown",
+      navigationEventId: options.navigationEventId || null,
+      targetPhrase: describePhraseAtIndex(index),
+      seekToSec: roundTime(startSeconds),
+      expectedPauseAtSec: roundTime(endSeconds),
+      playbackAfterSeek: getPlaybackSnapshot(),
+    });
 
     if (!state.autoPause) {
       render();
-      return;
+      return {
+        ok: true,
+        seekToSec: roundTime(startSeconds),
+        expectedPauseAtSec: null,
+        autoPause: false,
+      };
     }
 
     state.activePlayback = {
@@ -1128,6 +1280,28 @@
         state.playbackFrame = window.requestAnimationFrame(frame);
       }
     });
+    return {
+      ok: true,
+      seekToSec: roundTime(startSeconds),
+      expectedPauseAtSec: roundTime(endSeconds),
+      autoPause: true,
+    };
+  }
+
+  function scheduleNavigationObservation(navigationEventId, command, targetIndex, delayMs) {
+    window.setTimeout(() => {
+      recordNavigationEvent("command-observation", {
+        command,
+        navigationEventId,
+        delayMs,
+        targetPhrase: describePhraseAtIndex(targetIndex),
+        currentPhrase: describePhraseAtIndex(state.currentIndex),
+        playback: getPlaybackSnapshot(),
+      });
+      if (state.debugVisible) {
+        render();
+      }
+    }, delayMs);
   }
 
   function stopPlaybackTimer() {
@@ -1276,12 +1450,11 @@
     if (!youtubeAdapterApi.isWatchPage()) return;
     if (!state.learningEnabled) return;
     if (shouldIgnoreKeyEvent(event)) return;
-    if (!state.guidedMode) return;
 
     if (isSpaceKey(event)) {
       blockYouTubeShortcut(event);
-      if (event.type === "keydown") {
-        replayCurrentPhrase();
+      if (event.type === "keydown" && !event.repeat) {
+        toggleContinuousPlayback();
       }
       return;
     }
@@ -1296,11 +1469,43 @@
       previousPhrase();
     } else if (event.code === "ArrowDown") {
       blockYouTubeShortcutWithOptions(event);
-      showText();
+      replayCurrentPhrase();
     } else if (event.code === "ArrowUp") {
       blockYouTubeShortcutWithOptions(event);
       hideText();
     }
+  }
+
+  function toggleContinuousPlayback() {
+    const video = getVideoElement();
+    if (!video) return;
+
+    const before = getPlaybackSnapshot();
+    stopPlaybackTimer();
+    state.guidedMode = false;
+    state.passivePausedKey = "";
+
+    if (video.paused || video.ended) {
+      recordNavigationEvent("space-play", {
+        currentPhrase: describePhraseAtIndex(state.currentIndex),
+        playbackBefore: before,
+      });
+      video.play().catch(() => {});
+    } else {
+      recordNavigationEvent("space-pause", {
+        currentPhrase: describePhraseAtIndex(state.currentIndex),
+        playbackBefore: before,
+      });
+      video.pause();
+    }
+
+    scheduleNavigationObservation(
+      state.navigationEvents[state.navigationEvents.length - 1]?.id || null,
+      "space",
+      state.currentIndex,
+      250,
+    );
+    render();
   }
 
   function isSpaceKey(event) {

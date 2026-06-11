@@ -25,6 +25,10 @@ For extension smoke checks:
 - retrieval path shown in debug;
 - phrase list non-empty when captions are expected;
 - replay stops near phrase end;
+- Previous/Next advance from the visible selected phrase, not from the YouTube playhead;
+- Space toggles continuous YouTube play/pause and exits guided phrase playback;
+- ArrowDown replays the current visible phrase;
+- Mark Issue copies a navigation incident report after a manual miss;
 - source mismatch or unknown source warning appears only when metadata is actually uncertain;
 - AudioFilms Off removes the learning layer and leaves YouTube visually normal.
 

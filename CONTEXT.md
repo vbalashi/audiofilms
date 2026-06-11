@@ -24,6 +24,10 @@ _Avoid_: Failed provider, disabled caption
 The visible or hidden text for the current practice phrase. It is what the learner reveals during practice and should not be called a source.
 _Avoid_: Source, transcript
 
+**Guided Phrase Navigation**:
+The deliberate practice mode where Replay, Previous, and Next operate on the currently selected visible practice phrase. In this mode button and shortcut navigation should advance from the visible phrase index, not from the YouTube playhead.
+_Avoid_: Passive sync, normal YouTube playback
+
 **Caption Language**:
 The language of the timed text supplied by a practice source. It is selected through the practice source choice, either by accepting the default ranking or by choosing another available source.
 _Avoid_: Learning language

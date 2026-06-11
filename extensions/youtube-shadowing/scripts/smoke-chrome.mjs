@@ -501,6 +501,8 @@ function assertInteractions(fixture) {
   const assertions = [];
   if (fixture.expect.checkReplay) {
     assertions.push(...assertReplayInteraction());
+    assertions.push(...assertMarkIssueInteraction());
+    assertions.push(...assertKeyboardNavigationInteraction());
   }
   if (fixture.expect.checkOffOn) {
     assertions.push(...assertOffOnInteraction(fixture));
@@ -533,6 +535,44 @@ function assertReplayInteraction() {
     assertion("replay enters guided mode", after.mode === "Shortcuts active", after.mode),
     assertion("replay keeps visible phrase", Boolean(after.rowText), after.rowText),
     assertion("replay seeks near current phrase", closeToPhrase, `row=${before.rowTime}, video=${after.video?.currentTime}`),
+  ];
+}
+
+function assertMarkIssueInteraction() {
+  clickShadowButton("[data-af-mark-issue]");
+  sleep(400);
+  const snapshot = readSnapshot();
+  const report = snapshot.debug?.lastIssueReport || "";
+  let parsed = null;
+  try {
+    parsed = JSON.parse(report);
+  } catch (_error) {
+    parsed = null;
+  }
+  return [
+    assertion("mark issue report captured", parsed?.kind === "audiofilms-youtube-navigation-issue", report.slice(0, 120)),
+    assertion("mark issue includes current phrase", Boolean(parsed?.currentPhrase?.text), parsed?.currentPhrase?.text || ""),
+    assertion("mark issue includes navigation events", Array.isArray(parsed?.navigationEvents) && parsed.navigationEvents.length > 0, String(parsed?.navigationEvents?.length || 0)),
+  ];
+}
+
+function assertKeyboardNavigationInteraction() {
+  pressKey("Space", " ");
+  sleep(350);
+  const afterSpace = readSnapshot();
+  pressKey("ArrowDown", "ArrowDown");
+  sleep(900);
+  const afterReplay = readSnapshot();
+  const rowSeconds = parseTimestampSeconds(afterSpace.rowTime);
+  const currentTime = Number(afterReplay.video?.currentTime);
+  const closeToPhrase = Number.isFinite(rowSeconds) &&
+    Number.isFinite(currentTime) &&
+    Math.abs(currentTime - rowSeconds) <= 3;
+
+  return [
+    assertion("space exits guided mode", afterSpace.mode === "Passive sync", afterSpace.mode),
+    assertion("arrow down replays current phrase", afterReplay.mode === "Shortcuts active", afterReplay.mode),
+    assertion("arrow down seeks near visible phrase", closeToPhrase, `row=${afterSpace.rowTime}, video=${afterReplay.video?.currentTime}`),
   ];
 }
 
@@ -849,6 +889,23 @@ function clickShadowButton(selector) {
   if (result !== "clicked") {
     fail(`Could not click shadow button ${selector}: ${result}`);
   }
+}
+
+function pressKey(code, key) {
+  chromeEval(`
+(() => {
+  const eventInit = {
+    key: ${JSON.stringify(key)},
+    code: ${JSON.stringify(code)},
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  };
+  document.dispatchEvent(new KeyboardEvent("keydown", eventInit));
+  document.dispatchEvent(new KeyboardEvent("keyup", eventInit));
+  return "pressed";
+})()
+  `);
 }
 
 function pauseVideo() {

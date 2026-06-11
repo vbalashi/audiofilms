@@ -138,9 +138,23 @@ Use the extension UI `Debug` button first. It includes:
 - selected source;
 - transcript result metadata;
 - phrase count;
+- current phrase;
+- recent guided phrase navigation events;
 - visible error;
 - per-source errors and retrieval attempts;
 - recent extension events.
+
+Use `Mark Issue` while manually testing phrase navigation. Press it immediately after a wrong Replay/Previous/Next/Space behavior. It copies a navigation incident report to the clipboard with:
+
+- current video and URL;
+- selected practice source;
+- guided/auto-pause state;
+- current YouTube playback time;
+- visible phrase index and text;
+- recent navigation commands and delayed playback observations;
+- recent debug events.
+
+Paste that report into the next agent message instead of describing the miss only in prose.
 
 For service worker or manifest/runtime errors:
 

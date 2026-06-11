@@ -52,14 +52,16 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
   - dictionary/lookup panel appears only after clicking a word;
   - YouTube player size and recommendations are not changed by default.
 - Keeps normal YouTube playback passive by default. Replay, Previous, and Next enter guided phrase mode; auto-pause only affects guided mode.
+- In guided phrase navigation, Previous and Next advance from the visible phrase in the AudioFilms panel, not from the current YouTube playhead.
+- Adds a `Mark Issue` control that copies a navigation incident report with recent phrase commands, playback timings, selected source, and current phrase context.
 - Adds an `AudioFilms On/Off` page toggle that restores the normal YouTube layout when disabled.
 - Treats lookup as guest-capable by default; signing in to 2000NL is for personal progress, saved words, and review grading.
 - Uses YouTube's own transcript panel as a caption extraction fallback and debug fallback, not as the final learning UI.
 - Supports:
-  - `Space`: replay current phrase;
+  - `Space`: toggle normal continuous YouTube play/pause and leave guided phrase playback;
   - `ArrowRight`: next phrase;
   - `ArrowLeft`: previous phrase;
-  - `ArrowDown`: show phrase text;
+  - `ArrowDown`: replay current phrase;
   - `ArrowUp`: hide phrase text.
 
 ## Load Locally
@@ -152,6 +154,8 @@ It also verifies:
 - source menu availability on a video with manual and auto-generated tracks;
 - switching from manual to auto-generated captions and back to manual;
 - Replay enters `Shortcuts active` and seeks near the current phrase;
+- `Space` exits guided phrase playback and toggles continuous YouTube play/pause;
+- `Mark Issue` copies a navigation incident report for manual bug reports;
 - clicking a word opens the dictionary panel, preserves the current phrase context, and marks the clicked word;
 - no-captions hides phrase playback controls;
 - no-captions does not show a dictionary panel;

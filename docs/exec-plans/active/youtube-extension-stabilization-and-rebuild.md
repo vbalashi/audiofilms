@@ -330,6 +330,7 @@ Tasks:
 - Scope keyboard capture to active AudioFilms mode.
 - Avoid global `stopImmediatePropagation()` unless a specific key and state require it.
 - Add visible indication when keyboard shortcuts are active.
+- Add a manual navigation incident marker so bad Replay/Previous/Next behavior can be reported with exact playback and phrase context.
 
 Progress:
 
@@ -337,7 +338,9 @@ Progress:
 - Passive playback now syncs the current phrase but does not auto-pause normal YouTube playback.
 - Replay/Next/Previous enter explicit guided mode. Guided mode is shown in the compact bar as `Shortcuts active`; passive mode is shown as `Passive sync`.
 - Active phrase replay now uses a single `requestAnimationFrame` loop for phrase-end enforcement. The previous interval plus active `timeupdate` stop loop was removed.
-- Keyboard shortcuts are ignored unless AudioFilms is on and guided mode is active. Space still uses immediate propagation blocking while guided, but arrow keys only prevent the matching YouTube shortcut without global immediate stopping.
+- Guided phrase navigation now advances from the visible selected phrase in the AudioFilms panel, not from the YouTube playhead. This keeps Previous/Next deterministic near phrase boundaries and during quick repeated clicks.
+- Space now exits guided phrase playback and toggles normal continuous YouTube play/pause. ArrowLeft/ArrowRight remain Previous/Next, and ArrowDown replays the current visible phrase.
+- `Mark Issue` copies a navigation incident report with the current phrase, selected source, playback snapshot, recent navigation commands, and delayed observations after recent seeks.
 - Chrome smoke on `https://www.youtube.com/watch?v=4EE7m94mJpk` after reloading the unpacked extension:
   - boot diagnostics report a detected video element and `backend-provider`;
   - passive mode advanced from phrase `6 / 185` to `14 / 185` while the video continued playing;
@@ -350,6 +353,7 @@ Exit criteria:
 - Normal YouTube playback remains normal when AudioFilms is off or not in guided mode.
 - Replay/Next/Previous seek to the expected phrase consistently.
 - Space handling no longer feels like an invisible global override.
+- Manual misses can be reported with a copied `Mark Issue` payload rather than prose-only reproduction.
 
 ## Phase 7: Rebuild Retrieval Ladder Deliberately
 
