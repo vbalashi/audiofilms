@@ -64,6 +64,7 @@ Current subtitle backend expectation:
 - Runtime `yt-dlp` auto captions include the Stage 1 rolling-caption cleanup used by the shootout lab.
 - Supadata fallback cache is intentional. Do not clear it just because it is Supadata; clear it only when testing provider selection from scratch.
 - During testing, the source badge should distinguish live/cached and primary/fallback paths, for example `via Supadata · cached · fallback`.
+- Subtitle cache is indefinite by default. Use the extension `Refresh Cache` debug button, or `/api/get-subs?...&refresh=1`, only when an intentional re-fetch is needed.
 
 ## Boot Diagnostics
 

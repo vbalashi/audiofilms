@@ -9,9 +9,6 @@ const CACHE_VERSION = "v6";
 // Cache directory - will be created if it doesn't exist
 const CACHE_DIR = path.join(process.cwd(), '.subtitle-cache');
 
-// Subtitles rarely change; keep them for a reasonable period
-const TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
-
 /**
  * Ensure cache directory exists
  */
@@ -31,15 +28,10 @@ function getCacheFilePath(videoId: string): string {
 }
 
 /**
- * Check if a cached entry is expired
- */
-function isExpired(createdAt: number): boolean {
-  return Date.now() - createdAt > TTL_MS;
-}
-
-/**
  * Get cached subtitles for a video ID
- * Returns null if not cached or if cache is expired
+ * Returns null if not cached. Subtitle cache is intentionally indefinite:
+ * YouTube video captions rarely change, and provider/API calls can be paid
+ * or rate-limited. Use the API refresh flag for an explicit re-fetch.
  */
 export function getCachedSubtitles(videoId: string): SubtitleResponse | null {
   try {
@@ -52,13 +44,6 @@ export function getCachedSubtitles(videoId: string): SubtitleResponse | null {
 
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     const cacheEntry = JSON.parse(fileContent);
-
-    // Check if expired
-    if (isExpired(cacheEntry.createdAt)) {
-      console.log(`[SubtitleCache] Cache expired for ${videoId}`);
-      fs.unlinkSync(filePath); // Clean up expired cache
-      return null;
-    }
 
     console.log(`[SubtitleCache] Cache hit for ${videoId}`);
     return cacheEntry.value;
@@ -111,38 +96,8 @@ export function clearCache(): void {
 }
 
 /**
- * Clean up expired cache entries (useful for maintenance)
+ * Deprecated no-op. Cache is intentionally indefinite.
  */
 export function cleanupExpiredCache(): void {
-  try {
-    if (!fs.existsSync(CACHE_DIR)) {
-      return;
-    }
-
-    const files = fs.readdirSync(CACHE_DIR);
-    let cleaned = 0;
-
-    for (const file of files) {
-      const filePath = path.join(CACHE_DIR, file);
-      try {
-        const fileContent = fs.readFileSync(filePath, 'utf-8');
-        const cacheEntry = JSON.parse(fileContent);
-        
-        if (isExpired(cacheEntry.createdAt)) {
-          fs.unlinkSync(filePath);
-          cleaned++;
-        }
-      } catch {
-        // If we can't parse it, delete it
-        fs.unlinkSync(filePath);
-        cleaned++;
-      }
-    }
-
-    if (cleaned > 0) {
-      console.log(`[SubtitleCache] Cleaned up ${cleaned} expired cache entries`);
-    }
-  } catch (error) {
-    console.error('[SubtitleCache] Error cleaning up cache:', error);
-  }
+  console.log('[SubtitleCache] cleanupExpiredCache skipped: cache is indefinite');
 }

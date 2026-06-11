@@ -206,6 +206,9 @@
     url.searchParams.set("videoId", videoId);
     url.searchParams.set("lang", requestedLanguage || "auto");
     url.searchParams.set("sourceKind", requestedSourceKind);
+    if (options.refreshCache) {
+      url.searchParams.set("refresh", "1");
+    }
 
     const response = await requestBackendSubtitles(url.toString());
     const text = response.text || "";

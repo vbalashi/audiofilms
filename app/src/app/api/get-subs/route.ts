@@ -89,13 +89,14 @@ export async function GET(request: Request) {
   const videoId = searchParams.get("videoId");
   const language = (searchParams.get("lang") || "auto") as SubtitleLanguagePreference;
   const requestedSourceKind = searchParams.get("sourceKind");
+  const refresh = searchParams.get("refresh") === "1" || searchParams.get("refresh") === "true";
   const sourceKind =
     requestedSourceKind === "manual" || requestedSourceKind === "auto"
       ? requestedSourceKind
       : undefined;
 
   console.log(
-    `[get-subs] Fetching subtitles for videoId: ${videoId}, lang: ${language}, sourceKind: ${sourceKind || "any"}`,
+    `[get-subs] Fetching subtitles for videoId: ${videoId}, lang: ${language}, sourceKind: ${sourceKind || "any"}, refresh: ${refresh ? "yes" : "no"}`,
   );
 
   if (!videoId) {
@@ -103,7 +104,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await loadSubtitles(videoId, language, { sourceKind });
+    const response = await loadSubtitles(videoId, language, { sourceKind, refresh });
     console.log(
       `[get-subs] Returning ${response.phrases.length} phrases in language ${response.language} for ${videoId}`,
     );

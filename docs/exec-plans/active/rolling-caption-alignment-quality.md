@@ -276,6 +276,8 @@ Current policy:
 - Try local/backend `yt-dlp` before paid providers.
 - If YouTube subtitle downloads return `HTTP 429`, allow Supadata fallback.
 - Cache Supadata fallback results for the same `videoId + lang + sourceKind` to avoid repeated paid calls.
+- Cache entries are intentionally indefinite during this testing phase. Do not re-query YouTube/Supadata when a cache entry exists.
+- Explicit refresh is available through `refresh=1` on `/api/get-subs` and the extension debug `Refresh Cache` button.
 - Expose cache and fallback origin in debug and the source badge:
   - `cached` means the API returned an already stored transcript;
   - `fallback` means a previous provider failed and another provider supplied captions;

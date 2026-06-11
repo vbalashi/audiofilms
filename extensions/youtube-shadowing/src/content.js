@@ -36,6 +36,7 @@
     transcriptResult: null,
     debugVisible: false,
     debugCopied: false,
+    cacheRefreshRequested: false,
     issueCopied: false,
     debugEvents: [],
     navigationEvents: [],
@@ -248,6 +249,7 @@
     appendButton(controls, "Auto-Pause", "afAutoPause");
     appendButton(controls, "Debug", "afDebugToggle");
     appendButton(controls, "Copy", "afDebugCopy");
+    appendButton(controls, "Refresh Cache", "afRefreshCache");
     appendButton(controls, "Mark Issue", "afMarkIssue");
 
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
@@ -258,6 +260,7 @@
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
+    panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
     panel.querySelector("[data-af-mark-issue]").addEventListener("click", markIssue);
     return panel;
   }
@@ -329,6 +332,7 @@
     const autoPause = panel.querySelector("[data-af-auto-pause]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
     const debugCopy = panel.querySelector("[data-af-debug-copy]");
+    const refreshCache = panel.querySelector("[data-af-refresh-cache]");
     const markIssue = panel.querySelector("[data-af-mark-issue]");
     const playbackButtons = [
       panel.querySelector("[data-af-prev]"),
@@ -350,6 +354,7 @@
     autoPause.textContent = state.autoPause ? "Auto-Pause On" : "Auto-Pause Off";
     debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
+    refreshCache.textContent = state.cacheRefreshRequested ? "Refreshing" : "Refresh Cache";
     markIssue.textContent = state.issueCopied ? "Issue Copied" : "Mark Issue";
     error.textContent = state.error;
     debug.textContent = state.debugVisible ? formatDebugState() : "";
@@ -360,6 +365,7 @@
     });
     autoPause.hidden = isEmpty;
     autoPause.disabled = state.loading || !hasPhrases;
+    refreshCache.disabled = state.loading || !getSelectedPracticeSource();
     markIssue.disabled = state.loading;
 
     clearElement(list);
@@ -399,6 +405,27 @@
       state.debugCopied = false;
       render();
     }, 1200);
+  }
+
+  async function refreshSelectedSourceCache() {
+    const source = getSelectedPracticeSource();
+    if (!source || state.loading) return;
+    state.cacheRefreshRequested = true;
+    recordDebugEvent("cache-refresh-start", {
+      source: captionTrackApi.sourceDisplayName(source),
+      videoId: state.videoId,
+    });
+    render();
+    try {
+      await loadPracticeSource(source, {
+        keepExistingOnError: true,
+        preserveVideoTime: true,
+        refreshCache: true,
+      });
+    } finally {
+      state.cacheRefreshRequested = false;
+      render();
+    }
   }
 
   function markIssue() {
@@ -930,7 +957,9 @@
     try {
       state.cueSource = "";
       state.transcriptResult = null;
-      const transcriptResult = await fetchBestAvailableCues(source.track);
+      const transcriptResult = await fetchBestAvailableCues(source.track, {
+        refreshCache: Boolean(options.refreshCache),
+      });
       const cues = transcriptResult.cues;
       const phrases = phraseApi.buildPhrases(cues, {
         maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
@@ -1038,7 +1067,7 @@
     return findPhraseIndexForTime(phrases, currentMs);
   }
 
-  async function fetchBestAvailableCues(track) {
+  async function fetchBestAvailableCues(track, options = {}) {
     if (!transcriptRetrievalApi?.fetchBestAvailableCues) {
       throw new Error("Transcript retrieval helper was not loaded.");
     }
@@ -1048,6 +1077,7 @@
       recordDebugEvent,
       updateRetrievalPath: (path) => updateBootDiagnostics({ selectedRetrievalPath: path }),
       updateLastError: (message) => updateBootDiagnostics({ lastError: message }),
+      refreshCache: Boolean(options.refreshCache),
     });
     return normalizeTranscriptResult(result, track);
   }

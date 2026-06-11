@@ -29,6 +29,7 @@ function getMockPhrases(): Phrase[] {
 
 type LoadSubtitleOptions = {
   sourceKind?: Extract<SubtitleSourceKind, 'manual' | 'auto'>;
+  refresh?: boolean;
 };
 
 function getCacheKey(
@@ -58,7 +59,8 @@ export async function loadSubtitles(
   options: LoadSubtitleOptions = {},
 ): Promise<SubtitleResponse> {
   const cacheKey = getCacheKey(videoId, language, options);
-  const cached = getCachedSubtitles(cacheKey);
+  const existingCached = getCachedSubtitles(cacheKey);
+  const cached = options.refresh ? null : existingCached;
 
   if (cached?.language) {
     console.log(
@@ -79,7 +81,9 @@ export async function loadSubtitles(
     };
   }
 
-  if (cached) {
+  if (options.refresh) {
+    console.log(`[SubtitleService] Cache refresh requested for ${videoId}`);
+  } else if (cached) {
     console.log(
       `[SubtitleService] Cached data missing language field for ${videoId}, refetching`,
     );
@@ -149,7 +153,19 @@ export async function loadSubtitles(
         },
       };
 
-      setCachedSubtitles(cacheKey, response);
+      const shouldStore = !(
+        options.refresh &&
+        fallbackUsed &&
+        existingCached?.meta &&
+        existingCached.meta.fallbackUsed === false
+      );
+      if (shouldStore) {
+        setCachedSubtitles(cacheKey, response);
+      } else {
+        console.log(
+          `[SubtitleService] Keeping existing primary-provider cache for ${videoId}; refresh only produced fallback captions`,
+        );
+      }
       return response;
     } catch (error) {
       if (
