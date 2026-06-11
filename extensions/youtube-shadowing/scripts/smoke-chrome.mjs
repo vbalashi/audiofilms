@@ -501,6 +501,7 @@ function assertInteractions(fixture) {
   const assertions = [];
   if (fixture.expect.checkReplay) {
     assertions.push(...assertReplayInteraction());
+    assertions.push(...assertNextStaysOnTargetInteraction());
     assertions.push(...assertMarkIssueInteraction());
     assertions.push(...assertKeyboardNavigationInteraction());
   }
@@ -554,6 +555,28 @@ function assertMarkIssueInteraction() {
     assertion("mark issue includes current phrase", Boolean(parsed?.currentPhrase?.text), parsed?.currentPhrase?.text || ""),
     assertion("mark issue includes navigation events", Array.isArray(parsed?.navigationEvents) && parsed.navigationEvents.length > 0, String(parsed?.navigationEvents?.length || 0)),
   ];
+}
+
+function assertNextStaysOnTargetInteraction() {
+  const before = readSnapshot();
+  const beforeOrdinal = parseCountOrdinal(before.count);
+  clickShadowButton("[data-af-next]");
+  sleep(450);
+  const afterEarly = readSnapshot();
+  sleep(3800);
+  const afterAutoPause = readSnapshot();
+  const expectedOrdinal = beforeOrdinal ? beforeOrdinal + 1 : null;
+
+  return [
+    assertion("next advances from visible phrase", parseCountOrdinal(afterEarly.count) === expectedOrdinal, `${before.count} -> ${afterEarly.count}`),
+    assertion("next does not roll back during guided playback", parseCountOrdinal(afterAutoPause.count) === expectedOrdinal, `${before.count} -> ${afterAutoPause.count}`),
+    assertion("next leaves guided mode active", afterAutoPause.mode === "Shortcuts active", afterAutoPause.mode),
+  ];
+}
+
+function parseCountOrdinal(countText) {
+  const match = String(countText || "").match(/^(\d+)\s*\/\s*\d+/);
+  return match ? Number(match[1]) : null;
 }
 
 function assertKeyboardNavigationInteraction() {

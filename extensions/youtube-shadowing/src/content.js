@@ -52,6 +52,7 @@
     accountStatus: "guest",
     playbackFrame: null,
     activePlayback: null,
+    guidedHold: null,
     passiveVideo: null,
     passiveFrame: null,
     passivePausedKey: "",
@@ -1164,6 +1165,7 @@
       targetPhrase: describePhraseAtIndex(targetIndex),
       playbackBefore: before,
     });
+    state.guidedHold = null;
     state.currentIndex = targetIndex;
     state.selectedWord = null;
     enterGuidedMode();
@@ -1385,7 +1387,22 @@
   function syncPassivePlayback(video) {
     if (!video || !state.learningEnabled || state.loading || !state.phrases.length) return;
 
+    if (state.activePlayback) {
+      const phrase = state.phrases[state.activePlayback.index];
+      if (phrase && state.currentIndex !== state.activePlayback.index) {
+        state.currentIndex = state.activePlayback.index;
+        state.selectedWord = null;
+        markCurrentTranscriptSegment(phrase);
+        render();
+      }
+      return;
+    }
+
     const currentMs = video.currentTime * 1000;
+    if (shouldPreserveGuidedHold(currentMs)) {
+      return;
+    }
+
     const index = findPlaybackPhraseIndex(state.phrases, currentMs);
     const phrase = state.phrases[index];
     if (!phrase) return;
@@ -1416,13 +1433,44 @@
     if (!state.activePlayback || !video) return;
 
     if (video.currentTime >= state.activePlayback.endSeconds) {
+      const index = state.activePlayback.index;
       const phrase = state.phrases[state.activePlayback.index];
       video.pause();
       video.currentTime = state.activePlayback.holdSeconds;
+      state.currentIndex = index;
+      state.guidedHold = {
+        index,
+        holdSeconds: state.activePlayback.holdSeconds,
+        createdAt: Date.now(),
+      };
       markCurrentTranscriptSegment(phrase);
+      recordNavigationEvent("auto-pause-held", {
+        targetPhrase: describePhraseAtIndex(index),
+        holdSeconds: roundTime(state.activePlayback.holdSeconds),
+        playback: getPlaybackSnapshot(),
+      });
       stopPlaybackTimer();
       render();
     }
+  }
+
+  function shouldPreserveGuidedHold(currentMs) {
+    if (!state.guidedMode || !state.guidedHold) return false;
+    const phrase = state.phrases[state.guidedHold.index];
+    if (!phrase) return false;
+    const holdMs = state.guidedHold.holdSeconds * 1000;
+    const atHeldBoundary = Math.abs(currentMs - holdMs) <= 350;
+    if (!atHeldBoundary) {
+      state.guidedHold = null;
+      return false;
+    }
+    if (state.currentIndex !== state.guidedHold.index) {
+      state.currentIndex = state.guidedHold.index;
+      state.selectedWord = null;
+      markCurrentTranscriptSegment(phrase);
+      render();
+    }
+    return true;
   }
 
   function markCurrentTranscriptSegment(phrase) {
