@@ -1,0 +1,8 @@
+.DS_Store
+
+# Local subtitle/video caches are disposable artifacts.
+.subtitle-cache/
+.video-info-cache/
+
+# Expert-review archives are generated on demand from tracked docs/source/screenshots.
+docs/design-handoff/youtube-extension-expert-review/*.zip
