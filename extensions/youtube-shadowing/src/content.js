@@ -1058,11 +1058,15 @@
   function findPlaybackPhraseIndex(phrases, currentMs) {
     if (!phrases.length || !Number.isFinite(currentMs) || currentMs <= 0) return 0;
 
-    const activeIndex = phrases.findIndex((phrase) => (
-      currentMs >= phrase.startMs - PRE_ROLL_MS &&
-      currentMs <= phrase.endMs + POST_ROLL_MS
-    ));
-    if (activeIndex >= 0) return activeIndex;
+    for (let index = 0; index < phrases.length; index += 1) {
+      const phrase = phrases[index];
+      if (
+        currentMs >= phrase.startMs - PRE_ROLL_MS &&
+        currentMs <= playbackEndMsForPhrase(phrases, index)
+      ) {
+        return index;
+      }
+    }
 
     return findPhraseIndexForTime(phrases, currentMs);
   }
@@ -1310,6 +1314,17 @@
     return currentMs >= phrase.startMs && currentMs <= phrase.endMs + replayGraceMs;
   }
 
+  function playbackEndMsForPhrase(phrases, index) {
+    const phrase = phrases[index];
+    if (!phrase) return 0;
+    const nextPhrase = phrases[index + 1];
+    const postRollEndMs = phrase.endMs + POST_ROLL_MS;
+    if (nextPhrase && nextPhrase.startMs < postRollEndMs) {
+      return Math.max(phrase.startMs, nextPhrase.startMs);
+    }
+    return postRollEndMs;
+  }
+
   function playPhrase(index, options = {}) {
     const phrase = state.phrases[index];
     const video = getVideoElement();
@@ -1319,7 +1334,7 @@
 
     stopPlaybackTimer();
     const startSeconds = Math.max(0, phrase.startMs - PRE_ROLL_MS) / 1000;
-    const endSeconds = (phrase.endMs + POST_ROLL_MS) / 1000;
+    const endSeconds = playbackEndMsForPhrase(state.phrases, index) / 1000;
     markCurrentTranscriptSegment(phrase);
     video.currentTime = startSeconds;
     video.play().catch(() => {});
@@ -1488,7 +1503,7 @@
 
     if (!state.guidedMode || !state.autoPause || state.activePlayback || video.paused) return;
 
-    const endMs = phrase.endMs + POST_ROLL_MS;
+    const endMs = playbackEndMsForPhrase(state.phrases, index);
     if (currentMs < endMs) return;
 
     const pauseKey = `${state.videoId || ""}:${state.selectedSourceId}:${index}`;
