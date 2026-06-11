@@ -24,6 +24,7 @@
   const LONG_PAUSE_MS = 1000;
   const PRE_ROLL_MS = 150;
   const POST_ROLL_MS = 250;
+  const CONTIGUOUS_BOUNDARY_GUARD_MS = 90;
 
   const state = {
     videoId: null,
@@ -1320,7 +1321,7 @@
     const nextPhrase = phrases[index + 1];
     const postRollEndMs = phrase.endMs + POST_ROLL_MS;
     if (nextPhrase && nextPhrase.startMs < postRollEndMs) {
-      return Math.max(phrase.startMs, nextPhrase.startMs);
+      return Math.max(phrase.startMs, nextPhrase.startMs - CONTIGUOUS_BOUNDARY_GUARD_MS);
     }
     return postRollEndMs;
   }
