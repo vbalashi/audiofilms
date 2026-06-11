@@ -263,7 +263,7 @@ async function inspectBackendApiSource(fixture, sourceKind) {
 function emptySource(source, sourceKind, status, error) {
   return {
     source,
-    provider: source.split("-")[0],
+    provider: source.startsWith("yt-dlp") ? "yt-dlp" : source.split("-")[0],
     sourceKind,
     status,
     error,
@@ -370,7 +370,7 @@ function normalizeRollingCues(cues) {
     return dedupeRollingCueText(cues);
   }
 
-  return buildPhrasesFromWords(words);
+  return makeNonOverlapping(buildPhrasesFromWords(words));
 }
 
 function tokenizeDisplayText(text) {
@@ -431,6 +431,23 @@ function buildPhrasesFromWords(words) {
   }
   if (current) phrases.push(current);
   return phrases.map((phrase) => ({ ...phrase, text: cleanText(phrase.text) })).filter((phrase) => phrase.text && phrase.end > phrase.start);
+}
+
+function makeNonOverlapping(cues) {
+  const sorted = [...cues].sort((a, b) => a.start - b.start || a.end - b.end);
+  const result = [];
+  for (const cue of sorted) {
+    const previous = result[result.length - 1];
+    const next = { ...cue };
+    if (previous && next.start < previous.end) {
+      next.start = previous.end;
+    }
+    if (next.end <= next.start) {
+      continue;
+    }
+    result.push(next);
+  }
+  return result;
 }
 
 function dedupeRollingCueText(cues) {

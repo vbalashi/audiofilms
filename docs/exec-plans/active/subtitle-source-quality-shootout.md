@@ -268,6 +268,8 @@ npm run subtitle:shootout
 
 This command intentionally does not call Supadata. It uses `yt-dlp` and local cached artifacts so repeated runs do not spend paid API quota.
 
+Use `--refresh` sparingly. A refresh run on June 11, 2026 hit repeated YouTube HTTP `429` responses while fetching timedtext URLs. The normal cached run recovered immediately from local artifacts. This confirms that even "free" YouTube/yt-dlp retrieval needs cache-first behavior.
+
 Report:
 
 ```text
@@ -277,12 +279,12 @@ docs/exec-plans/active/subtitle-source-quality-shootout-report.md
 Initial findings:
 
 - `RJrjzCuCHpo` manual Dutch via `yt-dlp` has `138` cues, one `22.28s` long cue, and is poor for shadowing stops.
-- `RJrjzCuCHpo` auto Dutch via `yt-dlp` has `384` raw rolling VTT cues and the first rolling normalizer produced `250` shorter cues with max duration about `4.95s`.
-- The rolling normalizer is useful evidence but not product-ready. It now reconstructs the start of the transcript correctly, but still has overlap/duplicate artifacts that must be cleaned before product use.
+- `RJrjzCuCHpo` auto Dutch via `yt-dlp` has `384` raw rolling VTT cues and the first rolling normalizer produced `187` shorter non-overlapping cues with max duration about `4.95s`.
+- The rolling normalizer is useful evidence but not product-ready. It reconstructs the start of the transcript correctly and removes overlaps for the key fixture, but other fixtures still show duplicate-text and occasional long-cue artifacts.
 - `xymyDvCgWDA` confirms auto-only videos can be fetched through `yt-dlp` without Supadata.
 - `EColTNIbOko` correctly stays no-caption through both manual and auto paths.
 - `KrdVIUmBoE4` manual can be fetched through `yt-dlp` in the lab, which supports testing a cheaper/free fallback path before paying for provider calls.
 
 Immediate conclusion:
 
-Do not change product defaults yet. The next implementation step should improve rolling-caption normalization by removing timing overlaps and duplicate text artifacts, then compare against Supadata only with an explicit `npm run subtitle:shootout:supadata` run when quota use is acceptable.
+Do not change product defaults yet. The next implementation step should improve rolling-caption normalization by removing duplicate text artifacts and splitting remaining long ASR phrases, then compare against Supadata only with an explicit `npm run subtitle:shootout:supadata` run when quota use is acceptable.
