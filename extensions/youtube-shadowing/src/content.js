@@ -1223,6 +1223,24 @@
     navigateToPhrase("replay", state.currentIndex);
   }
 
+  function pauseCurrentPlayback(command = "pause") {
+    const video = getVideoElement();
+    if (!video) return;
+
+    const before = getPlaybackSnapshot();
+    stopPlaybackTimer();
+    state.guidedHold = null;
+    if (!video.paused) {
+      video.pause();
+    }
+    recordNavigationEvent(`${command}-pause`, {
+      currentPhrase: describePhraseAtIndex(state.currentIndex),
+      playbackBefore: before,
+      playbackAfter: getPlaybackSnapshot(),
+    });
+    render();
+  }
+
   function nextPhrase() {
     if (!state.phrases.length) return;
     navigateToPhrase("next", Math.min(state.currentIndex + 1, state.phrases.length - 1));
@@ -1283,11 +1301,6 @@
 
   function showText() {
     state.textVisible = true;
-    render();
-  }
-
-  function hideText() {
-    state.textVisible = false;
     render();
   }
 
@@ -1608,7 +1621,7 @@
       replayCurrentPhrase();
     } else if (event.code === "ArrowUp") {
       blockYouTubeShortcutWithOptions(event);
-      hideText();
+      pauseCurrentPlayback("arrow-up");
     }
   }
 
