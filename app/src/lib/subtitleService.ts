@@ -32,6 +32,13 @@ type LoadSubtitleOptions = {
   refresh?: boolean;
 };
 
+type TimingQualityIssue = {
+  badCount: number;
+  totalCount: number;
+  ratio: number;
+  examples: string[];
+};
+
 function getCacheKey(
   videoId: string,
   language: SubtitleLanguagePreference,
@@ -53,6 +60,52 @@ function getDemoSubtitleFallback(videoId: string): SubtitleResponse | null {
   };
 }
 
+function countWords(text: string): number {
+  return text.match(/[\p{L}\p{N}]+/gu)?.length || 0;
+}
+
+function findUnusableTimingIssue(response: SubtitleResponse): TimingQualityIssue | null {
+  const provider = response.meta?.provider;
+  const sourceKind = response.meta?.sourceKind;
+  if (provider !== 'yt-dlp' || sourceKind !== 'auto') {
+    return null;
+  }
+
+  const phrases = response.phrases || [];
+  if (phrases.length < 10) {
+    return null;
+  }
+
+  const badPhrases = phrases.filter((phrase) => {
+    const durationSec = phrase.endSec - phrase.startSec;
+    const words = countWords(phrase.text);
+    if (!Number.isFinite(durationSec) || durationSec <= 0) {
+      return true;
+    }
+
+    const wordsPerSecond = words / durationSec;
+    return (words >= 4 && durationSec < 0.75) || (words >= 6 && durationSec < 1) || wordsPerSecond > 9;
+  });
+
+  const ratio = badPhrases.length / phrases.length;
+  if (badPhrases.length < 5 || ratio < 0.12) {
+    return null;
+  }
+
+  return {
+    badCount: badPhrases.length,
+    totalCount: phrases.length,
+    ratio,
+    examples: badPhrases.slice(0, 3).map((phrase) => phrase.text),
+  };
+}
+
+function timingIssueMessage(issue: TimingQualityIssue): string {
+  const percent = Math.round(issue.ratio * 100);
+  const examples = issue.examples.length ? ` Examples: ${issue.examples.join(' | ')}` : '';
+  return `yt-dlp auto captions have unreliable timing (${issue.badCount}/${issue.totalCount} phrases, ${percent}%).${examples}`;
+}
+
 export async function loadSubtitles(
   videoId: string,
   language: SubtitleLanguagePreference,
@@ -61,28 +114,39 @@ export async function loadSubtitles(
   const cacheKey = getCacheKey(videoId, language, options);
   const existingCached = getCachedSubtitles(cacheKey);
   const cached = options.refresh ? null : existingCached;
+  const cachedTimingIssue = cached?.language ? findUnusableTimingIssue(cached) : null;
 
   if (cached?.language) {
-    console.log(
-      `[SubtitleService] Returning cached subtitles for ${videoId} (language: ${cached.language})`,
-    );
-    return {
-      ...cached,
-      meta: cached.meta
-        ? {
-          ...cached.meta,
-          cacheStatus: 'hit',
-        }
-        : {
-          provider: 'cache',
-          fallbackUsed: false,
-          cacheStatus: 'hit',
-        },
-    };
+    if (cachedTimingIssue) {
+      console.warn(
+        `[SubtitleService] Ignoring cached subtitles for ${videoId}: ${timingIssueMessage(cachedTimingIssue)}`,
+      );
+    } else {
+      console.log(
+        `[SubtitleService] Returning cached subtitles for ${videoId} (language: ${cached.language})`,
+      );
+      return {
+        ...cached,
+        meta: cached.meta
+          ? {
+            ...cached.meta,
+            cacheStatus: 'hit',
+          }
+          : {
+            provider: 'cache',
+            fallbackUsed: false,
+            cacheStatus: 'hit',
+          },
+      };
+    }
   }
 
   if (options.refresh) {
     console.log(`[SubtitleService] Cache refresh requested for ${videoId}`);
+  } else if (cachedTimingIssue) {
+    console.log(
+      `[SubtitleService] Cached data failed timing quality for ${videoId}, refetching`,
+    );
   } else if (cached) {
     console.log(
       `[SubtitleService] Cached data missing language field for ${videoId}, refetching`,
@@ -152,6 +216,10 @@ export async function loadSubtitles(
           ],
         },
       };
+      const timingIssue = findUnusableTimingIssue(response);
+      if (timingIssue) {
+        throw new Error(timingIssueMessage(timingIssue));
+      }
 
       const shouldStore = !(
         options.refresh &&
