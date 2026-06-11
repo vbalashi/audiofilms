@@ -67,8 +67,19 @@ function classifyYtDlpError(error: unknown): SubtitleProviderError {
     return new SubtitleProviderError('No subtitles found', 'NOT_FOUND');
   }
 
+  if (
+    normalized.includes('http 429') ||
+    normalized.includes('too many requests') ||
+    normalized.includes('rate limit')
+  ) {
+    return new SubtitleProviderError(
+      'YouTube subtitle download was rate-limited with HTTP 429.',
+      'RATE_LIMIT',
+    );
+  }
+
   return new SubtitleProviderError(
-    'Fallback subtitle provider failed.',
+    message,
     'PROVIDER_ERROR',
   );
 }
@@ -146,7 +157,6 @@ export class YtDlpProvider implements SubtitleProvider {
         warnings: [],
       };
     } catch (error) {
-      console.warn('[YtDlpProvider] Failed:', error);
       throw classifyYtDlpError(error);
     }
   }

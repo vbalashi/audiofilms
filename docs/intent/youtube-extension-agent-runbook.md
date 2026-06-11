@@ -62,6 +62,8 @@ Current subtitle backend expectation:
   - unavailable local `yt-dlp`, forcing provider fallback;
   - YouTube subtitle downloads returning `HTTP 429`, forcing provider fallback.
 - Runtime `yt-dlp` auto captions include the Stage 1 rolling-caption cleanup used by the shootout lab.
+- Supadata fallback cache is intentional. Do not clear it just because it is Supadata; clear it only when testing provider selection from scratch.
+- During testing, the source badge should distinguish live/cached and primary/fallback paths, for example `via Supadata · cached · fallback`.
 
 ## Boot Diagnostics
 

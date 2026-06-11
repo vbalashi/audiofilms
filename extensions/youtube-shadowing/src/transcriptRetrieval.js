@@ -236,13 +236,14 @@
     }
 
     const languageCode = payload?.language || "";
-    const provider = payload?.meta?.provider || "audiofilms-backend";
-    const returnedSourceKind = payload?.meta?.sourceKind || payload?.sourceKind || "";
+    const meta = payload?.meta || {};
+    const provider = meta.provider || "audiofilms-backend";
+    const returnedSourceKind = meta.sourceKind || payload?.sourceKind || "";
     const warnings = [];
     const qualityFlags = [];
 
-    if (payload?.meta?.warning) {
-      warnings.push(payload.meta.warning);
+    if (meta.warning) {
+      warnings.push(meta.warning);
     }
     if (languageCode && requestedLanguage !== "auto" && languageCode !== requestedLanguage) {
       qualityFlags.push("language-mismatch");
@@ -261,6 +262,11 @@
       languageCode,
       provider,
       sourceKind: returnedSourceKind,
+      cacheStatus: meta.cacheStatus || "",
+      fallbackUsed: Boolean(meta.fallbackUsed),
+      primaryProvider: meta.primaryProvider || "",
+      failedProvider: meta.failedProvider || "",
+      fallbackReason: meta.fallbackReason || "",
       qualityFlags,
       warnings,
     };
@@ -335,6 +341,11 @@
       qualityFlags: uniqueStrings([...(metadata.qualityFlags || []), ...quality.qualityFlags]),
       warnings: uniqueStrings([...(metadata.warnings || []), ...quality.warnings]),
       retrievalAttempts: Array.isArray(metadata.retrievalAttempts) ? metadata.retrievalAttempts : [],
+      cacheStatus: metadata.cacheStatus || "",
+      fallbackUsed: Boolean(metadata.fallbackUsed),
+      primaryProvider: metadata.primaryProvider || "",
+      failedProvider: metadata.failedProvider || "",
+      fallbackReason: metadata.fallbackReason || "",
     };
   }
 

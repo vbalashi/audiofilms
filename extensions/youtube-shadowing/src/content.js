@@ -1066,6 +1066,11 @@
       qualityFlags: Array.isArray(result?.qualityFlags) ? result.qualityFlags : [],
       warnings: Array.isArray(result?.warnings) ? result.warnings : [],
       retrievalAttempts: Array.isArray(result?.retrievalAttempts) ? result.retrievalAttempts : [],
+      cacheStatus: result?.cacheStatus || "",
+      fallbackUsed: Boolean(result?.fallbackUsed),
+      primaryProvider: result?.primaryProvider || "",
+      failedProvider: result?.failedProvider || "",
+      fallbackReason: result?.fallbackReason || "",
     };
     state.cueSource = normalized.retrievalPath;
     return normalized;
@@ -1088,6 +1093,11 @@
       qualityFlags: [...(result.qualityFlags || [])],
       warnings: [...(result.warnings || [])],
       retrievalAttempts: Array.isArray(result.retrievalAttempts) ? result.retrievalAttempts : [],
+      cacheStatus: result.cacheStatus || "",
+      fallbackUsed: Boolean(result.fallbackUsed),
+      primaryProvider: result.primaryProvider || "",
+      failedProvider: result.failedProvider || "",
+      fallbackReason: result.fallbackReason || "",
     };
   }
 
@@ -1104,7 +1114,9 @@
       ? "exact"
       : result.timingExactness === "word-level" ? "word-level" : "rough timing";
     const originLabel = formatFetchOriginLabel(result);
-    return `${sourceLabel} · ${timingLabel}${originLabel ? ` · via ${originLabel}` : ""}`;
+    const cacheLabel = result.cacheStatus === "hit" ? " · cached" : "";
+    const fallbackLabel = result.fallbackUsed ? " · fallback" : "";
+    return `${sourceLabel} · ${timingLabel}${originLabel ? ` · via ${originLabel}` : ""}${cacheLabel}${fallbackLabel}`;
   }
 
   function fetchOriginFromRetrievalPath(retrievalPath) {

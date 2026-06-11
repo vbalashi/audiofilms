@@ -64,7 +64,19 @@ export async function loadSubtitles(
     console.log(
       `[SubtitleService] Returning cached subtitles for ${videoId} (language: ${cached.language})`,
     );
-    return cached;
+    return {
+      ...cached,
+      meta: cached.meta
+        ? {
+          ...cached.meta,
+          cacheStatus: 'hit',
+        }
+        : {
+          provider: 'cache',
+          fallbackUsed: false,
+          cacheStatus: 'hit',
+        },
+    };
   }
 
   if (cached) {
@@ -78,6 +90,7 @@ export async function loadSubtitles(
   const candidates = getSubtitleProviderCandidates();
   let lastError: Error | SubtitleProviderError | null = null;
   let notFoundError: SubtitleProviderError | null = null;
+  const failedAttempts: { provider: string; reason: string }[] = [];
 
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index];
@@ -93,15 +106,21 @@ export async function loadSubtitles(
       }
 
       const fallbackUsed = index > 0;
+      const primaryProvider = candidates[0]?.type || candidate.type;
+      const lastFailedAttempt = failedAttempts[failedAttempts.length - 1];
       const response: SubtitleResponse = {
         phrases: result.phrases,
         language: result.language,
         meta: {
           provider: candidate.type,
           fallbackUsed,
+          cacheStatus: 'stored',
+          primaryProvider,
+          failedProvider: fallbackUsed ? lastFailedAttempt?.provider : undefined,
+          fallbackReason: fallbackUsed ? lastFailedAttempt?.reason : undefined,
           warning: [
             fallbackUsed
-              ? `Primary subtitle provider was unavailable. Loaded captions via ${candidate.type}.`
+              ? `Primary subtitle provider ${primaryProvider} was unavailable. Loaded captions via ${candidate.type}.`
               : '',
             ...(result.warnings || []),
           ].filter(Boolean)[0],
@@ -111,11 +130,22 @@ export async function loadSubtitles(
           qualityFlags: result.qualityFlags || [],
           warnings: [
             ...(fallbackUsed
-              ? [`Primary subtitle provider was unavailable. Loaded captions via ${candidate.type}.`]
+              ? [`Primary subtitle provider ${primaryProvider} was unavailable. Loaded captions via ${candidate.type}.`]
               : []),
             ...(result.warnings || []),
           ],
-          retrievalAttempts: result.retrievalAttempts,
+          retrievalAttempts: [
+            ...failedAttempts.map((attempt) => ({
+              path: attempt.provider,
+              status: 'failed' as const,
+              error: attempt.reason,
+            })),
+            ...(result.retrievalAttempts || [{
+              path: candidate.type,
+              status: 'ok' as const,
+              cues: result.phrases.length,
+            }]),
+          ],
         },
       };
 
@@ -132,6 +162,10 @@ export async function loadSubtitles(
           `[SubtitleService] ${candidate.type} failed for ${videoId}: ${providerError.code}`,
         );
         lastError = providerError;
+        failedAttempts.push({
+          provider: candidate.type,
+          reason: providerError.message || providerError.code,
+        });
 
         if (providerError.code === 'INVALID_VIDEO') {
           throw providerError;
@@ -148,6 +182,10 @@ export async function loadSubtitles(
       );
       lastError =
         error instanceof Error ? error : new Error('Failed to fetch subtitles');
+      failedAttempts.push({
+        provider: candidate.type,
+        reason: lastError.message,
+      });
     }
   }
 

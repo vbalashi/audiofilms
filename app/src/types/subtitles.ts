@@ -55,6 +55,10 @@ export type SubtitleResponse = {
   meta?: {
     provider: string;
     fallbackUsed: boolean;
+    cacheStatus?: 'hit' | 'miss' | 'stored';
+    primaryProvider?: string;
+    failedProvider?: string;
+    fallbackReason?: string;
     warning?: string;
     sourceKind?: SubtitleSourceKind;
     retrievalPath?: string;

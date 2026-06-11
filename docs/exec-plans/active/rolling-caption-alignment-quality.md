@@ -266,6 +266,28 @@ Model comparison plan, when needed:
 - compare phrase boundaries against Stage 1 and Stage 2;
 - use this as a diagnostic baseline, not as production architecture until it clearly beats simpler processing.
 
+## Provider Cache And 429 Policy
+
+Supadata fallback results are useful and should be cached. The problem is not using Supadata; the problem is not knowing why Supadata was used.
+
+Current policy:
+
+- Try browser/YouTube page captions first in the extension.
+- Try local/backend `yt-dlp` before paid providers.
+- If YouTube subtitle downloads return `HTTP 429`, allow Supadata fallback.
+- Cache Supadata fallback results for the same `videoId + lang + sourceKind` to avoid repeated paid calls.
+- Expose cache and fallback origin in debug and the source badge:
+  - `cached` means the API returned an already stored transcript;
+  - `fallback` means a previous provider failed and another provider supplied captions;
+  - `retrievalAttempts` should show the failed provider and final provider.
+
+If `HTTP 429` becomes persistent:
+
+1. Continue using cached Supadata where quality is good.
+2. Run a non-production MacWhisper CLI spike on a small fixture set.
+3. Compare MacWhisper phrase boundaries against Stage 1 and Supadata, not just raw transcript text.
+4. Only promote local ASR/alignment if it materially improves UX or reduces paid-provider dependence.
+
 ## Next Implementation Step
 
 Continue Stage 1 rolling cleanup before changing runtime behavior:
