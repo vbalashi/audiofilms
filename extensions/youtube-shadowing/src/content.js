@@ -1057,6 +1057,8 @@
       cues: Array.isArray(result?.cues) ? result.cues : [],
       sourceKind: result?.sourceKind || sourceKindFromTrack(track),
       retrievalPath: result?.retrievalPath || result?.cueSource || "backend-provider",
+      fetchOrigin: result?.fetchOrigin || fetchOriginFromRetrievalPath(result?.retrievalPath || result?.cueSource || "backend-provider"),
+      provider: result?.provider || result?.actualTrackId || "",
       selectedTrackId: result?.selectedTrackId || track?.vssId || track?.languageCode || "",
       actualTrackId: result?.actualTrackId || "",
       languageCode: result?.languageCode || track?.languageCode || "",
@@ -1077,6 +1079,8 @@
     return {
       sourceKind: result.sourceKind,
       retrievalPath: result.retrievalPath,
+      fetchOrigin: result.fetchOrigin || fetchOriginFromRetrievalPath(result.retrievalPath),
+      provider: result.provider || result.actualTrackId || "",
       selectedTrackId: result.selectedTrackId || "",
       actualTrackId: result.actualTrackId || "",
       languageCode: result.languageCode || "",
@@ -1099,7 +1103,33 @@
     const timingLabel = result.timingExactness === "exact"
       ? "exact"
       : result.timingExactness === "word-level" ? "word-level" : "rough timing";
-    return `${sourceLabel} · ${timingLabel}`;
+    const originLabel = formatFetchOriginLabel(result);
+    return `${sourceLabel} · ${timingLabel}${originLabel ? ` · via ${originLabel}` : ""}`;
+  }
+
+  function fetchOriginFromRetrievalPath(retrievalPath) {
+    if (!retrievalPath) return "";
+    if (String(retrievalPath).startsWith("timedtext")) return "youtube-page";
+    if (retrievalPath === "backend-provider") return "backend";
+    if (retrievalPath === "youtubei-transcript") return "youtube-transcript-api";
+    if (retrievalPath === "transcript-dom") return "youtube-transcript-dom";
+    return "";
+  }
+
+  function formatFetchOriginLabel(result) {
+    const provider = String(result?.provider || "").trim();
+    if (provider === "supadata") return "Supadata";
+    if (provider === "yt-dlp") return "yt-dlp";
+    if (provider === "youtube-timedtext") return "YouTube page";
+    if (provider === "youtubei-transcript") return "YouTube transcript API";
+    if (provider === "youtube-transcript-panel") return "YouTube transcript DOM";
+
+    const origin = String(result?.fetchOrigin || "").trim();
+    if (origin === "youtube-page") return "YouTube page";
+    if (origin === "backend") return provider || "backend";
+    if (origin === "youtube-transcript-api") return "YouTube transcript API";
+    if (origin === "youtube-transcript-dom") return "YouTube transcript DOM";
+    return provider;
   }
 
   function getVideoElement() {

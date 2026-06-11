@@ -136,6 +136,7 @@ Use the extension UI `Debug` button first. It includes:
 
 - boot state;
 - selected source;
+- fetch origin and provider, for example `via YouTube page`, `via Supadata`, or `via yt-dlp`;
 - transcript result metadata;
 - phrase count;
 - current phrase;
@@ -148,6 +149,7 @@ Use `Mark Issue` while manually testing phrase navigation. Press it immediately 
 
 - current video and URL;
 - selected practice source;
+- fetch origin/provider and retrieval path, so page-loaded captions can be distinguished from backend provider captions;
 - guided/auto-pause state;
 - current YouTube playback time;
 - visible phrase index and text;

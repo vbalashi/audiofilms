@@ -12,6 +12,8 @@
       return buildTranscriptResult(captionResult.cues, {
         sourceKind: track?.kind === "asr" ? "auto" : "manual",
         retrievalPath: captionResult.retrievalPath,
+        fetchOrigin: "youtube-page",
+        provider: "youtube-timedtext",
         selectedTrackId: trackId(track),
         actualTrackId: trackId(track),
         languageCode: track?.languageCode || "",
@@ -31,6 +33,8 @@
       return buildTranscriptResult(backendResult.cues, {
         sourceKind: backendResult.sourceKind || "provider",
         retrievalPath: "backend-provider",
+        fetchOrigin: "backend",
+        provider: backendResult.provider || "audiofilms-backend",
         selectedTrackId: trackId(track),
         actualTrackId: backendResult.provider || "",
         languageCode: backendResult.languageCode || track?.languageCode || "",
@@ -61,6 +65,8 @@
       return buildTranscriptResult(cues, {
         sourceKind: "transcript-panel",
         retrievalPath: "youtubei-transcript",
+        fetchOrigin: "youtube-transcript-api",
+        provider: "youtubei-transcript",
         selectedTrackId: trackId(track),
         actualTrackId: "",
         languageCode: track?.languageCode || "",
@@ -82,6 +88,8 @@
       return buildTranscriptResult(cues, {
         sourceKind: "transcript-panel",
         retrievalPath: "transcript-dom",
+        fetchOrigin: "youtube-transcript-dom",
+        provider: "youtube-transcript-panel",
         selectedTrackId: trackId(track),
         actualTrackId: "",
         languageCode: track?.languageCode || "",
@@ -318,6 +326,8 @@
       cues,
       sourceKind: metadata.sourceKind || "unknown",
       retrievalPath: metadata.retrievalPath || "backend-provider",
+      fetchOrigin: metadata.fetchOrigin || "",
+      provider: metadata.provider || "",
       selectedTrackId: metadata.selectedTrackId || "",
       actualTrackId: metadata.actualTrackId || "",
       languageCode: metadata.languageCode || "",
