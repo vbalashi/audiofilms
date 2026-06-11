@@ -8,7 +8,7 @@ import fs from 'fs';
  */
 export type ProviderType = 'supadata' | 'yt-dlp';
 
-export const DEFAULT_SUBTITLE_PROVIDER: ProviderType = 'supadata';
+export const DEFAULT_SUBTITLE_PROVIDER: ProviderType = 'yt-dlp';
 export const DEFAULT_YT_DLP_PATH = '/usr/bin/yt-dlp';
 const LOCAL_YT_DLP_CANDIDATES = [
   DEFAULT_YT_DLP_PATH,

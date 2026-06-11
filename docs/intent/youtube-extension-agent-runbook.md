@@ -50,6 +50,19 @@ http://localhost:3000/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
 
 If the backend is intentionally unavailable for browser-only diagnostics, pass `--skip-backend-check`. Do not use that for normal regression validation.
 
+Current subtitle backend expectation:
+
+- The app/provider default is `yt-dlp`, with Supadata as an explicit fallback path.
+- The extension still tries YouTube page `timedtext` first. If YouTube returns `HTTP 429`, it falls back to `http://localhost:3000/api/get-subs`.
+- Backend auto captions should show `via yt-dlp` when local `yt-dlp` is available.
+- If the UI still shows `via Supadata`, check for:
+  - an old Next dev server that was not restarted after provider changes;
+  - `.env.local` explicitly setting `SUBTITLE_PROVIDER=supadata`;
+  - stale subtitle cache from an older cache version;
+  - unavailable local `yt-dlp`, forcing provider fallback;
+  - YouTube subtitle downloads returning `HTTP 429`, forcing provider fallback.
+- Runtime `yt-dlp` auto captions include the Stage 1 rolling-caption cleanup used by the shootout lab.
+
 ## Boot Diagnostics
 
 On a YouTube watch page, these page-readable diagnostics should be available from the normal page console:

@@ -4,7 +4,7 @@ import type { SubtitleResponse } from "@/types/subtitles";
 
 // Bump this when we change the subtitle response structure or selection logic
 // so old cached entries don't cause confusing behaviour.
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v6";
 
 // Cache directory - will be created if it doesn't exist
 const CACHE_DIR = path.join(process.cwd(), '.subtitle-cache');

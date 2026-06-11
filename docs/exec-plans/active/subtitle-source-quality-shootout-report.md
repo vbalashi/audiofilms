@@ -1,6 +1,6 @@
 # Subtitle Source Quality Shootout Report
 
-Generated: 2026-06-11T11:37:16.037Z
+Generated: 2026-06-11T11:49:24.826Z
 
 Supadata/API calls included: no
 

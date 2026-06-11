@@ -6,8 +6,8 @@ This is the canonical setup and local development document for the application.
 
 ## Runtime Defaults
 
-- Subtitle provider default: `supadata`
-- Subtitle fallback provider: `yt-dlp`
+- Subtitle provider default: `yt-dlp`
+- Subtitle fallback provider: `supadata`
 - Dictionary provider default: `openrouter`
 - Dictionary fallback provider: `free-dictionary`
 
@@ -16,10 +16,10 @@ These defaults are defined in the provider factories and mirrored in [`env.examp
 ## Prerequisites
 
 - Node.js 20+ and npm
-- A Supadata API key for the default subtitle path
+- `yt-dlp` for the default local subtitle path
 - An OpenRouter API key for the default dictionary path
 
-`yt-dlp` is optional. Install it only if you want to run the subtitle fallback provider locally.
+A Supadata API key is optional. Configure it only if you want the paid API fallback path.
 
 ## Setup
 
@@ -38,8 +38,7 @@ cp env.example .env.local
 3. Fill in at least these values in `.env.local`.
 
 ```bash
-SUBTITLE_PROVIDER=supadata
-SUPADATA_API_KEY=...
+SUBTITLE_PROVIDER=yt-dlp
 DICTIONARY_PROVIDER=openrouter
 OPENROUTER_API_KEY=...
 ```
@@ -59,12 +58,14 @@ npm run build
 
 ## Optional Local Fallbacks
 
-If you want subtitles without Supadata, switch to `yt-dlp`:
+If you want the default local subtitle path, use `yt-dlp`:
 
 ```bash
 SUBTITLE_PROVIDER=yt-dlp
 YT_DLP_PATH=/usr/bin/yt-dlp
 ```
+
+If you intentionally want the paid Supadata path, switch to `supadata` and provide `SUPADATA_API_KEY`.
 
 If you want dictionary lookups without OpenRouter, switch to `free-dictionary`:
 
