@@ -24,7 +24,7 @@
   const LONG_PAUSE_MS = 1000;
   const PRE_ROLL_MS = 150;
   const POST_ROLL_MS = 250;
-  const CONTIGUOUS_BOUNDARY_GUARD_MS = 130;
+  const CONTIGUOUS_BOUNDARY_GUARD_MS = 120;
 
   const state = {
     videoId: null,
