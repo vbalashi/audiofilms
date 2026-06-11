@@ -3,6 +3,9 @@
   "name": "AudioFilms YouTube Shadowing",
   "version": "0.1.0",
   "description": "Phrase-by-phrase shadowing controls for YouTube captions.",
+  "background": {
+    "service_worker": "src/serviceWorker.js"
+  },
   "content_scripts": [
     {
       "matches": [
@@ -10,6 +13,22 @@
         "https://youtube.com/*"
       ],
       "js": [
+        "src/pageBridge.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://youtube.com/*"
+      ],
+      "js": [
+        "src/bootDiagnostics.js",
+        "src/phrases.js",
+        "src/captionTracks.js",
+        "src/youtubeAdapter.js",
+        "src/transcriptRetrieval.js",
         "src/content.js"
       ],
       "css": [
@@ -20,6 +39,19 @@
   ],
   "host_permissions": [
     "https://www.youtube.com/*",
-    "https://youtube.com/*"
+    "https://youtube.com/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/shadow.css"
+      ],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://youtube.com/*"
+      ]
+    }
   ]
 }

@@ -16,10 +16,13 @@ This repo should be treated as a `light` Harness-mode application project.
 - `docs/exec-plans/completed/`: closed plans worth keeping.
 - `docs/tech-debt/`: known structural issues and cleanup targets.
 
+For YouTube extension continuation, read `docs/intent/youtube-extension-agent-runbook.md` before changing or validating `extensions/youtube-shadowing/`. It records the local Chrome extension id, reload flow, smoke commands, diagnostics, and expert-review zip policy.
+
 ## Working Rules
 
 - Prefer changes inside `app/` unless the task is explicitly about repo-level docs.
 - Keep extension spike work inside `extensions/youtube-shadowing/` unless the task explicitly promotes behavior back into the main app.
+- For YouTube extension work, keep `extensions/youtube-shadowing/README.md`, `docs/intent/youtube-extension-validation-matrix.md`, and `docs/intent/youtube-extension-agent-runbook.md` aligned with any validation or workflow changes.
 - Keep API route changes aligned with provider interfaces in `app/src/lib/providers/` and `app/src/lib/providers/dictionary/`.
 - Treat `.subtitle-cache/` and `.video-info-cache/` as disposable local artifacts, not source of truth.
 - Do not spread environment assumptions across random markdown files. Add or update canonical setup notes in `ARCHITECTURE.md` or `docs/intent/`.

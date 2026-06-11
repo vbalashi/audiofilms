@@ -1,7 +1,25 @@
 (function audioFilmsYouTubeShadowing() {
+  const bootDiagnosticsApi = window.__afShadowingBootDiagnostics || createBootDiagnosticsFallback();
+  const phraseApi = window.__afShadowingPhrases || createPhraseFallback();
+  const captionTrackApi = window.__afShadowingCaptionTracks || createCaptionTracksFallback();
+  const youtubeAdapterApi = window.__afShadowingYouTubeAdapter || createYouTubeAdapterFallback();
+  const transcriptRetrievalApi = window.__afShadowingTranscriptRetrieval;
+
+  try {
+    bootAudioFilmsYouTubeShadowing();
+  } catch (error) {
+    bootDiagnosticsApi.recordBootFailure(error);
+    bootDiagnosticsApi.renderBootFailureBadge(error);
+  }
+
+  function bootAudioFilmsYouTubeShadowing() {
+  const bootDiagnostics = bootDiagnosticsApi.markBootStarted();
   const DICTIONARY_PANEL_ID = "af-shadowing-dictionary-panel";
   const RIBBON_PANEL_ID = "af-shadowing-ribbon-panel";
-  const TARGET_LANGUAGE = "nl";
+  const ROOT_ID = "audiofilms-root";
+  const SHADOW_CONTAINER_ID = "audiofilms-shadow-container";
+  const TOGGLE_ID = "af-shadowing-toggle";
+  const LEARNING_ENABLED_STORAGE_KEY = "afShadowingLearningEnabled";
   const MAX_PHRASE_DURATION_MS = 12000;
   const LONG_PAUSE_MS = 1000;
   const PRE_ROLL_MS = 150;
@@ -10,47 +28,163 @@
   const state = {
     videoId: null,
     tracks: [],
+    practiceSources: [],
+    selectedSourceId: "",
+    sourceMenuOpen: false,
     selectedTrack: null,
     cueSource: "",
+    transcriptResult: null,
+    debugVisible: false,
+    debugCopied: false,
+    debugEvents: [],
     cues: [],
     phrases: [],
     currentIndex: 0,
+    learningEnabled: readLearningEnabled(),
     textVisible: true,
     autoPause: true,
+    guidedMode: false,
     selectedWord: null,
-    accountStatus: "signed-out",
-    playbackTimer: null,
+    accountStatus: "guest",
     playbackFrame: null,
     activePlayback: null,
+    passiveVideo: null,
+    passiveFrame: null,
+    passivePausedKey: "",
     loading: false,
+    loadToken: 0,
     error: "",
+    bootDiagnostics,
   };
   window.__afShadowingDebug = state;
 
-  function getVideoIdFromUrl() {
-    const url = new URL(window.location.href);
-    return url.searchParams.get("v");
+  function updateBootDiagnostics(updates) {
+    Object.assign(state.bootDiagnostics, updates, {
+      updatedAt: new Date().toISOString(),
+      url: window.location.href,
+    });
+    bootDiagnosticsApi.publish(state.bootDiagnostics);
+    if (updates.lastError) {
+      document.documentElement.dataset.afShadowingLastError = String(updates.lastError).slice(0, 180);
+    }
   }
 
-  function isWatchPage() {
-    return Boolean(getVideoIdFromUrl());
+  function readLearningEnabled() {
+    return window.localStorage.getItem(LEARNING_ENABLED_STORAGE_KEY) !== "false";
+  }
+
+  function writeLearningEnabled(value) {
+    window.localStorage.setItem(LEARNING_ENABLED_STORAGE_KEY, value ? "true" : "false");
+  }
+
+  function ensureToggle() {
+    let button = document.getElementById(TOGGLE_ID);
+    if (button) return button;
+
+    button = document.createElement("button");
+    button.id = TOGGLE_ID;
+    button.type = "button";
+    button.addEventListener("click", toggleLearningMode);
+    document.documentElement.appendChild(button);
+    return button;
+  }
+
+  function renderToggle() {
+    const button = ensureToggle();
+    button.textContent = state.learningEnabled ? "AudioFilms On" : "AudioFilms Off";
+    button.classList.toggle("is-enabled", state.learningEnabled);
+    button.setAttribute(
+      "aria-label",
+      state.learningEnabled ? "Disable AudioFilms shadowing workspace" : "Enable AudioFilms shadowing workspace",
+    );
+  }
+
+  function toggleLearningMode() {
+    state.learningEnabled = !state.learningEnabled;
+    writeLearningEnabled(state.learningEnabled);
+    if (!state.learningEnabled) {
+      stopPlaybackTimer();
+      detachPassivePlaybackWatcher();
+      state.guidedMode = false;
+      removeWorkspace();
+      renderToggle();
+      return;
+    }
+    handleCurrentLocation();
   }
 
   function ensureWorkspace() {
-    document.documentElement.classList.add("af-shadowing-workspace");
+    document.documentElement.classList.add("af-shadowing-workspace", "af-shadowing-enabled");
+    const root = ensureAudioFilmsRoot();
+    const container = ensureShadowContainer(root);
 
-    let dictionaryPanel = document.getElementById(DICTIONARY_PANEL_ID);
-    if (!dictionaryPanel) {
-      dictionaryPanel = createDictionaryPanel();
-    }
-
-    let ribbonPanel = document.getElementById(RIBBON_PANEL_ID);
+    let ribbonPanel = root.querySelector(`#${RIBBON_PANEL_ID}`);
     if (!ribbonPanel) {
       ribbonPanel = createRibbonPanel();
     }
 
-    mountWorkspace(dictionaryPanel, ribbonPanel);
+    let dictionaryPanel = root.querySelector(`#${DICTIONARY_PANEL_ID}`);
+    if (state.selectedWord && !dictionaryPanel) {
+      dictionaryPanel = createDictionaryPanel();
+    }
+
+    mountWorkspace(container, dictionaryPanel, ribbonPanel);
     return { dictionaryPanel, ribbonPanel };
+  }
+
+  function ensureAudioFilmsRoot() {
+    let host = document.getElementById(ROOT_ID);
+    if (!(host instanceof HTMLElement)) {
+      host = document.createElement("div");
+      host.id = ROOT_ID;
+      host.setAttribute("aria-label", "AudioFilms YouTube learning layer");
+      document.documentElement.appendChild(host);
+    }
+
+    const root = host.shadowRoot || host.attachShadow({ mode: "open" });
+    ensureShadowStyles(root);
+    return root;
+  }
+
+  function ensureShadowContainer(root) {
+    let container = root.getElementById(SHADOW_CONTAINER_ID);
+    if (container instanceof HTMLElement) return container;
+
+    container = document.createElement("div");
+    container.id = SHADOW_CONTAINER_ID;
+    root.appendChild(container);
+    return container;
+  }
+
+  function ensureShadowStyles(root) {
+    if (root.querySelector("style[data-af-shadow-style]")) return;
+
+    const style = document.createElement("style");
+    style.dataset.afShadowStyle = "";
+    style.textContent = ":host{all:initial;position:fixed;inset:auto 16px 16px 16px;z-index:2147483646;display:block;pointer-events:none}";
+    root.prepend(style);
+
+    loadShadowStyles(root, style);
+  }
+
+  async function loadShadowStyles(root, style) {
+    if (style.dataset.afLoaded === "1") return;
+    style.dataset.afLoaded = "1";
+
+    try {
+      const response = await fetch(chrome.runtime.getURL("src/shadow.css"));
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const css = await response.text();
+      style.textContent = css
+        .replace(/html\.af-shadowing-workspace/g, ":host")
+        .replace(/#audiofilms-root/g, ":host");
+    } catch (error) {
+      recordDebugEvent("shadow-style-load-failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   function createDictionaryPanel() {
@@ -71,16 +205,6 @@
     const body = appendElement(panel, "div", "af-dictionary-body");
     body.dataset.afDictionaryBody = "";
 
-    const footer = appendElement(panel, "div", "af-dictionary-footer");
-    const footerTitle = appendElement(footer, "div", "af-dictionary-footer-title");
-    footerTitle.textContent = "Grade Your Memory";
-    const review = appendElement(footer, "div", "af-review-actions");
-    appendButton(review, "Again", "afAgain");
-    appendButton(review, "Hard", "afHard");
-    appendButton(review, "Good", "afGood");
-    appendButton(review, "Easy", "afEasy");
-
-    document.documentElement.appendChild(panel);
     return panel;
   }
 
@@ -90,88 +214,69 @@
     panel.setAttribute("aria-label", "AudioFilms phrase ribbon");
 
     const meta = appendElement(panel, "div", "af-ribbon-meta");
-    const track = appendElement(meta, "span", "af-ribbon-track");
+    const track = appendElement(meta, "div", "af-source-selector");
     track.dataset.afTrack = "";
-    track.textContent = "Track: -";
+    const trackButton = appendButton(track, "Captions: -", "afSourceToggle");
+    trackButton.className = "af-source-toggle";
+    const sourceMenu = appendElement(track, "div", "af-source-menu");
+    sourceMenu.dataset.afSourceMenu = "";
     const count = appendElement(meta, "span", "af-ribbon-count");
     count.dataset.afCount = "";
     count.textContent = "0 / 0";
+    const mode = appendElement(meta, "span", "af-ribbon-mode");
+    mode.dataset.afMode = "";
+    mode.textContent = "Passive";
 
     const list = appendElement(panel, "div", "af-ribbon-list");
     list.dataset.afRibbonList = "";
 
     const error = appendElement(panel, "div", "af-ribbon-error");
     error.dataset.afError = "";
+    const debug = appendElement(panel, "pre", "af-ribbon-debug");
+    debug.dataset.afDebug = "";
 
     const controls = appendElement(panel, "div", "af-ribbon-controls");
-    appendButton(controls, "Prev Phrase", "afPrev");
+    appendButton(controls, "Prev", "afPrev");
     appendButton(controls, "Replay", "afReplay");
-    appendButton(controls, "Hide Source", "afToggle");
-    appendButton(controls, "Next Phrase", "afNext");
-    appendButton(controls, "Auto-Pause On", "afAutoPause");
+    appendButton(controls, "Hide Text", "afToggle");
+    appendButton(controls, "Next", "afNext");
+    appendButton(controls, "Auto-Pause", "afAutoPause");
+    appendButton(controls, "Debug", "afDebugToggle");
+    appendButton(controls, "Copy", "afDebugCopy");
 
-    document.documentElement.appendChild(panel);
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
     panel.querySelector("[data-af-replay]").addEventListener("click", replayCurrentPhrase);
     panel.querySelector("[data-af-toggle]").addEventListener("click", toggleText);
     panel.querySelector("[data-af-next]").addEventListener("click", nextPhrase);
     panel.querySelector("[data-af-auto-pause]").addEventListener("click", toggleAutoPause);
+    panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
+    panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
+    panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
     return panel;
   }
 
-  function mountWorkspace(dictionaryPanel, ribbonPanel) {
-    // YouTube's DOM changes often. Keep selectors scoped and fall back to fixed panels.
-    const rightColumn = findFirstElement([
-      "ytd-watch-flexy #secondary",
-      "#secondary",
-    ]);
-    if (rightColumn) {
-      dictionaryPanel.classList.remove("af-is-fixed");
-      if (dictionaryPanel.parentElement !== rightColumn) {
-        rightColumn.prepend(dictionaryPanel);
-      }
-    } else {
-      dictionaryPanel.classList.add("af-is-fixed");
-      if (dictionaryPanel.parentElement !== document.documentElement) {
-        document.documentElement.appendChild(dictionaryPanel);
-      }
+  function mountWorkspace(container, dictionaryPanel, ribbonPanel) {
+    if (ribbonPanel.parentElement !== container) {
+      container.appendChild(ribbonPanel);
     }
 
-    const playerAnchor = findFirstElement([
-      "ytd-watch-flexy #primary-inner #player",
-      "ytd-watch-flexy #player",
-      "#player-container-outer",
-      "#player",
-    ]);
-    if (playerAnchor?.parentElement) {
-      ribbonPanel.classList.remove("af-is-fixed");
-      if (ribbonPanel.previousElementSibling !== playerAnchor) {
-        playerAnchor.insertAdjacentElement("afterend", ribbonPanel);
-      }
-    } else {
-      ribbonPanel.classList.add("af-is-fixed");
-      if (ribbonPanel.parentElement !== document.documentElement) {
-        document.documentElement.appendChild(ribbonPanel);
-      }
+    if (!state.selectedWord) {
+      dictionaryPanel?.remove();
+      return;
     }
-  }
 
-  function findFirstElement(selectors) {
-    for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      if (element instanceof HTMLElement) return element;
+    if (dictionaryPanel && dictionaryPanel.parentElement !== container) {
+      container.appendChild(dictionaryPanel);
     }
-    return null;
   }
 
   function removeWorkspace() {
     document.documentElement.classList.remove(
       "af-shadowing-workspace",
-      "af-shadowing-cover-secondary",
+      "af-shadowing-enabled",
       "af-shadowing-hide-transcript",
     );
-    document.getElementById(DICTIONARY_PANEL_ID)?.remove();
-    document.getElementById(RIBBON_PANEL_ID)?.remove();
+    document.getElementById(ROOT_ID)?.remove();
   }
 
   function appendElement(parent, tagName, className = "") {
@@ -190,52 +295,185 @@
   }
 
   function render() {
+    renderToggle();
+    if (!state.learningEnabled) {
+      removeWorkspace();
+      return;
+    }
+
     const { dictionaryPanel, ribbonPanel } = ensureWorkspace();
     renderRibbon(ribbonPanel);
-    renderDictionary(dictionaryPanel);
-    document.documentElement.classList.toggle("af-shadowing-cover-secondary", !state.loading);
+    if (dictionaryPanel) {
+      renderDictionary(dictionaryPanel);
+    }
     document.documentElement.classList.toggle("af-shadowing-hide-transcript", !state.textVisible);
   }
 
   function renderRibbon(panel) {
     const track = panel.querySelector("[data-af-track]");
+    const sourceToggle = panel.querySelector("[data-af-source-toggle]");
+    const sourceMenu = panel.querySelector("[data-af-source-menu]");
     const count = panel.querySelector("[data-af-count]");
+    const mode = panel.querySelector("[data-af-mode]");
     const list = panel.querySelector("[data-af-ribbon-list]");
     const error = panel.querySelector("[data-af-error]");
+    const debug = panel.querySelector("[data-af-debug]");
     const toggle = panel.querySelector("[data-af-toggle]");
     const autoPause = panel.querySelector("[data-af-auto-pause]");
-    const buttons = panel.querySelectorAll("button");
+    const debugToggle = panel.querySelector("[data-af-debug-toggle]");
+    const debugCopy = panel.querySelector("[data-af-debug-copy]");
+    const playbackButtons = [
+      panel.querySelector("[data-af-prev]"),
+      panel.querySelector("[data-af-replay]"),
+      panel.querySelector("[data-af-toggle]"),
+      panel.querySelector("[data-af-next]"),
+    ].filter(Boolean);
+    const hasPhrases = state.phrases.length > 0;
+    const isEmpty = !state.loading && !hasPhrases;
 
-    track.textContent = state.selectedTrack
-      ? `${describeTrack(state.selectedTrack)}${state.cueSource ? ` via ${state.cueSource}` : ""}`
-      : "Track: -";
-    count.textContent = state.phrases.length
+    renderSourceSelector(track, sourceToggle, sourceMenu);
+    panel.classList.toggle("is-empty", isEmpty);
+    count.textContent = hasPhrases
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
       : state.loading ? "Loading" : "0 / 0";
-    toggle.textContent = state.textVisible ? "Hide Source" : "Show Source";
+    mode.textContent = state.guidedMode ? "Shortcuts active" : "Passive sync";
+    mode.classList.toggle("is-guided", state.guidedMode);
+    toggle.textContent = state.textVisible ? "Hide Text" : "Show Text";
     autoPause.textContent = state.autoPause ? "Auto-Pause On" : "Auto-Pause Off";
+    debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
+    debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
     error.textContent = state.error;
+    debug.textContent = state.debugVisible ? formatDebugState() : "";
 
-    buttons.forEach((button) => {
-      button.disabled = state.loading || !state.phrases.length;
+    playbackButtons.forEach((button) => {
+      button.hidden = isEmpty;
+      button.disabled = state.loading || !hasPhrases;
     });
-    autoPause.disabled = state.loading;
+    autoPause.hidden = isEmpty;
+    autoPause.disabled = state.loading || !hasPhrases;
 
     clearElement(list);
     if (state.loading) {
       appendRibbonMessage(list, "Loading captions...");
       return;
     }
-    if (!state.phrases.length) {
-      appendRibbonMessage(list, "No timed phrases available.");
+    if (!hasPhrases) {
+      appendRibbonMessage(
+        list,
+        state.tracks.length
+          ? "No timed phrases available for this caption source."
+          : "This video has no captions, so phrase practice cannot start.",
+      );
       return;
     }
 
-    const start = Math.max(0, state.currentIndex - 2);
-    const end = Math.min(state.phrases.length - 1, state.currentIndex + 3);
-    for (let index = start; index <= end; index += 1) {
-      appendPhraseRow(list, state.phrases[index], index);
+    list.classList.add("is-compact");
+    appendPhraseRow(list, state.phrases[state.currentIndex], state.currentIndex);
+  }
+
+  function toggleDebug() {
+    state.debugVisible = !state.debugVisible;
+    render();
+  }
+
+  async function copyDebug() {
+    const text = formatDebugState();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_error) {
+      copyTextWithFallback(text);
     }
+    state.debugCopied = true;
+    render();
+    window.setTimeout(() => {
+      state.debugCopied = false;
+      render();
+    }, 1200);
+  }
+
+  function copyTextWithFallback(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.documentElement.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+  }
+
+  function formatDebugState() {
+    const selectedSource = getSelectedPracticeSource();
+    return JSON.stringify({
+      boot: state.bootDiagnostics,
+      videoId: state.videoId,
+      selectedSource: selectedSource ? captionTrackApi.formatSourceDebug(selectedSource) : null,
+      cueSource: state.cueSource,
+      transcriptResult: state.transcriptResult ? summarizeTranscriptResult(state.transcriptResult) : null,
+      phrases: state.phrases.length,
+      error: state.error,
+      sources: state.practiceSources.map(captionTrackApi.formatSourceDebug),
+      events: state.debugEvents.slice(-8),
+    }, null, 2);
+  }
+
+  function recordDebugEvent(type, detail) {
+    state.debugEvents.push({
+      at: new Date().toISOString(),
+      type,
+      ...detail,
+    });
+    if (state.debugEvents.length > 30) {
+      state.debugEvents.splice(0, state.debugEvents.length - 30);
+    }
+  }
+
+  function renderSourceSelector(track, sourceToggle, sourceMenu) {
+    const selectedSource = getSelectedPracticeSource();
+    const loadedVia = selectedSource?.loadedTranscriptResult
+      ? ` · ${formatTranscriptBadge(selectedSource.loadedTranscriptResult)}`
+      : selectedSource?.loadedCueSource ? ` · ${captionTrackApi.cueSourceLabel(selectedSource.loadedCueSource)}` : "";
+    const warning = selectedSource?.loadedTranscriptResult?.warnings?.length ? " · source warning" : "";
+    sourceToggle.textContent = selectedSource
+      ? `${captionTrackApi.sourceDisplayName(selectedSource)}${loadedVia}${warning}`
+      : state.tracks.length ? "Captions: -" : "No captions";
+    sourceToggle.disabled = state.loading || state.practiceSources.length <= 1;
+    sourceToggle.setAttribute("aria-expanded", state.sourceMenuOpen ? "true" : "false");
+    track.classList.toggle("is-open", state.sourceMenuOpen);
+
+    clearElement(sourceMenu);
+    if (!state.sourceMenuOpen || state.practiceSources.length <= 1) return;
+
+    for (const group of captionTrackApi.groupPracticeSources(state.practiceSources)) {
+      const header = appendElement(sourceMenu, "div", "af-source-group");
+      header.textContent = group.label;
+
+      for (const source of group.sources) {
+        const option = appendElement(sourceMenu, "button", "af-source-option");
+        option.type = "button";
+        option.dataset.afSourceId = source.id;
+        option.classList.toggle("is-selected", source.id === state.selectedSourceId);
+        option.textContent = captionTrackApi.sourceDisplayName(source);
+        option.addEventListener("click", () => selectPracticeSource(source.id));
+
+        if (source.error) {
+          const error = appendElement(sourceMenu, "div", "af-source-option-error");
+          error.textContent = source.error;
+        } else if (source.loadedTranscriptResult?.warnings?.length) {
+          const warning = appendElement(sourceMenu, "div", "af-source-option-error");
+          warning.textContent = source.loadedTranscriptResult.warnings[0];
+        }
+      }
+    }
+  }
+
+  function toggleSourceMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (state.practiceSources.length <= 1) return;
+    state.sourceMenuOpen = !state.sourceMenuOpen;
+    render();
   }
 
   function appendRibbonMessage(parent, text) {
@@ -295,16 +533,11 @@
     const subtitle = panel.querySelector("[data-af-dictionary-subtitle]");
     const account = panel.querySelector("[data-af-account]");
     const body = panel.querySelector("[data-af-dictionary-body]");
-    const reviewButtons = panel.querySelectorAll(".af-review-actions button");
 
     subtitle.textContent = state.selectedTrack
-      ? describeTrack(state.selectedTrack)
+      ? captionTrackApi.describeTrack(state.selectedTrack)
       : "Contextual Lookup";
     account.textContent = accountStatusLabel();
-
-    reviewButtons.forEach((button) => {
-      button.disabled = state.accountStatus !== "signed-in" || !state.selectedWord;
-    });
 
     clearElement(body);
     if (state.selectedWord) {
@@ -317,15 +550,19 @@
   function renderAccountCard(parent) {
     const card = appendElement(parent, "div", "af-dictionary-card");
     const eyebrow = appendElement(card, "div", "af-dictionary-eyebrow");
-    eyebrow.textContent = "2000NL account";
+    eyebrow.textContent = "Lookup";
     const title = appendElement(card, "div", "af-dictionary-card-title");
-    title.textContent = state.accountStatus === "signed-in" ? "Ready for lookup" : "Sign in to 2000NL";
+    title.textContent = "Click a word";
     const copy = appendElement(card, "p", "af-dictionary-copy");
-    copy.textContent = state.accountStatus === "signed-in"
-      ? "Click a word in the transcript ribbon to inspect dictionary matches."
-      : "Phrase navigation works locally. Dictionary lookup and review progress require your 2000NL account.";
-    const action = appendButton(card, "Sign in to 2000NL", "afSignIn");
-    action.className = "af-signin-button";
+    copy.textContent = "Basic lookup should work in guest mode. Sign in later to sync saved words, review grades, and progress with 2000NL.";
+
+    const accountCard = appendElement(parent, "div", "af-dictionary-card af-account-mini-card");
+    const accountTitle = appendElement(accountCard, "div", "af-account-mini-title");
+    accountTitle.textContent = "2000NL account";
+    const accountCopy = appendElement(accountCard, "p", "af-dictionary-copy");
+    accountCopy.textContent = "Not connected. Personal progress is off.";
+    const action = appendButton(accountCard, "Connect 2000NL", "afSignIn");
+    action.className = "af-secondary-button";
     action.disabled = true;
   }
 
@@ -341,28 +578,37 @@
     menu.setAttribute("aria-label", "More word actions");
 
     const status = appendElement(card, "div", "af-word-status");
-    status.textContent = state.accountStatus === "signed-in"
-      ? "Lookup ready"
-      : "Sign in to 2000NL to lookup and review this word.";
-
-    if (state.accountStatus !== "signed-in") {
-      const action = appendButton(card, "Sign in to 2000NL", "afSignIn");
-      action.className = "af-signin-button";
-      action.disabled = true;
-    }
+    status.textContent = state.accountStatus === "signed-in" ? "Personal lookup" : "Guest lookup";
 
     if (phrase) {
       const context = appendElement(card, "div", "af-context-block");
       const label = appendElement(context, "div", "af-context-label");
       label.textContent = "Current Context";
       const text = appendElement(context, "div", "af-context-text");
-      renderClickablePhraseText(text, phrase.text, phrase.index);
+      renderClickablePhraseText(text, phrase.text, state.selectedWord.phraseIndex);
     }
 
-    const placeholder = appendElement(card, "div", "af-lookup-placeholder");
-    placeholder.textContent = state.accountStatus === "signed-in"
-      ? "Dictionary API wiring will load definitions here."
-      : "No lookup request is sent until the 2000NL session is connected.";
+    const lookup = appendElement(card, "div", "af-lookup-placeholder");
+    const lookupTitle = appendElement(lookup, "div", "af-lookup-placeholder-title");
+    lookupTitle.textContent = "Dictionary result";
+    const lookupCopy = appendElement(lookup, "p", "af-dictionary-copy");
+    lookupCopy.textContent = "API wiring will load public dictionary matches here. Login will add your personal progress, not unlock basic lookup.";
+
+    renderReviewActions(card);
+  }
+
+  function renderReviewActions(parent) {
+    const section = appendElement(parent, "div", "af-card-review");
+    const label = appendElement(section, "div", "af-card-review-label");
+    label.textContent = state.accountStatus === "signed-in" ? "Grade this card" : "Connect 2000NL to grade memory";
+    const actions = appendElement(section, "div", "af-review-actions");
+    const again = appendButton(actions, "Again", "afAgain");
+    const hard = appendButton(actions, "Hard", "afHard");
+    const good = appendButton(actions, "Good", "afGood");
+    const easy = appendButton(actions, "Easy", "afEasy");
+    [again, hard, good, easy].forEach((button) => {
+      button.disabled = state.accountStatus !== "signed-in";
+    });
   }
 
   function selectLookupWord(word, phraseIndex) {
@@ -374,7 +620,7 @@
   function accountStatusLabel() {
     if (state.accountStatus === "signed-in") return "2000NL connected";
     if (state.accountStatus === "expired") return "Reconnect 2000NL";
-    return "Sign in required";
+    return "Guest lookup";
   }
 
   function clearElement(element) {
@@ -405,632 +651,382 @@
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
   }
 
-  function describeTrack(track) {
-    const name = track.name?.simpleText || track.name?.runs?.map((run) => run.text).join("") || track.languageCode || "unknown";
-    const source = track.kind === "asr" ? "auto" : "manual";
-    return `${name} (${source})`;
-  }
-
   async function initializeForCurrentVideo() {
-    const videoId = getVideoIdFromUrl();
+    const videoId = youtubeAdapterApi.getVideoIdFromUrl();
+    updateBootDiagnostics({
+      watchPageDetected: Boolean(videoId),
+      videoIdDetected: videoId || "",
+    });
     if (!videoId || videoId === state.videoId || state.loading) return;
 
+    const previousVideoId = state.videoId;
+    const loadToken = state.loadToken + 1;
     state.videoId = videoId;
+    state.loadToken = loadToken;
     state.tracks = [];
+    state.practiceSources = [];
+    state.selectedSourceId = "";
+    state.sourceMenuOpen = false;
     state.selectedTrack = null;
     state.cueSource = "";
+    state.transcriptResult = null;
     state.cues = [];
     state.phrases = [];
     state.currentIndex = 0;
     state.textVisible = true;
     state.selectedWord = null;
+    state.guidedMode = false;
     state.error = "";
     state.loading = true;
     stopPlaybackTimer();
+    detachPassivePlaybackWatcher();
+    resetTranscriptPanelState(previousVideoId);
     render();
 
     try {
       const playerResponse = await waitForPlayerResponse();
-      state.tracks = getCaptionTracks(playerResponse);
-      state.selectedTrack = chooseBestTrack(state.tracks);
-      if (!state.selectedTrack) {
+      state.tracks = captionTrackApi.getCaptionTracks(playerResponse);
+      updateBootDiagnostics({ captionTracksCount: state.tracks.length });
+      state.practiceSources = captionTrackApi.buildPracticeSources(state.tracks);
+      const defaultSource = captionTrackApi.chooseDefaultPracticeSource(state.practiceSources);
+      if (!defaultSource) {
         throw new Error("No caption tracks found for this video.");
       }
-
-      state.cues = await fetchBestAvailableCues(state.selectedTrack);
-      state.phrases = buildPhrases(state.cues);
-      if (!state.phrases.length) {
-        throw new Error("Caption track loaded, but no timed phrases were parsed.");
-      }
+      await loadPracticeSource(defaultSource, { keepExistingOnError: false, preserveVideoTime: false, loadToken });
     } catch (error) {
+      if (loadToken !== state.loadToken) return;
       state.error = error instanceof Error ? error.message : String(error);
+      updateBootDiagnostics({ lastError: state.error });
     } finally {
-      state.loading = false;
-      render();
+      if (loadToken === state.loadToken) {
+        state.loading = false;
+        render();
+      }
     }
   }
 
   async function waitForPlayerResponse() {
     const startedAt = Date.now();
+    let fetchedFreshPage = false;
+    let lastError = "";
+
     while (Date.now() - startedAt < 10000) {
       const response = extractPlayerResponse();
       if (response) return response;
+
+      if (!fetchedFreshPage && Date.now() - startedAt > 1000) {
+        fetchedFreshPage = true;
+        try {
+          const freshResponse = await fetchFreshPlayerResponse();
+          if (freshResponse) return freshResponse;
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : String(error);
+          recordDebugEvent("player-metadata-fetch-failed", {
+            videoId: youtubeAdapterApi.getVideoIdFromUrl(),
+            error: lastError,
+          });
+        }
+      }
+
       await delay(250);
     }
-    throw new Error("Could not read YouTube player metadata.");
+    throw new Error(lastError ? `Could not read YouTube player metadata. ${lastError}` : "Could not read YouTube player metadata.");
   }
 
   function extractPlayerResponse() {
-    const scripts = Array.from(document.scripts);
-    for (const script of scripts) {
-      const text = script.textContent || "";
-      const markerIndex = text.indexOf("ytInitialPlayerResponse");
-      if (markerIndex === -1) continue;
-
-      const assignmentIndex = text.indexOf("=", markerIndex);
-      if (assignmentIndex === -1) continue;
-
-      const jsonStart = text.indexOf("{", assignmentIndex);
-      if (jsonStart === -1) continue;
-
-      const jsonText = extractBalancedJson(text, jsonStart);
-      if (!jsonText) continue;
-
-      try {
-        return JSON.parse(jsonText);
-      } catch (_error) {
-        continue;
-      }
-    }
-
-    const ytInitialData = document.documentElement.innerHTML.match(/"playerCaptionsTracklistRenderer":\{/);
-    if (ytInitialData) {
-      return null;
-    }
-    return null;
+    return youtubeAdapterApi.extractPlayerResponseFromDocument(document, youtubeAdapterApi.getVideoIdFromUrl());
   }
 
-  function extractBalancedJson(text, startIndex) {
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
+  async function fetchFreshPlayerResponse() {
+    const videoId = youtubeAdapterApi.getVideoIdFromUrl();
+    if (!videoId) return null;
 
-    for (let index = startIndex; index < text.length; index += 1) {
-      const char = text[index];
+    recordDebugEvent("player-metadata-fetch-start", { videoId });
+    const response = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    const html = await response.text();
 
-      if (inString) {
-        if (escaped) {
-          escaped = false;
-        } else if (char === "\\") {
-          escaped = true;
-        } else if (char === "\"") {
-          inString = false;
-        }
-        continue;
-      }
-
-      if (char === "\"") {
-        inString = true;
-      } else if (char === "{") {
-        depth += 1;
-      } else if (char === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          return text.slice(startIndex, index + 1);
-        }
-      }
+    if (!response.ok) {
+      throw new Error(`Fresh watch page request failed: HTTP ${response.status}`);
     }
 
-    return "";
+    const playerResponse = youtubeAdapterApi.extractPlayerResponseFromText(html, videoId);
+    if (!playerResponse) {
+      throw new Error("Fresh watch page did not contain current player metadata.");
+    }
+
+    recordDebugEvent("player-metadata-fetch-loaded", {
+      videoId,
+      tracks: captionTrackApi.getCaptionTracks(playerResponse).length,
+    });
+    return playerResponse;
   }
 
-  function getCaptionTracks(playerResponse) {
-    return playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+  function resetTranscriptPanelState(previousVideoId) {
+    document.documentElement.dataset.afTranscriptVideoId = "";
+    Array.from(document.querySelectorAll("[data-af-current]")).forEach((segment) => {
+      delete segment.dataset.afCurrent;
+    });
+
+    if (previousVideoId && previousVideoId !== state.videoId) {
+      closeOpenTranscriptPanels();
+    }
   }
 
-  function chooseBestTrack(tracks) {
-    if (!tracks.length) return null;
+  function closeOpenTranscriptPanels() {
+    const closeButtons = Array.from(document.querySelectorAll("button[aria-label*='Close transcript'], button[aria-label*='Sluiten']"));
+    const button = closeButtons.find((candidate) => isVisibleElement(candidate));
+    if (button instanceof HTMLElement) {
+      activateElement(button);
+    }
+  }
 
-    const manualTarget = tracks.find((track) => track.languageCode === TARGET_LANGUAGE && track.kind !== "asr");
-    if (manualTarget) return manualTarget;
+  function getSelectedPracticeSource() {
+    return state.practiceSources.find((source) => source.id === state.selectedSourceId) || null;
+  }
 
-    const autoTarget = tracks.find((track) => track.languageCode === TARGET_LANGUAGE && track.kind === "asr");
-    if (autoTarget) return autoTarget;
+  async function selectPracticeSource(sourceId) {
+    const source = state.practiceSources.find((candidate) => candidate.id === sourceId);
+    if (!source || source.id === state.selectedSourceId || state.loading) return;
 
-    const manualAny = tracks.find((track) => track.kind !== "asr");
-    if (manualAny) return manualAny;
+    state.sourceMenuOpen = false;
+    await loadPracticeSource(source, { keepExistingOnError: true, preserveVideoTime: true });
+  }
 
-    return tracks[0];
+  async function loadPracticeSource(source, options) {
+    const loadToken = options.loadToken ?? state.loadToken;
+    if (loadToken !== state.loadToken) return;
+
+    const video = getVideoElement();
+    const currentMs = options.preserveVideoTime && video ? video.currentTime * 1000 : 0;
+
+    state.loading = true;
+    state.error = "";
+    source.error = "";
+    source.lastError = "";
+    source.lastRetrievalAttempts = [];
+    render();
+
+    try {
+      state.cueSource = "";
+      state.transcriptResult = null;
+      const transcriptResult = await fetchBestAvailableCues(source.track);
+      const cues = transcriptResult.cues;
+      const phrases = phraseApi.buildPhrases(cues, {
+        maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
+        longPauseMs: LONG_PAUSE_MS,
+        maxWords: 18,
+        maxCharacters: 140,
+      });
+      if (loadToken !== state.loadToken) return;
+      if (!phrases.length) {
+        throw new Error("Caption track loaded, but no timed phrases were parsed.");
+      }
+
+      state.selectedSourceId = source.id;
+      state.selectedTrack = source.track;
+      state.cues = cues;
+      state.transcriptResult = transcriptResult;
+      state.phrases = phrases;
+      state.currentIndex = findPhraseIndexForTime(phrases, currentMs);
+      state.selectedWord = null;
+      source.loadedCueSource = transcriptResult.retrievalPath;
+      source.loadedTranscriptResult = summarizeTranscriptResult(transcriptResult);
+      source.lastRetrievalAttempts = transcriptResult.retrievalAttempts || [];
+      state.error = "";
+      updateBootDiagnostics({
+        selectedRetrievalPath: transcriptResult.retrievalPath,
+        lastError: "",
+      });
+      ensurePassivePlaybackWatcher();
+      recordDebugEvent("source-loaded", {
+        source: captionTrackApi.sourceDisplayName(source),
+        sourceKind: transcriptResult.sourceKind,
+        retrievalPath: transcriptResult.retrievalPath,
+        timingExactness: transcriptResult.timingExactness,
+        qualityFlags: transcriptResult.qualityFlags,
+        warnings: transcriptResult.warnings,
+        cues: cues.length,
+        phrases: phrases.length,
+      });
+    } catch (error) {
+      if (loadToken !== state.loadToken) return;
+      const message = error instanceof Error ? error.message : String(error);
+      source.lastError = message;
+      source.error = summarizeError(message);
+      source.lastRetrievalAttempts = Array.isArray(error?.retrievalAttempts) ? error.retrievalAttempts : [];
+      state.error = source.error;
+      updateBootDiagnostics({ lastError: message });
+      recordDebugEvent("source-failed", {
+        source: captionTrackApi.sourceDisplayName(source),
+        languageCode: source.languageCode,
+        error: message,
+      });
+      if (!options.keepExistingOnError) {
+        state.selectedSourceId = source.id;
+        state.selectedTrack = source.track;
+        state.cues = [];
+        state.transcriptResult = null;
+        state.phrases = [];
+        state.currentIndex = 0;
+        state.sourceMenuOpen = state.practiceSources.length > 1;
+      }
+    } finally {
+      if (loadToken === state.loadToken) {
+        state.loading = false;
+        render();
+      }
+    }
+  }
+
+  function summarizeError(message) {
+    if (/Backend provider fallback is disabled/i.test(message)) {
+      return "Caption retrieval failed: YouTube timedtext was empty and backend fallback is disabled.";
+    }
+    if (/Backend provider request timed out|Backend provider returned no response|Backend provider request failed/i.test(message)) {
+      return "Caption retrieval failed: YouTube timedtext was empty and backend provider failed.";
+    }
+    if (/Diagnostic YouTube transcript fallback is disabled/i.test(message) && /empty response/i.test(message)) {
+      return "Caption retrieval failed: YouTube timedtext was empty and diagnostic transcript fallback is disabled.";
+    }
+    const first = message.split("|")[0]?.split(";")[0]?.trim() || message;
+    return first.length > 140 ? `${first.slice(0, 137)}...` : first;
+  }
+
+  function findPhraseIndexForTime(phrases, currentMs) {
+    if (!phrases.length || !Number.isFinite(currentMs) || currentMs <= 0) return 0;
+
+    const activeIndex = phrases.findIndex((phrase) => currentMs >= phrase.startMs && currentMs < phrase.endMs);
+    if (activeIndex >= 0) return activeIndex;
+
+    for (let index = phrases.length - 1; index >= 0; index -= 1) {
+      if (phrases[index].startMs <= currentMs) return index;
+    }
+
+    return 0;
+  }
+
+  function findPlaybackPhraseIndex(phrases, currentMs) {
+    if (!phrases.length || !Number.isFinite(currentMs) || currentMs <= 0) return 0;
+
+    const activeIndex = phrases.findIndex((phrase) => (
+      currentMs >= phrase.startMs - PRE_ROLL_MS &&
+      currentMs <= phrase.endMs + POST_ROLL_MS
+    ));
+    if (activeIndex >= 0) return activeIndex;
+
+    return findPhraseIndexForTime(phrases, currentMs);
   }
 
   async function fetchBestAvailableCues(track) {
-    const errors = [];
-
-    try {
-      const cues = await fetchCaptionCues(track);
-      state.cueSource = "timedtext";
-      return cues;
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+    if (!transcriptRetrievalApi?.fetchBestAvailableCues) {
+      throw new Error("Transcript retrieval helper was not loaded.");
     }
 
-    try {
-      const cues = await fetchTranscriptCues();
-      state.cueSource = "transcript-api";
-      return cues;
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-    }
-
-    try {
-      const cues = await fetchTranscriptPanelCues();
-      state.cueSource = "transcript-panel";
-      return cues;
-    } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
-    }
-
-    throw new Error(errors.join(" | "));
+    const result = await transcriptRetrievalApi.fetchBestAvailableCues(track, {
+      videoId: state.videoId,
+      recordDebugEvent,
+      updateRetrievalPath: (path) => updateBootDiagnostics({ selectedRetrievalPath: path }),
+      updateLastError: (message) => updateBootDiagnostics({ lastError: message }),
+    });
+    return normalizeTranscriptResult(result, track);
   }
 
-  async function fetchTranscriptPanelCues() {
-    let cues = parseTranscriptPanelCues();
-    if (cues.length) return cues;
-
-    await openTranscriptPanel();
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < 8000) {
-      cues = parseTranscriptPanelCues();
-      if (cues.length) return cues;
-      await delay(250);
-    }
-
-    throw new Error("Transcript panel did not expose timed segments.");
+  function normalizeTranscriptResult(result, track) {
+    const normalized = {
+      cues: Array.isArray(result?.cues) ? result.cues : [],
+      sourceKind: result?.sourceKind || sourceKindFromTrack(track),
+      retrievalPath: result?.retrievalPath || result?.cueSource || "backend-provider",
+      selectedTrackId: result?.selectedTrackId || track?.vssId || track?.languageCode || "",
+      actualTrackId: result?.actualTrackId || "",
+      languageCode: result?.languageCode || track?.languageCode || "",
+      timingExactness: result?.timingExactness || "approximate",
+      qualityFlags: Array.isArray(result?.qualityFlags) ? result.qualityFlags : [],
+      warnings: Array.isArray(result?.warnings) ? result.warnings : [],
+      retrievalAttempts: Array.isArray(result?.retrievalAttempts) ? result.retrievalAttempts : [],
+    };
+    state.cueSource = normalized.retrievalPath;
+    return normalized;
   }
 
-  async function openTranscriptPanel() {
-    clickButtonByText(["...more", "more", "meer", "show more"]);
-    await delay(300);
-
-    if (clickButtonByText(["transcript", "transcriptie", "transcript tonen", "show transcript"])) {
-      return;
-    }
-
-    const transcriptSectionButton = document.querySelector("ytd-video-description-transcript-section-renderer button");
-    if (transcriptSectionButton instanceof HTMLButtonElement) {
-      transcriptSectionButton.click();
-      return;
-    }
-
-    throw new Error("Could not find the YouTube transcript button.");
+  function sourceKindFromTrack(track) {
+    return track?.kind === "asr" ? "auto" : "manual";
   }
 
-  function clickButtonByText(needles) {
-    const buttons = Array.from(document.querySelectorAll("button, yt-button-shape button"));
-    for (const button of buttons) {
-      const label = `${button.textContent || ""} ${button.getAttribute("aria-label") || ""}`.toLowerCase();
-      if (needles.some((needle) => label.includes(needle))) {
-        button.click();
-        return true;
-      }
-    }
-    return false;
-  }
-
-  async function fetchCaptionCues(track) {
-    const attempts = [
-      { fmt: "json3", parser: parseJson3Cues },
-      { fmt: "vtt", parser: parseVttCues },
-      { fmt: "srv3", parser: parseSrv3Cues },
-    ];
-
-    const errors = [];
-
-    for (const attempt of attempts) {
-      try {
-        const url = new URL(track.baseUrl);
-        url.searchParams.set("fmt", attempt.fmt);
-
-        const response = await fetch(url.toString(), {
-          credentials: "include",
-        });
-
-        const text = await response.text();
-        if (!response.ok) {
-          errors.push(`${attempt.fmt}: HTTP ${response.status}`);
-          continue;
-        }
-
-        if (!text.trim()) {
-          errors.push(`${attempt.fmt}: empty response`);
-          continue;
-        }
-
-        const payload = attempt.fmt === "json3" ? JSON.parse(text) : text;
-        const cues = attempt.parser(payload);
-        if (cues.length) return cues;
-        errors.push(`${attempt.fmt}: no cues`);
-      } catch (error) {
-        errors.push(`${attempt.fmt}: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-
-    throw new Error(`Could not load caption data (${errors.join("; ")}).`);
-  }
-
-  async function fetchTranscriptCues() {
-    const ytcfg = extractYtcfg();
-    const initialData = extractInitialData();
-    const endpoint = findDeep(initialData, (value) => value.getTranscriptEndpoint?.params)[0];
-    const params = endpoint?.getTranscriptEndpoint?.params;
-
-    if (!ytcfg?.INNERTUBE_API_KEY || !ytcfg?.INNERTUBE_CONTEXT || !params) {
-      throw new Error("Transcript endpoint metadata was not found.");
-    }
-
-    const response = await fetch(
-      `https://www.youtube.com/youtubei/v1/get_transcript?key=${encodeURIComponent(ytcfg.INNERTUBE_API_KEY)}&prettyPrint=false`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "content-type": "application/json",
-          "x-youtube-client-name": String(ytcfg.INNERTUBE_CONTEXT_CLIENT_NAME || ytcfg.INNERTUBE_CLIENT_NAME || "1"),
-          "x-youtube-client-version": String(ytcfg.INNERTUBE_CLIENT_VERSION || ""),
-        },
-        body: JSON.stringify({
-          context: ytcfg.INNERTUBE_CONTEXT,
-          params,
-        }),
-      },
-    );
-
-    const text = await response.text();
-    if (!response.ok) {
-      throw new Error(`Transcript request failed: HTTP ${response.status} ${text.slice(0, 160)}`);
-    }
-
-    if (!text.trim()) {
-      throw new Error("Transcript request returned an empty response.");
-    }
-
-    const payload = JSON.parse(text);
-    const cues = parseTranscriptCues(payload);
-    if (!cues.length) {
-      throw new Error("Transcript response did not contain timed segments.");
-    }
-
-    return cues;
-  }
-
-  function extractYtcfg() {
-    const scripts = Array.from(document.scripts);
-
-    for (const script of scripts) {
-      const text = script.textContent || "";
-      const markerIndex = text.indexOf("ytcfg.set({");
-      if (markerIndex === -1) continue;
-
-      const jsonStart = text.indexOf("{", markerIndex);
-      const jsonText = extractBalancedJson(text, jsonStart);
-      if (!jsonText) continue;
-
-      try {
-        return JSON.parse(jsonText);
-      } catch (_error) {
-        continue;
-      }
-    }
-
-    return null;
-  }
-
-  function extractInitialData() {
-    const scripts = Array.from(document.scripts);
-
-    for (const script of scripts) {
-      const text = script.textContent || "";
-      const markerIndex = text.indexOf("ytInitialData");
-      if (markerIndex === -1) continue;
-
-      const assignmentIndex = text.indexOf("=", markerIndex);
-      if (assignmentIndex === -1) continue;
-
-      const jsonStart = text.indexOf("{", assignmentIndex);
-      const jsonText = extractBalancedJson(text, jsonStart);
-      if (!jsonText) continue;
-
-      try {
-        return JSON.parse(jsonText);
-      } catch (_error) {
-        continue;
-      }
-    }
-
-    return null;
-  }
-
-  function findDeep(value, predicate, results = []) {
-    if (!value || typeof value !== "object") return results;
-    if (predicate(value)) results.push(value);
-
-    for (const child of Object.values(value)) {
-      if (child && typeof child === "object") {
-        findDeep(child, predicate, results);
-      }
-    }
-
-    return results;
-  }
-
-  function parseJson3Cues(json3) {
-    const cues = [];
-    for (const event of json3.events || []) {
-      if (!event.segs || typeof event.tStartMs !== "number") continue;
-
-      const text = event.segs
-        .map((segment) => segment.utf8 || "")
-        .join("")
-        .replace(/\s+/g, " ")
-        .trim();
-
-      if (!text) continue;
-
-      const duration = typeof event.dDurationMs === "number" ? event.dDurationMs : 0;
-      cues.push({
-        startMs: event.tStartMs,
-        endMs: event.tStartMs + duration,
-        text,
-      });
-    }
-
-    return cues
-      .filter((cue) => cue.endMs > cue.startMs)
-      .sort((a, b) => a.startMs - b.startMs);
-  }
-
-  function parseVttCues(vttText) {
-    const cues = [];
-    const blocks = vttText.split(/\n{2,}/);
-
-    for (const block of blocks) {
-      const lines = block
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
-
-      const timingIndex = lines.findIndex((line) => line.includes("-->"));
-      if (timingIndex === -1) continue;
-
-      const [startRaw, endRaw] = lines[timingIndex].split("-->").map((value) => value.trim().split(/\s+/)[0]);
-      const startMs = parseVttTime(startRaw);
-      const endMs = parseVttTime(endRaw);
-      const text = cleanCaptionText(lines.slice(timingIndex + 1).join(" "));
-
-      if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs && text) {
-        cues.push({ startMs, endMs, text });
-      }
-    }
-
-    return cues.sort((a, b) => a.startMs - b.startMs);
-  }
-
-  function parseVttTime(value) {
-    const parts = value.split(":");
-    const secondsPart = parts.pop();
-    if (!secondsPart) return Number.NaN;
-
-    const [secondsRaw, millisRaw = "0"] = secondsPart.split(".");
-    const seconds = Number(secondsRaw);
-    const minutes = Number(parts.pop() || "0");
-    const hours = Number(parts.pop() || "0");
-    const millis = Number(millisRaw.padEnd(3, "0").slice(0, 3));
-
-    if ([hours, minutes, seconds, millis].some((part) => Number.isNaN(part))) {
-      return Number.NaN;
-    }
-
-    return ((hours * 60 * 60 + minutes * 60 + seconds) * 1000) + millis;
-  }
-
-  function parseSrv3Cues(xmlText) {
-    const documentXml = new DOMParser().parseFromString(xmlText, "text/xml");
-    const textNodes = Array.from(documentXml.querySelectorAll("text"));
-
-    return textNodes
-      .map((node) => {
-        const startMs = Number(node.getAttribute("t"));
-        const durationMs = Number(node.getAttribute("d"));
-        const text = cleanCaptionText(node.textContent || "");
-        return {
-          startMs,
-          endMs: startMs + durationMs,
-          text,
-        };
-      })
-      .filter((cue) => Number.isFinite(cue.startMs) && Number.isFinite(cue.endMs) && cue.endMs > cue.startMs && cue.text)
-      .sort((a, b) => a.startMs - b.startMs);
-  }
-
-  function parseTranscriptCues(payload) {
-    return findDeep(payload, (value) => value.transcriptSegmentRenderer)
-      .map((wrapper) => wrapper.transcriptSegmentRenderer)
-      .map((segment) => {
-        const startMs = Number(segment.startMs ?? segment.start_ms);
-        const endMs = Number(segment.endMs ?? segment.end_ms);
-        const text = cleanCaptionText(textRunsToString(segment.snippet));
-
-        return {
-          startMs,
-          endMs,
-          text,
-        };
-      })
-      .filter((cue) => Number.isFinite(cue.startMs) && Number.isFinite(cue.endMs) && cue.endMs > cue.startMs && cue.text)
-      .sort((a, b) => a.startMs - b.startMs);
-  }
-
-  function parseTranscriptPanelCues() {
-    const segments = Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"));
-    const rawCues = segments
-      .map((segment, segmentIndex) => {
-        const timestampEl = segment.querySelector(".segment-timestamp, .segment-start-offset, [class*='timestamp']");
-        const textEls = Array.from(segment.querySelectorAll(".segment-text, [class*='segment-text']"));
-        const timestampText = timestampEl?.textContent?.trim() || "";
-        const startMs = parseTimestampText(timestampText);
-        const text = cleanCaptionText(
-          textEls
-            .map((textEl) => textEl.textContent || "")
-            .join(" "),
-        );
-
-        return {
-          startMs,
-          endMs: startMs,
-          text,
-          segmentIndex,
-        };
-      })
-      .filter((cue) => Number.isFinite(cue.startMs) && cue.text)
-      .sort((a, b) => a.startMs - b.startMs);
-
-    const dedupedCues = dedupeCues(rawCues);
-
-    return dedupedCues
-      .map((cue, index) => {
-        const nextCue = dedupedCues[index + 1];
-        const estimatedEndMs = nextCue ? Math.max(cue.startMs + 500, nextCue.startMs) : cue.startMs + 4000;
-        return {
-          ...cue,
-          endMs: estimatedEndMs,
-        };
-      })
-      .filter((cue) => cue.endMs > cue.startMs);
-  }
-
-  function dedupeCues(cues) {
-    const seen = new Set();
-    const deduped = [];
-
-    for (const cue of cues) {
-      const key = `${cue.startMs}:${cue.text}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(cue);
-    }
-
-    return deduped;
-  }
-
-  function parseTimestampText(text) {
-    const normalized = text.trim();
-    if (!normalized) return Number.NaN;
-
-    const parts = normalized.split(":").map((part) => Number(part));
-    if (parts.some((part) => Number.isNaN(part))) {
-      return Number.NaN;
-    }
-
-    if (parts.length === 2) {
-      const [minutes, seconds] = parts;
-      return (minutes * 60 + seconds) * 1000;
-    }
-
-    if (parts.length === 3) {
-      const [hours, minutes, seconds] = parts;
-      return ((hours * 60 * 60) + (minutes * 60) + seconds) * 1000;
-    }
-
-    return Number.NaN;
-  }
-
-  function textRunsToString(value) {
-    if (!value) return "";
-    if (typeof value.simpleText === "string") return value.simpleText;
-    if (Array.isArray(value.runs)) {
-      return value.runs.map((run) => run.text || "").join("");
-    }
-    return "";
-  }
-
-  function cleanCaptionText(text) {
-    return decodeCommonHtmlEntities(text)
-      .replace(/<[^>]+>/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function decodeCommonHtmlEntities(text) {
-    return text
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, "\"")
-      .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, " ");
-  }
-
-  function buildPhrases(cues) {
-    const phrases = [];
-    let current = null;
-
-    for (const cue of cues) {
-      if (!current) {
-        current = phraseFromCue(cue);
-        continue;
-      }
-
-      const pause = cue.startMs - current.endMs;
-      const nextDuration = cue.endMs - current.startMs;
-      const shouldBreak =
-        hasSentenceEnding(current.text) ||
-        pause > LONG_PAUSE_MS ||
-        nextDuration > MAX_PHRASE_DURATION_MS;
-
-      if (shouldBreak) {
-        phrases.push(current);
-        current = phraseFromCue(cue);
-      } else {
-        current.endMs = Math.max(current.endMs, cue.endMs);
-        current.text = cleanPhraseText(`${current.text} ${cue.text}`);
-        current.cues.push(cue);
-      }
-    }
-
-    if (current) phrases.push(current);
-
-    return phrases.map((phrase, index) => ({
-      ...phrase,
-      index,
-    }));
-  }
-
-  function phraseFromCue(cue) {
+  function summarizeTranscriptResult(result) {
     return {
-      startMs: cue.startMs,
-      endMs: cue.endMs,
-      text: cleanPhraseText(cue.text),
-      cues: [cue],
+      sourceKind: result.sourceKind,
+      retrievalPath: result.retrievalPath,
+      selectedTrackId: result.selectedTrackId || "",
+      actualTrackId: result.actualTrackId || "",
+      languageCode: result.languageCode || "",
+      timingExactness: result.timingExactness,
+      qualityFlags: [...(result.qualityFlags || [])],
+      warnings: [...(result.warnings || [])],
+      retrievalAttempts: Array.isArray(result.retrievalAttempts) ? result.retrievalAttempts : [],
     };
   }
 
-  function cleanPhraseText(text) {
-    return text
-      .replace(/\s+([,.;:!?])/g, "$1")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function hasSentenceEnding(text) {
-    return /(?:[.!?]|\.{3}|…|।|؟)$/.test(text.trim());
+  function formatTranscriptBadge(result) {
+    const sourceLabel = {
+      manual: "Manual",
+      auto: "Auto",
+      "transcript-panel": "Transcript fallback",
+      provider: "Provider",
+      asr: "ASR",
+      unknown: "Unknown",
+    }[result.sourceKind] || "Unknown";
+    const timingLabel = result.timingExactness === "exact"
+      ? "exact"
+      : result.timingExactness === "word-level" ? "word-level" : "rough timing";
+    return `${sourceLabel} · ${timingLabel}`;
   }
 
   function getVideoElement() {
-    return document.querySelector("video");
+    const video = youtubeAdapterApi.getVideoElement(document);
+    updateBootDiagnostics({ videoElementDetected: Boolean(video) });
+    return video;
+  }
+
+  function isVisibleElement(element) {
+    if (!(element instanceof HTMLElement)) return false;
+    if (!element.isConnected) return false;
+    if (element.hidden || element.getAttribute("aria-hidden") === "true") return false;
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+    return element.getClientRects().length > 0;
+  }
+
+  function activateElement(element) {
+    if (typeof element.scrollIntoView === "function") {
+      element.scrollIntoView({ block: "center", inline: "nearest" });
+    }
+    if (typeof element.focus === "function") {
+      element.focus({ preventScroll: true });
+    }
+
+    const eventOptions = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+    };
+
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+      element.dispatchEvent(new MouseEvent(type, eventOptions));
+    }
+
+    if (typeof element.click === "function") {
+      element.click();
+    }
   }
 
   function replayCurrentPhrase() {
     syncIndexToCurrentTime({ keepCurrentIfJustEnded: true });
+    enterGuidedMode();
+    render();
     playPhrase(state.currentIndex);
   }
 
@@ -1039,6 +1035,7 @@
     syncIndexToCurrentTime();
     state.currentIndex = Math.min(state.currentIndex + 1, state.phrases.length - 1);
     state.selectedWord = null;
+    enterGuidedMode();
     render();
     playPhrase(state.currentIndex);
   }
@@ -1048,6 +1045,7 @@
     syncIndexToCurrentTime();
     state.currentIndex = Math.max(state.currentIndex - 1, 0);
     state.selectedWord = null;
+    enterGuidedMode();
     render();
     playPhrase(state.currentIndex);
   }
@@ -1059,7 +1057,12 @@
 
   function toggleAutoPause() {
     state.autoPause = !state.autoPause;
+    state.guidedMode = state.autoPause ? true : false;
     render();
+  }
+
+  function enterGuidedMode() {
+    state.guidedMode = true;
   }
 
   function showText() {
@@ -1119,10 +1122,6 @@
       holdSeconds: Math.max(0, phrase.startMs / 1000),
     };
 
-    state.playbackTimer = window.setInterval(() => {
-      enforcePhraseEnd(video);
-    }, 25);
-    video.addEventListener("timeupdate", onVideoTimeUpdate, true);
     state.playbackFrame = window.requestAnimationFrame(function frame() {
       enforcePhraseEnd(video);
       if (state.activePlayback) {
@@ -1132,23 +1131,111 @@
   }
 
   function stopPlaybackTimer() {
-    if (state.playbackTimer) {
-      window.clearInterval(state.playbackTimer);
-      state.playbackTimer = null;
-    }
     if (state.playbackFrame) {
       window.cancelAnimationFrame(state.playbackFrame);
       state.playbackFrame = null;
     }
-    const video = getVideoElement();
-    if (video) {
-      video.removeEventListener("timeupdate", onVideoTimeUpdate, true);
-    }
     state.activePlayback = null;
   }
 
-  function onVideoTimeUpdate(event) {
-    enforcePhraseEnd(event.currentTarget);
+  function ensurePassivePlaybackWatcher() {
+    const video = getVideoElement();
+    if (!video || state.passiveVideo === video) return;
+
+    detachPassivePlaybackWatcher();
+    state.passiveVideo = video;
+    state.passivePausedKey = "";
+    video.addEventListener("timeupdate", onPassiveVideoTimeUpdate, true);
+    video.addEventListener("play", onPassiveVideoPlay, true);
+    video.addEventListener("pause", onPassiveVideoPause, true);
+    syncPassivePlayback(video);
+    if (!video.paused) {
+      startPassivePlaybackFrame(video);
+    }
+  }
+
+  function detachPassivePlaybackWatcher() {
+    if (state.passiveFrame) {
+      window.cancelAnimationFrame(state.passiveFrame);
+      state.passiveFrame = null;
+    }
+
+    if (state.passiveVideo) {
+      state.passiveVideo.removeEventListener("timeupdate", onPassiveVideoTimeUpdate, true);
+      state.passiveVideo.removeEventListener("play", onPassiveVideoPlay, true);
+      state.passiveVideo.removeEventListener("pause", onPassiveVideoPause, true);
+      state.passiveVideo = null;
+    }
+
+    state.passivePausedKey = "";
+  }
+
+  function onPassiveVideoTimeUpdate(event) {
+    syncPassivePlayback(event.currentTarget);
+  }
+
+  function onPassiveVideoPlay(event) {
+    state.passivePausedKey = "";
+    const video = event.currentTarget;
+    syncPassivePlayback(video);
+    startPassivePlaybackFrame(video);
+  }
+
+  function onPassiveVideoPause() {
+    if (state.passiveFrame) {
+      window.cancelAnimationFrame(state.passiveFrame);
+      state.passiveFrame = null;
+    }
+  }
+
+  function startPassivePlaybackFrame(video) {
+    if (state.passiveFrame) {
+      window.cancelAnimationFrame(state.passiveFrame);
+    }
+
+    state.passiveFrame = window.requestAnimationFrame(function frame() {
+      if (state.passiveVideo !== video) {
+        state.passiveFrame = null;
+        return;
+      }
+
+      syncPassivePlayback(video);
+      if (!video.paused) {
+        state.passiveFrame = window.requestAnimationFrame(frame);
+      } else {
+        state.passiveFrame = null;
+      }
+    });
+  }
+
+  function syncPassivePlayback(video) {
+    if (!video || !state.learningEnabled || state.loading || !state.phrases.length) return;
+
+    const currentMs = video.currentTime * 1000;
+    const index = findPlaybackPhraseIndex(state.phrases, currentMs);
+    const phrase = state.phrases[index];
+    if (!phrase) return;
+
+    if (index !== state.currentIndex) {
+      state.currentIndex = index;
+      state.selectedWord = null;
+      markCurrentTranscriptSegment(phrase);
+      render();
+    }
+
+    if (!state.guidedMode || !state.autoPause || state.activePlayback || video.paused) return;
+
+    const endMs = phrase.endMs + POST_ROLL_MS;
+    if (currentMs < endMs) return;
+
+    const pauseKey = `${state.videoId || ""}:${state.selectedSourceId}:${index}`;
+    if (state.passivePausedKey === pauseKey) return;
+
+    state.passivePausedKey = pauseKey;
+    video.pause();
+    video.currentTime = Math.max(0, phrase.startMs / 1000);
+    markCurrentTranscriptSegment(phrase);
+    render();
   }
 
   function enforcePhraseEnd(video) {
@@ -1166,7 +1253,11 @@
 
   function markCurrentTranscriptSegment(phrase) {
     const segmentIndex = phrase?.cues?.[0]?.segmentIndex;
-    const segments = Array.from(document.querySelectorAll("ytd-transcript-segment-renderer"));
+    const segmentSelector = phrase?.cues?.[0]?.segmentSelector;
+    const selector = segmentSelector === "modern"
+      ? "transcript-segment-view-model"
+      : "ytd-transcript-segment-renderer";
+    const segments = Array.from(document.querySelectorAll(selector));
 
     segments.forEach((segment) => {
       delete segment.dataset.afCurrent;
@@ -1182,8 +1273,10 @@
   }
 
   function onKeyboardEvent(event) {
-    if (!isWatchPage()) return;
+    if (!youtubeAdapterApi.isWatchPage()) return;
+    if (!state.learningEnabled) return;
     if (shouldIgnoreKeyEvent(event)) return;
+    if (!state.guidedMode) return;
 
     if (isSpaceKey(event)) {
       blockYouTubeShortcut(event);
@@ -1196,16 +1289,16 @@
     if (event.type !== "keydown") return;
 
     if (event.code === "ArrowRight") {
-      blockYouTubeShortcut(event);
+      blockYouTubeShortcutWithOptions(event);
       nextPhrase();
     } else if (event.code === "ArrowLeft") {
-      blockYouTubeShortcut(event);
+      blockYouTubeShortcutWithOptions(event);
       previousPhrase();
     } else if (event.code === "ArrowDown") {
-      blockYouTubeShortcut(event);
+      blockYouTubeShortcutWithOptions(event);
       showText();
     } else if (event.code === "ArrowUp") {
-      blockYouTubeShortcut(event);
+      blockYouTubeShortcutWithOptions(event);
       hideText();
     }
   }
@@ -1215,9 +1308,15 @@
   }
 
   function blockYouTubeShortcut(event) {
+    blockYouTubeShortcutWithOptions(event, { immediate: true });
+  }
+
+  function blockYouTubeShortcutWithOptions(event, options = {}) {
     event.preventDefault();
     event.stopPropagation();
-    event.stopImmediatePropagation();
+    if (options.immediate) {
+      event.stopImmediatePropagation();
+    }
   }
 
   function shouldIgnoreKeyEvent(event) {
@@ -1237,6 +1336,8 @@
     window.setInterval(() => {
       if (window.location.href !== lastUrl) {
         lastUrl = window.location.href;
+        state.loadToken += 1;
+        state.loading = false;
         state.videoId = null;
         handleCurrentLocation();
       }
@@ -1245,15 +1346,35 @@
 
   function watchWorkspaceMount() {
     window.setInterval(() => {
-      if (isWatchPage()) {
+      if (youtubeAdapterApi.isWatchPage() && state.learningEnabled) {
         ensureWorkspace();
+        initializeForCurrentVideo();
+        if (state.phrases.length) {
+          ensurePassivePlaybackWatcher();
+        }
       }
     }, 2000);
   }
 
   function handleCurrentLocation() {
-    if (!isWatchPage()) {
+    const videoId = youtubeAdapterApi.getVideoIdFromUrl();
+    updateBootDiagnostics({
+      watchPageDetected: Boolean(videoId),
+      videoIdDetected: videoId || "",
+    });
+
+    if (!videoId) {
       stopPlaybackTimer();
+      detachPassivePlaybackWatcher();
+      removeWorkspace();
+      document.getElementById(TOGGLE_ID)?.remove();
+      return;
+    }
+    renderToggle();
+    if (!state.learningEnabled) {
+      stopPlaybackTimer();
+      detachPassivePlaybackWatcher();
+      state.guidedMode = false;
       removeWorkspace();
       return;
     }
@@ -1271,4 +1392,312 @@
   watchYouTubeNavigation();
   watchWorkspaceMount();
   handleCurrentLocation();
+  }
+
+  function createBootDiagnosticsFallback() {
+    const version = "missing-boot-diagnostics-helper";
+    const publish = (diagnostics) => {
+      document.documentElement.dataset.afShadowingBootState = JSON.stringify(diagnostics);
+    };
+
+    return {
+      markBootStarted() {
+        const diagnostics = {
+          contentScriptLoaded: true,
+          bootFailed: false,
+          version,
+          loadedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          url: window.location.href,
+          extensionId: "",
+          watchPageDetected: false,
+          videoIdDetected: "",
+          videoElementDetected: false,
+          captionTracksCount: null,
+          selectedRetrievalPath: "",
+          lastError: "",
+        };
+        document.documentElement.dataset.afShadowingBoot = "1";
+        document.documentElement.dataset.afShadowingBootVersion = version;
+        publish(diagnostics);
+        return diagnostics;
+      },
+      recordBootFailure(error) {
+        console.error("[AudioFilms] content script boot failed", error);
+      },
+      renderBootFailureBadge() {},
+      publish,
+    };
+  }
+
+  function createPhraseFallback() {
+    const cleanPhraseText = (text) => text
+      .replace(/\s+([,.;:!?])/g, "$1")
+      .replace(/\s+/g, " ")
+      .trim();
+    const hasSentenceEnding = (text) => /(?:[.!?]|\.{3}|…|।|؟)$/.test(text.trim());
+    const wordCount = (text) => {
+      const matches = String(text || "").match(/[\p{L}\p{N}]+/gu);
+      return matches ? matches.length : 0;
+    };
+
+    return {
+      buildPhrases(cues, options = {}) {
+        const maxPhraseDurationMs = options.maxPhraseDurationMs ?? 12000;
+        const longPauseMs = options.longPauseMs ?? 1000;
+        const maxWords = options.maxWords ?? 18;
+        const maxCharacters = options.maxCharacters ?? 140;
+        const phrases = [];
+        let current = null;
+
+        for (const cue of cues) {
+          if (!current) {
+            current = {
+              startMs: cue.startMs,
+              endMs: cue.endMs,
+              text: cleanPhraseText(cue.text),
+              cues: [cue],
+            };
+            continue;
+          }
+
+          const pause = cue.startMs - current.endMs;
+          const nextDuration = cue.endMs - current.startMs;
+          const nextText = cleanPhraseText(`${current.text} ${cue.text}`);
+          const shouldBreak =
+            hasSentenceEnding(current.text) ||
+            pause > longPauseMs ||
+            nextDuration > maxPhraseDurationMs ||
+            wordCount(nextText) > maxWords ||
+            nextText.length > maxCharacters;
+
+          if (shouldBreak) {
+            phrases.push(current);
+            current = {
+              startMs: cue.startMs,
+              endMs: cue.endMs,
+              text: cleanPhraseText(cue.text),
+              cues: [cue],
+            };
+          } else {
+            current.endMs = Math.max(current.endMs, cue.endMs);
+            current.text = nextText;
+            current.cues.push(cue);
+          }
+        }
+
+        if (current) phrases.push(current);
+        return phrases.map((phrase, index) => ({ ...phrase, index }));
+      },
+      cleanPhraseText,
+      hasSentenceEnding,
+      wordCount,
+    };
+  }
+
+  function createCaptionTracksFallback() {
+    const trackName = (track) => (
+      track.name?.simpleText ||
+      track.name?.runs?.map((run) => run.text).join("") ||
+      track.languageCode ||
+      "unknown"
+    );
+    const sourceDisplayName = (source) => source.name || source.languageCode || "Captions";
+    const languageLabelFromSource = (source) => {
+      const name = source.name || source.languageCode || "Unknown";
+      return name
+        .replace(/\s*\([^)]*(auto-generated|automatisch gegenereerd|automatic|auto)[^)]*\)\s*/i, "")
+        .trim() || name;
+    };
+
+    return {
+      getCaptionTracks(playerResponse) {
+        return playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+      },
+      buildPracticeSources(tracks) {
+        return tracks.map((track, index) => ({
+          id: `${track.languageCode || "unknown"}:${track.vssId || index}:${index}`,
+          index,
+          name: trackName(track),
+          languageCode: track.languageCode || "",
+          track,
+          error: "",
+          lastError: "",
+          lastRetrievalAttempts: [],
+          loadedCueSource: "",
+          loadedTranscriptResult: null,
+        }));
+      },
+      chooseDefaultPracticeSource(sources) {
+        return sources.find((source) => source.track.kind !== "asr") || sources[0] || null;
+      },
+      describeTrack: trackName,
+      trackName,
+      sourceDisplayName,
+      cueSourceLabel(value) {
+        if (!value) return "";
+        if (String(value).startsWith("timedtext")) return "timedtext";
+        if (value === "youtubei-transcript") return "transcript API";
+        if (value === "transcript-dom") return "transcript fallback";
+        return "fallback";
+      },
+      groupPracticeSources(sources) {
+        const groups = [];
+        const byLanguage = new Map();
+
+        for (const source of sources) {
+          const key = source.languageCode || source.name || "unknown";
+          if (!byLanguage.has(key)) {
+            const label = source.languageCode
+              ? `${languageLabelFromSource(source)} (${source.languageCode})`
+              : languageLabelFromSource(source);
+            const group = { key, label, sources: [] };
+            byLanguage.set(key, group);
+            groups.push(group);
+          }
+          byLanguage.get(key).sources.push(source);
+        }
+
+        groups.forEach((group) => {
+          group.sources.sort((left, right) => {
+            const leftAuto = left.track.kind === "asr" ? 1 : 0;
+            const rightAuto = right.track.kind === "asr" ? 1 : 0;
+            return leftAuto - rightAuto || left.index - right.index;
+          });
+        });
+
+        return groups;
+      },
+      languageLabelFromSource,
+      formatSourceDebug(source) {
+        return {
+          id: source.id,
+          name: source.name,
+          languageCode: source.languageCode,
+          kind: source.track.kind || "manual",
+          vssId: source.track.vssId || "",
+          loadedCueSource: source.loadedCueSource,
+          loadedTranscriptResult: source.loadedTranscriptResult,
+          lastRetrievalAttempts: source.lastRetrievalAttempts || [],
+          error: source.error,
+          lastError: source.lastError,
+        };
+      },
+    };
+  }
+
+  function createYouTubeAdapterFallback() {
+    const getVideoIdFromUrl = (href = window.location.href) => {
+      const url = new URL(href);
+      return url.searchParams.get("v");
+    };
+
+    const extractBalancedJson = (text, startIndex) => {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+
+      for (let index = startIndex; index < text.length; index += 1) {
+        const char = text[index];
+
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+          } else if (char === "\\") {
+            escaped = true;
+          } else if (char === "\"") {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (char === "\"") {
+          inString = true;
+        } else if (char === "{") {
+          depth += 1;
+        } else if (char === "}") {
+          depth -= 1;
+          if (depth === 0) {
+            return text.slice(startIndex, index + 1);
+          }
+        }
+      }
+
+      return "";
+    };
+
+    const extractPlayerResponseFromText = (text, currentVideoId) => {
+      let searchFrom = 0;
+
+      while (searchFrom < text.length) {
+        const markerIndex = text.indexOf("ytInitialPlayerResponse", searchFrom);
+        if (markerIndex === -1) return null;
+        searchFrom = markerIndex + "ytInitialPlayerResponse".length;
+
+        const assignmentIndex = text.indexOf("=", markerIndex);
+        if (assignmentIndex === -1) continue;
+
+        const jsonStart = text.indexOf("{", assignmentIndex);
+        if (jsonStart === -1) continue;
+
+        const jsonText = extractBalancedJson(text, jsonStart);
+        if (!jsonText) continue;
+
+        try {
+          const response = JSON.parse(jsonText);
+          const responseVideoId = response?.videoDetails?.videoId;
+          if (!currentVideoId || !responseVideoId || responseVideoId === currentVideoId) {
+            return response;
+          }
+        } catch (_error) {
+          continue;
+        }
+      }
+
+      return null;
+    };
+
+    const isVisibleVideoElement = (video) => {
+      if (!(video instanceof HTMLVideoElement)) return false;
+      if (!video.isConnected) return false;
+      const rect = video.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+      const style = window.getComputedStyle(video);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+      return true;
+    };
+
+    const isUsableYouTubeVideo = (video) => {
+      if (!isVisibleVideoElement(video)) return false;
+      if (!Number.isFinite(video.duration) || video.duration <= 0) return false;
+      if (video.readyState < HTMLMediaElement.HAVE_METADATA) return false;
+      const rect = video.getBoundingClientRect();
+      if (rect.width < 180 || rect.height < 100) return false;
+      if (video.closest(".ytp-ad-player-overlay, .ytp-ad-module")) return false;
+      return true;
+    };
+
+    return {
+      getVideoIdFromUrl,
+      isWatchPage(href = window.location.href) {
+        return Boolean(getVideoIdFromUrl(href));
+      },
+      extractPlayerResponseFromDocument(doc = document, currentVideoId = getVideoIdFromUrl()) {
+        const scripts = Array.from(doc.scripts);
+        for (const script of scripts) {
+          const response = extractPlayerResponseFromText(script.textContent || "", currentVideoId);
+          if (response) return response;
+        }
+        return null;
+      },
+      extractPlayerResponseFromText,
+      extractBalancedJson,
+      getVideoElement(doc = document) {
+        const videos = Array.from(doc.querySelectorAll("video"));
+        return videos.find(isUsableYouTubeVideo) || videos.find(isVisibleVideoElement) || videos[0] || null;
+      },
+      isUsableYouTubeVideo,
+      isVisibleVideoElement,
+    };
+  }
 })();

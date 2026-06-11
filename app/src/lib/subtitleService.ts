@@ -3,9 +3,10 @@ import { getCachedSubtitles, setCachedSubtitles } from '@/lib/subtitleCache';
 import type {
   Phrase,
   SubtitleLanguagePreference,
-  SubtitleProviderError,
   SubtitleResponse,
+  SubtitleSourceKind,
 } from '@/types/subtitles';
+import { SubtitleProviderError } from '@/types/subtitles';
 
 function getMockPhrases(): Phrase[] {
   return [
@@ -26,8 +27,18 @@ function getMockPhrases(): Phrase[] {
   ];
 }
 
-function getCacheKey(videoId: string, language: SubtitleLanguagePreference): string {
-  return language === 'auto' ? videoId : `${videoId}_${language}`;
+type LoadSubtitleOptions = {
+  sourceKind?: Extract<SubtitleSourceKind, 'manual' | 'auto'>;
+};
+
+function getCacheKey(
+  videoId: string,
+  language: SubtitleLanguagePreference,
+  options: LoadSubtitleOptions = {},
+): string {
+  const languageKey = language === 'auto' ? 'auto' : language;
+  const sourceKindKey = options.sourceKind || 'any';
+  return `${videoId}_${languageKey}_${sourceKindKey}`;
 }
 
 function getDemoSubtitleFallback(videoId: string): SubtitleResponse | null {
@@ -44,8 +55,9 @@ function getDemoSubtitleFallback(videoId: string): SubtitleResponse | null {
 export async function loadSubtitles(
   videoId: string,
   language: SubtitleLanguagePreference,
+  options: LoadSubtitleOptions = {},
 ): Promise<SubtitleResponse> {
-  const cacheKey = getCacheKey(videoId, language);
+  const cacheKey = getCacheKey(videoId, language, options);
   const cached = getCachedSubtitles(cacheKey);
 
   if (cached?.language) {
@@ -65,6 +77,7 @@ export async function loadSubtitles(
 
   const candidates = getSubtitleProviderCandidates();
   let lastError: Error | SubtitleProviderError | null = null;
+  let notFoundError: SubtitleProviderError | null = null;
 
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index];
@@ -72,6 +85,7 @@ export async function loadSubtitles(
     try {
       const result = await candidate.provider.fetchSubtitles(videoId, {
         language: language === 'auto' ? undefined : language,
+        sourceKind: options.sourceKind,
       });
 
       if (!result.phrases.length) {
@@ -85,9 +99,23 @@ export async function loadSubtitles(
         meta: {
           provider: candidate.type,
           fallbackUsed,
-          warning: fallbackUsed
-            ? `Primary subtitle provider was unavailable. Loaded captions via ${candidate.type}.`
-            : undefined,
+          warning: [
+            fallbackUsed
+              ? `Primary subtitle provider was unavailable. Loaded captions via ${candidate.type}.`
+              : '',
+            ...(result.warnings || []),
+          ].filter(Boolean)[0],
+          sourceKind: result.sourceKind,
+          retrievalPath: result.retrievalPath || candidate.type,
+          timingExactness: result.timingExactness || 'exact',
+          qualityFlags: result.qualityFlags || [],
+          warnings: [
+            ...(fallbackUsed
+              ? [`Primary subtitle provider was unavailable. Loaded captions via ${candidate.type}.`]
+              : []),
+            ...(result.warnings || []),
+          ],
+          retrievalAttempts: result.retrievalAttempts,
         },
       };
 
@@ -107,6 +135,9 @@ export async function loadSubtitles(
 
         if (providerError.code === 'INVALID_VIDEO') {
           throw providerError;
+        }
+        if (providerError.code === 'NOT_FOUND') {
+          notFoundError = providerError;
         }
 
         continue;
@@ -134,5 +165,5 @@ export async function loadSubtitles(
     };
   }
 
-  throw lastError || new Error('Failed to fetch subtitles');
+  throw notFoundError || lastError || new Error('Failed to fetch subtitles');
 }

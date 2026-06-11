@@ -1,6 +1,7 @@
 import type { SubtitleProvider } from '@/types/subtitles';
 import { SupadataProvider } from './SupadataProvider';
 import { YtDlpProvider } from './YtDlpProvider';
+import fs from 'fs';
 
 /**
  * Available subtitle provider types
@@ -9,6 +10,11 @@ export type ProviderType = 'supadata' | 'yt-dlp';
 
 export const DEFAULT_SUBTITLE_PROVIDER: ProviderType = 'supadata';
 export const DEFAULT_YT_DLP_PATH = '/usr/bin/yt-dlp';
+const LOCAL_YT_DLP_CANDIDATES = [
+  DEFAULT_YT_DLP_PATH,
+  '/opt/homebrew/bin/yt-dlp',
+  '/usr/local/bin/yt-dlp',
+];
 
 /**
  * Configuration for subtitle providers
@@ -18,6 +24,15 @@ export type ProviderConfig = {
   apiKey?: string; // Required for Supadata
   ytDlpPath?: string; // Optional for YtDlpProvider
 };
+
+function resolveYtDlpPath(): string {
+  if (process.env.YT_DLP_PATH) {
+    return process.env.YT_DLP_PATH;
+  }
+
+  return LOCAL_YT_DLP_CANDIDATES.find((candidate) => fs.existsSync(candidate)) ||
+    DEFAULT_YT_DLP_PATH;
+}
 
 /**
  * Factory function to create subtitle providers
@@ -50,7 +65,7 @@ export function getConfiguredProvider(): SubtitleProvider {
   const config: ProviderConfig = {
     type: providerType,
     apiKey: process.env.SUPADATA_API_KEY,
-    ytDlpPath: process.env.YT_DLP_PATH || DEFAULT_YT_DLP_PATH,
+    ytDlpPath: resolveYtDlpPath(),
   };
 
   console.log(`[Provider] Using subtitle provider: ${providerType}`);
@@ -79,7 +94,7 @@ export function getSubtitleProviderCandidates(): SubtitleProviderCandidate[] {
       const config: ProviderConfig = {
         type,
         apiKey: process.env.SUPADATA_API_KEY,
-        ytDlpPath: process.env.YT_DLP_PATH || DEFAULT_YT_DLP_PATH,
+        ytDlpPath: resolveYtDlpPath(),
       };
       candidates.push({ type, provider: createSubtitleProvider(config) });
     } catch (error) {

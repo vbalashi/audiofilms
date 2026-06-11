@@ -3,117 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { PlayerLayout } from '@/components/PlayerLayout';
+import { normalizePracticePhrases } from '@/lib/practice/phrases';
 import { usePlayerStore } from '@/store/playerStore';
-import type { Phrase, SubtitleResponse, VideoInfoResponse } from '@/types/subtitles';
+import type { SubtitleResponse, VideoInfoResponse } from '@/types/subtitles';
 
 type Props = {
   videoId: string;
 };
-
-const maxWordsPerPracticePhrase = 16;
-
-function wordCount(text: string) {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-function splitLongText(text: string, maxWords: number) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const chunks: string[] = [];
-
-  for (let index = 0; index < words.length; index += maxWords) {
-    chunks.push(words.slice(index, index + maxWords).join(' '));
-  }
-
-  return chunks.length > 0 ? chunks : [text];
-}
-
-function splitPhraseIntoTimedParts(phrase: Phrase): Phrase[] {
-  const text = phrase.text.trim().replace(/\s+/g, ' ');
-  const duration = Math.max(0, phrase.endSec - phrase.startSec);
-  const sentenceParts = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
-  const parts = sentenceParts.flatMap((part) => {
-    const cleanPart = part.trim();
-    if (!cleanPart) return [];
-
-    if (wordCount(cleanPart) <= maxWordsPerPracticePhrase) {
-      return [cleanPart];
-    }
-
-    return splitLongText(cleanPart, maxWordsPerPracticePhrase);
-  });
-
-  const totalChars = parts.reduce((sum, part) => sum + part.length, 0);
-  let elapsed = 0;
-
-  return parts.map((part, index) => {
-    const isLast = index === parts.length - 1;
-    const partDuration = isLast
-      ? duration - elapsed
-      : totalChars > 0
-        ? duration * (part.length / totalChars)
-        : 0;
-    const startSec = phrase.startSec + elapsed;
-    const endSec = isLast ? phrase.endSec : startSec + partDuration;
-
-    elapsed += partDuration;
-
-    return {
-      id: index,
-      startSec,
-      endSec,
-      text: part,
-    };
-  });
-}
-
-function normalizePracticePhrases(phrases: Phrase[]) {
-  const normalized: Phrase[] = [];
-  let buffer = '';
-  let bufferStart: number | null = null;
-  let bufferEnd = 0;
-
-  const flush = () => {
-    const text = buffer.trim().replace(/\s+/g, ' ');
-    if (!text) return;
-
-    normalized.push({
-      id: normalized.length,
-      startSec: bufferStart ?? bufferEnd,
-      endSec: bufferEnd,
-      text,
-    });
-    buffer = '';
-    bufferStart = null;
-  };
-
-  for (const phrase of phrases) {
-    const parts = splitPhraseIntoTimedParts(phrase);
-
-    for (const part of parts) {
-      if (
-        buffer &&
-        wordCount(buffer) + wordCount(part.text) > maxWordsPerPracticePhrase
-      ) {
-        flush();
-      }
-
-      if (bufferStart === null) {
-        bufferStart = part.startSec;
-      }
-
-      buffer = `${buffer} ${part.text}`.trim();
-      bufferEnd = Math.max(bufferEnd, part.endSec);
-
-      if (/[.!?]$/.test(part.text) || wordCount(buffer) >= maxWordsPerPracticePhrase) {
-        flush();
-      }
-    }
-  }
-
-  flush();
-
-  return normalized.length > 0 ? normalized : phrases;
-}
 
 export function WatchClient({ videoId }: Props) {
   // Select each field separately so Zustand returns stable references.

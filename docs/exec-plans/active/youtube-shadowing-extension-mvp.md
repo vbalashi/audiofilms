@@ -1,5 +1,7 @@
 # YouTube Shadowing Extension MVP
 
+> Post-review note: this document describes the original extension spike. The stabilization/rebuild path after expert review is tracked in `docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md`.
+
 ## Goal
 
 Build a Chrome extension spike that runs directly on YouTube watch pages, reads the available caption tracks, prefers manual/native captions when available, falls back to auto-generated captions, and lets the learner move phrase-by-phrase with keyboard shortcuts.
@@ -21,10 +23,11 @@ This is a hypothesis test, not a polished product.
 - Content script on `youtube.com/watch`.
 - Minimal injected panel on the YouTube page.
 - Caption track extraction from the current page/player metadata.
-- Manual-caption preference:
-  - target language first, initially `nl`;
-  - non-`asr` track before `asr`;
-  - first usable track as final fallback.
+- Caption source selection:
+  - show YouTube-provided caption choices grouped by caption language;
+  - load only the default or explicitly selected source;
+  - prefer the first non-`asr` track by YouTube order for default selection;
+  - keep the previous working source active when a user-selected source fails to load.
 - Caption fetch with `fmt=json3`.
 - Parsing JSON3 `events` into timed cues.
 - Basic phrase builder:
@@ -72,7 +75,7 @@ The existing Next.js app remains under `app/`. The extension may later share par
 On the NOS op 3 test video, the extension should:
 
 - detect at least one Dutch manual caption track;
-- show whether the selected source is manual or auto;
+- show the selected YouTube caption source name;
 - build a non-empty phrase list;
 - show current phrase text in the injected panel;
 - replay the current phrase with `Space`;
@@ -112,7 +115,7 @@ The target test video `ZNQWWW-vvfM` was checked before implementation. It expose
 - a manual Dutch `nl` track;
 - an auto/original Dutch track with more granular segment offsets.
 
-For MVP, manual `nl` should be the selected source.
+For MVP, the first non-`asr` Dutch source should be selected on this video because it is first in YouTube's caption order.
 
 ## Validation Update: June 7, 2026
 

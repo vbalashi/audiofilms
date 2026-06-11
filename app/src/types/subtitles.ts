@@ -5,6 +5,50 @@ export type Phrase = {
   text: string;
 };
 
+export type SubtitleSourceKind =
+  | 'manual'
+  | 'auto'
+  | 'provider'
+  | 'transcript-panel'
+  | 'unknown';
+
+export type SubtitleTimingExactness =
+  | 'exact'
+  | 'word-level'
+  | 'inferred-end'
+  | 'approximate';
+
+export type SubtitleQualityFlag =
+  | 'source-kind-unverified'
+  | 'source-kind-mismatch'
+  | 'source-unverified'
+  | 'language-mismatch'
+  | 'duplicate-cues'
+  | 'overlap-cues'
+  | 'inferred-end'
+  | 'long-cues'
+  | 'rolling-caption';
+
+export type SubtitleRetrievalAttempt = {
+  path: string;
+  status: 'ok' | 'failed' | 'skipped';
+  cues?: number;
+  error?: string;
+  reason?: string;
+};
+
+export type SubtitleQualityMeta = {
+  sourceKind: SubtitleSourceKind;
+  retrievalPath: string;
+  selectedTrackId?: string;
+  actualTrackId?: string;
+  languageCode?: string;
+  timingExactness: SubtitleTimingExactness;
+  qualityFlags: SubtitleQualityFlag[];
+  warnings: string[];
+  retrievalAttempts?: SubtitleRetrievalAttempt[];
+};
+
 export type SubtitleResponse = {
   phrases: Phrase[];
   language?: string; // The actual language of the fetched subtitles
@@ -12,6 +56,12 @@ export type SubtitleResponse = {
     provider: string;
     fallbackUsed: boolean;
     warning?: string;
+    sourceKind?: SubtitleSourceKind;
+    retrievalPath?: string;
+    timingExactness?: SubtitleTimingExactness;
+    qualityFlags?: SubtitleQualityFlag[];
+    warnings?: string[];
+    retrievalAttempts?: SubtitleRetrievalAttempt[];
   };
 };
 
@@ -23,6 +73,12 @@ export type SubtitleLanguagePreference = string | 'auto';
 export type SubtitleFetchResult = {
   phrases: Phrase[];
   language: string; // The actual language code of the fetched subtitles
+  sourceKind?: SubtitleSourceKind;
+  retrievalPath?: string;
+  timingExactness?: SubtitleTimingExactness;
+  qualityFlags?: SubtitleQualityFlag[];
+  warnings?: string[];
+  retrievalAttempts?: SubtitleRetrievalAttempt[];
 };
 
 /**
@@ -46,6 +102,7 @@ export interface SubtitleProvider {
 export type SubtitleFetchOptions = {
   language?: string;
   format?: 'vtt' | 'srt' | 'text';
+  sourceKind?: Extract<SubtitleSourceKind, 'manual' | 'auto'>;
 };
 
 export type VideoInfoResponse = {

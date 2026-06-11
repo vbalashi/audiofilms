@@ -77,9 +77,16 @@ export class YtDlpProvider implements SubtitleProvider {
       
       let subTrack = null;
       let detectedLang = 'en';
+      let sourceKind: 'manual' | 'auto' = 'manual';
       
       for (const lang of preferredLangs) {
-        subTrack = subtitles[lang] || autoCaptions[lang];
+        if (subtitles[lang]) {
+          subTrack = subtitles[lang];
+          sourceKind = 'manual';
+        } else if (autoCaptions[lang]) {
+          subTrack = autoCaptions[lang];
+          sourceKind = 'auto';
+        }
         if (subTrack && Array.isArray(subTrack)) {
           detectedLang = lang;
           break;
@@ -92,7 +99,13 @@ export class YtDlpProvider implements SubtitleProvider {
         const firstLang = Object.keys(subtitles)[0] || Object.keys(autoCaptions)[0];
         if (firstLang) {
           detectedLang = firstLang;
-          subTrack = subtitles[firstLang] || autoCaptions[firstLang];
+          if (subtitles[firstLang]) {
+            subTrack = subtitles[firstLang];
+            sourceKind = 'manual';
+          } else {
+            subTrack = autoCaptions[firstLang];
+            sourceKind = 'auto';
+          }
         }
       }
 
@@ -118,7 +131,15 @@ export class YtDlpProvider implements SubtitleProvider {
       // Parse VTT to phrases
       const phrases = this.parseVTT(vttContent);
 
-      return { phrases, language: detectedLang };
+      return {
+        phrases,
+        language: detectedLang,
+        sourceKind,
+        retrievalPath: `yt-dlp-${sourceKind}`,
+        timingExactness: 'exact',
+        qualityFlags: [],
+        warnings: [],
+      };
     } catch (error) {
       throw classifyYtDlpError(error);
     }

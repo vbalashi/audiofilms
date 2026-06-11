@@ -82,12 +82,23 @@ export class SupadataProvider implements SubtitleProvider {
 
   async fetchSubtitles(videoId: string, options?: SubtitleFetchOptions): Promise<SubtitleFetchResult> {
     const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const requestedMode = options?.sourceKind === 'auto' ? 'auto' : 'native';
     
     // If language is explicitly provided, use it
     if (options?.language && options.language !== 'auto') {
-      console.log(`[SupadataProvider] Fetching subtitles for ${videoId} (explicit lang: ${options.language})`);
-      const result = await this.fetchWithLanguage(videoUrl, videoId, options.language);
-      return { phrases: result.phrases, language: result.actualLang };
+      console.log(
+        `[SupadataProvider] Fetching subtitles for ${videoId} (explicit lang: ${options.language}, source: ${requestedMode})`,
+      );
+      const result = await this.fetchWithLanguage(videoUrl, videoId, options.language, requestedMode);
+      return {
+        phrases: result.phrases,
+        language: result.actualLang,
+        sourceKind: result.sourceKind,
+        retrievalPath: `supadata-${result.sourceKind}`,
+        timingExactness: 'exact',
+        qualityFlags: [],
+        warnings: [],
+      };
     }
     
     // Otherwise, try auto-detection by omitting the lang parameter
@@ -107,7 +118,15 @@ export class SupadataProvider implements SubtitleProvider {
         const transcriptResponse = isSupadataTranscriptResponse(response) ? response : null;
         const detectedLang = transcriptResponse?.lang || 'en';
         console.log(`[SupadataProvider] Auto-detected native captions in ${detectedLang}`);
-        return { phrases, language: detectedLang };
+        return {
+          phrases,
+          language: detectedLang,
+          sourceKind: 'manual',
+          retrievalPath: 'supadata-manual',
+          timingExactness: 'exact',
+          qualityFlags: [],
+          warnings: [],
+        };
       }
       
       // Try auto-generated if native not available
@@ -122,7 +141,15 @@ export class SupadataProvider implements SubtitleProvider {
         const transcriptResponse = isSupadataTranscriptResponse(response) ? response : null;
         const detectedLang = transcriptResponse?.lang || 'en';
         console.log(`[SupadataProvider] Auto-detected generated captions in ${detectedLang}`);
-        return { phrases, language: detectedLang };
+        return {
+          phrases,
+          language: detectedLang,
+          sourceKind: 'auto',
+          retrievalPath: 'supadata-auto',
+          timingExactness: 'exact',
+          qualityFlags: [],
+          warnings: [],
+        };
       }
     } catch (error) {
       const providerError = classifySupadataError(error);
@@ -145,7 +172,15 @@ export class SupadataProvider implements SubtitleProvider {
           console.log(
             `[SupadataProvider] Captions resolved via language fallback ${lang} -> ${result.actualLang}`,
           );
-          return { phrases: result.phrases, language: result.actualLang };
+          return {
+            phrases: result.phrases,
+            language: result.actualLang,
+            sourceKind: result.sourceKind,
+            retrievalPath: `supadata-${result.sourceKind}`,
+            timingExactness: 'exact',
+            qualityFlags: [],
+            warnings: [],
+          };
         }
       } catch (error) {
         if (error instanceof SubtitleProviderError && error.code === 'INVALID_VIDEO') {
@@ -162,38 +197,41 @@ export class SupadataProvider implements SubtitleProvider {
    * Fetch subtitles with a specific language
    * Returns phrases AND the actual language received (which may differ from requested)
    */
-  private async fetchWithLanguage(videoUrl: string, videoId: string, lang: string): Promise<{ phrases: Phrase[]; actualLang: string }> {
+  private async fetchWithLanguage(
+    videoUrl: string,
+    videoId: string,
+    lang: string,
+    preferredMode: 'native' | 'auto' = 'native',
+  ): Promise<{ phrases: Phrase[]; actualLang: string; sourceKind: 'manual' | 'auto' }> {
     try {
-      // Try native subtitles first
-      let response = await this.client.transcript({
-        url: videoUrl,
-        lang,
-        text: false,
-        mode: 'native', // Get native/manual subtitles
-      });
-      
-      let phrases = this.transformResponse(response);
-      if (phrases.length > 0) {
-        const actualLang = isSupadataTranscriptResponse(response) ? response.lang : lang;
-        return { phrases, actualLang };
+      const modes: Array<'native' | 'auto'> = preferredMode === 'auto'
+        ? ['auto', 'native']
+        : ['native', 'auto'];
+
+      for (const mode of modes) {
+        const response = await this.client.transcript({
+          url: videoUrl,
+          lang,
+          text: false,
+          mode,
+        });
+
+        const phrases = this.transformResponse(response);
+        if (phrases.length > 0) {
+          const actualLang = isSupadataTranscriptResponse(response) ? response.lang : lang;
+          return {
+            phrases,
+            actualLang,
+            sourceKind: mode === 'native' ? 'manual' : 'auto',
+          };
+        }
+
+        if (mode === 'native') {
+          console.log(`[SupadataProvider] No native captions, trying auto-generated for ${lang}`);
+        }
       }
       
-      // Fallback to auto-generated
-      console.log(`[SupadataProvider] No native captions, trying auto-generated for ${lang}`);
-      response = await this.client.transcript({
-        url: videoUrl,
-        lang,
-        text: false,
-        mode: 'auto', // Get auto-generated subtitles
-      });
-      
-      phrases = this.transformResponse(response);
-      if (phrases.length > 0) {
-        const actualLang = isSupadataTranscriptResponse(response) ? response.lang : lang;
-        return { phrases, actualLang };
-      }
-      
-      return { phrases, actualLang: lang };
+      return { phrases: [], actualLang: lang, sourceKind: preferredMode === 'native' ? 'manual' : 'auto' };
     } catch (error) {
       throw classifySupadataError(error);
     }

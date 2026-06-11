@@ -88,15 +88,22 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const videoId = searchParams.get("videoId");
   const language = (searchParams.get("lang") || "auto") as SubtitleLanguagePreference;
+  const requestedSourceKind = searchParams.get("sourceKind");
+  const sourceKind =
+    requestedSourceKind === "manual" || requestedSourceKind === "auto"
+      ? requestedSourceKind
+      : undefined;
 
-  console.log(`[get-subs] Fetching subtitles for videoId: ${videoId}, lang: ${language}`);
+  console.log(
+    `[get-subs] Fetching subtitles for videoId: ${videoId}, lang: ${language}, sourceKind: ${sourceKind || "any"}`,
+  );
 
   if (!videoId) {
     return NextResponse.json({ error: "Missing videoId" }, { status: 400 });
   }
 
   try {
-    const response = await loadSubtitles(videoId, language);
+    const response = await loadSubtitles(videoId, language, { sourceKind });
     console.log(
       `[get-subs] Returning ${response.phrases.length} phrases in language ${response.language} for ${videoId}`,
     );
