@@ -61,6 +61,20 @@ Remaining Stage 1 gap:
 - some longest-cue text still shows ASR artifacts such as `[Muziek]` or mixed-language snippets;
 - this is good enough to justify continuing Stage 1 before jumping to backend forced alignment.
 
+Second Stage 1 cleanup result:
+
+| Fixture | Before | After | Meaning |
+| --- | ---: | ---: | --- |
+| `xymyDvCgWDA` auto-only | `4.23s` max phrase with `[Muziek]` in sample | `2.719s` max phrase, timing `100`, text `98` | Non-speech token filtering and word-duration bounding make this ready for manual review. |
+| `KrdVIUmBoE4` auto | `4.639s` max phrase, duplicate artifacts | `4.639s` max phrase, timing `100`, text `94` | Timing is good; remaining risk is ASR transcript quality and repeated text. |
+| `RJrjzCuCHpo` auto | `4.95s` max phrase | `4.95s` max phrase, timing `100`, text `100` | Stage 1 looks good enough as a timing fallback; Stage 2 can still improve display text. |
+
+Updated implication:
+
+- Stage 1 is now strong enough to dogfood manually on auto-only videos.
+- It is not a substitute for human/audio judgement: the report detects structural issues, not whether the phrase boundary feels natural.
+- Model-based validation is useful later, but should compare against Stage 1/2 rather than replace manual UX review.
+
 ## Research Baseline
 
 Sources checked:
@@ -124,14 +138,25 @@ Quality target:
 - most phrases <= `12` words and <= `90` characters;
 - no visible rolling-caption residue.
 
+Current Stage 1 measurement adds two separate scores:
+
+- `timingScore`: phrase duration and overlap quality;
+- `textScore`: duplicate, non-speech, and overly long text quality.
+
+Interpretation:
+
+- high timing + high text: ready for manual playback review;
+- high timing + low text: usable for stop timing, but display text probably needs manual/ASR alignment;
+- low timing: do not productize without more normalization or backend alignment.
+
 Stop condition:
 
 - If this produces good phrases for auto-only and bad-manual fixtures, productize it before doing clean-text alignment.
 
 Known current gap:
 
-- `xymyDvCgWDA` max phrase is now `4.23s`, but duplicate text and `[Muziek]` artifacts remain.
-- `KrdVIUmBoE4` auto max phrase is now `4.639s`, but duplicate text and ASR quality artifacts remain.
+- `xymyDvCgWDA` max phrase is now `2.719s`; one non-consecutive duplicate remains.
+- `KrdVIUmBoE4` auto max phrase is now `4.639s`; duplicate text and ASR quality artifacts remain.
 
 ## Stage 2: Lightweight Clean Text + ASR Timing
 
@@ -210,13 +235,42 @@ Stop condition:
 
 - Only build this if Stages 1-2 fail on important videos.
 
+## Evaluation Policy
+
+Automatic checks can answer:
+
+- are phrases too long;
+- do timings overlap;
+- did rolling captions repeat visible text;
+- are obvious non-speech markers leaking into learner text;
+- do manual and ASR streams have enough token overlap to attempt alignment.
+
+Automatic checks cannot fully answer:
+
+- whether a pause feels natural for shadowing;
+- whether ASR text is semantically good enough;
+- whether a phrase is cognitively pleasant to repeat;
+- whether a boundary is slightly early or late in a way that annoys a learner.
+
+Recommended evaluation sequence:
+
+1. Use the Stage 1 report to choose candidates with high timing/text scores.
+2. Manually dogfood those candidates in the extension.
+3. If manual review finds timing drift or awkward stops, prototype Stage 2 clean-text/ASR-timing.
+4. If Stage 2 still fails, run a non-production backend alignment comparison with Whisper/stable-ts or MFA.
+
+Model comparison plan, when needed:
+
+- download audio for a small fixture set;
+- run Whisper/stable-ts alignment locally;
+- compare phrase boundaries against Stage 1 and Stage 2;
+- use this as a diagnostic baseline, not as production architecture until it clearly beats simpler processing.
+
 ## Next Implementation Step
 
 Continue Stage 1 rolling cleanup before changing runtime behavior:
 
-1. Classify duplicate-text flags into consecutive duplicates vs legitimate repeated speech.
-2. Filter or label non-speech bracket tokens such as `[Muziek]`.
-3. Add a small phrase-quality score that separates timing quality from transcript text quality.
-4. Re-run the safe cached fixture shootout.
-5. If `xymyDvCgWDA` and `KrdVIUmBoE4` remain phrase-sized and duplicate artifacts are explainable, stop and productize Stage 1.
-6. If display-text quality is still not good enough on manual+ASR videos, prototype Stage 2 on `RJrjzCuCHpo`.
+1. Manually review `xymyDvCgWDA` with Stage 1 output because it is auto-only and now scores well.
+2. Manually review `RJrjzCuCHpo` auto output as a timing fallback, then decide if manual display text is still important enough for Stage 2.
+3. If the manual review passes, productize Stage 1 normalization behind the provider/source selection layer.
+4. If display-text quality is still not good enough on manual+ASR videos, prototype Stage 2 on `RJrjzCuCHpo`.

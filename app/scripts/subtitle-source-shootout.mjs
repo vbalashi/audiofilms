@@ -8,6 +8,16 @@ const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const appRoot = path.join(repoRoot, "app");
 const cacheDir = path.join(appRoot, ".subtitle-source-shootout-cache");
 const maxWordDurationSec = 1.2;
+const maxGoodPhraseDurationSec = 6;
+const knownNonSpeechTokens = new Set([
+  "applaus",
+  "applause",
+  "gelach",
+  "laughter",
+  "muziek",
+  "music",
+  "silence",
+]);
 
 const fixtures = [
   {
@@ -357,7 +367,7 @@ function normalizeRollingCues(cues) {
       const timing = timings[index] || timings[timings.length - 1];
       if (!timing) continue;
       const normalized = normalizeToken(displayToken);
-      if (normalized) {
+      if (normalized && !isNonSpeechToken(displayToken)) {
         const boundedTiming = boundWordTiming(timing);
         words.push({
           start: boundedTiming.start,
@@ -410,6 +420,13 @@ function approximateWordTimings(cue, tokens) {
 
 function normalizeToken(text) {
   return cleanText(text).toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+
+function isNonSpeechToken(text) {
+  const normalized = normalizeToken(text);
+  return knownNonSpeechTokens.has(normalized) ||
+    /^\[[^\]]+\]$/.test(text.trim()) ||
+    /^\([^)]+\)$/.test(text.trim());
 }
 
 function boundWordTiming(timing) {
@@ -510,17 +527,24 @@ function analyzeCueQuality(cues) {
       longCueCount: 0,
       overlapCount: 0,
       duplicateTextCount: 0,
+      consecutiveDuplicateTextCount: 0,
+      nonSpeechCueCount: 0,
       maxDurationSec: 0,
       avgDurationSec: 0,
+      timingScore: 0,
+      textScore: 0,
       flags: ["empty"],
     };
   }
   let longCueCount = 0;
   let overlapCount = 0;
   let duplicateTextCount = 0;
+  let consecutiveDuplicateTextCount = 0;
+  let nonSpeechCueCount = 0;
   let totalDuration = 0;
   let maxDurationSec = 0;
   let longestCue = null;
+  let previousNormalizedText = "";
   const seen = new Set();
   for (let index = 0; index < cues.length; index += 1) {
     const cue = cues[index];
@@ -532,24 +556,62 @@ function analyzeCueQuality(cues) {
     }
     if (duration > 12) longCueCount += 1;
     if (index > 0 && cue.start < cues[index - 1].end - 0.02) overlapCount += 1;
-    const normalized = cue.text.toLowerCase();
+    if (hasNonSpeechText(cue.text)) nonSpeechCueCount += 1;
+    const normalized = normalizePhrase(cue.text);
     if (seen.has(normalized)) duplicateTextCount += 1;
+    if (previousNormalizedText && normalized === previousNormalizedText) consecutiveDuplicateTextCount += 1;
     seen.add(normalized);
+    previousNormalizedText = normalized;
   }
+  const timingScore = scoreTimingQuality({ cues, longCueCount, overlapCount, maxDurationSec });
+  const textScore = scoreTextQuality({ cues, duplicateTextCount, consecutiveDuplicateTextCount, nonSpeechCueCount });
   const flags = [];
   if (longCueCount) flags.push("long-cues");
   if (overlapCount) flags.push("overlap-cues");
+  if (consecutiveDuplicateTextCount) flags.push("consecutive-duplicate-text");
   if (duplicateTextCount) flags.push("duplicate-text");
-  if (maxDurationSec <= 6 && !overlapCount) flags.push("phrase-sized");
+  if (nonSpeechCueCount) flags.push("non-speech-text");
+  if (maxDurationSec <= maxGoodPhraseDurationSec && !overlapCount) flags.push("phrase-sized");
   return {
     longCueCount,
     overlapCount,
     duplicateTextCount,
+    consecutiveDuplicateTextCount,
+    nonSpeechCueCount,
     maxDurationSec: round(maxDurationSec),
     avgDurationSec: round(totalDuration / cues.length),
+    timingScore,
+    textScore,
     longestCue: longestCue ? compactCue(longestCue) : null,
     flags,
   };
+}
+
+function hasNonSpeechText(text) {
+  return tokenizeDisplayText(text).some(isNonSpeechToken);
+}
+
+function scoreTimingQuality({ cues, longCueCount, overlapCount, maxDurationSec }) {
+  let score = 100;
+  score -= Math.min(longCueCount, 10) * 10;
+  score -= Math.min(overlapCount, 10) * 12;
+  score -= Math.max(0, maxDurationSec - maxGoodPhraseDurationSec) * 8;
+  if (cues.length < 3) score -= 20;
+  return clampScore(score);
+}
+
+function scoreTextQuality({ cues, duplicateTextCount, consecutiveDuplicateTextCount, nonSpeechCueCount }) {
+  let score = 100;
+  score -= Math.min(consecutiveDuplicateTextCount, 10) * 10;
+  score -= Math.min(Math.max(0, duplicateTextCount - consecutiveDuplicateTextCount), 20) * 2;
+  score -= Math.min(nonSpeechCueCount, 10) * 6;
+  const overlongTextCount = cues.filter((cue) => cue.text.length > 100 || tokenizeDisplayText(cue.text).length > 14).length;
+  score -= Math.min(overlongTextCount, 10) * 4;
+  return clampScore(score);
+}
+
+function clampScore(score) {
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 function recommendFixtureSource(fixture) {
@@ -696,7 +758,8 @@ function isGoodShadowingSource(source) {
     source.normalizedCueCount > 0 &&
     !flags.has("long-cues") &&
     !flags.has("overlap-cues") &&
-    source.quality?.maxDurationSec <= 8;
+    source.quality?.maxDurationSec <= 8 &&
+    source.quality?.timingScore >= 75;
 }
 
 function scoreSource(source) {
@@ -706,9 +769,13 @@ function scoreSource(source) {
   let score = 100;
   score -= (quality.longCueCount || 0) * 20;
   score -= (quality.overlapCount || 0) * 30;
-  score -= Math.min(quality.duplicateTextCount || 0, 20) * 2;
+  score -= Math.min(quality.consecutiveDuplicateTextCount || 0, 20) * 5;
+  score -= Math.min(Math.max(0, (quality.duplicateTextCount || 0) - (quality.consecutiveDuplicateTextCount || 0)), 20) * 2;
+  score -= Math.min(quality.nonSpeechCueCount || 0, 10) * 4;
   score -= Math.max(0, (quality.maxDurationSec || 0) - 8) * 8;
   if (flags.has("phrase-sized")) score += 15;
+  if ((quality.timingScore || 0) >= 90) score += 8;
+  if ((quality.textScore || 0) >= 90) score += 4;
   if (source.sourceKind === "manual") score += 6;
   if (source.provider === "yt-dlp") score += 3;
   return score;
@@ -764,8 +831,8 @@ function renderMarkdown(data) {
   lines.push("");
   lines.push("## Raw Measurements");
   lines.push("");
-  lines.push("| Fixture | Source | Status | Provider | Track | Raw | Normalized | Flags | Max cue | Longest cue | Sample |");
-  lines.push("| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | --- | --- |");
+  lines.push("| Fixture | Source | Status | Provider | Track | Raw | Normalized | Timing | Text | Dups | Non-speech | Flags | Max cue | Longest cue | Sample |");
+  lines.push("| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- | --- |");
   for (const fixture of data.fixtures) {
     for (const source of fixture.sources) {
       lines.push([
@@ -776,6 +843,10 @@ function renderMarkdown(data) {
         source.trackKey || "",
         String(source.rawCueCount || 0),
         String(source.normalizedCueCount || 0),
+        String(source.quality?.timingScore ?? ""),
+        String(source.quality?.textScore ?? ""),
+        String(source.quality?.duplicateTextCount ?? ""),
+        String(source.quality?.nonSpeechCueCount ?? ""),
         source.quality?.flags?.join(", ") || "",
         String(source.quality?.maxDurationSec ?? ""),
         source.quality?.longestCue?.text?.replace(/\|/g, "\\|") || "",
@@ -796,7 +867,7 @@ function renderMarkdown(data) {
     lines.push(`Available ${fixture.language} tracks: manual=${fixture.available?.subtitles?.join(", ") || "-"}; auto=${fixture.available?.automatic?.join(", ") || "-"}`);
     lines.push("");
     for (const source of fixture.sources) {
-      lines.push(`- ${source.source}: ${source.status}; raw ${source.rawCueCount}, normalized ${source.normalizedCueCount}; flags ${source.quality?.flags?.join(", ") || "-"}; max ${source.quality?.maxDurationSec ?? "-"}s.`);
+      lines.push(`- ${source.source}: ${source.status}; raw ${source.rawCueCount}, normalized ${source.normalizedCueCount}; timing ${source.quality?.timingScore ?? "-"}, text ${source.quality?.textScore ?? "-"}; flags ${source.quality?.flags?.join(", ") || "-"}; max ${source.quality?.maxDurationSec ?? "-"}s.`);
     }
     lines.push("");
   }
