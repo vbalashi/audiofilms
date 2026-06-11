@@ -38,6 +38,17 @@ Current pragmatic position:
 3. Make provider origin visible in Debug and Mark Issue so decisions are evidence-based.
 4. Do not let a paid provider hide source mismatch or degraded timing.
 
+Current answer after the first cached fixture shootout:
+
+- Supadata should not be the assumed primary source.
+- The primary product path should become source-quality selection:
+  1. try browser/page-visible YouTube tracks when available;
+  2. prefer manual captions when they are already phrase-sized;
+  3. prefer normalized `yt-dlp` auto captions when manual captions are too long for shadowing;
+  4. show a no-captions state when YouTube exposes no usable track;
+  5. call paid providers only as an explicit fallback or shootout candidate.
+- Supadata remains valuable if it beats YouTube/`yt-dlp` on availability or clean segmentation, but that must be measured with `npm run subtitle:shootout:supadata`, not consumed by default tests.
+
 ## Current Retrieval Candidates
 
 | Candidate | Cost | Strength | Weakness | Best Role |
@@ -125,6 +136,17 @@ Exit criteria:
 - We can justify provider order with data, not preference.
 - Smoke tests do not burn paid quota by default unless explicitly configured.
 - Debug always shows provider origin and whether the selected YouTube source was actually honored.
+
+Current fixture recommendation from the safe cached runner:
+
+| Fixture | Recommended source | Confidence | Meaning |
+| --- | --- | --- | --- |
+| `RJrjzCuCHpo` | `yt-dlp-auto` | medium | Manual text exists but is too long; ASR rolling captions currently stop better. |
+| `4EE7m94mJpk` | `yt-dlp-manual` | high | Manual captions are good enough for shadowing. |
+| `xymyDvCgWDA` | `yt-dlp-auto` | low | Auto-only works, but rolling cleanup still leaves artifacts. |
+| `EColTNIbOko` | none | high | Correct no-captions empty state; do not waste paid retries during normal playback. |
+| `KrdVIUmBoE4` | `yt-dlp-manual` | high | Manual captions are usable; ASR rolling version is worse right now. |
+| `aircAruvnKk` | `yt-dlp-manual` | high | Manual English is usable; auto is optional. |
 
 ## Experiment Track B: Manual Long-Cue Splitting
 
@@ -217,6 +239,43 @@ Exit criteria:
 
 - Prototype on one Dutch video demonstrates better phrase stops than raw manual cues and better text than raw ASR.
 - Failure mode is explicit and falls back to rolling-caption normalization or manual degraded split.
+
+## Next Project: Rolling And Alignment Quality
+
+Treat this as a separate product-quality project, not a quick patch in the extension.
+
+Working hypothesis:
+
+- For many videos, manual captions are the best display text.
+- For some videos, automatic captions are the best timing source because they expose denser cue timing or inline word markers.
+- The ideal output may be "show manual-quality text, stop using ASR timing."
+
+Proposed experiment variants:
+
+1. Rolling ASR cleanup only:
+   - normalize YouTube auto-caption VTT;
+   - remove repeated rolling text;
+   - split by punctuation, max duration, word count, character count, and pause gaps;
+   - use this directly when manual captions are absent or unusably long.
+2. Manual long-cue degraded split:
+   - split long manual cues by sentence/punctuation;
+   - assign approximate timings proportionally;
+   - mark as degraded because stops will not be exact.
+3. Clean text aligned to ASR timing:
+   - tokenize manual and ASR text;
+   - align token sequences;
+   - project ASR word timings onto matching manual tokens;
+   - use backend processing if browser-only logic becomes fragile.
+4. Forced-alignment backend:
+   - fetch audio;
+   - align manual transcript to audio with a dedicated aligner;
+   - use only if simpler ASR timing projection is not good enough.
+
+Decision rule:
+
+- browser/extension should stay responsible for playback and lightweight diagnostics;
+- backend should own provider policy, paid calls, cache, rolling normalization, and alignment experiments;
+- runtime should never spend paid quota during ordinary smoke tests or local iteration unless explicitly requested.
 
 ## Browser Vs Backend Boundary
 

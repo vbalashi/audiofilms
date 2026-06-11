@@ -1,8 +1,21 @@
 # Subtitle Source Quality Shootout Report
 
-Generated: 2026-06-11T11:21:29.360Z
+Generated: 2026-06-11T11:24:20.132Z
 
 Supadata/API calls included: no
+
+## Recommended Source By Fixture
+
+| Fixture | Recommendation | Confidence | Why |
+| --- | --- | --- | --- |
+| manual-asr-divergence (RJrjzCuCHpo) | yt-dlp-auto | medium | Manual captions exist, but automatic captions currently provide better phrase timing after rolling-caption normalization. |
+| normal-manual (4EE7m94mJpk) | yt-dlp-manual | high | Manual captions are available and already phrase-sized enough for shadowing. |
+| auto-only (xymyDvCgWDA) | yt-dlp-auto | low | Only automatic captions are available, and normalization is not yet clean enough to treat this as a solved product path. |
+| no-captions (EColTNIbOko) | none | high | No usable caption source was found. The UI should show the no-captions state and avoid paid retries during normal playback. |
+| provider-fallback-stress (KrdVIUmBoE4) | yt-dlp-manual | high | Manual captions are available and already phrase-sized enough for shadowing. |
+| multilingual-manual (aircAruvnKk) | yt-dlp-manual | high | Manual captions are available and already phrase-sized enough for shadowing. |
+
+## Raw Measurements
 
 | Fixture | Source | Status | Provider | Track | Raw | Normalized | Flags | Max cue | Sample |
 | --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | --- |

@@ -92,6 +92,7 @@ for (const fixture of selectedFixtures) {
     row.sources.push(await inspectBackendApiSource(fixture, "auto"));
   }
 
+  row.recommendation = recommendFixtureSource(row);
   report.fixtures.push(row);
 }
 
@@ -512,6 +513,88 @@ function analyzeCueQuality(cues) {
   };
 }
 
+function recommendFixtureSource(fixture) {
+  const okSources = fixture.sources.filter((source) => source.status === "ok" && source.normalizedCueCount > 0);
+  if (!okSources.length) {
+    return {
+      source: "none",
+      confidence: "high",
+      reason: "No usable caption source was found. The UI should show the no-captions state and avoid paid retries during normal playback.",
+    };
+  }
+
+  const manual = bestSource(okSources.filter((source) => source.sourceKind === "manual"));
+  const auto = bestSource(okSources.filter((source) => source.sourceKind === "auto"));
+
+  if (manual && isGoodShadowingSource(manual)) {
+    return {
+      source: manual.source,
+      confidence: "high",
+      reason: "Manual captions are available and already phrase-sized enough for shadowing.",
+    };
+  }
+
+  if (auto && isGoodShadowingSource(auto)) {
+    return {
+      source: auto.source,
+      confidence: manual ? "medium" : "high",
+      reason: manual
+        ? "Manual captions exist, but automatic captions currently provide better phrase timing after rolling-caption normalization."
+        : "No manual captions are available, and automatic captions normalize into usable phrase-sized cues.",
+    };
+  }
+
+  if (manual && auto && scoreSource(auto) > scoreSource(manual)) {
+    return {
+      source: auto.source,
+      confidence: "low",
+      reason: "Automatic captions look more usable than manual captions, but remaining long/duplicate artifacts require a dedicated rolling-caption cleanup pass.",
+    };
+  }
+
+  if (manual) {
+    return {
+      source: manual.source,
+      confidence: "low",
+      reason: "Manual captions are the best available source, but they need degraded long-cue splitting or a clean-text/ASR-timing experiment before product use.",
+    };
+  }
+
+  return {
+    source: auto?.source || okSources[0].source,
+    confidence: "low",
+    reason: "Only automatic captions are available, and normalization is not yet clean enough to treat this as a solved product path.",
+  };
+}
+
+function bestSource(sources) {
+  return [...sources].sort((a, b) => scoreSource(b) - scoreSource(a))[0] || null;
+}
+
+function isGoodShadowingSource(source) {
+  const flags = new Set(source.quality?.flags || []);
+  return source.status === "ok" &&
+    source.normalizedCueCount > 0 &&
+    !flags.has("long-cues") &&
+    !flags.has("overlap-cues") &&
+    source.quality?.maxDurationSec <= 8;
+}
+
+function scoreSource(source) {
+  if (source.status !== "ok" || !source.normalizedCueCount) return -1000;
+  const quality = source.quality || {};
+  const flags = new Set(quality.flags || []);
+  let score = 100;
+  score -= (quality.longCueCount || 0) * 20;
+  score -= (quality.overlapCount || 0) * 30;
+  score -= Math.min(quality.duplicateTextCount || 0, 20) * 2;
+  score -= Math.max(0, (quality.maxDurationSec || 0) - 8) * 8;
+  if (flags.has("phrase-sized")) score += 15;
+  if (source.sourceKind === "manual") score += 6;
+  if (source.provider === "yt-dlp") score += 3;
+  return score;
+}
+
 function compactCue(cue) {
   return {
     start: round(cue.start),
@@ -531,6 +614,21 @@ function renderMarkdown(data) {
   lines.push(`Generated: ${data.generatedAt}`);
   lines.push("");
   lines.push(`Supadata/API calls included: ${data.includeSupadata ? "yes" : "no"}`);
+  lines.push("");
+  lines.push("## Recommended Source By Fixture");
+  lines.push("");
+  lines.push("| Fixture | Recommendation | Confidence | Why |");
+  lines.push("| --- | --- | --- | --- |");
+  for (const fixture of data.fixtures) {
+    lines.push([
+      `${fixture.label} (${fixture.id})`,
+      fixture.recommendation?.source || "none",
+      fixture.recommendation?.confidence || "",
+      (fixture.recommendation?.reason || "").replace(/\|/g, "\\|"),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
+  }
+  lines.push("");
+  lines.push("## Raw Measurements");
   lines.push("");
   lines.push("| Fixture | Source | Status | Provider | Track | Raw | Normalized | Flags | Max cue | Sample |");
   lines.push("| --- | --- | --- | --- | --- | ---: | ---: | --- | ---: | --- |");
