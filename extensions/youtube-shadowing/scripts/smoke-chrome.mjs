@@ -2,7 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 
-const EXTENSION_ID = "lahhflkjhgnicgogaocdipfelambklmo";
+const EXTENSION_ID = "hhdkchoccmikoefhenobdjipgdppdpoc";
 
 const FIXTURES = [
   {

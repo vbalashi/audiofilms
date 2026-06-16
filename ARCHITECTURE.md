@@ -27,6 +27,7 @@ Primary flow:
 4. `/api/get-subs` fetches and caches subtitle phrases through the configured subtitle provider.
 5. The client playback UI uses Zustand state to loop phrases and switch between blind/read modes.
 6. `/api/dict` resolves clicked-word definitions through the configured dictionary provider.
+7. `/api/dict/actions` and `/api/dict/translation` proxy explicit 2000NL card actions and per-card translation requests when the selected dictionary provider returns platform-backed cards.
 
 ## Main Boundaries
 
@@ -74,11 +75,16 @@ This path exists to support language selection and avoid redundant provider work
 ### Dictionary Lookup
 
 - `app/src/app/api/dict/route.ts`
+- `app/src/app/api/dict/actions/route.ts`
+- `app/src/app/api/dict/translation/route.ts`
 - `app/src/lib/dictionaryLookup.ts`
+- `app/src/lib/twoThousandNlPlatform.ts`
 - `app/src/lib/providers/dictionary/`
 - `app/src/types/dictionary.ts`
 
 Dictionary lookups are server-mediated. The UI should not call third-party providers directly or understand provider-specific payloads. The route returns normalized dictionary payloads; provider execution and error-to-response mapping live in the server service layer.
+
+For 2000NL-backed lookup, AudioFilms treats 2000NL as the dictionary, progress, action, and translation authority. AudioFilms owns a shallow overlay projection (`cards[]`) for app and extension rendering. Plain lookup is read-only; mutations go through explicit card actions and are followed by refreshed lookup state instead of local progress simulation.
 
 ### Local File Caches
 
@@ -96,7 +102,7 @@ Runtime dependencies currently include:
 - Next.js / React
 - YouTube embed via `react-youtube`
 - subtitle providers: Supadata or `yt-dlp`
-- dictionary providers: OpenRouter or Free Dictionary
+- dictionary providers: 2000NL, OpenRouter, OpenAI, or Free Dictionary
 
 Environment selection currently happens through `app/env.example` keys:
 
@@ -107,6 +113,14 @@ Environment selection currently happens through `app/env.example` keys:
 - `OPENROUTER_API_KEY`
 - `OPENROUTER_DICTIONARY_MODEL`
 - `OPENROUTER_DICTIONARY_PROMPT`
+- `OPENAI_API_KEY`
+- `OPENAI_API_URL`
+- `OPENAI_MODEL`
+- `OPENAI_DICTIONARY_PROMPT`
+- `DICTIONARY_2000NL_API_BASE`
+- `DICTIONARY_2000NL_ACCESS_TOKEN`
+- `DICTIONARY_2000NL_INCLUDE_USER_STATE`
+- `DICTIONARY_2000NL_TIMEOUT_MS`
 
 ## Safe Change Patterns
 
@@ -116,26 +130,70 @@ Environment selection currently happens through `app/env.example` keys:
 - Cache changes should preserve graceful failure. Cache read/write failures must not break normal requests.
 - If changing environment variables or defaults, update `app/env.example` and this doc set in the same change.
 
-## ADR-0001: Module Ownership For Retrieval And Playback
+## ADR-0001: Backend-Owned Practice Phrase Building
 
 ### Status
 
-Accepted on March 22, 2026.
+Accepted. Implementation is still in progress.
 
 ### Context
 
-The app had started to drift in two ways:
-
-- vendor-specific dictionary and subtitle shaping was leaking toward UI code,
-- route handlers were accumulating cache, provider, fallback, and normalization work.
-
-That made it harder to reason about safe changes and obscured which layer owned which behavior.
+The app and no-build YouTube extension both need learner-facing phrase units for replay, hide/reveal, and phrase navigation. Provider subtitle units are not always good practice units: they can be too long, too short, rolling-caption-shaped, or poorly aligned with sentence boundaries.
 
 ### Decision
 
-Use a thin-route, service-backed architecture with normalized app-level contracts.
+AudioFilms will build learner-facing `practicePhrases[]` in the backend/app pipeline while retaining provider/source subtitle units separately as provider phrases. The extension should consume backend-produced practice phrases and metadata when available. Extension-only segmentation is allowed only as a temporary fallback for direct page `timedtext` captions that have not yet passed through the backend.
 
-Ownership is:
+Current implementation note: `app/src/lib/practice/phrases.ts` already contains the app normalizer, but `/api/get-subs` still returns only `phrases[]` and `WatchClient` currently runs normalization on the client. The next ADR-0001 implementation step is to move that practice phrase projection into the subtitle response boundary and separate source/provider units from learner-facing practice units.
+
+### Consequences
+
+- API contracts should separate provider/source phrases from practice phrases instead of overloading `phrases[]`.
+- Display text and timing evidence can come from different sources, but the backend is responsible for exposing that relationship clearly.
+- Debug and issue reports should show when phrase boundaries are exact, inferred, projected from ASR timing, or otherwise degraded.
+
+## ADR-0002: 2000NL Dictionary Platform Boundary
+
+### Status
+
+Accepted. First dogfood implementation is present.
+
+### Context
+
+Dutch lookup should use 2000NL as the dictionary and learning authority instead of duplicating its dictionary domain model, progress semantics, action IDs, card type IDs, or translation cache rules inside AudioFilms.
+
+### Decision
+
+AudioFilms treats 2000NL as the dictionary, progress, action, and translation authority for Dutch word lookup. AudioFilms backend owns the shallow overlay projection from 2000NL lookup results into display-oriented dictionary cards. The extension renders that backend-provided shape and does not parse 2000NL `entry.raw` directly.
+
+The first overlay card model follows these rules:
+
+- one AudioFilms overlay card maps to one top-level 2000NL `lookup.items[]` result;
+- nested `entry.raw.meanings[]` are content inside that card, not separate action targets;
+- overlay actions always target `cardTypeId=word-to-definition`;
+- plain lookup is read-only and must not automatically call `record-view`;
+- all learning/progress changes happen only after an explicit user action on one card;
+- after a successful action, AudioFilms refreshes lookup instead of simulating updated progress locally;
+- translation is requested per card through 2000NL `POST /api/platform/v1/translation` using `entryId` and `targetLang`.
+
+### Current Implementation
+
+- `app/src/lib/providers/dictionary/TwoThousandNlDictionaryProvider.ts` calls 2000NL lookup and projects rich `cards[]`.
+- `app/src/app/api/dict/route.ts` accepts an optional incoming Bearer token and passes it to the provider layer.
+- `app/src/app/api/dict/actions/route.ts` proxies explicit platform actions.
+- `app/src/app/api/dict/translation/route.ts` proxies per-card translation requests.
+- The extension has a 2000NL Connect flow in its service worker and forwards the current access token to AudioFilms `/api/dict*` calls when available.
+- `DICTIONARY_2000NL_ACCESS_TOKEN` remains a local dogfood fallback, not the final product auth model.
+
+### Consequences
+
+- AudioFilms `/api/dict` supports both the legacy flat `definition` shape and an `overlay-v1` card shape for rich consumers.
+- AudioFilms backend may derive labels, collapsed content, examples, and ordering for its overlay, but it must not invent dictionary meanings, action IDs, review result IDs, progress states, or card types.
+- Button localization is separate from this boundary.
+
+## Module Ownership Baseline
+
+The repo still follows a thin-route, service-backed architecture with normalized app-level contracts. Ownership is:
 
 - `app/src/components/` and `app/src/app/`: rendering and route-level user experience
 - `app/src/hooks/`: client-side orchestration such as keyboard controls and dictionary fetch lifecycle

@@ -1,30 +1,28 @@
 # 2000NL Platform Dictionary Integration
 
-Status: active planning note, June 16, 2026.
+Status: dogfood slice implemented; remaining work is product hardening and ADR-0001 follow-up, June 16, 2026.
 
 ## Goal
 
 When a learner clicks a word in an AudioFilms practice phrase, AudioFilms should call the 2000NL platform dictionary API and show real dictionary matches, progress context, and later explicit learning actions.
 
-This replaces the current YouTube extension placeholder:
-
-```text
-API wiring will load public dictionary matches here.
-```
-
-and should eventually supersede AudioFilms' standalone LLM dictionary provider path for Dutch lookup.
+This replaced the YouTube extension placeholder dictionary copy with real backend lookup wiring. It should eventually supersede AudioFilms' standalone LLM dictionary provider path for Dutch lookup when 2000NL is configured.
 
 ## Existing AudioFilms State
 
 AudioFilms currently has:
 
 - app route: `app/src/app/api/dict/route.ts`;
+- explicit action route: `app/src/app/api/dict/actions/route.ts`;
+- per-card translation route: `app/src/app/api/dict/translation/route.ts`;
 - lookup orchestration: `app/src/lib/dictionaryLookup.ts`;
+- 2000NL platform proxy helper: `app/src/lib/twoThousandNlPlatform.ts`;
 - provider system: `app/src/lib/providers/dictionary/`;
-- extension UI placeholder in `extensions/youtube-shadowing/src/content.js`;
-- extension service worker bridge only for subtitle backend fetches.
+- 2000NL provider: `app/src/lib/providers/dictionary/TwoThousandNlDictionaryProvider.ts`;
+- extension dictionary UI rendering, action buttons, and per-card translation in `extensions/youtube-shadowing/src/content.js`;
+- extension service worker bridge for subtitles, dictionary fetches, and 2000NL Connect session management.
 
-The current `/api/dict` route calls local dictionary providers (`openrouter`, `openai`, `free-dictionary`). It does not call 2000NL.
+The current `/api/dict` route can call local dictionary providers (`openrouter`, `openai`, `free-dictionary`) or 2000NL. 2000NL is selected through `DICTIONARY_PROVIDER=2000nl`, and incoming extension Bearer tokens override the local dogfood env token when present.
 
 ## Existing 2000NL Platform API
 
@@ -133,9 +131,9 @@ Explicit later actions:
 
 Those must call `POST /api/platform/v1/actions` only after an explicit user action.
 
-## Architecture Decision Pending
+## Architecture Decision
 
-The major unresolved decision is auth/session ownership.
+Accepted ADR-0002 chooses the AudioFilms backend proxy boundary for the first architecture.
 
 Options:
 
@@ -156,13 +154,13 @@ Options:
    - YouTube extension uses direct 2000NL platform API after connecting 2000NL.
    - More moving parts but matches each runtime's constraints.
 
-Recommendation:
+Current decision:
 
-Start with **AudioFilms backend proxy** for the first dogfood slice, because the extension already depends on the local AudioFilms backend for subtitles and the UI can remain simple. Do not add mutations until lookup is stable. Revisit direct extension-to-2000NL calls when the sign-in/connect flow is real and `PLATFORM_API_ALLOWED_ORIGINS` is configured for the extension origin.
+Use **AudioFilms backend proxy** for lookup, actions, and translation. The extension may own a 2000NL Connect session for dogfood, but it still calls AudioFilms `/api/dict*`; AudioFilms forwards the current Bearer token to 2000NL. `DICTIONARY_2000NL_ACCESS_TOKEN` remains a short-lived local fallback. Revisit direct extension-to-2000NL platform calls only if the product intentionally changes the proxy boundary.
 
-## Proposed AudioFilms Runtime Shape
+## AudioFilms Runtime Shape
 
-Add a 2000NL dictionary provider behind the existing AudioFilms dictionary provider interface:
+The 2000NL dictionary provider is available behind the existing AudioFilms dictionary provider interface:
 
 ```text
 DICTIONARY_PROVIDER=2000nl
@@ -185,7 +183,7 @@ with:
 }
 ```
 
-Then adapt the 2000NL response into the existing AudioFilms response enough for the current app/extension panel:
+AudioFilms adapts the 2000NL response into the current app/extension response:
 
 - selected word;
 - headword;
@@ -194,11 +192,13 @@ Then adapt the 2000NL response into the existing AudioFilms response enough for 
 - progress summary if present;
 - available actions as disabled/visible affordances.
 
-Longer term, AudioFilms should stop flattening this into a single `definition` string and expose a richer platform lookup response.
+The response now keeps the legacy flat `definition` result and exposes richer `cards[]` with `meta.responseVersion="overlay-v1"` for extension/UI consumers.
 
 ## Implementation Stages
 
 ### Stage 0: Contract Smoke
+
+Status: completed for the first dogfood slice.
 
 Verify 2000NL platform API can answer:
 
@@ -229,6 +229,8 @@ Current production smoke, June 16, 2026:
 
 ### Stage 1: AudioFilms 2000NL Provider
 
+Status: completed for the first dogfood slice.
+
 Add a `2000nl` dictionary provider in AudioFilms.
 
 Responsibilities:
@@ -239,6 +241,7 @@ Responsibilities:
 - adapt the first useful candidate into current `DictionaryResult`;
 - preserve provider metadata as `provider=2000nl`;
 - keep existing providers as fallback only if configured.
+- expose rich `cards[]` through the service response while keeping legacy `result.definition`.
 
 Exit criteria:
 
@@ -246,6 +249,8 @@ Exit criteria:
 - Existing app dictionary panel still works.
 
 ### Stage 2: Extension Lookup Wiring
+
+Status: completed for the first dogfood slice.
 
 Extend the service worker bridge beyond subtitles:
 
@@ -261,6 +266,8 @@ Exit criteria:
 - Lookup failure is visible but does not disturb playback.
 
 ### Stage 3: Rich Result Shape
+
+Status: completed for the first dogfood slice.
 
 Move beyond a single definition string.
 
@@ -385,19 +392,27 @@ Mapping rule:
 
 ### Stage 4: Explicit Actions
 
+Status: partially implemented for the first dogfood slice.
+
 Wire explicit user actions only after read-only lookup is stable:
 
 - start learning;
 - mark known;
 - review card;
+- per-card translation.
+
+Not implemented in this slice:
+
 - add to list;
-- copy to user dictionary.
+- copy to user dictionary;
+- complete review-grade surface for `hard` and `easy` in the extension UI.
 
 Exit criteria:
 
 - No mutation happens on plain lookup.
 - Every mutation goes through `/api/platform/v1/actions` and is reflected in refreshed lookup state.
-- The YouTube extension sends action requests to AudioFilms backend, and AudioFilms backend proxies them to 2000NL. The extension does not store or send the 2000NL token directly in the first architecture.
+- The YouTube extension sends action requests to AudioFilms backend, and AudioFilms backend proxies them to 2000NL.
+- The extension can store a 2000NL Connect session and forward its current Bearer token to AudioFilms. It does not call 2000NL platform lookup/actions/translation directly in the first architecture.
 
 ## Documentation / ADR
 
@@ -417,6 +432,7 @@ Decision recorded:
 
 ## Open Questions
 
-1. Should lookup include phrase context in the 2000NL request now, or keep context local until 2000NL supports context-aware ranking?
-2. What is the fallback policy when 2000NL is down: show LLM provider result, show no result, or show both with source labels?
-3. What is the durable auth model after dogfood: OAuth/OTP connect flow, refresh-token storage in AudioFilms, or direct extension session with 2000NL CORS enabled?
+1. Should lookup include phrase context in the 2000NL request once 2000NL supports context-aware ranking? Today AudioFilms preserves context locally but sends only `query` and `includeUserState`.
+2. What is the product fallback policy when 2000NL is down: show LLM provider result, show no result, or show both with source labels?
+3. Is the extension-owned 2000NL Connect session the durable product model, or should the web app also gain its own first-party 2000NL session/connect UX?
+4. Should the extension expose all review results (`fail`, `hard`, `success`, `easy`) in the first polished action surface, or keep the current narrower Start/Known/Again/Good dogfood controls?

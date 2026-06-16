@@ -80,14 +80,14 @@ Progress notes, June 10, 2026:
   - direct binary launch briefly opened the CDP port but exited before inspection in this desktop environment.
   - next validation should be a normal visible Chrome "Load unpacked" reload using the README checklist, or a more reliable browser automation profile that can keep Chrome alive with the unpacked extension loaded.
 - Live visible Chrome check via AppleScript after reloading the YouTube tab found AudioFilms UI nodes (`#af-shadowing-toggle` and workspace panels), but no `documentElement.dataset.afShadowingBoot`. This suggests the page was still running an older already-loaded extension script. Refresh the unpacked extension itself on `chrome://extensions`, then reload the YouTube tab and re-check `dataset.afShadowingBootVersion`.
-- The unpacked extension is recorded in local Chrome `Secure Preferences` with id `lahhflkjhgnicgogaocdipfelambklmo` and path `/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing`. Use `chrome://extensions/?id=lahhflkjhgnicgogaocdipfelambklmo` for the next visible refresh/check on this machine.
+- The unpacked extension is recorded in local Chrome with stable manifest id `hhdkchoccmikoefhenobdjipgdppdpoc` and path `/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing`. Use `chrome://extensions/?id=hhdkchoccmikoefhenobdjipgdppdpoc` for the next visible refresh/check on this machine.
 - The extension detail page exposes `#dev-reload-button`; clicking it via the page Shadow DOM successfully refreshed the unpacked extension without visible errors.
 - After extension refresh and YouTube tab reload, `document.documentElement.dataset.afShadowingBoot === "1"` and `dataset.afShadowingBootVersion === "phase1-boot-diagnostics-2026-06-10"` appeared on the YouTube page. This proves current content script injection in the visible profile.
 - `window.__afShadowingBoot` and `window.__afShadowingDebug` were not visible from AppleScript/page context even after successful injection because Chrome content scripts run in an isolated world. Mirror diagnostics into `dataset.afShadowingBootState` for page-readable validation.
 - After mirroring diagnostics into `dataset.afShadowingBootState` and refreshing the extension again, the visible YouTube tab reported:
   - `contentScriptLoaded: true`;
   - `bootFailed: false`;
-  - `extensionId: lahhflkjhgnicgogaocdipfelambklmo`;
+  - `extensionId: hhdkchoccmikoefhenobdjipgdppdpoc`;
   - `watchPageDetected: true`;
   - `videoIdDetected: 4EE7m94mJpk`;
   - `videoElementDetected: true`;

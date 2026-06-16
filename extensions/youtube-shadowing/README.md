@@ -87,8 +87,8 @@ Use this before deeper debugging or UI work:
 
 1. Load this folder as an unpacked extension.
 2. After code changes, click the reload/refresh button for this unpacked extension on `chrome://extensions`. Reloading only the YouTube tab can leave an older content script active.
-   - On this local Chrome profile the current unpacked extension id is `lahhflkjhgnicgogaocdipfelambklmo`, so this direct page can be useful:
-     `chrome://extensions/?id=lahhflkjhgnicgogaocdipfelambklmo`.
+   - On this local Chrome profile the current unpacked extension id is `hhdkchoccmikoefhenobdjipgdppdpoc`, so this direct page can be useful:
+     `chrome://extensions/?id=hhdkchoccmikoefhenobdjipgdppdpoc`.
 3. Open a fresh YouTube watch page and reload it after the extension is loaded.
 4. Confirm one of these appears:
    - the `AudioFilms On/Off` toggle;
@@ -124,7 +124,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --reload-extension
 The smoke check expects:
 
 - Chrome is installed and can be controlled by AppleScript;
-- this unpacked extension is loaded with id `lahhflkjhgnicgogaocdipfelambklmo`;
+- this unpacked extension is loaded with id `hhdkchoccmikoefhenobdjipgdppdpoc`;
 - the local AudioFilms app API is reachable at `http://localhost:3000`.
 
 The default fixture sequence checks:
@@ -206,7 +206,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 
 - `manifest.json`: Chrome extension manifest.
 - `scripts/smoke-chrome.mjs`: local Chrome multi-video smoke checker for manual, auto-only, no-captions, recovery, SPA, backend-off, backend-failed, failed source-switch, multilingual source-switch, and viewport geometry cases.
-- `src/serviceWorker.js`: extension-origin backend/provider fetch bridge for local AudioFilms API calls.
+- `src/serviceWorker.js`: extension-origin backend/provider fetch bridge for local AudioFilms API calls and 2000NL Connect session management.
 - `src/pageBridge.js`: minimal main-world bridge for YouTube UI clicks that do not respond reliably from the isolated content-script world.
 - `src/bootDiagnostics.js`: boot sentinel, page-readable diagnostics, and visible boot failure badge.
 - `src/phrases.js`: cue-to-phrase builder used by the content script.
@@ -220,9 +220,10 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 ## Current Limits
 
 - No build step.
-- No 2000NL sign-in flow inside the extension yet; the manifest now reserves a stable unpacked dev extension ID for the upcoming 2000NL Connect flow.
-- Dictionary lookup is read-only and goes through `http://localhost:3000/api/dict` by default. Set `localStorage.afShadowingDictionaryUrl` to another endpoint or `off` for diagnostics.
-- 2000NL-backed dictionary results currently require either a valid short-lived `DICTIONARY_2000NL_ACCESS_TOKEN` fallback or the planned 2000NL Connect session token.
+- 2000NL Connect exists in the extension service worker for local dogfood. It stores and refreshes a Connect session through Chrome extension storage, then forwards the current access token to AudioFilms `/api/dict*` calls.
+- Dictionary lookup goes through `http://localhost:3000/api/dict` by default. Set `localStorage.afShadowingDictionaryUrl` to another endpoint or `off` for diagnostics.
+- 2000NL-backed dictionary results require either the extension Connect session token or a valid short-lived `DICTIONARY_2000NL_ACCESS_TOKEN` fallback in the AudioFilms app environment.
+- Plain lookup is read-only. Explicit card actions go through `/api/dict/actions`, then refresh lookup state. Per-card translation goes through `/api/dict/translation`.
 - Stable unpacked dev extension ID: `hhdkchoccmikoefhenobdjipgdppdpoc`.
 - 2000NL Connect dev redirect URI: `https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/`.
 - 2000NL Connect dev origin: `chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc`.

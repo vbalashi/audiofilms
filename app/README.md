@@ -9,9 +9,10 @@ This is the canonical setup and local development document for the application.
 - Subtitle provider default: `yt-dlp`
 - Subtitle fallback provider: `supadata`
 - Dictionary provider default: `openrouter`
-- Dictionary fallback provider: `free-dictionary`
+- Supported dictionary providers: `2000nl`, `openrouter`, `openai`, `free-dictionary`
+- 2000NL is the preferred Dutch lookup authority when user progress or curated dictionary cards are needed.
 
-These defaults are defined in the provider factories and mirrored in [`env.example`](/home/khrustal/dev/audiofilms/app/env.example).
+These defaults are defined in the provider factories and mirrored in [`env.example`](/Users/khrustal/dev/audiofilms/app/env.example).
 
 ## Prerequisites
 
@@ -20,6 +21,8 @@ These defaults are defined in the provider factories and mirrored in [`env.examp
 - An OpenRouter API key for the default dictionary path
 
 A Supadata API key is optional. Configure it only if you want the paid API fallback path.
+
+For 2000NL-backed Dutch lookup, use a 2000NL user access token through the app environment or send a Bearer token from the extension Connect flow. The env token is a short-lived dogfood fallback, not a durable product session model.
 
 ## Setup
 
@@ -75,6 +78,17 @@ DICTIONARY_PROVIDER=free-dictionary
 
 Note: `free-dictionary` is English-only and should be treated as a fallback, not the default learning path.
 
+For 2000NL-backed Dutch lookup and progress-aware cards:
+
+```bash
+DICTIONARY_PROVIDER=2000nl
+DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
+DICTIONARY_2000NL_ACCESS_TOKEN=...
+DICTIONARY_2000NL_INCLUDE_USER_STATE=true
+```
+
+The YouTube extension can also obtain a 2000NL Connect session and forward its current Bearer token to the AudioFilms `/api/dict*` backend routes.
+
 ## Current Behavior
 
 - Uses embedded YouTube playback via `react-youtube`
@@ -82,17 +96,20 @@ Note: `free-dictionary` is English-only and should be treated as a fallback, not
 - Preserves the actual subtitle language returned by the provider
 - Supports blind/read playback modes
 - Looks up clicked words through the configured dictionary provider
+- Returns rich `cards[]` for 2000NL dictionary results while keeping legacy flat definitions for older consumers
+- Proxies explicit 2000NL card actions through `/api/dict/actions`
+- Proxies per-card 2000NL translation requests through `/api/dict/translation`
 
 ## Validation
 
-Run from `/home/khrustal/dev/audiofilms/app`:
+Run from `/Users/khrustal/dev/audiofilms/app`:
 
 ```bash
 npm run lint
 npm run build
 ```
 
-For architecture and module ownership, use [ARCHITECTURE.md](/home/khrustal/dev/audiofilms/ARCHITECTURE.md) instead of extending this file into a boundary document.
+For architecture and module ownership, use [ARCHITECTURE.md](/Users/khrustal/dev/audiofilms/ARCHITECTURE.md) instead of extending this file into a boundary document.
 
 ## Built With
 
