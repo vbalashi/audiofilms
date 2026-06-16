@@ -49,13 +49,13 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
   - an open Shadow DOM root with `#audiofilms-shadow-container`;
   - compact current-phrase bar and controls inside the shadow container;
   - visible `Passive sync` / `Shortcuts active` mode indicator;
-  - dictionary/lookup panel appears only after clicking a word;
+  - dictionary/lookup panel appears only after clicking a word and loads results through the local AudioFilms `/api/dict` backend;
   - YouTube player size and recommendations are not changed by default.
 - Keeps normal YouTube playback passive by default. Replay, Previous, and Next enter guided phrase mode; auto-pause only affects guided mode.
 - In guided phrase navigation, Previous and Next advance from the visible phrase in the AudioFilms panel, not from the current YouTube playhead.
 - Adds a `Mark Issue` control that copies a navigation incident report with recent phrase commands, playback timings, selected source, and current phrase context.
 - Adds an `AudioFilms On/Off` page toggle that restores the normal YouTube layout when disabled.
-- Treats lookup as guest-capable by default; signing in to 2000NL is for personal progress, saved words, and review grading.
+- Treats lookup as backend-capable by default; 2000NL account/progress data depends on the AudioFilms dictionary backend provider configuration.
 - Uses YouTube's own transcript panel as a caption extraction fallback and debug fallback, not as the final learning UI.
 - Supports:
   - `Space`: toggle normal continuous YouTube play/pause and leave guided phrase playback;
@@ -220,9 +220,9 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 ## Current Limits
 
 - No build step.
-- No 2000NL sign-in flow yet; account/review UI is no longer shown in the default overlay.
-- No backend lookup wiring yet.
-- No live translation or dictionary result payload yet.
+- No 2000NL sign-in flow inside the extension yet; account/review UI remains disabled unless a later explicit action flow is added.
+- Dictionary lookup is read-only and goes through `http://localhost:3000/api/dict` by default. Set `localStorage.afShadowingDictionaryUrl` to another endpoint or `off` for diagnostics.
+- 2000NL-backed dictionary results require the AudioFilms app to run with `DICTIONARY_PROVIDER=2000nl` and a valid `DICTIONARY_2000NL_ACCESS_TOKEN`.
 - No word-level alignment.
 - Uses YouTube web-player metadata, which can change.
 - Backend/provider fallback expects the local AudioFilms app API at `http://localhost:3000/api/get-subs` unless `localStorage.afShadowingBackendSubtitlesUrl` is set to another URL or `off`.

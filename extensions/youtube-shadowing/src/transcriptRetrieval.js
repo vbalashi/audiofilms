@@ -30,6 +30,9 @@
       options.updateRetrievalPath?.("backend-provider");
       const backendResult = await fetchBackendProviderCues(track, options);
       attempts.push(successfulAttempt("backend-provider", backendResult.cues));
+      const backendAttempts = Array.isArray(backendResult.retrievalAttempts)
+        ? backendResult.retrievalAttempts
+        : [];
       return buildTranscriptResult(backendResult.cues, {
         sourceKind: backendResult.sourceKind || "provider",
         retrievalPath: "backend-provider",
@@ -41,7 +44,12 @@
         timingExactness: "exact",
         qualityFlags: backendResult.qualityFlags,
         warnings: backendResult.warnings,
-        retrievalAttempts: attempts,
+        retrievalAttempts: [...attempts, ...backendAttempts],
+        cacheStatus: backendResult.cacheStatus,
+        fallbackUsed: backendResult.fallbackUsed,
+        primaryProvider: backendResult.primaryProvider,
+        failedProvider: backendResult.failedProvider,
+        fallbackReason: backendResult.fallbackReason,
       });
     } catch (error) {
       const message = errorMessage(error);
@@ -270,6 +278,7 @@
       primaryProvider: meta.primaryProvider || "",
       failedProvider: meta.failedProvider || "",
       fallbackReason: meta.fallbackReason || "",
+      retrievalAttempts: Array.isArray(meta.retrievalAttempts) ? meta.retrievalAttempts : [],
       qualityFlags,
       warnings,
     };

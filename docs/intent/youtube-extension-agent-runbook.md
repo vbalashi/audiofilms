@@ -50,6 +50,22 @@ http://localhost:3000/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
 
 If the backend is intentionally unavailable for browser-only diagnostics, pass `--skip-backend-check`. Do not use that for normal regression validation.
 
+Dictionary lookup defaults to the local AudioFilms app API:
+
+```text
+http://localhost:3000/api/dict
+```
+
+The extension sends dictionary requests through its service worker. To use 2000NL-backed Dutch lookup, run the AudioFilms app with:
+
+```text
+DICTIONARY_PROVIDER=2000nl
+DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
+DICTIONARY_2000NL_ACCESS_TOKEN=<supabase-user-access-token>
+```
+
+Direct YouTube extension calls to `https://2000.dilum.io/api/platform/v1/lookup` are not the first dogfood path because production CORS must explicitly allow the extension origin. Use the AudioFilms backend proxy unless that origin is configured.
+
 Current subtitle backend expectation:
 
 - The app/provider default is `yt-dlp`, with Supadata as an explicit fallback path.

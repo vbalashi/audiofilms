@@ -8,6 +8,20 @@ The dictionary provider system uses a provider-based architecture similar to the
 
 ## Available Providers
 
+### 2000NL Platform Dictionary Provider
+
+Uses the 2000NL Platform API as the dictionary authority for Dutch lookup and user progress context.
+
+This is the preferred provider for AudioFilms Dutch shadowing because it returns curated dictionary entries and can include 2000NL user state. Plain lookup is read-only; learning mutations belong to the 2000NL `/api/platform/v1/actions` endpoint and should be wired only through explicit user actions.
+
+**Configuration:**
+```bash
+DICTIONARY_PROVIDER=2000nl
+DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
+DICTIONARY_2000NL_ACCESS_TOKEN=your_supabase_user_access_token_here
+DICTIONARY_2000NL_INCLUDE_USER_STATE=true
+```
+
 ### OpenAI Dictionary Provider
 
 Uses the OpenAI chat completions API for context-aware dictionary-style definitions.
@@ -221,6 +235,6 @@ To test the dictionary provider:
 
 1. **Use context when available** - Provides more accurate definitions
 2. **Cache results** - Implement caching to reduce API calls and costs
-3. **Fallback strategy** - Prefer `openai` or `openrouter` first, then fall back to Free Dictionary for English words
+3. **Fallback strategy** - Prefer `2000nl` for Dutch curated lookup, use `openai` or `openrouter` for generated/contextual fallback, then fall back to Free Dictionary for English words
 4. **Rate limiting** - Implement user-side rate limiting to prevent abuse
 5. **Error handling** - Always handle errors gracefully with user-friendly messages

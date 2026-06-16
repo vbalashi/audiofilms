@@ -2,16 +2,18 @@ import type { DictionaryProvider } from '@/types/dictionary';
 import { OpenAIDictionaryProvider } from './OpenAIDictionaryProvider';
 import { OpenRouterDictionaryProvider } from './OpenRouterDictionaryProvider';
 import { FreeDictionaryProvider } from './FreeDictionaryProvider';
+import { TwoThousandNlDictionaryProvider } from './TwoThousandNlDictionaryProvider';
 
 /**
  * Available dictionary provider types
  */
-export type DictionaryProviderType = 'openai' | 'openrouter' | 'free-dictionary';
+export type DictionaryProviderType = 'openai' | 'openrouter' | 'free-dictionary' | '2000nl';
 
 export const DEFAULT_DICTIONARY_PROVIDER: DictionaryProviderType = 'openrouter';
 export const DEFAULT_OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 export const DEFAULT_OPENAI_MODEL = 'gpt-5.2';
 export const DEFAULT_OPENROUTER_MODEL = 'x-ai/grok-4.1-fast:free';
+export const DEFAULT_2000NL_API_BASE = 'https://2000.dilum.io/api/platform/v1';
 
 /**
  * Configuration for dictionary providers
@@ -27,6 +29,10 @@ export type DictionaryProviderConfig = {
   openRouterApiKey?: string;
   openRouterModel?: string;
   openRouterPrompt?: string;
+  // 2000NL platform API specific
+  twoThousandNlApiBase?: string;
+  twoThousandNlAccessToken?: string;
+  twoThousandNlIncludeUserState?: boolean;
 };
 
 /**
@@ -61,6 +67,17 @@ export function createDictionaryProvider(
 
     case 'free-dictionary':
       return new FreeDictionaryProvider();
+
+    case '2000nl':
+      if (!config.twoThousandNlAccessToken) {
+        throw new Error('Access token is required for 2000NL dictionary provider');
+      }
+      return new TwoThousandNlDictionaryProvider({
+        apiBase: config.twoThousandNlApiBase || DEFAULT_2000NL_API_BASE,
+        accessToken: config.twoThousandNlAccessToken,
+        includeUserState: config.twoThousandNlIncludeUserState,
+        timeoutMs: Number(process.env.DICTIONARY_2000NL_TIMEOUT_MS || 8000),
+      });
 
     default:
       throw new Error(`Unknown dictionary provider type: ${config.type}`);
@@ -116,6 +133,11 @@ function getDictionaryProviderConfig(
     // Check https://openrouter.ai/models for current offerings
     openRouterModel: process.env.OPENROUTER_DICTIONARY_MODEL || DEFAULT_OPENROUTER_MODEL,
     openRouterPrompt: process.env.OPENROUTER_DICTIONARY_PROMPT,
+    twoThousandNlApiBase:
+      process.env.DICTIONARY_2000NL_API_BASE?.trim() || DEFAULT_2000NL_API_BASE,
+    twoThousandNlAccessToken: process.env.DICTIONARY_2000NL_ACCESS_TOKEN?.trim(),
+    twoThousandNlIncludeUserState:
+      process.env.DICTIONARY_2000NL_INCLUDE_USER_STATE !== 'false',
   };
 }
 
@@ -150,6 +172,10 @@ export function getDictionaryProviderCandidates(
   };
 
   maybeAdd(configuredType);
+
+  if (configuredType !== '2000nl') {
+    maybeAdd('2000nl');
+  }
 
   if (configuredType !== 'openai') {
     maybeAdd('openai');
@@ -196,4 +222,9 @@ function buildAzureOpenAiUrl(opts: {
   return `${endpointBase}/openai/v1/chat/completions`;
 }
 
-export { OpenAIDictionaryProvider, OpenRouterDictionaryProvider, FreeDictionaryProvider };
+export {
+  OpenAIDictionaryProvider,
+  OpenRouterDictionaryProvider,
+  FreeDictionaryProvider,
+  TwoThousandNlDictionaryProvider,
+};

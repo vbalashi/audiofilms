@@ -51,6 +51,7 @@
     autoPause: true,
     guidedMode: false,
     selectedWord: null,
+    dictionaryLookupSeq: 0,
     accountStatus: "guest",
     playbackFrame: null,
     activePlayback: null,
@@ -734,13 +735,64 @@
       renderClickablePhraseText(text, phrase.text, state.selectedWord.phraseIndex);
     }
 
-    const lookup = appendElement(card, "div", "af-lookup-placeholder");
-    const lookupTitle = appendElement(lookup, "div", "af-lookup-placeholder-title");
-    lookupTitle.textContent = "Dictionary result";
-    const lookupCopy = appendElement(lookup, "p", "af-dictionary-copy");
-    lookupCopy.textContent = "API wiring will load public dictionary matches here. Login will add your personal progress, not unlock basic lookup.";
+    renderDictionaryLookup(card);
 
     renderReviewActions(card);
+  }
+
+  function renderDictionaryLookup(parent) {
+    const lookup = appendElement(parent, "div", "af-lookup-placeholder");
+    const lookupTitle = appendElement(lookup, "div", "af-lookup-placeholder-title");
+    const lookupCopy = appendElement(lookup, "p", "af-dictionary-copy");
+    const selectedWord = state.selectedWord;
+
+    if (!selectedWord) {
+      lookupTitle.textContent = "Dictionary result";
+      lookupCopy.textContent = "Click a word to look it up.";
+      return;
+    }
+
+    if (selectedWord.lookupStatus === "loading") {
+      lookupTitle.textContent = "Looking up...";
+      lookupCopy.textContent = "Loading dictionary matches from AudioFilms.";
+      return;
+    }
+
+    if (selectedWord.lookupStatus === "error") {
+      lookupTitle.textContent = "Lookup failed";
+      lookupCopy.textContent = selectedWord.lookupError || "Dictionary lookup failed.";
+      if (selectedWord.translateUrl) {
+        const link = appendElement(lookup, "a", "af-dictionary-link");
+        link.href = selectedWord.translateUrl;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = "Open translation fallback";
+      }
+      return;
+    }
+
+    const result = selectedWord.lookupResult?.result;
+    const definitions = selectedWord.lookupResult?.definitions || [];
+    if (!result) {
+      lookupTitle.textContent = "No match";
+      lookupCopy.textContent = "No dictionary match was returned for this word.";
+      return;
+    }
+
+    lookupTitle.textContent = `${result.word || selectedWord.word} · ${result.language || "dictionary"}`;
+    lookupCopy.textContent = selectedWord.lookupResult?.meta?.provider
+      ? `Source: ${selectedWord.lookupResult.meta.provider}`
+      : "Dictionary match";
+
+    for (const definition of definitions.length ? definitions : [result.definition]) {
+      const item = appendElement(lookup, "p", "af-dictionary-copy");
+      item.textContent = definition;
+    }
+
+    if (selectedWord.lookupResult?.meta?.warning) {
+      const warning = appendElement(lookup, "p", "af-source-option-error");
+      warning.textContent = selectedWord.lookupResult.meta.warning;
+    }
   }
 
   function renderReviewActions(parent) {
@@ -758,9 +810,137 @@
   }
 
   function selectLookupWord(word, phraseIndex) {
-    state.selectedWord = { word, phraseIndex };
+    const lookupSeq = state.dictionaryLookupSeq + 1;
+    state.dictionaryLookupSeq = lookupSeq;
+    state.selectedWord = {
+      word,
+      phraseIndex,
+      lookupSeq,
+      lookupStatus: "loading",
+      lookupResult: null,
+      lookupError: "",
+      translateUrl: "",
+    };
     state.currentIndex = phraseIndex;
     render();
+    lookupSelectedWord(state.selectedWord);
+  }
+
+  async function lookupSelectedWord(selectedWord) {
+    const phrase = state.phrases[selectedWord.phraseIndex] || state.phrases[state.currentIndex];
+    const source = getSelectedPracticeSource();
+    const language = source?.loadedTranscriptResult?.languageCode || source?.languageCode || "auto";
+
+    try {
+      const result = await fetchDictionaryResult({
+        word: selectedWord.word,
+        language,
+        context: phrase?.text || "",
+      });
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        lookupStatus: "ready",
+        lookupResult: result,
+        lookupError: "",
+        translateUrl: "",
+      };
+      recordDebugEvent("dictionary-lookup-loaded", {
+        word: selectedWord.word,
+        language,
+        provider: result?.meta?.provider || "",
+      });
+    } catch (error) {
+      if (!isCurrentLookup(selectedWord)) return;
+      const payload = error?.payload || {};
+      state.selectedWord = {
+        ...state.selectedWord,
+        lookupStatus: "error",
+        lookupResult: null,
+        lookupError: payload.error || (error instanceof Error ? error.message : String(error)),
+        translateUrl: payload.translateUrl || "",
+      };
+      recordDebugEvent("dictionary-lookup-failed", {
+        word: selectedWord.word,
+        language,
+        error: state.selectedWord.lookupError,
+      });
+    } finally {
+      if (isCurrentLookup(selectedWord)) {
+        render();
+      }
+    }
+  }
+
+  function isCurrentLookup(selectedWord) {
+    return state.selectedWord?.lookupSeq === selectedWord.lookupSeq &&
+      state.selectedWord?.word === selectedWord.word;
+  }
+
+  async function fetchDictionaryResult({ word, language, context }) {
+    const endpoint = dictionaryLookupEndpoint();
+    if (!endpoint) {
+      throw new Error("Dictionary lookup is disabled.");
+    }
+
+    const url = new URL(endpoint);
+    url.searchParams.set("word", word);
+    url.searchParams.set("language", language || "auto");
+    if (context) {
+      url.searchParams.set("context", context);
+    }
+
+    const response = await requestDictionaryLookup(url.toString());
+    const text = response.text || "";
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch (_error) {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const message = response.error || payload?.error || text.slice(0, 180) || `HTTP ${response.status}`;
+      const error = new Error(`Dictionary lookup failed: HTTP ${response.status} ${message}`);
+      error.payload = payload || { error: message };
+      throw error;
+    }
+
+    return payload;
+  }
+
+  function dictionaryLookupEndpoint() {
+    const configured = window.localStorage.getItem("afShadowingDictionaryUrl") || "";
+    if (configured === "off") return "";
+    if (configured) return configured;
+    return "http://localhost:3000/api/dict";
+  }
+
+  function requestDictionaryLookup(url) {
+    if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+      return fetch(url, {
+        credentials: "omit",
+        headers: { accept: "application/json" },
+      }).then(async (response) => ({
+        ok: response.ok,
+        status: response.status,
+        text: await response.text(),
+      }));
+    }
+
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: "af-fetch-dictionary-lookup", url }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (!response) {
+          reject(new Error("Dictionary lookup returned no response."));
+          return;
+        }
+        resolve(response);
+      });
+    });
   }
 
   function accountStatusLabel() {
