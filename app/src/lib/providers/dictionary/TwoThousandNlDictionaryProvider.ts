@@ -1,4 +1,9 @@
-import type { DictionaryProvider, DictionaryResult } from '@/types/dictionary';
+import type {
+  DictionaryOverlayCard,
+  DictionaryProvider,
+  DictionaryResult,
+  DictionaryRichLookup,
+} from '@/types/dictionary';
 import { DictionaryError } from '@/types/dictionary';
 
 type TwoThousandNlDictionaryProviderOptions = {
@@ -18,16 +23,24 @@ type PlatformLookupResponse = {
 type PlatformLookupItem = {
   entry?: {
     id?: string;
+    dictionaryId?: string;
     languageCode?: string | null;
     headword?: string;
+    meaningId?: number | null;
     partOfSpeech?: string | null;
     gender?: string | null;
     raw?: PlatformRawEntry;
   };
   dictionary?: {
+    id?: string;
     name?: string;
     slug?: string;
+    kind?: string;
   } | null;
+  userStateByCardType?: Record<string, unknown>;
+  progressSummary?: unknown;
+  listMemberships?: unknown[];
+  availableActions?: string[];
 };
 
 type PlatformRawEntry = {
@@ -65,6 +78,29 @@ export class TwoThousandNlDictionaryProvider implements DictionaryProvider {
     sourceLanguage: string,
     context?: string,
   ): Promise<DictionaryResult> {
+    const lookup = await this.getRichLookup(word, sourceLanguage);
+    const card = lookup.cards[0];
+    if (!card) {
+      throw new DictionaryError(`Word "${word.trim()}" not found in 2000NL`, 'NOT_FOUND');
+    }
+
+    const definition = formatCardDefinition(card);
+    if (!definition) {
+      throw new DictionaryError(`No definition found for "${word.trim()}"`, 'NOT_FOUND');
+    }
+
+    return {
+      word: card.headword,
+      language: card.language || sourceLanguage,
+      definition,
+      context,
+    };
+  }
+
+  async getRichLookup(
+    word: string,
+    sourceLanguage: string,
+  ): Promise<DictionaryRichLookup> {
     const query = word.trim();
     if (!query) {
       throw new DictionaryError('Word is required', 'INVALID_INPUT');
@@ -93,24 +129,13 @@ export class TwoThousandNlDictionaryProvider implements DictionaryProvider {
         throw mapPlatformError(response.status, payload);
       }
 
-      const item = payload?.items?.[0];
-      if (!item?.entry) {
+      const items = payload?.items || [];
+      const cards = items.map((item, index) => projectOverlayCard(item, query, sourceLanguage, index));
+      if (cards.length === 0) {
         throw new DictionaryError(`Word "${query}" not found in 2000NL`, 'NOT_FOUND');
       }
 
-      const raw = item.entry.raw;
-      const headword = item.entry.headword || raw?.headword || query;
-      const definition = formatDefinition(item);
-      if (!definition) {
-        throw new DictionaryError(`No definition found for "${query}"`, 'NOT_FOUND');
-      }
-
-      return {
-        word: headword,
-        language: item.entry.languageCode || sourceLanguage,
-        definition,
-        context,
-      };
+      return { query: payload?.query || query, cards };
     } catch (error) {
       if (error instanceof DictionaryError) {
         throw error;
@@ -142,36 +167,78 @@ function mapPlatformError(status: number, payload: PlatformLookupResponse | null
   return new DictionaryError(message, 'API_ERROR');
 }
 
-function formatDefinition(item: PlatformLookupItem) {
+function projectOverlayCard(
+  item: PlatformLookupItem,
+  query: string,
+  sourceLanguage: string,
+  index: number,
+): DictionaryOverlayCard {
   const raw = item.entry?.raw;
+  const entryId = item.entry?.id;
+  const headword = item.entry?.headword || raw?.headword || query;
+  const meanings = (raw?.meanings || [])
+    .map((meaning) => ({
+      definition: meaning.definition?.trim() || '',
+      context: meaning.context?.trim() || undefined,
+      examples: (meaning.examples || []).map((example) => example.trim()).filter(Boolean),
+      idioms: formatIdioms(meaning.idioms),
+    }))
+    .filter((meaning) => meaning.definition || meaning.examples.length || meaning.idioms.length);
+  const userState = item.userStateByCardType?.['word-to-definition'];
+
+  return {
+    id: entryId || `${headword}-${index}`,
+    entryId,
+    cardTypeId: 'word-to-definition',
+    headword,
+    language: item.entry?.languageCode || sourceLanguage,
+    partOfSpeech: item.entry?.partOfSpeech || raw?.part_of_speech || undefined,
+    gender: item.entry?.gender || raw?.gender || undefined,
+    pronunciation: raw?.pronunciation || undefined,
+    plural: raw?.plural || undefined,
+    diminutive: raw?.diminutive || undefined,
+    dictionary: item.dictionary
+      ? {
+          id: item.dictionary.id,
+          slug: item.dictionary.slug,
+          name: item.dictionary.name,
+          kind: item.dictionary.kind,
+        }
+      : undefined,
+    meanings,
+    progressSummary: item.progressSummary,
+    userState,
+    listMemberships: item.listMemberships || [],
+    availableActions: item.availableActions || [],
+  };
+}
+
+function formatCardDefinition(card: DictionaryOverlayCard) {
   const lines: string[] = [];
-  const source = item.dictionary?.name || item.dictionary?.slug || '2000NL';
-  const partOfSpeech = item.entry?.partOfSpeech || raw?.part_of_speech || '';
-  const gender = item.entry?.gender || raw?.gender || '';
-  const descriptor = [partOfSpeech, gender].filter(Boolean).join(', ');
+  const source = card.dictionary?.name || card.dictionary?.slug || '2000NL';
+  const descriptor = [card.partOfSpeech, card.gender].filter(Boolean).join(', ');
 
   if (descriptor) {
     lines.push(descriptor);
   }
 
-  for (const meaning of raw?.meanings || []) {
+  for (const meaning of card.meanings) {
     if (meaning.definition) {
       lines.push(meaning.definition);
     }
     if (meaning.examples?.length) {
       lines.push(`Examples: ${meaning.examples.join(' | ')}`);
     }
-    const idioms = formatIdioms(meaning.idioms);
-    if (idioms) {
-      lines.push(`Idioms: ${idioms}`);
+    if (meaning.idioms?.length) {
+      lines.push(`Idioms: ${meaning.idioms.join(' | ')}`);
     }
   }
 
-  if (raw?.plural) {
-    lines.push(`Plural: ${raw.plural}`);
+  if (card.plural) {
+    lines.push(`Plural: ${card.plural}`);
   }
-  if (raw?.diminutive) {
-    lines.push(`Diminutive: ${raw.diminutive}`);
+  if (card.diminutive) {
+    lines.push(`Diminutive: ${card.diminutive}`);
   }
   lines.push(`Source: ${source}`);
 
@@ -184,6 +251,5 @@ function formatIdioms(idioms: PlatformMeaning['idioms']) {
       if (typeof idiom === 'string') return idiom;
       return [idiom.expression, idiom.explanation].filter(Boolean).join(' - ');
     })
-    .filter(Boolean)
-    .join(' | ');
+    .filter(Boolean);
 }

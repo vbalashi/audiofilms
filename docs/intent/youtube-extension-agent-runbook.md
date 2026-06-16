@@ -17,22 +17,105 @@ Keep extension spike changes inside `extensions/youtube-shadowing/` unless the w
 
 ## Local Chrome Profile
 
-The currently used local unpacked Chrome extension is:
+The currently used local unpacked Chrome extension in the user's normal Google
+Chrome profile is:
 
 - extension path: `/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing`
-- extension id in the current normal Chrome profile: `lahhflkjhgnicgogaocdipfelambklmo`
-- extension details page: `chrome://extensions/?id=lahhflkjhgnicgogaocdipfelambklmo`
+- extension id in the current normal Chrome profile: `hhdkchoccmikoefhenobdjipgdppdpoc`
+- extension details page: `chrome://extensions/?id=hhdkchoccmikoefhenobdjipgdppdpoc`
 
 Reload the unpacked extension itself after content script changes. Reloading only the YouTube tab can leave an older content script active.
 
 Expected manual reload flow:
 
-1. Open `chrome://extensions/?id=lahhflkjhgnicgogaocdipfelambklmo`.
+1. Open `chrome://extensions/?id=hhdkchoccmikoefhenobdjipgdppdpoc`.
 2. Click the extension reload button.
 3. Reload the active YouTube watch tab.
 4. Confirm the AudioFilms toggle or panel appears.
 
 The smoke script can do this reload automatically with `--reload-extension`.
+
+## Real Google Chrome Profile Protocol
+
+Use the user's visible `/Applications/Google Chrome.app` profile for extension
+dogfooding unless the user explicitly approves an isolated browser. The goal is
+that the user and the agent inspect the same installed extension, the same
+Chrome session, the same logged-in websites, and the same extension storage.
+
+Do not use Chrome for Testing, Playwright's default browser profile, or
+agent-browser managed profiles for this workflow. Those profiles are useful for
+isolated web QA, but they install a different extension instance and can hide
+profile-specific issues.
+
+The current stable unpacked dev extension identity is fixed by the manifest
+`key`:
+
+```text
+extension id: hhdkchoccmikoefhenobdjipgdppdpoc
+extension origin: chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc
+connect redirect URI: https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/
+```
+
+If Chrome still shows the old unpacked id
+`lahhflkjhgnicgogaocdipfelambklmo`, remove that old unpacked extension and load
+`/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing` again. The old id
+was produced before the stable manifest key was added and will not match the
+2000NL Connect client registration.
+
+To load the unpacked extension into the user's real profile:
+
+1. Open `/Applications/Google Chrome.app`, not Chrome for Testing.
+2. Open `chrome://extensions`.
+3. Keep Developer mode enabled.
+4. Click `Load unpacked`.
+5. Select `/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing`.
+6. Verify the card shows `AudioFilms YouTube Shadowing` and ID
+   `hhdkchoccmikoefhenobdjipgdppdpoc`.
+7. Click the extension reload button on that card.
+
+When automating the macOS file picker, do not type the path with keystrokes
+while the user's keyboard layout might be non-English. A bad layout can turn
+`/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing` into unreadable
+text such as `/фффl/...`, and Chrome will silently fail to load the extension.
+Use the clipboard or set the accessibility text field value directly.
+
+Useful verification commands:
+
+```bash
+osascript -e 'tell application "Google Chrome" to open location "chrome://extensions"'
+```
+
+```bash
+osascript <<'OSA'
+tell application "Google Chrome"
+  tell active tab of front window
+    execute javascript "JSON.stringify((() => { const list=document.querySelector('extensions-manager').shadowRoot.querySelector('extensions-item-list').shadowRoot; return Array.from(list.querySelectorAll('extensions-item')).map(item => ({id:item.getAttribute('id') || item.data?.id, text:item.shadowRoot?.innerText || ''})).filter(x => x.id === 'hhdkchoccmikoefhenobdjipgdppdpoc'); })())"
+  end tell
+end tell
+OSA
+```
+
+```bash
+curl -sS -H 'Origin: chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc' \
+  'https://2000.dilum.io/api/connect/clients/audiofilms_chrome_dev?redirect_uri=https%3A%2F%2Fhhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org%2F&scope=platform%3Aread%20platform%3Awrite%20offline_access'
+```
+
+Chrome may not immediately flush newly loaded unpacked extension settings to
+`~/Library/Application Support/Google/Chrome/*/Preferences`. Treat the visible
+`chrome://extensions` card as the primary confirmation during the live session;
+the Preferences file is only a secondary check after Chrome has had time to
+write profile state.
+
+Remote debugging caveat: launching the user's normal Chrome with
+`--remote-debugging-port=9222` can leave the process running with that flag while
+no port listens. Do not interpret that as permission to switch to Chrome for
+Testing. Continue through the visible Chrome UI, AppleScript, accessibility, or
+the existing smoke helper that targets normal Google Chrome.
+
+Before using any helper that opens a browser, confirm whether it targets the
+normal Chrome profile. `extensions/youtube-shadowing/scripts/smoke-chrome.mjs`
+is the preferred helper for this extension because it uses AppleScript against
+normal Google Chrome and supports `--reload-extension`.
 
 ## Backend Requirement
 
@@ -64,7 +147,55 @@ DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
 DICTIONARY_2000NL_ACCESS_TOKEN=<supabase-user-access-token>
 ```
 
-Direct YouTube extension calls to `https://2000.dilum.io/api/platform/v1/lookup` are not the first dogfood path because production CORS must explicitly allow the extension origin. Use the AudioFilms backend proxy unless that origin is configured.
+`DICTIONARY_2000NL_ACCESS_TOKEN` is only a short-lived dogfood fallback. The
+durable path is 2000NL Connect:
+
+- AudioFilms extension manifest has a stable unpacked dev ID:
+  `hhdkchoccmikoefhenobdjipgdppdpoc`.
+- Connect redirect URI:
+  `https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/`.
+- Extension origin:
+  `chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc`.
+- 2000NL connected client id:
+  `audiofilms_chrome_dev`.
+
+Register the 2000NL client with:
+
+```sql
+insert into connected_clients (
+  client_id,
+  display_name,
+  client_type,
+  allowed_redirect_uris,
+  allowed_origins,
+  allowed_scopes,
+  requires_pkce
+) values (
+  'audiofilms_chrome_dev',
+  'AudioFilms Dev',
+  'chrome_extension',
+  array['https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/'],
+  array['chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc'],
+  array['platform:read', 'platform:write', 'offline_access'],
+  true
+) on conflict (client_id) do update set
+  allowed_redirect_uris = excluded.allowed_redirect_uris,
+  allowed_origins = excluded.allowed_origins,
+  allowed_scopes = excluded.allowed_scopes,
+  requires_pkce = excluded.requires_pkce,
+  status = 'active',
+  updated_at = now();
+```
+
+Set 2000NL CORS to include the extension origin:
+
+```text
+CONNECT_API_ALLOWED_ORIGINS=chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc
+PLATFORM_API_ALLOWED_ORIGINS=chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc
+```
+
+The extension should still call AudioFilms `/api/dict*`; AudioFilms forwards the
+current 2000NL Bearer token to `https://2000.dilum.io/api/platform/v1/*`.
 
 Current subtitle backend expectation:
 
@@ -192,7 +323,7 @@ Paste that report into the next agent message instead of describing the miss onl
 
 For service worker or manifest/runtime errors:
 
-1. Open `chrome://extensions/?id=lahhflkjhgnicgogaocdipfelambklmo`.
+1. Open `chrome://extensions/?id=hhdkchoccmikoefhenobdjipgdppdpoc`.
 2. Inspect extension errors on the detail page.
 3. Open the service worker inspector if Chrome exposes the service worker link.
 

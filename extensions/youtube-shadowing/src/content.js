@@ -53,6 +53,9 @@
     selectedWord: null,
     dictionaryLookupSeq: 0,
     accountStatus: "guest",
+    accountUser: null,
+    accountError: "",
+    accountLoading: false,
     playbackFrame: null,
     activePlayback: null,
     guidedHold: null,
@@ -65,6 +68,7 @@
     bootDiagnostics,
   };
   window.__afShadowingDebug = state;
+  syncTwoThousandNlAccount();
 
   function updateBootDiagnostics(updates) {
     Object.assign(state.bootDiagnostics, updates, {
@@ -707,10 +711,22 @@
     const accountTitle = appendElement(accountCard, "div", "af-account-mini-title");
     accountTitle.textContent = "2000NL account";
     const accountCopy = appendElement(accountCard, "p", "af-dictionary-copy");
-    accountCopy.textContent = "Not connected. Personal progress is off.";
+    accountCopy.textContent = accountStatusCopy();
+    if (state.accountError) {
+      const accountError = appendElement(accountCard, "p", "af-source-option-error");
+      accountError.textContent = state.accountError;
+    }
     const action = appendButton(accountCard, "Connect 2000NL", "afSignIn");
     action.className = "af-secondary-button";
-    action.disabled = true;
+    action.textContent = state.accountStatus === "signed-in" ? "Disconnect" : accountConnectLabel();
+    action.disabled = state.accountLoading;
+    action.addEventListener("click", () => {
+      if (state.accountStatus === "signed-in") {
+        disconnectTwoThousandNlAccount();
+      } else {
+        connectTwoThousandNlAccount();
+      }
+    });
   }
 
   function renderSelectedWordCard(parent) {
@@ -726,6 +742,16 @@
 
     const status = appendElement(card, "div", "af-word-status");
     status.textContent = state.accountStatus === "signed-in" ? "Personal lookup" : "Guest lookup";
+    const accountAction = appendButton(card, accountConnectLabel(), "afSignIn");
+    accountAction.className = "af-secondary-button af-account-inline-action";
+    accountAction.disabled = state.accountLoading;
+    accountAction.addEventListener("click", () => {
+      if (state.accountStatus === "signed-in") {
+        disconnectTwoThousandNlAccount();
+      } else {
+        connectTwoThousandNlAccount();
+      }
+    });
 
     if (phrase) {
       const context = appendElement(card, "div", "af-context-block");
@@ -736,8 +762,6 @@
     }
 
     renderDictionaryLookup(card);
-
-    renderReviewActions(card);
   }
 
   function renderDictionaryLookup(parent) {
@@ -771,6 +795,32 @@
       return;
     }
 
+    const cards = selectedWord.lookupResult?.cards || [];
+    if (cards.length) {
+      lookupTitle.textContent = `${cards.length} dictionary ${cards.length === 1 ? "card" : "cards"}`;
+      lookupCopy.textContent = selectedWord.lookupResult?.meta?.provider
+        ? `Source: ${selectedWord.lookupResult.meta.provider}`
+        : "Dictionary match";
+
+      for (const card of cards) {
+        renderOverlayCard(lookup, card);
+      }
+
+      if (selectedWord.cardActionStatus) {
+        const status = appendElement(lookup, "p", "af-dictionary-copy af-card-action-status");
+        status.textContent = selectedWord.cardActionStatus;
+      }
+      if (selectedWord.cardActionError) {
+        const error = appendElement(lookup, "p", "af-source-option-error");
+        error.textContent = selectedWord.cardActionError;
+      }
+      if (selectedWord.lookupResult?.meta?.warning) {
+        const warning = appendElement(lookup, "p", "af-source-option-error");
+        warning.textContent = selectedWord.lookupResult.meta.warning;
+      }
+      return;
+    }
+
     const result = selectedWord.lookupResult?.result;
     const definitions = selectedWord.lookupResult?.definitions || [];
     if (!result) {
@@ -795,18 +845,102 @@
     }
   }
 
-  function renderReviewActions(parent) {
+  function renderOverlayCard(parent, card) {
+    const entry = appendElement(parent, "div", "af-overlay-card");
+    const header = appendElement(entry, "div", "af-overlay-card-header");
+    const title = appendElement(header, "div", "af-overlay-card-title");
+    title.textContent = card.headword || "Dictionary card";
+    const meta = appendElement(header, "div", "af-overlay-card-meta");
+    meta.textContent = [
+      card.partOfSpeech,
+      card.gender,
+      card.dictionary?.name || card.dictionary?.slug,
+    ].filter(Boolean).join(" · ") || card.language || "2000NL";
+
+    const formBits = [
+      card.pronunciation ? `Pronunciation: ${card.pronunciation}` : "",
+      card.plural ? `Plural: ${card.plural}` : "",
+      card.diminutive ? `Diminutive: ${card.diminutive}` : "",
+    ].filter(Boolean);
+    for (const bit of formBits) {
+      const line = appendElement(entry, "p", "af-dictionary-copy af-overlay-form");
+      line.textContent = bit;
+    }
+
+    for (const meaning of card.meanings || []) {
+      const meaningEl = appendElement(entry, "div", "af-overlay-meaning");
+      if (meaning.definition) {
+        const definition = appendElement(meaningEl, "p", "af-dictionary-copy af-overlay-definition");
+        definition.textContent = meaning.definition;
+      }
+      if (meaning.context) {
+        const context = appendElement(meaningEl, "p", "af-dictionary-copy");
+        context.textContent = meaning.context;
+      }
+      for (const example of meaning.examples || []) {
+        const exampleEl = appendElement(meaningEl, "p", "af-dictionary-copy af-overlay-example");
+        exampleEl.textContent = example;
+      }
+      for (const idiom of meaning.idioms || []) {
+        const idiomEl = appendElement(meaningEl, "p", "af-dictionary-copy af-overlay-idiom");
+        idiomEl.textContent = idiom;
+      }
+    }
+
+    const translation = state.selectedWord?.translationsByCardId?.[card.id];
+    if (translation) {
+      renderCardTranslation(entry, translation);
+    }
+
+    renderReviewActions(entry, card);
+  }
+
+  function renderCardTranslation(parent, translation) {
+    const block = appendElement(parent, "div", "af-card-translation");
+    const label = appendElement(block, "div", "af-card-review-label");
+    label.textContent = translation.status === "pending" ? "Translation pending" : "Translation";
+    const text = appendElement(block, "p", "af-dictionary-copy");
+    text.textContent = summarizeTranslationOverlay(translation.overlay) || translation.note || translation.error || translation.status || "No translation text returned.";
+  }
+
+  function summarizeTranslationOverlay(overlay) {
+    if (!overlay || typeof overlay !== "object") return "";
+    const parts = [];
+    if (typeof overlay.headword === "string") parts.push(overlay.headword);
+    if (Array.isArray(overlay.meanings)) {
+      for (const meaning of overlay.meanings) {
+        if (meaning?.definition) parts.push(String(meaning.definition));
+      }
+    }
+    return parts.filter(Boolean).join(" · ");
+  }
+
+  function renderReviewActions(parent, card = null) {
     const section = appendElement(parent, "div", "af-card-review");
     const label = appendElement(section, "div", "af-card-review-label");
-    label.textContent = state.accountStatus === "signed-in" ? "Grade this card" : "Connect 2000NL to grade memory";
+    label.textContent = card?.entryId ? "2000NL card actions" : "Connect 2000NL to grade memory";
     const actions = appendElement(section, "div", "af-review-actions");
+    const available = new Set(card?.availableActions || []);
+
+    const start = appendButton(actions, "Start", "afStartLearning");
+    start.disabled = !card?.entryId || !available.has("start-learning");
+    start.addEventListener("click", () => performDictionaryCardAction(card, { action: "start-learning" }));
+
+    const known = appendButton(actions, "Known", "afKnown");
+    known.disabled = !card?.entryId || !available.has("mark-known");
+    known.addEventListener("click", () => performDictionaryCardAction(card, { action: "mark-known" }));
+
     const again = appendButton(actions, "Again", "afAgain");
-    const hard = appendButton(actions, "Hard", "afHard");
+    again.disabled = !card?.entryId || !available.has("review-card");
+    again.addEventListener("click", () => performDictionaryCardAction(card, { action: "review-card", result: "fail" }));
+
     const good = appendButton(actions, "Good", "afGood");
-    const easy = appendButton(actions, "Easy", "afEasy");
-    [again, hard, good, easy].forEach((button) => {
-      button.disabled = state.accountStatus !== "signed-in";
-    });
+    good.disabled = !card?.entryId || !available.has("review-card");
+    good.addEventListener("click", () => performDictionaryCardAction(card, { action: "review-card", result: "success" }));
+
+    const translate = appendButton(actions, "Translate", "afTranslate");
+    translate.disabled = !card?.entryId;
+    translate.addEventListener("click", () => requestDictionaryCardTranslation(card));
   }
 
   function selectLookupWord(word, phraseIndex) {
@@ -820,6 +954,9 @@
       lookupResult: null,
       lookupError: "",
       translateUrl: "",
+      cardActionStatus: "",
+      cardActionError: "",
+      translationsByCardId: {},
     };
     state.currentIndex = phraseIndex;
     render();
@@ -844,6 +981,8 @@
         lookupResult: result,
         lookupError: "",
         translateUrl: "",
+        cardActionStatus: "",
+        cardActionError: "",
       };
       recordDebugEvent("dictionary-lookup-loaded", {
         word: selectedWord.word,
@@ -872,6 +1011,81 @@
     }
   }
 
+  async function performDictionaryCardAction(card, actionPayload) {
+    if (!card?.entryId || !state.selectedWord) return;
+
+    const selectedWord = state.selectedWord;
+    state.selectedWord = {
+      ...state.selectedWord,
+      cardActionStatus: "Saving action...",
+      cardActionError: "",
+    };
+    render();
+
+    try {
+      await postDictionaryBackend(dictionaryBackendEndpoint("actions"), {
+        ...actionPayload,
+        entryId: card.entryId,
+      });
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        lookupStatus: "loading",
+        cardActionStatus: "Refreshing lookup...",
+        cardActionError: "",
+      };
+      render();
+      await lookupSelectedWord(state.selectedWord);
+    } catch (error) {
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        cardActionStatus: "",
+        cardActionError: error instanceof Error ? error.message : String(error),
+      };
+      render();
+    }
+  }
+
+  async function requestDictionaryCardTranslation(card) {
+    if (!card?.entryId || !state.selectedWord) return;
+
+    const selectedWord = state.selectedWord;
+    const targetLang = window.localStorage.getItem("afShadowingTranslationLang") || "en";
+    state.selectedWord = {
+      ...state.selectedWord,
+      cardActionStatus: "Loading translation...",
+      cardActionError: "",
+    };
+    render();
+
+    try {
+      const translation = await postDictionaryBackend(dictionaryBackendEndpoint("translation"), {
+        entryId: card.entryId,
+        targetLang,
+      });
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        cardActionStatus: "",
+        cardActionError: "",
+        translationsByCardId: {
+          ...(state.selectedWord.translationsByCardId || {}),
+          [card.id]: translation,
+        },
+      };
+      render();
+    } catch (error) {
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        cardActionStatus: "",
+        cardActionError: error instanceof Error ? error.message : String(error),
+      };
+      render();
+    }
+  }
+
   function isCurrentLookup(selectedWord) {
     return state.selectedWord?.lookupSeq === selectedWord.lookupSeq &&
       state.selectedWord?.word === selectedWord.word;
@@ -890,7 +1104,9 @@
       url.searchParams.set("context", context);
     }
 
-    const response = await requestDictionaryLookup(url.toString());
+    const response = await requestDictionaryLookup(url.toString(), {
+      headers: await dictionaryAuthHeaders(),
+    });
     const text = response.text || "";
     let payload = null;
     try {
@@ -916,11 +1132,158 @@
     return "http://localhost:3000/api/dict";
   }
 
-  function requestDictionaryLookup(url) {
+  function dictionaryBackendEndpoint(kind) {
+    const endpoint = dictionaryLookupEndpoint();
+    if (!endpoint) return "";
+    const url = new URL(endpoint);
+    url.pathname = url.pathname.replace(/\/dict\/?$/, `/dict/${kind}`);
+    return url.toString();
+  }
+
+  async function dictionaryAuthHeaders() {
+    const session = await getFreshTwoThousandNlSession();
+    return session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {};
+  }
+
+  async function postDictionaryBackend(url, payload) {
+    if (!url) {
+      throw new Error("Dictionary backend is disabled.");
+    }
+
+    const response = await requestDictionaryLookup(url, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        ...(await dictionaryAuthHeaders()),
+      },
+    });
+    const text = response.text || "";
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch (_error) {
+      body = null;
+    }
+    if (!response.ok) {
+      throw new Error(body?.error || body?.detail || response.error || `HTTP ${response.status}`);
+    }
+    return body;
+  }
+
+  async function syncTwoThousandNlAccount() {
+    try {
+      const session = await getFreshTwoThousandNlSession();
+      setTwoThousandNlSessionState(session, "");
+    } catch (error) {
+      setTwoThousandNlSessionState(null, error instanceof Error ? error.message : String(error));
+    }
+    render();
+  }
+
+  async function connectTwoThousandNlAccount() {
+    state.accountLoading = true;
+    state.accountError = "";
+    render();
+
+    try {
+      const response = await sendRuntimeMessage({
+        type: "af-connect-2000nl",
+        options: twoThousandNlConnectOptions(),
+      });
+      if (!response?.ok) {
+        throw new Error(response?.error || "2000NL authorization failed.");
+      }
+      setTwoThousandNlSessionState(response.session, "");
+      if (state.selectedWord) {
+        selectLookupWord(state.selectedWord.word, state.selectedWord.phraseIndex);
+        return;
+      }
+    } catch (error) {
+      setTwoThousandNlSessionState(null, error instanceof Error ? error.message : String(error));
+    } finally {
+      state.accountLoading = false;
+      render();
+    }
+  }
+
+  async function disconnectTwoThousandNlAccount() {
+    state.accountLoading = true;
+    state.accountError = "";
+    render();
+
+    try {
+      await sendRuntimeMessage({
+        type: "af-disconnect-2000nl",
+        options: twoThousandNlConnectOptions(),
+      });
+      setTwoThousandNlSessionState(null, "");
+      if (state.selectedWord) {
+        selectLookupWord(state.selectedWord.word, state.selectedWord.phraseIndex);
+        return;
+      }
+    } catch (error) {
+      state.accountError = error instanceof Error ? error.message : String(error);
+    } finally {
+      state.accountLoading = false;
+      render();
+    }
+  }
+
+  async function getFreshTwoThousandNlSession() {
+    if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+      return null;
+    }
+    const response = await sendRuntimeMessage({
+      type: "af-get-2000nl-session",
+      options: twoThousandNlConnectOptions(),
+    });
+    if (!response?.ok) {
+      setTwoThousandNlSessionState(null, response?.error || "2000NL session is unavailable.");
+      return null;
+    }
+    setTwoThousandNlSessionState(response.session, "");
+    return response.session || null;
+  }
+
+  function setTwoThousandNlSessionState(session, error) {
+    state.accountUser = session?.user || null;
+    state.accountError = error || "";
+    if (session?.access_token) {
+      state.accountStatus = "signed-in";
+    } else if (error) {
+      state.accountStatus = "expired";
+    } else {
+      state.accountStatus = "guest";
+    }
+  }
+
+  function twoThousandNlConnectOptions() {
+    return {
+      baseUrl: window.localStorage.getItem("afShadowing2000nlBaseUrl") || "https://2000.dilum.io",
+      clientId: window.localStorage.getItem("afShadowing2000nlClientId") || "audiofilms_chrome_dev",
+    };
+  }
+
+  function sendRuntimeMessage(message) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(response);
+      });
+    });
+  }
+
+  function requestDictionaryLookup(url, options = {}) {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
       return fetch(url, {
         credentials: "omit",
-        headers: { accept: "application/json" },
+        ...options,
+        headers: { accept: "application/json", ...(options.headers || {}) },
       }).then(async (response) => ({
         ok: response.ok,
         status: response.status,
@@ -929,7 +1292,7 @@
     }
 
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: "af-fetch-dictionary-lookup", url }, (response) => {
+      chrome.runtime.sendMessage({ type: "af-fetch-dictionary-lookup", url, options }, (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
           return;
@@ -944,9 +1307,27 @@
   }
 
   function accountStatusLabel() {
-    if (state.accountStatus === "signed-in") return "2000NL connected";
+    if (state.accountStatus === "signed-in") return state.accountUser?.email || "2000NL connected";
     if (state.accountStatus === "expired") return "Reconnect 2000NL";
     return "Guest lookup";
+  }
+
+  function accountStatusCopy() {
+    if (state.accountLoading) return "Connecting to 2000NL...";
+    if (state.accountStatus === "signed-in") {
+      return state.accountUser?.email
+        ? `Connected as ${state.accountUser.email}.`
+        : "Connected to 2000NL.";
+    }
+    if (state.accountStatus === "expired") return "Session expired. Reconnect to restore lookup and progress.";
+    return "Not connected. Personal progress is off.";
+  }
+
+  function accountConnectLabel() {
+    if (state.accountLoading) return "Connecting...";
+    if (state.accountStatus === "signed-in") return "Disconnect";
+    if (state.accountStatus === "expired") return "Reconnect 2000NL";
+    return "Connect 2000NL";
   }
 
   function clearElement(element) {

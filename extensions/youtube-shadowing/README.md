@@ -220,9 +220,12 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 ## Current Limits
 
 - No build step.
-- No 2000NL sign-in flow inside the extension yet; account/review UI remains disabled unless a later explicit action flow is added.
+- No 2000NL sign-in flow inside the extension yet; the manifest now reserves a stable unpacked dev extension ID for the upcoming 2000NL Connect flow.
 - Dictionary lookup is read-only and goes through `http://localhost:3000/api/dict` by default. Set `localStorage.afShadowingDictionaryUrl` to another endpoint or `off` for diagnostics.
-- 2000NL-backed dictionary results require the AudioFilms app to run with `DICTIONARY_PROVIDER=2000nl` and a valid `DICTIONARY_2000NL_ACCESS_TOKEN`.
+- 2000NL-backed dictionary results currently require either a valid short-lived `DICTIONARY_2000NL_ACCESS_TOKEN` fallback or the planned 2000NL Connect session token.
+- Stable unpacked dev extension ID: `hhdkchoccmikoefhenobdjipgdppdpoc`.
+- 2000NL Connect dev redirect URI: `https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/`.
+- 2000NL Connect dev origin: `chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc`.
 - No word-level alignment.
 - Uses YouTube web-player metadata, which can change.
 - Backend/provider fallback expects the local AudioFilms app API at `http://localhost:3000/api/get-subs` unless `localStorage.afShadowingBackendSubtitlesUrl` is set to another URL or `off`.

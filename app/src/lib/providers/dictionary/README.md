@@ -157,14 +157,56 @@ curl "http://localhost:3000/api/dict?word=hello&language=en&context=Hello%20worl
 **Response:**
 ```json
 {
+  "query": "huis",
   "result": {
-    "word": "hello",
-    "language": "en",
-    "definition": "A greeting used when meeting someone or starting a conversation...",
-    "context": "Hello world"
+    "word": "huis",
+    "language": "nl",
+    "definition": "het-woord\n\nA place where people live...",
+    "context": "Het huis is groot."
+  },
+  "definitions": ["het-woord", "A place where people live..."],
+  "cards": [
+    {
+      "id": "entry-id",
+      "entryId": "entry-id",
+      "cardTypeId": "word-to-definition",
+      "headword": "huis",
+      "language": "nl",
+      "partOfSpeech": "zn",
+      "gender": "het",
+      "dictionary": {
+        "id": "dictionary-id",
+        "slug": "nl-vandale",
+        "name": "VanDale Dutch"
+      },
+      "meanings": [
+        {
+          "definition": "A place where people live...",
+          "examples": [],
+          "idioms": []
+        }
+      ],
+      "availableActions": ["start-learning", "review-card"]
+    }
+  ],
+  "meta": {
+    "provider": "2000nl",
+    "fallbackUsed": false,
+    "responseVersion": "overlay-v1"
   }
 }
 ```
+
+For 2000NL, `cards[]` is a shallow AudioFilms overlay projection where one
+card maps to one top-level 2000NL `lookup.items[]` result. The response does not
+expose `entry.raw`; consumers should render `cards[]`.
+
+Explicit per-card mutations go through the AudioFilms backend:
+
+- `POST /api/dict/actions` proxies supported card actions to 2000NL
+  `/api/platform/v1/actions` with `cardTypeId: "word-to-definition"`.
+- `POST /api/dict/translation` proxies provider-backed translation requests to
+  2000NL `/api/platform/v1/translation`.
 
 **Error Response:**
 ```json

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { lookupDictionaryEntry } from '@/lib/dictionaryLookup';
+import { getBearerToken } from '@/lib/twoThousandNlPlatform';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,7 +13,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const outcome = await lookupDictionaryEntry({ word, language, context });
+    const outcome = await lookupDictionaryEntry({
+      word,
+      language,
+      context,
+      platformAccessToken: getBearerToken(request),
+    });
     return NextResponse.json(outcome.body, { status: outcome.status });
   } catch {
     return NextResponse.json({ error: 'Failed to fetch definition' }, { status: 500 });

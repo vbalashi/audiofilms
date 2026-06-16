@@ -35,6 +35,10 @@ export type DictionaryProviderConfig = {
   twoThousandNlIncludeUserState?: boolean;
 };
 
+export type DictionaryProviderOverrides = {
+  twoThousandNlAccessToken?: string;
+};
+
 /**
  * Factory function to create dictionary providers
  * This allows easy switching between providers without code changes
@@ -100,6 +104,7 @@ export function getConfiguredDictionaryProvider(): DictionaryProvider {
 
 function getDictionaryProviderConfig(
   providerType: DictionaryProviderType,
+  overrides: DictionaryProviderOverrides = {},
 ): DictionaryProviderConfig {
   const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim() || '';
   const azureApiKey = process.env.AZURE_OPENAI_API_KEY?.trim() || '';
@@ -135,7 +140,9 @@ function getDictionaryProviderConfig(
     openRouterPrompt: process.env.OPENROUTER_DICTIONARY_PROMPT,
     twoThousandNlApiBase:
       process.env.DICTIONARY_2000NL_API_BASE?.trim() || DEFAULT_2000NL_API_BASE,
-    twoThousandNlAccessToken: process.env.DICTIONARY_2000NL_ACCESS_TOKEN?.trim(),
+    twoThousandNlAccessToken:
+      overrides.twoThousandNlAccessToken ||
+      process.env.DICTIONARY_2000NL_ACCESS_TOKEN?.trim(),
     twoThousandNlIncludeUserState:
       process.env.DICTIONARY_2000NL_INCLUDE_USER_STATE !== 'false',
   };
@@ -148,6 +155,7 @@ export type DictionaryProviderCandidate = {
 
 export function getDictionaryProviderCandidates(
   sourceLanguage: string,
+  overrides: DictionaryProviderOverrides = {},
 ): DictionaryProviderCandidate[] {
   const configuredType = (process.env.DICTIONARY_PROVIDER ||
     DEFAULT_DICTIONARY_PROVIDER) as DictionaryProviderType;
@@ -161,7 +169,7 @@ export function getDictionaryProviderCandidates(
     attempted.add(type);
 
     try {
-      const config = getDictionaryProviderConfig(type);
+      const config = getDictionaryProviderConfig(type, overrides);
       candidates.push({ type, provider: createDictionaryProvider(config) });
     } catch (error) {
       console.warn(

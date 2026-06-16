@@ -2,14 +2,18 @@ import { getDictionaryProviderCandidates } from '@/lib/providers/dictionary';
 import {
   DictionaryError,
   splitDictionaryDefinition,
+  type DictionaryOverlayCard,
+  type DictionaryProvider,
   type DictionaryLookupErrorResponse,
   type DictionaryLookupSuccessResponse,
+  type DictionaryRichLookup,
 } from '@/types/dictionary';
 
 export type DictionaryLookupParams = {
   word: string;
   language: string;
   context?: string;
+  platformAccessToken?: string;
 };
 
 export type DictionaryLookupOutcome =
@@ -71,7 +75,7 @@ function toErrorOutcome(
         ok: false,
         status: 500,
         body: {
-          error: 'Failed to fetch definition',
+          error: error.message || 'Failed to fetch definition',
           code: 'API_ERROR',
           recoverable: true,
           suggestedAction: 'Try again later or use a different word.',
@@ -80,19 +84,77 @@ function toErrorOutcome(
   }
 }
 
+type RichDictionaryProvider = DictionaryProvider & {
+  getRichLookup(
+    word: string,
+    sourceLanguage: string,
+    context?: string,
+  ): Promise<DictionaryRichLookup>;
+};
+
+function hasRichLookup(provider: DictionaryProvider): provider is RichDictionaryProvider {
+  return typeof (provider as Partial<RichDictionaryProvider>).getRichLookup === 'function';
+}
+
+function formatDefinitionFromCard(card: DictionaryOverlayCard) {
+  const lines: string[] = [];
+  const descriptor = [card.partOfSpeech, card.gender].filter(Boolean).join(', ');
+  const source = card.dictionary?.name || card.dictionary?.slug || '2000NL';
+
+  if (descriptor) {
+    lines.push(descriptor);
+  }
+
+  for (const meaning of card.meanings) {
+    if (meaning.definition) {
+      lines.push(meaning.definition);
+    }
+    if (meaning.examples.length) {
+      lines.push(`Examples: ${meaning.examples.join(' | ')}`);
+    }
+    if (meaning.idioms.length) {
+      lines.push(`Idioms: ${meaning.idioms.join(' | ')}`);
+    }
+  }
+
+  if (card.plural) {
+    lines.push(`Plural: ${card.plural}`);
+  }
+  if (card.diminutive) {
+    lines.push(`Diminutive: ${card.diminutive}`);
+  }
+  lines.push(`Source: ${source}`);
+
+  return lines.filter(Boolean).join('\n\n');
+}
+
 export async function lookupDictionaryEntry({
   word,
   language,
   context,
+  platformAccessToken,
 }: DictionaryLookupParams): Promise<DictionaryLookupOutcome> {
-  const candidates = getDictionaryProviderCandidates(language);
+  const candidates = getDictionaryProviderCandidates(language, {
+    twoThousandNlAccessToken: platformAccessToken,
+  });
   let lastDictionaryError: DictionaryError | null = null;
 
   for (let index = 0; index < candidates.length; index += 1) {
     const candidate = candidates[index];
 
     try {
-      const result = await candidate.provider.getDefinition(word, language, context);
+      const richLookup = hasRichLookup(candidate.provider)
+        ? await candidate.provider.getRichLookup(word, language, context)
+        : null;
+      const firstCard = richLookup?.cards[0];
+      const result = firstCard
+        ? {
+            word: firstCard.headword,
+            language: firstCard.language || language,
+            definition: formatDefinitionFromCard(firstCard),
+            context,
+          }
+        : await candidate.provider.getDefinition(word, language, context);
       const fallbackUsed = index > 0;
 
       return {
@@ -101,12 +163,15 @@ export async function lookupDictionaryEntry({
         body: {
           result,
           definitions: splitDictionaryDefinition(result.definition),
+          query: richLookup?.query,
+          cards: richLookup?.cards,
           meta: {
             provider: candidate.type,
             fallbackUsed,
             warning: fallbackUsed
               ? `Primary dictionary provider was unavailable. Showing a fallback definition from ${candidate.type}.`
               : undefined,
+            responseVersion: richLookup ? 'overlay-v1' : 'legacy',
           },
         },
       };
@@ -115,9 +180,11 @@ export async function lookupDictionaryEntry({
 
       if (error instanceof DictionaryError) {
         lastDictionaryError = error;
+        const primaryProvider = process.env.DICTIONARY_PROVIDER || '';
         const shouldTryFallback =
           index < candidates.length - 1 &&
-          (error.code === 'API_ERROR' || error.code === 'RATE_LIMIT');
+          (error.code === 'API_ERROR' || error.code === 'RATE_LIMIT') &&
+          !(primaryProvider === '2000nl' && candidate.type === '2000nl');
 
         if (shouldTryFallback) {
           continue;

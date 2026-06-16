@@ -26,13 +26,52 @@ export interface DictionaryResult {
   context?: string;
 }
 
+export type DictionaryOverlayCardMeaning = {
+  definition: string;
+  context?: string;
+  examples: string[];
+  idioms: string[];
+};
+
+export type DictionaryOverlayCard = {
+  id: string;
+  entryId?: string;
+  cardTypeId: 'word-to-definition';
+  headword: string;
+  language: string;
+  partOfSpeech?: string;
+  gender?: string;
+  pronunciation?: string;
+  plural?: string;
+  diminutive?: string;
+  dictionary?: {
+    id?: string;
+    slug?: string;
+    name?: string;
+    kind?: string;
+  };
+  meanings: DictionaryOverlayCardMeaning[];
+  progressSummary?: unknown;
+  userState?: unknown;
+  listMemberships?: unknown[];
+  availableActions: string[];
+};
+
+export type DictionaryRichLookup = {
+  query: string;
+  cards: DictionaryOverlayCard[];
+};
+
 export interface DictionaryLookupSuccessResponse {
   result: DictionaryResult;
   definitions: string[];
+  query?: string;
+  cards?: DictionaryOverlayCard[];
   meta?: {
     provider: string;
     fallbackUsed: boolean;
     warning?: string;
+    responseVersion?: 'legacy' | 'overlay-v1';
   };
 }
 

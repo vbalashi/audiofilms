@@ -3,6 +3,11 @@
   "name": "AudioFilms YouTube Shadowing",
   "version": "0.1.0",
   "description": "Phrase-by-phrase shadowing controls for YouTube captions.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs2+Ygyoyc9iTrOG2Ybv9ioO2OTb+EsOUkTbhilVcVLLrLGEk7MUCto1LHZCitT6hPf6QnfLTHJWnskFbhk7GjIQsMgY2/kby3aCxr0qxibsU91pUGFteAf8n/eEmqr0og9vvknDGXWuGU+vaZUn90HDPv0/rRHgOw+mit5MnSBJtQfdp/UfWddsUWS5frzxaGJifcS71/Vux00gqEuxt0zDuMtOUzAxUJaZ6YDuirDoKfJ09GWF+9K117SaTEnpn8lbvuZsPczl6+dlvoVjcNJRJG7lupmERq6qrqzBbupZTMXe5sAEQr65qViSfI9yn7LomX2rjr2xuUoPZ5AhgoQIDAQAB",
+  "permissions": [
+    "identity",
+    "storage"
+  ],
   "background": {
     "service_worker": "src/serviceWorker.js"
   },
@@ -40,6 +45,7 @@
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://youtube.com/*",
+    "https://2000.dilum.io/*",
     "http://localhost:*/*",
     "http://127.0.0.1:*/*"
   ],

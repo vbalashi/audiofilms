@@ -230,6 +230,51 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   color: var(--af-muted);
 }
 
+.af-overlay-card {
+  margin-top: 12px;
+  padding: 12px;
+  color: var(--af-text);
+  background: rgba(15, 23, 42, 0.44);
+  border: 1px solid var(--af-border);
+  border-radius: 6px;
+}
+
+.af-overlay-card-header {
+  display: grid;
+  gap: 4px;
+}
+
+.af-overlay-card-title {
+  color: var(--af-text);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.af-overlay-card-meta,
+.af-overlay-form {
+  color: var(--af-muted);
+  font-size: 12px;
+}
+
+.af-overlay-meaning + .af-overlay-meaning,
+.af-card-translation {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--af-border);
+}
+
+.af-overlay-definition {
+  color: var(--af-text);
+}
+
+.af-overlay-example {
+  color: #bfdbfe;
+}
+
+.af-overlay-idiom {
+  color: #fcd34d;
+}
+
 .af-lookup-placeholder-title,
 .af-account-mini-title,
 .af-card-review-label {
@@ -250,9 +295,13 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   margin-bottom: 9px;
 }
 
+.af-account-inline-action {
+  margin-top: 10px;
+}
+
 .af-review-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 8px;
 }
 
