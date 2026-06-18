@@ -118,6 +118,10 @@ ASR_MAX_ACTIVE_JOBS=1
 ASR_ALLOW_FULL_AUDIO=true
 ```
 
+Keep the deployment `.env` on the target host. If syncing the repo with
+`rsync --delete`, exclude both root `.env*` and `app/.env*`; otherwise the
+server-side tester token and public base URL can be removed from the deployment.
+
 ## Build and Run
 
 From the repo root:
@@ -178,6 +182,30 @@ Run `cloudflared` on the same host that can reach `127.0.0.1:3010`. Once this
 is active, change `AUDIOFILMS_PUBLIC_API_BASE` to
 `https://audiofilms-api.dilum.io` and restart the API container so job links use
 the public URL.
+
+Current Dell tunnel:
+
+```text
+Tunnel name: audiofilms-api
+Tunnel ID:   7a9853ba-45b1-4217-93c3-2b080d563eb5
+Hostname:    audiofilms-api.dilum.io
+Origin:      http://127.0.0.1:3010
+```
+
+The Dell connector currently runs as a restartable Docker container:
+
+```bash
+docker run -d --name audiofilms-cloudflared --restart unless-stopped \
+  --network host \
+  --user "$(id -u):$(id -g)" \
+  -v /home/khrustal/cloudflared/audiofilms-api:/etc/cloudflared:ro \
+  cloudflare/cloudflared:2026.6.0 \
+  tunnel --config /etc/cloudflared/config.yml run
+```
+
+The credentials and config directory on Dell is
+`/home/khrustal/cloudflared/audiofilms-api`. Keep it private and do not commit
+the tunnel JSON credentials.
 
 The extension manifest grants `https://audiofilms-api.dilum.io/*` specifically. Prefer this over `https://*.dilum.io/*` for the first tester build. If the public API hostname changes later, move it behind DNS or adjust the shared extension config before widening host permissions.
 
