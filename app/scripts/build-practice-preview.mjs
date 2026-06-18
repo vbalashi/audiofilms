@@ -4,7 +4,7 @@ import path from "node:path";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const appRoot = path.join(repoRoot, "app");
-const cacheDir = path.join(appRoot, ".asr-cache");
+const cacheDir = process.env.AUDIOFILMS_ASR_CACHE_DIR || path.join(appRoot, ".asr-cache");
 
 const videoId = valueFor("--video") || valueFor("--videoId") || "RJrjzCuCHpo";
 const language = valueFor("--lang") || "nl";

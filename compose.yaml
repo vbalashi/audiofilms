@@ -6,14 +6,18 @@ services:
     image: audiofilms-api:local
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${AUDIOFILMS_API_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      HOME: /data/audiofilms/home
+      XDG_CACHE_HOME: /data/audiofilms/cache
+      HF_HOME: /data/audiofilms/huggingface
       AUDIOFILMS_PUBLIC_API_BASE: ${AUDIOFILMS_PUBLIC_API_BASE:-}
       AUDIOFILMS_DATA_DIR: /data/audiofilms
       AUDIOFILMS_CACHE_DIR: /data/audiofilms/cache
+      AUDIOFILMS_ASR_CACHE_DIR: /data/audiofilms/asr-cache
       SUBTITLE_PROVIDER: ${SUBTITLE_PROVIDER:-yt-dlp}
       YT_DLP_PATH: ${YT_DLP_PATH:-/usr/local/bin/yt-dlp}
       SUPADATA_API_KEY: ${SUPADATA_API_KEY:-}
@@ -35,6 +39,7 @@ services:
       ASR_MAX_DURATION_SEC: ${ASR_MAX_DURATION_SEC:-900}
       ASR_MAX_ACTIVE_JOBS: ${ASR_MAX_ACTIVE_JOBS:-4}
       ASR_RATE_LIMIT_MAX: ${ASR_RATE_LIMIT_MAX:-4}
+      ASR_ALLOW_FULL_AUDIO: ${ASR_ALLOW_FULL_AUDIO:-false}
       LOCAL_ASR_PRACTICE_ENABLED: ${LOCAL_ASR_PRACTICE_ENABLED:-false}
     volumes:
       - audiofilms-data:/data/audiofilms
@@ -52,8 +57,12 @@ services:
     command: ["node", "scripts/asr-worker.mjs"]
     environment:
       NODE_ENV: production
+      HOME: /data/audiofilms/home
+      XDG_CACHE_HOME: /data/audiofilms/cache
+      HF_HOME: /data/audiofilms/huggingface
       AUDIOFILMS_DATA_DIR: /data/audiofilms
       AUDIOFILMS_CACHE_DIR: /data/audiofilms/cache
+      AUDIOFILMS_ASR_CACHE_DIR: /data/audiofilms/asr-cache
       YT_DLP_PATH: ${YT_DLP_PATH:-/usr/local/bin/yt-dlp}
       ASR_QUEUE_DIR: /data/audiofilms/asr-jobs
       ASR_ARTIFACT_STORE: file:///data/audiofilms/asr-artifacts

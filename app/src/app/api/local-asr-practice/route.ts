@@ -20,6 +20,10 @@ function safeArg(value: string) {
   return value.replace(/[^\w./:-]/g, "");
 }
 
+function asrCacheDir(appRoot: string): string {
+  return process.env.AUDIOFILMS_ASR_CACHE_DIR || path.join(appRoot, ".asr-cache");
+}
+
 function localAsrPracticeEnabled(request: Request): boolean {
   const explicit = String(process.env.LOCAL_ASR_PRACTICE_ENABLED || '').toLowerCase();
   if (explicit === 'true') return true;
@@ -66,7 +70,7 @@ export async function GET(request: Request) {
 
   const appRoot = process.cwd();
   const windowLabel = fullAudio ? "full" : `${duration}s`;
-  const runDir = path.join(appRoot, ".asr-cache", `${safeArg(videoId)}-${safeArg(language)}-${windowLabel}`);
+  const runDir = path.join(asrCacheDir(appRoot), `${safeArg(videoId)}-${safeArg(language)}-${windowLabel}`);
   const modelSlug = slugify(model);
   const previewPath = path.join(runDir, `${engine}-${modelSlug}-practice-preview.json`);
   const wordsPath = path.join(runDir, `${engine}-${modelSlug}-words.json`);

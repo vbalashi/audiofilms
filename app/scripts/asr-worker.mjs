@@ -70,6 +70,10 @@ function artifactStore() {
   return process.env.ASR_ARTIFACT_STORE || `file://${path.join(appRoot, ".asr-cache", "artifacts")}`;
 }
 
+function asrCacheDir() {
+  return process.env.AUDIOFILMS_ASR_CACHE_DIR || path.join(appRoot, ".asr-cache");
+}
+
 function artifactRoot() {
   const store = artifactStore();
   if (store.startsWith("file://")) return fileURLToPath(store);
@@ -144,7 +148,7 @@ function runAsrPipeline(job) {
     maxBuffer: 100 * 1024 * 1024,
   });
 
-  const runDir = path.join(appRoot, ".asr-cache", `${safeArg(videoId)}-${safeArg(language)}-${fullAudio ? "full" : `${durationSec}s`}`);
+  const runDir = path.join(asrCacheDir(), `${safeArg(videoId)}-${safeArg(language)}-${fullAudio ? "full" : `${durationSec}s`}`);
   const modelSlug = slugify(model);
   const wordsPath = path.join(runDir, `${engine}-${modelSlug}-words.json`);
   const previewPath = path.join(runDir, `${engine}-${modelSlug}-practice-preview.json`);

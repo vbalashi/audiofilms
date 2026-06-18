@@ -32,7 +32,18 @@ The extension should move service locations by changing `localStorage.afShadowin
 
 Use the Next.js API as the public facade for this MVP. It is already the place where subtitle provider selection, dictionary provider selection, and 2000NL token forwarding are implemented. Moving subtitle/dictionary routes into a separate service before dogfood would create more deployment surface without solving the current blocker.
 
-Run on the NUC first:
+For the current Dell-first dogfood deployment, run the API and ASR worker on
+`dell-k3s` (`192.168.178.114`) and leave the NUC untouched:
+
+```text
+audiofilms-api container on host port 3010
+audiofilms-asr-worker container
+persistent Docker volume mounted at /data/audiofilms inside containers
+Cloudflare Tunnel or reverse proxy/TLS in front of audiofilms-api.dilum.io
+```
+
+The earlier NUC-first shape is still valid for a lighter subtitle/dictionary-only
+deployment:
 
 ```text
 audiofilms-api container
@@ -66,6 +77,7 @@ ALLOWED_EXTENSION_ORIGINS=chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc
 ALLOWED_WEB_ORIGINS=https://www.youtube.com,https://youtube.com
 AUDIOFILMS_DATA_DIR=/data/audiofilms
 AUDIOFILMS_CACHE_DIR=/data/audiofilms/cache
+AUDIOFILMS_ASR_CACHE_DIR=/data/audiofilms/asr-cache
 AUDIOFILMS_PUBLIC_API_BASE=https://audiofilms-api.dilum.io
 ASR_MODE=disabled
 LOCAL_ASR_PRACTICE_ENABLED=false
@@ -87,12 +99,24 @@ ASR_TESTER_TOKENS=<random-long-token>
 ASR_QUEUE_DIR=/data/audiofilms/asr-jobs
 ASR_ARTIFACT_STORE=file:///data/audiofilms/asr-artifacts
 ASR_MAX_DURATION_SEC=900
-ASR_MAX_ACTIVE_JOBS=4
+ASR_MAX_ACTIVE_JOBS=1
 ASR_RATE_LIMIT_MAX=4
 ASR_ALLOW_FULL_AUDIO=false
 ```
 
-Full-video ASR is intentionally blocked unless `ASR_ALLOW_FULL_AUDIO=true` is set. For remote testers, use bounded duration jobs until resource behavior is known.
+Full-video ASR is intentionally blocked unless `ASR_ALLOW_FULL_AUDIO=true` is set.
+For private Dell dogfood this can be enabled while measuring performance. For
+remote testers, use bounded duration jobs until resource behavior is known.
+
+Current Dell LAN override for private testing before Cloudflare is ready:
+
+```bash
+AUDIOFILMS_API_PORT=3010
+AUDIOFILMS_PUBLIC_API_BASE=http://192.168.178.114:3010
+ASR_MODE=file-queue
+ASR_MAX_ACTIVE_JOBS=1
+ASR_ALLOW_FULL_AUDIO=true
+```
 
 ## Build and Run
 
@@ -108,6 +132,13 @@ Check health locally:
 ```bash
 curl -fsS http://127.0.0.1:3000/api/health | jq .
 curl -fsS 'http://127.0.0.1:3000/api/health?checks=1' | jq .
+```
+
+On the Dell LAN deployment with `AUDIOFILMS_API_PORT=3010`:
+
+```bash
+curl -fsS http://192.168.178.114:3010/api/health | jq .
+curl -fsS 'http://192.168.178.114:3010/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual' | jq '.language, (.practicePhrases | length)'
 ```
 
 Enable the optional same-host worker profile only after `ASR_MODE=file-queue` and `ASR_TESTER_TOKENS` are set:
@@ -133,6 +164,20 @@ audiofilms-api.dilum.io {
   reverse_proxy 127.0.0.1:3000
 }
 ```
+
+For a home-lab Dell behind NAT, prefer Cloudflare Tunnel over opening router
+ports:
+
+```bash
+cloudflared tunnel create audiofilms-api
+cloudflared tunnel route dns audiofilms-api audiofilms-api.dilum.io
+cloudflared tunnel run --url http://127.0.0.1:3010 audiofilms-api
+```
+
+Run `cloudflared` on the same host that can reach `127.0.0.1:3010`. Once this
+is active, change `AUDIOFILMS_PUBLIC_API_BASE` to
+`https://audiofilms-api.dilum.io` and restart the API container so job links use
+the public URL.
 
 The extension manifest grants `https://audiofilms-api.dilum.io/*` specifically. Prefer this over `https://*.dilum.io/*` for the first tester build. If the public API hostname changes later, move it behind DNS or adjust the shared extension config before widening host permissions.
 
