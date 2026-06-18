@@ -16,7 +16,7 @@ export function requireBearerToken(request: Request) {
 }
 
 export async function postTwoThousandNlPlatformJson(
-  path: 'actions' | 'translation' | 'lookup',
+  path: 'actions' | 'translation' | 'lookup' | 'text-translation',
   body: unknown,
   accessToken: string,
 ): Promise<PlatformProxyOutcome> {

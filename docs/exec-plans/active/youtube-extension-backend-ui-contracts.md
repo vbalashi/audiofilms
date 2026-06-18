@@ -403,6 +403,47 @@ POST /api/practice/phrase-translations
 GET  /api/practice/phrase-translations/{translationId}
 ```
 
+First backend slice implemented:
+
+- `POST /api/practice/phrase-translations` requires a forwarded 2000NL user
+  Bearer token and returns `401 authentication_required` /
+  `missing_2000nl_user_token` when the token is absent.
+- Request body identifies the phrase artifact with `phraseId`, `text` or
+  `sourceText`, `sourceLanguageCode`, optional `contextText`, optional
+  `phraseSetRevisionId` / `snapshotRevisionId`, and optional
+  `targetLanguageCode` override. Normal target-language resolution remains in
+  2000NL user settings.
+- AudioFilms forwards to 2000NL `POST /api/platform/v1/text-translation` with
+  default purpose `youtube-phrase-practice`; caller-supplied purpose must be a
+  short safe identifier.
+- Response is projected to the phrase artifact shape and intentionally omits
+  provider details:
+
+```ts
+type PhraseTranslation = {
+  phraseId: string;
+  phraseSetRevisionId?: string;
+  snapshotRevisionId?: string;
+  translationId?: string;
+  status: 'missing' | 'pending' | 'ready' | 'failed' | string;
+  sourceTextHash?: string;
+  sourceLanguageCode: string;
+  targetLanguageCode?: string;
+  translatedText?: string;
+  translationPolicyVersion?: string;
+  cached?: boolean;
+  error?: { code: string; message?: string };
+};
+```
+
+Current limitation:
+
+- 2000NL exposes POST-only text translation. AudioFilms `GET
+  /api/practice/phrase-translations/{translationId}` reads the lightweight local
+  phrase association cache populated by POST. If the association is missing, GET
+  returns `404 not_available` and callers should create/request the translation
+  through POST.
+
 Open contract choices:
 
 - whether Shadow Mode `Show Translation` is current-phrase only or a sticky
@@ -421,18 +462,22 @@ Safe first-implementation defaults:
   phrase unless prefetch is already cheap/reliable.
 - `Show Translation` is current-phrase only for now.
 
-Candidate response shape:
+Legacy candidate response shape superseded by the implemented shape above:
 
 ```ts
 type PhraseTranslation = {
   phraseId: string;
-  sourceTextHash: string;
-  targetLanguage: string;
-  status: 'missing' | 'queued' | 'running' | 'ready' | 'failed';
-  text?: string;
+  phraseSetRevisionId?: string;
+  snapshotRevisionId?: string;
+  translationId?: string;
+  status: 'missing' | 'pending' | 'ready' | 'failed' | string;
+  sourceTextHash?: string;
+  sourceLanguageCode: string;
+  targetLanguageCode?: string;
+  translatedText?: string;
+  translationPolicyVersion?: string;
   cached?: boolean;
-  provider?: string;
-  errorCode?: string;
+  error?: { code: string; message?: string };
 };
 ```
 
