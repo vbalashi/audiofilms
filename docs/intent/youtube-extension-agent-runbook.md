@@ -125,25 +125,34 @@ normal Google Chrome and supports `--reload-extension`.
 
 ## Backend Requirement
 
-Local smoke fixtures expect the local AudioFilms app API at:
+The extension runtime defaults to the remote tester API documented in
+`extensions/youtube-shadowing/README.md`:
+
+```text
+https://audiofilms-api.dilum.io/api/get-subs
+```
+
+Local regression smoke fixtures can still be pointed at the local AudioFilms app
+API when that is the explicit test target:
 
 ```text
 http://localhost:3000/api/get-subs
 ```
 
-Before full smoke, make sure the app server is running. The smoke script performs a preflight request to:
+Before full local smoke, make sure the app server is running. The smoke script
+performs a local preflight request to:
 
 ```text
 http://localhost:3000/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
 ```
 
-If the backend is intentionally unavailable for browser-only diagnostics, pass `--skip-backend-check`. Do not use that for normal regression validation.
+If the local backend is intentionally unavailable for browser-only diagnostics,
+pass `--skip-backend-check`. Do not use that as evidence that backend
+integration works.
 
-Tester builds may default to the remote API configured in
-`extensions/youtube-shadowing/README.md`. Treat this section as local regression
-smoke guidance, not as the remote tester deployment default.
-
-Dictionary lookup defaults to the local AudioFilms app API command path:
+Dictionary lookup defaults to the configured AudioFilms API base plus
+`/api/dict/lookup`, which is remote unless localStorage explicitly overrides the
+API base. The local development command path is:
 
 ```text
 http://localhost:3000/api/dict/lookup
@@ -212,7 +221,7 @@ current 2000NL Bearer token to `https://2000.dilum.io/api/platform/v1/*`.
 Current subtitle backend expectation:
 
 - The app default subtitle extractor is `yt-dlp`, with Supadata as an explicit subtitle provider fallback when configured.
-- The extension still tries YouTube page timed text first. If YouTube returns `HTTP 429`, it falls back to `http://localhost:3000/api/get-subs`.
+- The extension still tries YouTube page timed text first. If YouTube returns `HTTP 429`, it falls back to the configured `/api/get-subs` endpoint, which defaults to `https://audiofilms-api.dilum.io/api/get-subs`.
 - For private local ASR dogfood, set `localStorage.afShadowingLocalAsr = "on"` on the
   YouTube watch page. This deliberately tries
   `http://localhost:3000/api/local-asr-practice` before YouTube `timedtext`,

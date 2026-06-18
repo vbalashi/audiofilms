@@ -49,6 +49,10 @@
     learningEnabled: readLearningEnabled(),
     textVisible: true,
     autoPause: true,
+    practiceMode: "shadow",
+    phraseTranslationVisible: false,
+    utilityMenuOpen: false,
+    lastMenuTrigger: null,
     guidedMode: false,
     selectedWord: null,
     dictionaryLookupSeq: 0,
@@ -57,6 +61,7 @@
     accountPreferences: null,
     accountError: "",
     accountLoading: false,
+    accountMenuOpen: false,
     playbackFrame: null,
     activePlayback: null,
     guidedHold: null,
@@ -212,8 +217,36 @@
     const subtitle = appendElement(heading, "div", "af-dictionary-subtitle");
     subtitle.dataset.afDictionarySubtitle = "";
     subtitle.textContent = "Contextual Lookup";
-    const account = appendElement(header, "div", "af-dictionary-account");
+    const accountWrap = appendElement(header, "div", "af-dictionary-account-wrap");
+    const account = appendElement(accountWrap, "button", "af-dictionary-account");
+    account.type = "button";
     account.dataset.afAccount = "";
+    account.setAttribute("aria-label", "2000NL account");
+    account.setAttribute("aria-haspopup", "menu");
+    account.setAttribute("aria-expanded", "false");
+    const accountMenu = appendElement(accountWrap, "div", "af-account-popover");
+    accountMenu.dataset.afAccountMenu = "";
+    const accountCopy = appendElement(accountMenu, "div", "af-account-popover-copy");
+    accountCopy.dataset.afAccountCopy = "";
+    const accountAction = appendButton(accountMenu, "Connect 2000NL", "afAccountAction");
+    accountAction.className = "af-account-popover-action";
+    const close = appendElement(header, "button", "af-dictionary-close");
+    close.type = "button";
+    close.textContent = "Close";
+    close.setAttribute("aria-label", "Close dictionary panel");
+    close.addEventListener("click", () => {
+      state.selectedWord = null;
+      render();
+    });
+    account.addEventListener("click", toggleAccountMenu);
+    accountAction.addEventListener("click", () => {
+      state.accountMenuOpen = false;
+      if (state.accountStatus === "signed-in") {
+        disconnectTwoThousandNlAccount();
+      } else {
+        connectTwoThousandNlAccount();
+      }
+    });
 
     const body = appendElement(panel, "div", "af-dictionary-body");
     body.dataset.afDictionaryBody = "";
@@ -231,14 +264,28 @@
     track.dataset.afTrack = "";
     const trackButton = appendButton(track, "Captions: -", "afSourceToggle");
     trackButton.className = "af-source-toggle";
+    trackButton.setAttribute("aria-haspopup", "menu");
     const sourceMenu = appendElement(track, "div", "af-source-menu");
     sourceMenu.dataset.afSourceMenu = "";
-    const count = appendElement(meta, "span", "af-ribbon-count");
+    const metaRight = appendElement(meta, "div", "af-ribbon-meta-right");
+    const count = appendElement(metaRight, "span", "af-ribbon-count");
     count.dataset.afCount = "";
     count.textContent = "0 / 0";
-    const mode = appendElement(meta, "span", "af-ribbon-mode");
+    const mode = appendElement(metaRight, "span", "af-ribbon-mode");
     mode.dataset.afMode = "";
     mode.textContent = "Passive";
+    const utility = appendElement(metaRight, "div", "af-utility-menu");
+    const utilityButton = appendButton(utility, "More", "afUtilityToggle");
+    utilityButton.className = "af-icon-button af-utility-toggle";
+    utilityButton.setAttribute("aria-label", "More AudioFilms actions");
+    utilityButton.setAttribute("aria-haspopup", "menu");
+    utilityButton.setAttribute("aria-expanded", "false");
+    const utilityMenu = appendElement(utility, "div", "af-utility-popover");
+    utilityMenu.dataset.afUtilityMenu = "";
+    appendButton(utilityMenu, "Mark Issue", "afMarkIssue");
+    appendButton(utilityMenu, "Debug", "afDebugToggle");
+    appendButton(utilityMenu, "Copy Debug", "afDebugCopy");
+    appendButton(utilityMenu, "Refresh Cache", "afRefreshCache");
 
     const list = appendElement(panel, "div", "af-ribbon-list");
     list.dataset.afRibbonList = "";
@@ -249,22 +296,45 @@
     debug.dataset.afDebug = "";
 
     const controls = appendElement(panel, "div", "af-ribbon-controls");
-    appendButton(controls, "Prev", "afPrev");
-    appendButton(controls, "Replay", "afReplay");
-    appendButton(controls, "Hide Text", "afToggle");
-    appendButton(controls, "Next", "afNext");
-    appendButton(controls, "Auto-Pause", "afAutoPause");
-    appendButton(controls, "Debug", "afDebugToggle");
-    appendButton(controls, "Copy", "afDebugCopy");
-    appendButton(controls, "Refresh Cache", "afRefreshCache");
-    appendButton(controls, "Mark Issue", "afMarkIssue");
+    const practiceControls = appendElement(controls, "div", "af-control-group af-practice-controls");
+    const prevButton = appendButton(practiceControls, "Prev", "afPrev");
+    prevButton.setAttribute("aria-label", "Previous phrase");
+    prevButton.title = "Previous phrase (ArrowLeft)";
+    const replayButton = appendButton(practiceControls, "Replay", "afReplay");
+    replayButton.setAttribute("aria-label", "Replay current phrase");
+    replayButton.title = "Replay current phrase (ArrowDown)";
+    const nextButton = appendButton(practiceControls, "Next", "afNext");
+    nextButton.setAttribute("aria-label", "Next phrase");
+    nextButton.title = "Next phrase (ArrowRight)";
+
+    const modeControls = appendElement(controls, "div", "af-control-group af-mode-controls");
+    const shadowButton = appendButton(modeControls, "Shadow", "afModeShadow");
+    shadowButton.title = "Shadow mode (1)";
+    const recallButton = appendButton(modeControls, "Recall", "afModeRecall");
+    recallButton.title = "Recall mode (2)";
+
+    const displayControls = appendElement(controls, "div", "af-control-group af-display-controls");
+    const originalButton = appendButton(displayControls, "Show Original", "afToggle");
+    originalButton.title = "Show or hide original text (S)";
+    const translationButton = appendButton(displayControls, "Show Translation", "afPhraseTranslation");
+    translationButton.title = "Show phrase translation (T)";
+    const timingButton = appendButton(displayControls, "Improve Timing", "afImproveTiming");
+    timingButton.disabled = true;
+    timingButton.hidden = true;
+    timingButton.title = "Timing improvement needs the practice-timing contract.";
+
+    const hints = appendElement(panel, "div", "af-shortcut-hints");
+    hints.textContent = "Shortcuts: Arrow keys phrase navigation · S original · T translation · 1/2 modes";
 
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
     panel.querySelector("[data-af-replay]").addEventListener("click", replayCurrentPhrase);
     panel.querySelector("[data-af-toggle]").addEventListener("click", toggleText);
     panel.querySelector("[data-af-next]").addEventListener("click", nextPhrase);
-    panel.querySelector("[data-af-auto-pause]").addEventListener("click", toggleAutoPause);
+    panel.querySelector("[data-af-mode-shadow]").addEventListener("click", () => setPracticeMode("shadow"));
+    panel.querySelector("[data-af-mode-recall]").addEventListener("click", () => setPracticeMode("recall"));
+    panel.querySelector("[data-af-phrase-translation]").addEventListener("click", togglePhraseTranslation);
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
+    panel.querySelector("[data-af-utility-toggle]").addEventListener("click", toggleUtilityMenu);
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
     panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
@@ -335,8 +405,14 @@
     const list = panel.querySelector("[data-af-ribbon-list]");
     const error = panel.querySelector("[data-af-error]");
     const debug = panel.querySelector("[data-af-debug]");
+    const controls = panel.querySelector(".af-ribbon-controls");
+    const hints = panel.querySelector(".af-shortcut-hints");
     const toggle = panel.querySelector("[data-af-toggle]");
-    const autoPause = panel.querySelector("[data-af-auto-pause]");
+    const modeShadow = panel.querySelector("[data-af-mode-shadow]");
+    const modeRecall = panel.querySelector("[data-af-mode-recall]");
+    const phraseTranslation = panel.querySelector("[data-af-phrase-translation]");
+    const utilityToggle = panel.querySelector("[data-af-utility-toggle]");
+    const utilityMenu = panel.querySelector("[data-af-utility-menu]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
     const debugCopy = panel.querySelector("[data-af-debug-copy]");
     const refreshCache = panel.querySelector("[data-af-refresh-cache]");
@@ -344,21 +420,42 @@
     const playbackButtons = [
       panel.querySelector("[data-af-prev]"),
       panel.querySelector("[data-af-replay]"),
-      panel.querySelector("[data-af-toggle]"),
       panel.querySelector("[data-af-next]"),
     ].filter(Boolean);
+    const displayButtons = [toggle].filter(Boolean);
     const hasPhrases = state.phrases.length > 0;
     const isEmpty = !state.loading && !hasPhrases;
+    const readiness = practiceReadiness();
+    const phraseTranslationReady = phraseTranslationAvailable();
 
     renderSourceSelector(track, sourceToggle, sourceMenu);
     panel.classList.toggle("is-empty", isEmpty);
+    panel.classList.toggle("is-recall", state.practiceMode === "recall");
+    controls.classList.toggle("is-hidden", isEmpty);
+    hints.classList.toggle("is-hidden", isEmpty);
     count.textContent = hasPhrases
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
       : state.loading ? "Loading" : "0 / 0";
     mode.textContent = state.guidedMode ? "Shortcuts active" : "Passive sync";
     mode.classList.toggle("is-guided", state.guidedMode);
-    toggle.textContent = state.textVisible ? "Hide Text" : "Show Text";
-    autoPause.textContent = state.autoPause ? "Auto-Pause On" : "Auto-Pause Off";
+    toggle.textContent = state.practiceMode === "recall"
+      ? state.textVisible ? "Hide Original" : "Reveal Original"
+      : state.textVisible ? "Hide Original" : "Show Original";
+    toggle.classList.toggle("is-active", state.textVisible);
+    modeShadow.classList.toggle("is-active", state.practiceMode === "shadow");
+    modeRecall.classList.toggle("is-active", state.practiceMode === "recall");
+    modeRecall.disabled = false;
+    modeRecall.title = phraseTranslationReady ? "Recall mode" : "Recall mode (translation unavailable)";
+    modeShadow.setAttribute("aria-pressed", state.practiceMode === "shadow" ? "true" : "false");
+    modeRecall.setAttribute("aria-pressed", state.practiceMode === "recall" ? "true" : "false");
+    phraseTranslation.textContent = state.phraseTranslationVisible ? "Hide Translation" : "Show Translation";
+    phraseTranslation.classList.toggle("is-active", state.phraseTranslationVisible);
+    phraseTranslation.hidden = isEmpty;
+    phraseTranslation.disabled = state.loading || !hasPhrases;
+    phraseTranslation.title = phraseTranslationReady ? "Show phrase translation" : "Phrase translation is not available yet.";
+    utilityToggle.setAttribute("aria-expanded", state.utilityMenuOpen ? "true" : "false");
+    utilityToggle.classList.toggle("is-active", state.utilityMenuOpen);
+    utilityMenu.classList.toggle("is-open", state.utilityMenuOpen);
     debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
     refreshCache.textContent = state.cacheRefreshRequested ? "Refreshing" : "Refresh Cache";
@@ -370,10 +467,13 @@
       button.hidden = isEmpty;
       button.disabled = state.loading || !hasPhrases;
     });
-    autoPause.hidden = isEmpty;
-    autoPause.disabled = state.loading || !hasPhrases;
+    displayButtons.forEach((button) => {
+      button.hidden = isEmpty;
+      button.disabled = state.loading || !hasPhrases;
+    });
     refreshCache.disabled = state.loading || !getSelectedPracticeSource();
     markIssue.disabled = state.loading;
+    sourceToggle.dataset.afReadiness = readiness.state;
 
     clearElement(list);
     if (state.loading) {
@@ -392,6 +492,80 @@
 
     list.classList.add("is-compact");
     appendPhraseRow(list, state.phrases[state.currentIndex], state.currentIndex);
+  }
+
+  function setPracticeMode(mode) {
+    state.practiceMode = mode === "recall" ? "recall" : "shadow";
+    if (state.practiceMode === "recall") {
+      state.textVisible = false;
+      state.phraseTranslationVisible = true;
+    }
+    render();
+  }
+
+  function togglePhraseTranslation() {
+    state.phraseTranslationVisible = !state.phraseTranslationVisible;
+    render();
+  }
+
+  function phraseTranslationAvailable() {
+    return false;
+  }
+
+  function toggleUtilityMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.utilityMenuOpen = !state.utilityMenuOpen;
+    state.lastMenuTrigger = state.utilityMenuOpen ? "utility" : null;
+    if (state.utilityMenuOpen) {
+      state.accountMenuOpen = false;
+      state.sourceMenuOpen = false;
+    }
+    render();
+  }
+
+  function toggleAccountMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.accountMenuOpen = !state.accountMenuOpen;
+    state.lastMenuTrigger = state.accountMenuOpen ? "account" : null;
+    if (state.accountMenuOpen) {
+      state.utilityMenuOpen = false;
+      state.sourceMenuOpen = false;
+    }
+    render();
+  }
+
+  function closeOpenMenus() {
+    if (!state.utilityMenuOpen && !state.accountMenuOpen && !state.sourceMenuOpen) return false;
+    const trigger = state.lastMenuTrigger || (state.sourceMenuOpen ? "source" : state.utilityMenuOpen ? "utility" : "account");
+    state.utilityMenuOpen = false;
+    state.accountMenuOpen = false;
+    state.sourceMenuOpen = false;
+    state.lastMenuTrigger = null;
+    render();
+    requestAnimationFrame(() => focusMenuTrigger(trigger));
+    return true;
+  }
+
+  function focusMenuTrigger(trigger) {
+    const host = document.getElementById(ROOT_ID);
+    const root = host?.shadowRoot;
+    const selector = {
+      source: "[data-af-source-toggle]",
+      utility: "[data-af-utility-toggle]",
+      account: "[data-af-account]",
+    }[trigger];
+    if (!root || !selector) return;
+    root.querySelector(selector)?.focus?.();
+  }
+
+  function onDocumentPointerDown(event) {
+    if (!state.learningEnabled) return;
+    const host = document.getElementById(ROOT_ID);
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    if (host && path.includes(host)) return;
+    closeOpenMenus();
   }
 
   function toggleDebug() {
@@ -540,6 +714,36 @@
     }, null, 2);
   }
 
+  function practiceReadiness() {
+    if (state.loading || state.cacheRefreshRequested) {
+      return { state: "improving", label: "Improving..." };
+    }
+    if (!state.phrases.length) {
+      return { state: "no-captions", label: "No captions" };
+    }
+    const result = getSelectedPracticeSource()?.loadedTranscriptResult || state.transcriptResult;
+    if (!result) {
+      return { state: "ready", label: "Ready" };
+    }
+    if (result.timingExactness === "word-level" || result.sourceKind === "asr") {
+      return { state: "precise", label: "Precise" };
+    }
+    if (result.timingExactness === "rough" || result.warnings?.length || result.fallbackUsed) {
+      return { state: "rough", label: "Rough" };
+    }
+    return { state: "ready", label: "Ready" };
+  }
+
+  function userFacingSourceLabel(source) {
+    if (!source) return state.tracks.length ? "Captions" : "No captions";
+    const result = source.loadedTranscriptResult || state.transcriptResult;
+    const language = captionTrackApi.languageLabelFromSource?.(source) || source.name || source.languageCode || "Dutch";
+    if (result?.sourceKind === "asr") return "ASR transcript";
+    if (source.track?.kind === "asr" || result?.sourceKind === "auto") return `${language} auto-captions`;
+    if (result?.sourceKind === "transcript-panel") return `${language} captions`;
+    return `${language} captions`;
+  }
+
   function getPlaybackSnapshot() {
     const video = getVideoElement();
     if (!video) {
@@ -583,19 +787,60 @@
 
   function renderSourceSelector(track, sourceToggle, sourceMenu) {
     const selectedSource = getSelectedPracticeSource();
-    const loadedVia = selectedSource?.loadedTranscriptResult
-      ? ` · ${formatTranscriptBadge(selectedSource.loadedTranscriptResult)}`
-      : selectedSource?.loadedCueSource ? ` · ${captionTrackApi.cueSourceLabel(selectedSource.loadedCueSource)}` : "";
-    const warning = selectedSource?.loadedTranscriptResult?.warnings?.length ? " · source warning" : "";
+    const readiness = practiceReadiness();
     sourceToggle.textContent = selectedSource
-      ? `${captionTrackApi.sourceDisplayName(selectedSource)}${loadedVia}${warning}`
+      ? `${userFacingSourceLabel(selectedSource)} · ${readiness.label}`
       : state.tracks.length ? "Captions: -" : "No captions";
-    sourceToggle.disabled = state.loading || state.practiceSources.length <= 1;
+    sourceToggle.disabled = state.loading;
     sourceToggle.setAttribute("aria-expanded", state.sourceMenuOpen ? "true" : "false");
+    sourceToggle.dataset.afReadiness = readiness.state;
     track.classList.toggle("is-open", state.sourceMenuOpen);
 
     clearElement(sourceMenu);
-    if (!state.sourceMenuOpen || state.practiceSources.length <= 1) return;
+    if (!state.sourceMenuOpen) return;
+
+    renderReadinessPopover(sourceMenu, selectedSource, readiness);
+  }
+
+  function renderReadinessPopover(sourceMenu, selectedSource, readiness) {
+    const summary = appendElement(sourceMenu, "div", "af-readiness-summary");
+    const title = appendElement(summary, "div", "af-readiness-title");
+    title.textContent = readiness.label;
+    const copy = appendElement(summary, "div", "af-readiness-copy");
+    copy.textContent = readinessCopy(readiness.state);
+
+    const actions = appendElement(sourceMenu, "div", "af-readiness-actions");
+    const getCaptions = appendButton(actions, state.cacheRefreshRequested ? "Getting Captions" : "Get Captions", "afReadinessGetCaptions");
+    getCaptions.disabled = state.loading || !selectedSource;
+    getCaptions.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      state.sourceMenuOpen = false;
+      refreshSelectedSourceCache();
+    });
+    const improveTiming = appendButton(actions, "Improve Timing", "afReadinessImproveTiming");
+    improveTiming.disabled = true;
+    improveTiming.title = "Timing improvement needs the practice-timing contract.";
+    const openTranscript = appendButton(actions, "Open Transcript", "afReadinessOpenTranscript");
+    openTranscript.disabled = true;
+    openTranscript.title = "YouTube transcript shortcut is not wired yet.";
+
+    if (state.practiceSources.length > 1) {
+      const selectorLabel = appendElement(sourceMenu, "div", "af-source-group");
+      selectorLabel.textContent = "Text Source";
+      renderSourceOptions(sourceMenu);
+    }
+
+    const diagnostics = appendElement(sourceMenu, "details", "af-readiness-details");
+    const diagnosticsSummary = appendElement(diagnostics, "summary", "af-readiness-details-summary");
+    diagnosticsSummary.textContent = "Details";
+    const details = appendElement(diagnostics, "div", "af-readiness-detail-grid");
+    appendReadinessDetail(details, "Source", selectedSource ? userFacingSourceLabel(selectedSource) : "No captions");
+    appendReadinessDetail(details, "Readiness", readiness.label);
+    appendReadinessDetail(details, "Phrases", state.phrases.length ? String(state.phrases.length) : "0");
+  }
+
+  function renderSourceOptions(sourceMenu) {
 
     for (const group of captionTrackApi.groupPracticeSources(state.practiceSources)) {
       const header = appendElement(sourceMenu, "div", "af-source-group");
@@ -620,11 +865,33 @@
     }
   }
 
+  function readinessCopy(stateName) {
+    return {
+      "no-captions": "No usable phrase captions are loaded for this video.",
+      rough: "Phrase practice is available, but timing or source quality may be rough.",
+      ready: "Phrase practice is ready.",
+      precise: "Phrase practice has the best available timing.",
+      improving: "Caption or timing work is running; current practice can stay visible.",
+    }[stateName] || "Caption state is available.";
+  }
+
+  function appendReadinessDetail(parent, label, value) {
+    const row = appendElement(parent, "div", "af-readiness-detail");
+    const key = appendElement(row, "span", "af-readiness-detail-key");
+    key.textContent = label;
+    const text = appendElement(row, "span", "af-readiness-detail-value");
+    text.textContent = value;
+  }
+
   function toggleSourceMenu(event) {
     event.preventDefault();
     event.stopPropagation();
-    if (state.practiceSources.length <= 1) return;
     state.sourceMenuOpen = !state.sourceMenuOpen;
+    state.lastMenuTrigger = state.sourceMenuOpen ? "source" : null;
+    if (state.sourceMenuOpen) {
+      state.utilityMenuOpen = false;
+      state.accountMenuOpen = false;
+    }
     render();
   }
 
@@ -638,16 +905,43 @@
     row.classList.toggle("is-current", index === state.currentIndex);
     row.classList.toggle("is-past", index < state.currentIndex);
     row.classList.toggle("is-future", index > state.currentIndex);
+    row.classList.toggle("is-recall-mode", state.practiceMode === "recall");
+    row.classList.toggle("is-shadow-mode", state.practiceMode === "shadow");
 
     const time = appendElement(row, "div", "af-ribbon-time");
     time.textContent = formatTimestamp(phrase.startMs);
 
-    const text = appendElement(row, "div", "af-ribbon-text");
-    if (!state.textVisible && index === state.currentIndex) {
-      appendElement(text, "span", "af-ribbon-mask");
-      return;
+    if (state.practiceMode === "recall" && index === state.currentIndex) {
+      const prompt = appendElement(row, "div", "af-recall-prompt");
+      prompt.textContent = phraseTranslationText(phrase) || "Phrase translation unavailable";
     }
-    renderClickablePhraseText(text, phrase.text, index);
+
+    const text = appendElement(row, "div", "af-ribbon-text");
+    if (!shouldShowOriginalText(index)) {
+      appendElement(text, "span", "af-ribbon-mask");
+    } else {
+      renderClickablePhraseText(text, phrase.text, index);
+    }
+
+    const translation = appendElement(row, "div", "af-phrase-translation");
+    if (state.practiceMode === "recall") {
+      translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase));
+      translation.textContent = state.textVisible ? "Original revealed" : "Reveal original when ready.";
+    } else if (state.phraseTranslationVisible) {
+      translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase));
+      translation.textContent = phraseTranslationText(phrase) || "Phrase translation unavailable";
+    } else {
+      translation.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function phraseTranslationText(_phrase) {
+    return "";
+  }
+
+  function shouldShowOriginalText(index) {
+    if (index !== state.currentIndex) return true;
+    return state.textVisible;
   }
 
   function renderClickablePhraseText(parent, text, phraseIndex) {
@@ -684,12 +978,21 @@
   function renderDictionary(panel) {
     const subtitle = panel.querySelector("[data-af-dictionary-subtitle]");
     const account = panel.querySelector("[data-af-account]");
+    const accountMenu = panel.querySelector("[data-af-account-menu]");
+    const accountCopy = panel.querySelector("[data-af-account-copy]");
+    const accountAction = panel.querySelector("[data-af-account-action]");
     const body = panel.querySelector("[data-af-dictionary-body]");
 
     subtitle.textContent = state.selectedTrack
       ? captionTrackApi.describeTrack(state.selectedTrack)
       : "Contextual Lookup";
     account.textContent = accountStatusLabel();
+    account.classList.toggle("is-connected", state.accountStatus === "signed-in");
+    account.setAttribute("aria-expanded", state.accountMenuOpen ? "true" : "false");
+    accountMenu.classList.toggle("is-open", state.accountMenuOpen);
+    accountCopy.textContent = accountStatusCopy();
+    accountAction.textContent = accountConnectLabel();
+    accountAction.disabled = state.accountLoading;
 
     clearElement(body);
     if (state.selectedWord) {
@@ -736,28 +1039,14 @@
     const header = appendElement(card, "div", "af-word-card-header");
     const title = appendElement(header, "div", "af-word-title");
     title.textContent = state.selectedWord.word;
-    const menu = appendElement(header, "button", "af-word-menu");
-    menu.type = "button";
-    menu.textContent = "...";
-    menu.setAttribute("aria-label", "More word actions");
 
     const status = appendElement(card, "div", "af-word-status");
-    status.textContent = state.accountStatus === "signed-in" ? "Personal lookup" : "Guest lookup";
-    const accountAction = appendButton(card, accountConnectLabel(), "afSignIn");
-    accountAction.className = "af-secondary-button af-account-inline-action";
-    accountAction.disabled = state.accountLoading;
-    accountAction.addEventListener("click", () => {
-      if (state.accountStatus === "signed-in") {
-        disconnectTwoThousandNlAccount();
-      } else {
-        connectTwoThousandNlAccount();
-      }
-    });
+    status.textContent = state.accountStatus === "signed-in" ? "Personal progress on" : "Guest lookup";
 
     if (phrase) {
       const context = appendElement(card, "div", "af-context-block");
       const label = appendElement(context, "div", "af-context-label");
-      label.textContent = "Current Context";
+      label.textContent = "Context";
       const text = appendElement(context, "div", "af-context-text");
       renderClickablePhraseText(text, phrase.text, state.selectedWord.phraseIndex);
     }
@@ -778,14 +1067,22 @@
     }
 
     if (selectedWord.lookupStatus === "loading") {
+      lookup.classList.add("is-loading");
       lookupTitle.textContent = "Looking up...";
-      lookupCopy.textContent = "Loading dictionary matches from AudioFilms.";
+      lookupCopy.textContent = "Loading dictionary matches.";
+      appendElement(lookup, "div", "af-lookup-skeleton");
       return;
     }
 
     if (selectedWord.lookupStatus === "error") {
+      lookup.classList.add("is-error");
       lookupTitle.textContent = "Lookup failed";
       lookupCopy.textContent = selectedWord.lookupError || "Dictionary lookup failed.";
+      const retry = appendButton(lookup, "Retry lookup", "afLookupRetry");
+      retry.className = "af-lookup-retry";
+      retry.addEventListener("click", () => {
+        selectLookupWord(selectedWord.word, selectedWord.phraseIndex);
+      });
       if (selectedWord.translateUrl) {
         const link = appendElement(lookup, "a", "af-dictionary-link");
         link.href = selectedWord.translateUrl;
@@ -799,9 +1096,7 @@
     const cards = selectedWord.lookupResult?.cards || [];
     if (cards.length) {
       lookupTitle.textContent = `${cards.length} dictionary ${cards.length === 1 ? "card" : "cards"}`;
-      lookupCopy.textContent = selectedWord.lookupResult?.meta?.provider
-        ? `Source: ${selectedWord.lookupResult.meta.provider}`
-        : "Dictionary match";
+      lookupCopy.textContent = "Dictionary match";
 
       for (const card of cards) {
         renderOverlayCard(lookup, card);
@@ -825,15 +1120,14 @@
     const result = selectedWord.lookupResult?.result;
     const definitions = selectedWord.lookupResult?.definitions || [];
     if (!result) {
+      lookup.classList.add("is-empty");
       lookupTitle.textContent = "No match";
       lookupCopy.textContent = "No dictionary match was returned for this word.";
       return;
     }
 
-    lookupTitle.textContent = `${result.word || selectedWord.word} · ${result.language || "dictionary"}`;
-    lookupCopy.textContent = selectedWord.lookupResult?.meta?.provider
-      ? `Source: ${selectedWord.lookupResult.meta.provider}`
-      : "Dictionary match";
+    lookupTitle.textContent = result.word || selectedWord.word;
+    lookupCopy.textContent = result.language || "Dictionary match";
 
     for (const definition of definitions.length ? definitions : [result.definition]) {
       const item = appendElement(lookup, "p", "af-dictionary-copy");
@@ -849,43 +1143,33 @@
   function renderOverlayCard(parent, card) {
     const entry = appendElement(parent, "div", "af-overlay-card");
     const header = appendElement(entry, "div", "af-overlay-card-header");
-    const title = appendElement(header, "div", "af-overlay-card-title");
-    title.textContent = card.headword || "Dictionary card";
-    const meta = appendElement(header, "div", "af-overlay-card-meta");
-    meta.textContent = [
-      card.partOfSpeech,
-      card.gender,
-      card.dictionary?.name || card.dictionary?.slug,
-    ].filter(Boolean).join(" · ") || card.language || "2000NL";
-
-    const formBits = [
-      card.pronunciation ? `Pronunciation: ${card.pronunciation}` : "",
-      card.plural ? `Plural: ${card.plural}` : "",
-      card.diminutive ? `Diminutive: ${card.diminutive}` : "",
-    ].filter(Boolean);
-    for (const bit of formBits) {
-      const line = appendElement(entry, "p", "af-dictionary-copy af-overlay-form");
-      line.textContent = bit;
+    const titleWrap = appendElement(header, "div", "af-overlay-title-wrap");
+    const title = appendElement(titleWrap, "div", "af-overlay-card-title");
+    title.textContent = overlayTitle(card);
+    renderChipList(titleWrap, overlayChips(card));
+    const translationActions = displayActionsByGroup(card, "translation");
+    if (translationActions.length) {
+      const translateButton = appendButton(header, translationActions[0].label || "Translate", `afAction-${translationActions[0].id}`);
+      translateButton.className = "af-card-translate";
+      translateButton.disabled = !card?.entryId;
+      translateButton.addEventListener("click", () => performDisplayAction(card, translationActions[0]));
     }
 
-    for (const meaning of card.meanings || []) {
-      const meaningEl = appendElement(entry, "div", "af-overlay-meaning");
-      if (meaning.definition) {
-        const definition = appendElement(meaningEl, "p", "af-dictionary-copy af-overlay-definition");
-        definition.textContent = meaning.definition;
-      }
-      if (meaning.context) {
-        const context = appendElement(meaningEl, "p", "af-dictionary-copy");
-        context.textContent = meaning.context;
-      }
-      for (const example of meaning.examples || []) {
-        const exampleEl = appendElement(meaningEl, "p", "af-dictionary-copy af-overlay-example");
-        exampleEl.textContent = example;
-      }
-      for (const idiom of meaning.idioms || []) {
-        const idiomEl = appendElement(meaningEl, "p", "af-dictionary-copy af-overlay-idiom");
-        idiomEl.textContent = idiom;
-      }
+    const summary = card.summary || {};
+    if (summary.definition) {
+      const definition = appendElement(entry, "p", "af-dictionary-copy af-overlay-definition");
+      definition.textContent = summary.definition;
+    }
+    if (summary.example) {
+      const example = appendElement(entry, "p", "af-dictionary-copy af-overlay-example");
+      example.textContent = summary.example;
+    }
+
+    renderOverlaySections(entry, card.sections || []);
+
+    const personal = progressSignal(card.progress);
+    if (personal.length) {
+      renderChipList(entry, personal, "af-personal-chips");
     }
 
     const translation = state.selectedWord?.translationsByCardId?.[card.id];
@@ -894,6 +1178,87 @@
     }
 
     renderReviewActions(entry, card);
+  }
+
+  function overlayTitle(card) {
+    const clicked = card.clickedForm || state.selectedWord?.word || "";
+    const headword = card.headword || clicked || "Dictionary card";
+    if (clicked && headword && clicked.toLocaleLowerCase() !== headword.toLocaleLowerCase()) {
+      return `${clicked} -> ${headword}`;
+    }
+    return headword;
+  }
+
+  function overlayChips(card) {
+    const projected = Array.isArray(card.chips) ? card.chips : [];
+    const fallback = [
+      card.partOfSpeech ? { kind: "part-of-speech", label: card.partOfSpeech } : null,
+      card.language ? { kind: "language", label: card.language } : null,
+      card.dictionary?.name || card.dictionary?.slug
+        ? { kind: "dictionary", label: card.dictionary.name || card.dictionary.slug }
+        : null,
+      card.gender ? { kind: "form", label: card.gender } : null,
+    ].filter(Boolean);
+    return projected.length ? projected : fallback;
+  }
+
+  function renderChipList(parent, chips, className = "af-chip-list") {
+    if (!chips.length) return;
+    const list = appendElement(parent, "div", className);
+    for (const chip of chips) {
+      const item = appendElement(list, "span", "af-chip");
+      item.textContent = chip.label || chip;
+    }
+  }
+
+  function renderOverlaySections(parent, sections) {
+    const visibleSections = sections
+      .filter((section) => section?.text)
+      .filter((section, index) => index > 0 || section.kind !== "meaning")
+      .slice(0, 4);
+    if (!visibleSections.length) return;
+
+    const details = appendElement(parent, "details", "af-overlay-details");
+    const summary = appendElement(details, "summary", "af-overlay-details-summary");
+    summary.textContent = "Details";
+    for (const section of visibleSections) {
+      const block = appendElement(details, "div", `af-overlay-section is-${section.kind || "meaning"}`);
+      const label = appendElement(block, "div", "af-overlay-section-label");
+      label.textContent = section.label || sectionLabel(section.kind);
+      const text = appendElement(block, "p", "af-dictionary-copy");
+      text.textContent = section.text;
+      if (section.translation) {
+        const translation = appendElement(block, "p", "af-dictionary-copy af-section-translation");
+        translation.textContent = section.translation;
+      }
+    }
+  }
+
+  function sectionLabel(kind) {
+    return {
+      meaning: "Meaning",
+      example: "Example",
+      idiom: "Idiom",
+      form: "Form",
+      note: "Note",
+    }[kind] || "Detail";
+  }
+
+  function progressSignal(progress) {
+    if (!progress) return [];
+    return [
+      typeof progress.seenCount === "number" ? { label: `Seen ${progress.seenCount}x` } : null,
+      progress.lastSeenAt ? { label: `Last ${formatRelativeDate(progress.lastSeenAt)}` } : null,
+    ].filter(Boolean);
+  }
+
+  function formatRelativeDate(value) {
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) return "seen";
+    const days = Math.max(0, Math.round((Date.now() - timestamp) / 86400000));
+    if (days <= 0) return "today";
+    if (days === 1) return "1d";
+    return `${days}d`;
   }
 
   function renderCardTranslation(parent, translation) {
@@ -917,19 +1282,42 @@
   }
 
   function renderReviewActions(parent, card = null) {
+    const displayActions = displayActionsByGroup(card, "progress");
+    if (!displayActions.length) {
+      if (card?.entryId || state.accountStatus === "signed-in") return;
+      renderConnectPrompt(parent);
+      return;
+    }
     const section = appendElement(parent, "div", "af-card-review");
     const label = appendElement(section, "div", "af-card-review-label");
-    label.textContent = card?.entryId ? "Progress" : "Connect 2000NL to grade memory";
+    label.textContent = "Progress";
     const actions = appendElement(section, "div", "af-review-actions");
-    const displayActions = Array.isArray(card?.displayActions) ? card.displayActions : [];
 
-    if (displayActions.length) {
-      for (const displayAction of displayActions) {
-        const button = appendButton(actions, displayAction.label || displayAction.id, `afAction-${displayAction.id}`);
-        button.disabled = !card?.entryId && displayAction.command?.kind !== "card-translation";
-        button.addEventListener("click", () => performDisplayAction(card, displayAction));
-      }
+    for (const displayAction of displayActions) {
+      const button = appendButton(actions, displayAction.label || displayAction.id, `afAction-${displayAction.id}`);
+      button.disabled = !card?.entryId;
+      button.addEventListener("click", () => performDisplayAction(card, displayAction));
     }
+  }
+
+  function displayActionsByGroup(card, group) {
+    return (Array.isArray(card?.displayActions) ? card.displayActions : [])
+      .filter((displayAction) => (displayAction.group || "progress") === group);
+  }
+
+  function renderConnectPrompt(parent) {
+    const prompt = appendElement(parent, "div", "af-connect-prompt");
+    const text = appendElement(prompt, "span");
+    text.textContent = accountStatusCopy();
+    const action = appendButton(prompt, accountConnectLabel(), "afSignIn");
+    action.disabled = state.accountLoading;
+    action.addEventListener("click", () => {
+      if (state.accountStatus === "signed-in") {
+        disconnectTwoThousandNlAccount();
+      } else {
+        connectTwoThousandNlAccount();
+      }
+    });
   }
 
   function performDisplayAction(card, displayAction) {
@@ -1117,13 +1505,26 @@
     }
 
     if (!response.ok) {
-      const message = response.error || payload?.error || text.slice(0, 180) || `HTTP ${response.status}`;
+      const message = safeLookupErrorMessage(response, payload, text);
       const error = new Error(`Dictionary lookup failed: HTTP ${response.status} ${message}`);
       error.payload = payload || { error: message };
       throw error;
     }
 
     return payload;
+  }
+
+  function safeLookupErrorMessage(response, payload, text) {
+    if (response.error) return response.error;
+    if (payload?.error || payload?.detail) return payload.error || payload.detail;
+    const body = String(text || "").trim();
+    if (/^<!doctype\s+html/i.test(body) || /<html[\s>]/i.test(body)) {
+      if (response.status === 404) {
+        return "Dictionary endpoint is unavailable on the remote AudioFilms API.";
+      }
+      return "Dictionary endpoint returned HTML instead of JSON.";
+    }
+    return body.slice(0, 180) || `HTTP ${response.status}`;
   }
 
   function dictionaryLookupEndpoint() {
@@ -1857,7 +2258,10 @@
     });
     state.guidedHold = null;
     state.currentIndex = targetIndex;
-    state.selectedWord = null;
+    if (state.practiceMode === "recall") {
+      state.textVisible = false;
+      state.phraseTranslationVisible = true;
+    }
     enterGuidedMode();
     render();
     const playResult = playPhrase(state.currentIndex, { command, navigationEventId: navigationEvent.id });
@@ -2205,6 +2609,13 @@
 
     if (event.type !== "keydown") return;
 
+    if (event.code === "Escape") {
+      if (closeOpenMenus()) {
+        blockYouTubeShortcutWithOptions(event);
+      }
+      return;
+    }
+
     if (event.code === "ArrowRight") {
       blockYouTubeShortcutWithOptions(event);
       nextPhrase();
@@ -2216,7 +2627,23 @@
       replayCurrentPhrase();
     } else if (event.code === "ArrowUp") {
       blockYouTubeShortcutWithOptions(event);
-      pauseCurrentPlayback("arrow-up");
+      toggleText();
+    } else if (event.code === "KeyS") {
+      blockYouTubeShortcutWithOptions(event);
+      if (state.practiceMode !== "shadow") {
+        setPracticeMode("shadow");
+      } else {
+        toggleText();
+      }
+    } else if (event.code === "KeyT") {
+      blockYouTubeShortcutWithOptions(event);
+      togglePhraseTranslation();
+    } else if (event.code === "Digit1") {
+      blockYouTubeShortcutWithOptions(event);
+      setPracticeMode("shadow");
+    } else if (event.code === "Digit2") {
+      blockYouTubeShortcutWithOptions(event);
+      setPracticeMode("recall");
     }
   }
 
@@ -2335,6 +2762,7 @@
   document.addEventListener("keydown", onKeyboardEvent, true);
   document.addEventListener("keypress", onKeyboardEvent, true);
   document.addEventListener("keyup", onKeyboardEvent, true);
+  document.addEventListener("pointerdown", onDocumentPointerDown, true);
   window.addEventListener("keydown", onKeyboardEvent, true);
   window.addEventListener("keypress", onKeyboardEvent, true);
   window.addEventListener("keyup", onKeyboardEvent, true);
