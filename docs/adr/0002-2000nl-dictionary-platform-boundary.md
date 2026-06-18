@@ -9,12 +9,15 @@ The YouTube overlay still has its own presentation needs. AudioFilms backend own
 The first overlay card model follows these rules:
 
 - one AudioFilms overlay card maps to one top-level 2000NL `lookup.items[]` result;
-- nested `entry.raw.meanings[]` are content inside that card, not separate action targets;
+- normalized 2000NL `entry.content` is the preferred content source; legacy
+  `entry.raw` is diagnostic/compatibility data, not an extension UI contract;
 - overlay actions always target `cardTypeId=word-to-definition`;
 - plain lookup is read-only and must not automatically call `record-view`;
 - all learning/progress changes happen only after an explicit user action on one card;
 - after a successful action, AudioFilms refreshes lookup instead of simulating updated progress locally;
-- translation is requested per card through 2000NL `POST /api/platform/v1/translation` using `entryId` and `targetLang`.
+- translation is requested per card through 2000NL `POST /api/platform/v1/translation`
+  using `entryId`; `targetLang` may be omitted when 2000NL can resolve the
+  connected user's preference.
 
 Consequences:
 

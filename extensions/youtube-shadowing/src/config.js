@@ -31,7 +31,6 @@
 
   function connectBase() {
     return normalizeBaseUrl(
-      storageValue("afShadowing2000nlBaseUrl") ||
       root.__AF_2000NL_CONNECT_BASE ||
       DEFAULT_2000NL_CONNECT_BASE,
     );
@@ -59,9 +58,9 @@
     return endpoint("dictionary", "afShadowingDictionaryUrl");
   }
 
-  function testerAuthHeaders() {
+  function testerAuthToken() {
     const token = storageValue("afShadowingTesterToken") || storageValue("afShadowingAsrToken");
-    return token ? { authorization: `Bearer ${token}` } : {};
+    return token;
   }
 
   root.__afShadowingConfig = {
@@ -71,7 +70,7 @@
     subtitlesEndpoint,
     asrJobsEndpoint,
     dictionaryEndpoint,
-    testerAuthHeaders,
+    testerAuthToken,
     defaults: {
       apiBase: DEFAULT_API_BASE,
       connectBase: DEFAULT_2000NL_CONNECT_BASE,

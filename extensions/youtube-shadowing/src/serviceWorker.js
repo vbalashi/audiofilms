@@ -11,7 +11,18 @@ restrictChromeStorageToTrustedContexts();
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "af-fetch-backend-subtitles") {
-    fetchBackendSubtitles(message.url, message.options)
+    sendResponse({
+      ok: false,
+      status: 400,
+      text: "",
+      error: "Backend requests must use service-worker commands.",
+    });
+
+    return false;
+  }
+
+  if (message?.type === "af-backend-command") {
+    fetchBackendCommand(message.operation, message.body)
       .then(sendResponse)
       .catch((error) => {
         sendResponse({
@@ -101,19 +112,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function fetchBackendSubtitles(url, options = {}) {
-  if (!url || typeof url !== "string") {
-    throw new Error("Missing backend subtitles URL.");
+async function fetchBackendCommand(operation, body = {}) {
+  const command = backendCommand(operation, body || {});
+  const headers = {
+    accept: "application/json",
+    ...(command.method === "POST" ? { "content-type": "application/json" } : {}),
+  };
+  if (command.testerToken) {
+    headers.authorization = `Bearer ${command.testerToken}`;
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(command.url, {
     credentials: "omit",
-    method: options.method || "GET",
-    body: options.body,
-    headers: {
-      accept: "application/json",
-      ...(options.headers || {}),
-    },
+    method: command.method,
+    headers,
+    ...(command.method === "POST" ? { body: JSON.stringify(command.payload || {}) } : {}),
   });
   const text = await response.text();
 
@@ -122,6 +135,55 @@ async function fetchBackendSubtitles(url, options = {}) {
     status: response.status,
     text,
   };
+}
+
+function backendCommand(operation, body) {
+  const apiBase = trustedBackendApiBase(body.apiBase);
+  if (operation === "get-subs") {
+    const url = new URL("/api/get-subs", `${apiBase}/`);
+    setSearchParam(url, "videoId", body.videoId);
+    setSearchParam(url, "lang", body.lang || "auto");
+    setSearchParam(url, "sourceKind", body.sourceKind || "manual");
+    if (body.refresh === true) url.searchParams.set("refresh", "1");
+    return { method: "GET", url: url.toString() };
+  }
+  if (operation === "local-asr-practice") {
+    const url = new URL("/api/local-asr-practice", `${apiBase}/`);
+    setSearchParam(url, "videoId", body.videoId);
+    setSearchParam(url, "lang", body.lang || "auto");
+    setSearchParam(url, "sourceKind", body.sourceKind || "manual");
+    setSearchParam(url, "textSource", body.textSource);
+    setSearchParam(url, "engine", body.engine);
+    setSearchParam(url, "model", body.model);
+    setSearchParam(url, "duration", body.duration);
+    if (body.refresh === true) url.searchParams.set("refresh", "1");
+    return { method: "GET", url: url.toString() };
+  }
+  if (operation === "asr-create") {
+    return {
+      method: "POST",
+      url: new URL("/api/asr/jobs", `${apiBase}/`).toString(),
+      payload: body.payload || {},
+      testerToken: normalizeTesterToken(body.testerToken),
+    };
+  }
+  if (operation === "asr-status") {
+    const jobId = normalizeAsrJobId(body.jobId);
+    return {
+      method: "GET",
+      url: new URL(`/api/asr/jobs/${encodeURIComponent(jobId)}`, `${apiBase}/`).toString(),
+      testerToken: normalizeTesterToken(body.testerToken),
+    };
+  }
+  if (operation === "asr-result") {
+    const jobId = normalizeAsrJobId(body.jobId);
+    return {
+      method: "GET",
+      url: new URL(`/api/asr/jobs/${encodeURIComponent(jobId)}/result`, `${apiBase}/`).toString(),
+      testerToken: normalizeTesterToken(body.testerToken),
+    };
+  }
+  throw new Error("Unsupported backend command.");
 }
 
 async function fetchDictionaryCommand(operation, body = null) {
@@ -149,6 +211,40 @@ async function fetchDictionaryCommand(operation, body = null) {
     status: response.status,
     text,
   };
+}
+
+function trustedBackendApiBase(value) {
+  const fallback = trustedApiBase();
+  const parsed = new URL(String(value || fallback), `${fallback}/`);
+  const allowedOrigins = new Set([
+    "https://audiofilms-api.dilum.io",
+    new URL(fallback).origin,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+  ]);
+  if (!allowedOrigins.has(parsed.origin)) {
+    throw new Error("Backend API origin is not allowed.");
+  }
+  return parsed.origin;
+}
+
+function setSearchParam(url, name, value) {
+  const text = String(value || "").trim();
+  if (text) url.searchParams.set(name, text);
+}
+
+function normalizeTesterToken(value) {
+  const token = String(value || "").trim();
+  if (!token || /[\r\n]/.test(token)) return "";
+  return token;
+}
+
+function normalizeAsrJobId(value) {
+  const jobId = String(value || "").trim();
+  if (!/^asr_[a-z0-9_-]+$/i.test(jobId)) {
+    throw new Error("Invalid ASR job id.");
+  }
+  return jobId;
 }
 
 function dictionaryCommand(operation) {

@@ -373,11 +373,11 @@ Translation is not the same kind of action as review grading. It should be
 separate: a secondary link/button in the dictionary card, an overflow action, or
 an expandable translation section.
 
-The backend should tell the extension whether a card is not started, known, or
-actively reviewable through `userState`, `progressSummary`, or `availableActions`.
-The UI should render only the actions meaningful for that state. A not-started
-card should not show review grades. A reviewable card should show the four-grade
-row (`Again`, `Hard`, `Good`, `Easy`) when the backend supports those outcomes.
+The backend should project card progress and return `displayActions` as the
+only UI action source. Raw platform capabilities belong in diagnostics, not in
+the rendered action row. A not-started or encountered card should not show
+review grades. A learning or reviewing card should show the four-grade row
+(`Again`, `Hard`, `Good`, `Easy`) when the backend supports those outcomes.
 
 `Translate` should not sit in the review row. It can be a small secondary chip or
 icon near the headword/card header, used when the learner needs an additional
@@ -387,10 +387,9 @@ Open translation-language question:
 
 - 2000NL should be the source of truth for the learner's translation target
   language. The extension should not introduce a competing primary translation
-  language setting. An extension/local override is acceptable only as a
-  developer or dogfood fallback while the 2000NL preference is not available
-  through the connected session/API. The current API requires a `targetLang`, so
-  the backend contract may need to expose or infer it from 2000NL settings.
+  language setting. AudioFilms should expose the connected 2000NL preference
+  through session metadata and allow dictionary-card translation requests to omit
+  `targetLang` during normal use.
 
 ### Diagnostics Group
 

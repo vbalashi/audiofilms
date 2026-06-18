@@ -249,7 +249,6 @@ function projectOverlayCard(
         examples: [],
         idioms: [],
       })),
-    availableActions: capabilities?.actions || [],
   };
 }
 

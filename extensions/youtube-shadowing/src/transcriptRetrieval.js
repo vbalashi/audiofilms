@@ -257,20 +257,24 @@
       });
     }
 
-    const url = new URL(endpoint);
-    url.searchParams.set("videoId", videoId);
-    url.searchParams.set("lang", requestedLanguage || "auto");
-    url.searchParams.set("sourceKind", requestedSourceKind);
+    const params = {
+      apiBase: apiBaseForEndpoint(endpoint),
+      videoId,
+      lang: requestedLanguage || "auto",
+      sourceKind: requestedSourceKind,
+      refresh: Boolean(options.refreshCache),
+    };
     if (options.backendMode === "local-asr") {
-      applyLocalAsrParams(url);
-    }
-    if (options.refreshCache) {
-      url.searchParams.set("refresh", "1");
+      Object.assign(params, localAsrParams());
     }
 
-    const response = await requestBackendSubtitles(url.toString(), {
+    const response = await requestBackendCommand(
+      options.backendMode === "local-asr" ? "local-asr-practice" : "get-subs",
+      params,
+      {
       timeoutMs: options.backendMode === "local-asr" ? localAsrTimeoutMs() : 15000,
-    });
+      },
+    );
     const text = response.text || "";
     let payload = null;
     try {
@@ -365,14 +369,13 @@
   }
 
   async function fetchBackendAsrJobCues(endpoint, options = {}) {
-    const createResponse = await requestBackendSubtitles(endpoint, {
-      method: "POST",
+    const apiBase = apiBaseForEndpoint(endpoint);
+    const createResponse = await requestBackendCommand("asr-create", {
+      apiBase,
+      payload: buildAsrJobPayload(options),
+      testerToken: testerAuthToken(),
+    }, {
       timeoutMs: 15000,
-      headers: {
-        "content-type": "application/json",
-        ...testerAuthHeaders(),
-      },
-      body: JSON.stringify(buildAsrJobPayload(options)),
     });
     const createPayload = parseJsonResponse(createResponse);
     if (!createResponse.ok) {
@@ -384,10 +387,12 @@
     let job = createPayload;
     while (Date.now() < deadlineAt) {
       if (job?.status === "completed") {
-        const resultUrl = resolveAsrJobUrl(endpoint, job.resultUrl || `${job.statusUrl || ""}/result`);
-        const resultResponse = await requestBackendSubtitles(resultUrl, {
+        const resultResponse = await requestBackendCommand("asr-result", {
+          apiBase,
+          jobId: asrJobIdFromJob(endpoint, job),
+          testerToken: testerAuthToken(),
+        }, {
           timeoutMs: 15000,
-          headers: testerAuthHeaders(),
         });
         const resultPayload = parseJsonResponse(resultResponse);
         if (!resultResponse.ok) {
@@ -407,10 +412,12 @@
 
       const pollAfterMs = Number(job?.pollAfterMs || 3000);
       await sleep(Math.max(500, Math.min(pollAfterMs, 10000)));
-      const statusUrl = resolveAsrJobUrl(endpoint, job?.statusUrl || job?.jobId || "");
-      const statusResponse = await requestBackendSubtitles(statusUrl, {
+      const statusResponse = await requestBackendCommand("asr-status", {
+        apiBase,
+        jobId: asrJobIdFromJob(endpoint, job),
+        testerToken: testerAuthToken(),
+      }, {
         timeoutMs: 15000,
-        headers: testerAuthHeaders(),
       });
       job = parseJsonResponse(statusResponse);
       if (!statusResponse.ok) {
@@ -455,24 +462,14 @@
     }
   }
 
-  function resolveAsrJobUrl(endpoint, value) {
-    if (!value) throw new Error("ASR job response did not include a status URL.");
-    if (/^https?:\/\//i.test(value)) return value;
-    if (/^asr_[a-z0-9_-]+/i.test(value)) {
-      return new URL(`${endpoint.replace(/\/+$/, "")}/${encodeURIComponent(value)}`).toString();
-    }
-    return new URL(value, endpoint).toString();
-  }
-
   function isAsrJobsEndpoint(endpoint) {
     return /\/api\/asr\/jobs\/?$/i.test(new URL(endpoint).pathname);
   }
 
-  function testerAuthHeaders() {
+  function testerAuthToken() {
     const config = afConfig();
-    if (config?.testerAuthHeaders) return config.testerAuthHeaders();
-    const token = window.localStorage.getItem("afShadowingTesterToken") || window.localStorage.getItem("afShadowingAsrToken") || "";
-    return token ? { authorization: `Bearer ${token}` } : {};
+    if (config?.testerAuthToken) return config.testerAuthToken();
+    return window.localStorage.getItem("afShadowingTesterToken") || window.localStorage.getItem("afShadowingAsrToken") || "";
   }
 
   function afConfig() {
@@ -504,14 +501,6 @@
     return "https://audiofilms-api.dilum.io/api/get-subs";
   }
 
-  function applyLocalAsrParams(url) {
-    const params = localAsrParams();
-    url.searchParams.set("textSource", params.textSource);
-    if (params.engine) url.searchParams.set("engine", params.engine);
-    if (params.model) url.searchParams.set("model", params.model);
-    if (params.duration) url.searchParams.set("duration", params.duration);
-  }
-
   function localAsrSourceKind() {
     return (window.localStorage.getItem("afShadowingLocalAsrTextSource") || "asr") === "manual"
       ? "manual"
@@ -523,9 +512,9 @@
     return Number.isFinite(configured) && configured > 0 ? configured : 30 * 60 * 1000;
   }
 
-  function requestBackendSubtitles(url, options = {}) {
+  function requestBackendCommand(operation, body = {}, options = {}) {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-      return fetchBackendSubtitlesDirect(url, options);
+      return fetchBackendCommandDirect(operation, body, options);
     }
 
     return new Promise((resolve, reject) => {
@@ -535,9 +524,9 @@
 
       chrome.runtime.sendMessage(
         {
-          type: "af-fetch-backend-subtitles",
-          url,
-          options: fetchOptionsForBackend(options),
+          type: "af-backend-command",
+          operation,
+          body,
         },
         (response) => {
           window.clearTimeout(timeoutId);
@@ -556,28 +545,57 @@
     });
   }
 
-  async function fetchBackendSubtitlesDirect(url, options = {}) {
-    const response = await fetch(url, fetchOptionsForBackend(options));
-    const text = await response.text();
-    return {
+  function fetchBackendCommandDirect(operation, body = {}, options = {}) {
+    const apiBase = apiBaseForEndpoint(body.apiBase || backendProviderEndpoint(operation === "get-subs" ? "" : "local-asr"));
+    let url = "";
+    const fetchOptions = { credentials: "omit", method: "GET", headers: { accept: "application/json" } };
+
+    if (operation === "get-subs") {
+      url = new URL("/api/get-subs", `${apiBase}/`);
+      url.searchParams.set("videoId", body.videoId || "");
+      url.searchParams.set("lang", body.lang || "auto");
+      url.searchParams.set("sourceKind", body.sourceKind || "manual");
+      if (body.refresh === true) url.searchParams.set("refresh", "1");
+    } else if (operation === "local-asr-practice") {
+      url = new URL("/api/local-asr-practice", `${apiBase}/`);
+      for (const [key, value] of Object.entries(body)) {
+        if (key !== "apiBase" && value) url.searchParams.set(key, String(value));
+      }
+    } else if (operation === "asr-create") {
+      url = new URL("/api/asr/jobs", `${apiBase}/`);
+      fetchOptions.method = "POST";
+      fetchOptions.headers["content-type"] = "application/json";
+      if (body.testerToken) fetchOptions.headers.authorization = `Bearer ${body.testerToken}`;
+      fetchOptions.body = JSON.stringify(body.payload || {});
+    } else if (operation === "asr-status" || operation === "asr-result") {
+      const suffix = operation === "asr-result" ? "/result" : "";
+      url = new URL(`/api/asr/jobs/${encodeURIComponent(body.jobId)}${suffix}`, `${apiBase}/`);
+      if (body.testerToken) fetchOptions.headers.authorization = `Bearer ${body.testerToken}`;
+    } else {
+      return Promise.resolve({ ok: false, status: 400, text: JSON.stringify({ error: "Unsupported backend command." }) });
+    }
+
+    return fetch(url.toString(), fetchOptions).then(async (response) => ({
       ok: response.ok,
       status: response.status,
-      text,
-    };
-  }
-  function fetchOptionsForBackend(options = {}) {
-    return {
-      credentials: "omit",
-      method: options.method || "GET",
-      body: options.body,
-      headers: {
-        accept: "application/json",
-        ...(options.headers || {}),
-      },
-    };
+      text: await response.text(),
+    }));
   }
 
+  function apiBaseForEndpoint(endpoint) {
+    const parsed = new URL(endpoint);
+    return parsed.origin;
+  }
 
+  function asrJobIdFromJob(endpoint, job) {
+    if (typeof job?.jobId === "string" && job.jobId) return job.jobId;
+    const value = job?.statusUrl || job?.resultUrl || "";
+    if (!value) throw new Error("ASR job response did not include a job id.");
+    const parsed = new URL(value, endpoint);
+    const match = parsed.pathname.match(/\/api\/asr\/jobs\/([^/]+)/);
+    if (!match?.[1]) throw new Error("ASR job response did not include a valid job id.");
+    return decodeURIComponent(match[1]);
+  }
   function buildTranscriptResult(cues, metadata) {
     const quality = analyzeCueQuality(cues, metadata);
     return {

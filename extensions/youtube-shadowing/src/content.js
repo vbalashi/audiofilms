@@ -54,6 +54,7 @@
     dictionaryLookupSeq: 0,
     accountStatus: "guest",
     accountUser: null,
+    accountPreferences: null,
     accountError: "",
     accountLoading: false,
     playbackFrame: null,
@@ -931,19 +932,6 @@
       return;
     }
 
-    const available = new Set(card?.availableActions || []);
-    const legacyActions = [
-      ["Learn", "afStartLearning", { action: "start-learning" }, available.has("start-learning")],
-      ["Known", "afKnown", { action: "mark-known" }, available.has("mark-known")],
-      ["Again", "afAgain", { action: "review-card", result: "fail" }, available.has("review-card")],
-      ["Good", "afGood", { action: "review-card", result: "success" }, available.has("review-card")],
-    ];
-    for (const [text, command, payload, enabled] of legacyActions) {
-      const button = appendButton(actions, text, command);
-      button.disabled = !card?.entryId || !enabled;
-      button.addEventListener("click", () => performDictionaryCardAction(card, payload));
-    }
-
     const translate = appendButton(actions, "Translate", "afTranslate");
     translate.disabled = !card?.entryId;
     translate.addEventListener("click", () => requestDictionaryCardTranslation(card));
@@ -1237,12 +1225,23 @@
       setTwoThousandNlSessionState(null, response?.error || "2000NL session is unavailable.");
       return null;
     }
-    setTwoThousandNlSessionState(response.session, "");
-    return response.session || null;
+    const session = response.session || null;
+    const backendSession = session?.user ? await fetchDictionarySession().catch(() => null) : null;
+    const mergedSession = backendSession
+      ? {
+          ...session,
+          authenticated: backendSession.authenticated === true,
+          user: backendSession.user || session.user || null,
+          preferences: backendSession.preferences || null,
+        }
+      : session;
+    setTwoThousandNlSessionState(mergedSession, "");
+    return mergedSession || null;
   }
 
   function setTwoThousandNlSessionState(session, error) {
     state.accountUser = session?.user || null;
+    state.accountPreferences = session?.preferences || null;
     state.accountError = error || "";
     if (session?.user) {
       state.accountStatus = "signed-in";
@@ -1258,6 +1257,21 @@
       return crypto.randomUUID();
     }
     return `af-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  async function fetchDictionarySession() {
+    const response = await requestDictionaryCommand("dict-session");
+    const text = response.text || "";
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch (_error) {
+      body = null;
+    }
+    if (!response.ok) {
+      throw new Error(body?.error || body?.detail || response.error || `HTTP ${response.status}`);
+    }
+    return body;
   }
 
   function sendRuntimeMessage(message) {
@@ -1289,6 +1303,17 @@
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/actions");
       } else if (operation === "dict-translation") {
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/translation");
+      } else if (operation === "dict-session") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/session");
+        return fetch(url.toString(), {
+          credentials: "omit",
+          method: "GET",
+          headers: { accept: "application/json" },
+        }).then(async (response) => ({
+          ok: response.ok,
+          status: response.status,
+          text: await response.text(),
+        }));
       }
       return fetch(url.toString(), {
         credentials: "omit",
