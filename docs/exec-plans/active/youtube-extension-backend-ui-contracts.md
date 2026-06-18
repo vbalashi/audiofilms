@@ -99,7 +99,7 @@ them.
 | Area | Status | Endpoint / owner | UI behavior | Architect decision still needed |
 | --- | --- | --- | --- | --- |
 | Initial subtitle read | existing | `GET /api/get-subs` plus direct browser caption attempts | Load cheap/browser-visible captions automatically; do not show provider names by default. | Confirm which metadata fields are stable enough to drive `Text Source` and diagnostics. |
-| `Get Captions` | proposed | `POST /api/practice/captions`, backed by existing subtitle service/cache. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | Confirm sync-ready vs operation/polling response shape. |
+| `Get Captions` | first slice implemented | `POST /api/practice/captions`, backed by existing subtitle service/cache. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | First slice returns a synchronous `state: "ready"` envelope with a minimal `PracticeSnapshot`; queued/polling remains deferred. |
 | `Improve Timing` | proposed | `POST /api/practice/timing-jobs` and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` becomes `improving` while base quality remains visible. | Confirm job fields, polling URL, progress/ETA reliability, and cache key. |
 | Text Source switch | proposed | Backend/app metadata for available caption/transcript text sources. | Keep previous working source if selected source fails; pairwise alignment may run in background. | Confirm source ids, source text hashes, and alignment cache key. |
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
@@ -239,6 +239,35 @@ return immediately with `state: "ready"` and a `PracticeSnapshot`, or return
 `queued`/`running` with an operation id and polling metadata. Do not hide
 user-initiated retrieval behind `GET /api/get-subs?refresh=1`; keep
 `GET /api/get-subs` as the cached/read path for initial loading.
+
+First implementation:
+
+- Route: `app/src/app/api/practice/captions/route.ts`.
+- Request body accepts `videoId`, optional `language` or `lang`, optional
+  `sourceKind: "manual" | "auto"`, and optional `refresh`.
+- The route calls `loadSubtitles(videoId, language, { sourceKind, refresh })`
+  and returns a synchronous envelope:
+
+```ts
+type PracticeCaptionsResponse = {
+  state: 'ready';
+  operation: {
+    id: string;
+    kind: 'get-captions';
+    state: 'succeeded';
+  };
+  snapshot: PracticeSnapshot;
+};
+```
+
+- The returned snapshot includes `snapshotRevisionId`, active `textSource`,
+  `availableTextSources`, `timingEvidence`, `phraseSet`, and `readiness`.
+- `Get Captions` never starts ASR and never reports
+  `readiness.displayState = "improving"`. Readiness is derived from the
+  returned subtitle artifact: no usable practice phrases becomes
+  `no-captions`; approximate or flagged timing becomes `rough`; word-level,
+  aligned, or accepted provided-caption cue timing becomes `precise`; other
+  cue-timed captions become `ready`.
 
 ## Phase 3: Improve Timing Contract
 
