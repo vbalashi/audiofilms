@@ -200,10 +200,13 @@ https://audiofilms-api.dilum.io/api/asr/jobs
 
 For private local compatibility with the old synchronous endpoint, set `localStorage.afShadowingLocalAsrUrl = "http://localhost:3000/api/local-asr-practice"` and enable `LOCAL_ASR_PRACTICE_ENABLED=true` in the app environment. External tester builds should use `/api/asr/jobs`.
 
-Remote ASR job creation requires a tester token when the backend has `ASR_AUTH_REQUIRED=true`:
+Remote ASR job creation requires a tester token when the backend has
+`ASR_AUTH_REQUIRED=true`. This token must be owned by the extension trusted
+context, not YouTube page `localStorage`; set it in the extension/tester build
+configuration, for example in `src/config.js`:
 
 ```js
-localStorage.afShadowingTesterToken = "<tester-token>";
+globalThis.__AF_ASR_TESTER_TOKEN = "<tester-token>";
 ```
 
 Private local dogfood may use full-video ASR when explicitly enabled in the

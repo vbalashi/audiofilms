@@ -373,7 +373,6 @@
     const createResponse = await requestBackendCommand("asr-create", {
       apiBase,
       payload: buildAsrJobPayload(options),
-      testerToken: testerAuthToken(),
     }, {
       timeoutMs: 15000,
     });
@@ -390,7 +389,6 @@
         const resultResponse = await requestBackendCommand("asr-result", {
           apiBase,
           jobId: asrJobIdFromJob(endpoint, job),
-          testerToken: testerAuthToken(),
         }, {
           timeoutMs: 15000,
         });
@@ -415,7 +413,6 @@
       const statusResponse = await requestBackendCommand("asr-status", {
         apiBase,
         jobId: asrJobIdFromJob(endpoint, job),
-        testerToken: testerAuthToken(),
       }, {
         timeoutMs: 15000,
       });
@@ -464,12 +461,6 @@
 
   function isAsrJobsEndpoint(endpoint) {
     return /\/api\/asr\/jobs\/?$/i.test(new URL(endpoint).pathname);
-  }
-
-  function testerAuthToken() {
-    const config = afConfig();
-    if (config?.testerAuthToken) return config.testerAuthToken();
-    return window.localStorage.getItem("afShadowingTesterToken") || window.localStorage.getItem("afShadowingAsrToken") || "";
   }
 
   function afConfig() {

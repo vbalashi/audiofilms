@@ -164,7 +164,7 @@ function backendCommand(operation, body) {
       method: "POST",
       url: new URL("/api/asr/jobs", `${apiBase}/`).toString(),
       payload: body.payload || {},
-      testerToken: normalizeTesterToken(body.testerToken),
+      testerToken: trustedTesterToken(),
     };
   }
   if (operation === "asr-status") {
@@ -172,7 +172,7 @@ function backendCommand(operation, body) {
     return {
       method: "GET",
       url: new URL(`/api/asr/jobs/${encodeURIComponent(jobId)}`, `${apiBase}/`).toString(),
-      testerToken: normalizeTesterToken(body.testerToken),
+      testerToken: trustedTesterToken(),
     };
   }
   if (operation === "asr-result") {
@@ -180,7 +180,7 @@ function backendCommand(operation, body) {
     return {
       method: "GET",
       url: new URL(`/api/asr/jobs/${encodeURIComponent(jobId)}/result`, `${apiBase}/`).toString(),
-      testerToken: normalizeTesterToken(body.testerToken),
+      testerToken: trustedTesterToken(),
     };
   }
   throw new Error("Unsupported backend command.");
@@ -237,6 +237,15 @@ function normalizeTesterToken(value) {
   const token = String(value || "").trim();
   if (!token || /[\r\n]/.test(token)) return "";
   return token;
+}
+
+function trustedTesterToken() {
+  const configured =
+    globalThis.__afShadowingConfig?.trustedTesterToken?.() ||
+    globalThis.__afShadowingConfig?.defaults?.testerToken ||
+    globalThis.__AF_ASR_TESTER_TOKEN ||
+    "";
+  return normalizeTesterToken(configured);
 }
 
 function normalizeAsrJobId(value) {

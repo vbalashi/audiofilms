@@ -58,9 +58,8 @@
     return endpoint("dictionary", "afShadowingDictionaryUrl");
   }
 
-  function testerAuthToken() {
-    const token = storageValue("afShadowingTesterToken") || storageValue("afShadowingAsrToken");
-    return token;
+  function trustedTesterToken() {
+    return root.__AF_ASR_TESTER_TOKEN || "";
   }
 
   root.__afShadowingConfig = {
@@ -70,7 +69,7 @@
     subtitlesEndpoint,
     asrJobsEndpoint,
     dictionaryEndpoint,
-    testerAuthToken,
+    trustedTesterToken,
     defaults: {
       apiBase: DEFAULT_API_BASE,
       connectBase: DEFAULT_2000NL_CONNECT_BASE,

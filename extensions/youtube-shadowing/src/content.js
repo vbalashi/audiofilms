@@ -929,12 +929,7 @@
         button.disabled = !card?.entryId && displayAction.command?.kind !== "card-translation";
         button.addEventListener("click", () => performDisplayAction(card, displayAction));
       }
-      return;
     }
-
-    const translate = appendButton(actions, "Translate", "afTranslate");
-    translate.disabled = !card?.entryId;
-    translate.addEventListener("click", () => requestDictionaryCardTranslation(card));
   }
 
   function performDisplayAction(card, displayAction) {

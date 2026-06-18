@@ -261,8 +261,12 @@ localStorage.afShadowingBackendSubtitlesUrl = "off";
 localStorage.afShadowingDictionaryUrl = "off";
 localStorage.afShadowingLocalAsr = "on";
 localStorage.afShadowingLocalAsrDuration = "60";
-localStorage.afShadowingTesterToken = "<tester-token>";
 ```
+
+For ASR tester auth, do not put the tester token in YouTube page
+`localStorage`. Configure it in the trusted extension/tester build context, for
+example `globalThis.__AF_ASR_TESTER_TOKEN = "<tester-token>";` in
+`extensions/youtube-shadowing/src/config.js`.
 
 ## Open Decision Answers
 
