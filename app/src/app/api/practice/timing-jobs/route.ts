@@ -11,6 +11,7 @@ import {
   publicPracticeTimingOperation,
   upsertPracticeTimingOperation,
 } from '@/lib/practice/operations';
+import type { RejectedPracticeOperation } from '@/types/practice';
 
 export async function OPTIONS(request: Request) {
   return optionsResponse(request, { methods: ['POST', 'OPTIONS'] });
@@ -109,7 +110,7 @@ function rejectedOperation(
   message: string,
   retryable: boolean,
   extra: Record<string, unknown> = {},
-) {
+): RejectedPracticeOperation & Record<string, unknown> {
   return {
     id: null,
     kind: 'improve-timing',

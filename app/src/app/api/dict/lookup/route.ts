@@ -1,18 +1,21 @@
 import { DEFAULT_2000NL_API_BASE } from '@/lib/providers/dictionary';
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import { getBearerToken } from '@/lib/twoThousandNlPlatform';
+import type {
+  DictionaryLookupV2NoMatchResponse,
+  DictionaryLookupV2SuccessResponse,
+  DictionaryOverlayCardV2,
+  DictionaryOverlayCardV2Section,
+} from '@/types/dictionary';
 
 const CARD_TYPE_ID = 'word-to-definition';
 const CONTRACT_VERSION = 'dict-lookup-v2';
 
-type OverlaySection = {
-  id: string;
-  sourcePath: string;
-  kind: string;
-  label?: string;
-  text: string;
-  translation?: string;
-};
+type OverlayChip = DictionaryOverlayCardV2['chips'][number];
+type OverlayDisplayAction = DictionaryOverlayCardV2['displayActions'][number];
+type OverlayMatchRelation = NonNullable<DictionaryOverlayCardV2['match']>['relation'];
+type OverlayProgressPhase = NonNullable<DictionaryOverlayCardV2['progress']>['phase'];
+type OverlaySectionKind = DictionaryOverlayCardV2Section['kind'];
 
 type PlatformCardCapabilities = {
   phase?: string;
@@ -127,24 +130,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const cards = (platformBody?.items || []).map((item, index) =>
+  const cards: DictionaryOverlayCardV2[] = (platformBody?.items || []).map((item, index) =>
     projectOverlayCard(item, clickedForm, sourceLanguageCode, index, {
       allowProgressActions: lookupMode.allowProgressActions,
     }),
   );
 
   if (!cards.length) {
+    const responseBody: DictionaryLookupV2NoMatchResponse = {
+      contractVersion: CONTRACT_VERSION,
+      clickedForm,
+      query: platformBody?.query || clickedForm,
+      cards: [],
+      error: 'no_match',
+      code: 'no_match',
+      meta: { provider: '2000nl', responseVersion: 'overlay-v2' },
+    };
+
     return jsonResponse(
       request,
-      {
-        contractVersion: CONTRACT_VERSION,
-        clickedForm,
-        query: platformBody?.query || clickedForm,
-        cards: [],
-        error: 'no_match',
-        code: 'no_match',
-        meta: { provider: '2000nl', responseVersion: 'overlay-v2' },
-      },
+      responseBody,
       {
         status: 404,
         headers: responseHeaders(lookupMode),
@@ -153,26 +158,28 @@ export async function POST(request: Request) {
   }
 
   const firstCard = cards[0];
+  const responseBody: DictionaryLookupV2SuccessResponse = {
+    contractVersion: CONTRACT_VERSION,
+    clickedForm,
+    query: platformBody?.query || clickedForm,
+    result: {
+      word: firstCard.headword,
+      language: firstCard.language || sourceLanguageCode,
+      definition: firstCard.summary.definition,
+      context: contextText,
+    },
+    definitions: firstCard.summary.definition ? [firstCard.summary.definition] : [],
+    cards,
+    meta: {
+      provider: '2000nl',
+      fallbackUsed: false,
+      responseVersion: 'overlay-v2',
+    },
+  };
+
   return jsonResponse(
     request,
-    {
-      contractVersion: CONTRACT_VERSION,
-      clickedForm,
-      query: platformBody?.query || clickedForm,
-      result: {
-        word: firstCard.headword,
-        language: firstCard.language || sourceLanguageCode,
-        definition: firstCard.summary.definition,
-        context: contextText,
-      },
-      definitions: firstCard.summary.definition ? [firstCard.summary.definition] : [],
-      cards,
-      meta: {
-        provider: '2000nl',
-        fallbackUsed: false,
-        responseVersion: 'overlay-v2',
-      },
-    },
+    responseBody,
     {
       status: 200,
       headers: responseHeaders(lookupMode),
@@ -267,7 +274,7 @@ function projectOverlayCard(
   sourceLanguageCode: string,
   index: number,
   options: { allowProgressActions: boolean },
-) {
+): DictionaryOverlayCardV2 {
   const content = item.entry?.content || {};
   const headword =
     stringValue(content.headword) ||
@@ -324,21 +331,28 @@ function projectOverlayCard(
 function normalizedSections(content: Record<string, unknown>) {
   const sections = arrayValue(content.sections)
     .map((section, index) => normalizedSection(section, index))
-    .filter((section): section is OverlaySection => Boolean(section));
+    .filter((section): section is DictionaryOverlayCardV2Section => Boolean(section));
   if (sections.length) return sections;
 
   const meanings = arrayValue(content.meanings)
     .map((meaning, index) => normalizedMeaning(meaning, index))
-    .filter((meaning): meaning is OverlaySection => Boolean(meaning));
+    .filter((meaning): meaning is DictionaryOverlayCardV2Section => Boolean(meaning));
   if (meanings.length) return meanings;
 
   const definition = stringValue(content.definition) || stringValue(content.shortDefinition);
   return definition
-    ? [{ id: 'meaning-0', sourcePath: 'content.definition', kind: 'meaning', text: definition }]
+    ? [
+        {
+          id: 'meaning-0',
+          sourcePath: 'content.definition',
+          kind: 'meaning',
+          text: definition,
+        } satisfies DictionaryOverlayCardV2Section,
+      ]
     : [];
 }
 
-function normalizedSection(section: unknown, index: number): OverlaySection | null {
+function normalizedSection(section: unknown, index: number): DictionaryOverlayCardV2Section | null {
   if (!isRecord(section)) return null;
   const text = stringValue(section.text) || stringValue(section.definition);
   if (!text) return null;
@@ -352,7 +366,7 @@ function normalizedSection(section: unknown, index: number): OverlaySection | nu
   };
 }
 
-function normalizedMeaning(meaning: unknown, index: number): OverlaySection | null {
+function normalizedMeaning(meaning: unknown, index: number): DictionaryOverlayCardV2Section | null {
   if (!isRecord(meaning)) return null;
   const text = stringValue(meaning.definition) || stringValue(meaning.text);
   if (!text) return null;
@@ -365,27 +379,27 @@ function normalizedMeaning(meaning: unknown, index: number): OverlaySection | nu
   };
 }
 
-function chipsFromContent(item: PlatformLookupItem, content: Record<string, unknown>) {
+function chipsFromContent(item: PlatformLookupItem, content: Record<string, unknown>): OverlayChip[] {
   return [
     chip('part-of-speech', stringValue(content.partOfSpeech) || stringValue(item.entry?.partOfSpeech)),
     chip('language', item.entry?.languageCode || stringValue(content.languageCode)),
     chip('dictionary', item.dictionary?.name || item.dictionary?.slug),
     chip('form', stringValue(content.gender) || stringValue(item.entry?.gender)),
-  ].filter(Boolean);
+  ].filter((item): item is OverlayChip => Boolean(item));
 }
 
-function chip(kind: string, label?: string | null) {
+function chip(kind: OverlayChip['kind'], label?: string | null): OverlayChip | null {
   return label ? { kind, label } : null;
 }
 
 function displayActionsForCapabilities(
   capabilities: PlatformCardCapabilities | undefined,
   allowProgressActions: boolean,
-) {
+): OverlayDisplayAction[] {
   const phase = normalizedPhase(capabilities?.phase);
   const actions = new Set(capabilities?.actions || []);
   const reviewResults = new Set(capabilities?.reviewResults || []);
-  const displayActions = [];
+  const displayActions: OverlayDisplayAction[] = [];
 
   if (allowProgressActions) {
     if ((phase === 'not-started' || phase === 'encountered') && actions.has('start-learning')) {
@@ -412,12 +426,12 @@ function displayActionsForCapabilities(
 }
 
 function progressAction(
-  id: string,
-  label: string,
-  action: string,
-  result?: string,
+  id: Extract<OverlayDisplayAction['id'], 'learn' | 'known' | 'again' | 'hard' | 'good' | 'easy'>,
+  label: Extract<OverlayDisplayAction['label'], 'Learn' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy'>,
+  action: 'start-learning' | 'mark-known' | 'review-card',
+  result?: 'fail' | 'hard' | 'success' | 'easy',
   turnIdRequired = false,
-) {
+): OverlayDisplayAction {
   return {
     id,
     label,
@@ -444,30 +458,33 @@ function progressFields(userState: unknown, capabilities: { frozenUntil?: string
   };
 }
 
-function normalizedPhase(value: unknown) {
+function normalizedPhase(value: unknown): OverlayProgressPhase | null {
   const phase = stringValue(value);
-  return [
+  const validPhases: OverlayProgressPhase[] = [
     'not-started',
     'encountered',
     'learning',
     'reviewing',
     'hidden',
     'frozen',
-  ].includes(phase)
-    ? phase
+  ];
+  return validPhases.includes(phase as OverlayProgressPhase)
+    ? (phase as OverlayProgressPhase)
     : null;
 }
 
-function normalizedMatchRelation(value: unknown) {
+function normalizedMatchRelation(value: unknown): OverlayMatchRelation {
   const relation = stringValue(value);
-  return ['exact', 'inflection', 'lemma', 'fuzzy', 'unknown'].includes(relation)
-    ? relation
+  const validRelations: OverlayMatchRelation[] = ['exact', 'inflection', 'lemma', 'fuzzy', 'unknown'];
+  return validRelations.includes(relation as OverlayMatchRelation)
+    ? relation as OverlayMatchRelation
     : 'unknown';
 }
 
-function normalizedSectionKind(value: unknown) {
+function normalizedSectionKind(value: unknown): OverlaySectionKind {
   const kind = stringValue(value);
-  return ['meaning', 'example', 'idiom', 'form', 'note'].includes(kind) ? kind : 'meaning';
+  const validKinds: OverlaySectionKind[] = ['meaning', 'example', 'idiom', 'form', 'note'];
+  return validKinds.includes(kind as OverlaySectionKind) ? kind as OverlaySectionKind : 'meaning';
 }
 
 function mapPlatformError(status: number) {

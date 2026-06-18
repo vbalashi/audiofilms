@@ -1,6 +1,8 @@
 # YouTube Extension Backend/UI Contracts
 
-Status: active planning note, June 18, 2026.
+Status: active planning note, June 18, 2026. Shared V2 contract types and
+representative fixtures are frozen in `app/src/types/` for the first backend/UI
+contract slice; endpoint behavior is unchanged.
 
 This plan turns the designer brief into backend/API work that can be reviewed by
 an architect and then split between UI and backend agents. It is about contracts,
@@ -142,6 +144,21 @@ Exit criteria:
 
 - UI and backend can work from the same field names and state machine.
 - Any intentionally deferred field has a clear placeholder/fallback.
+
+Slice 1 status:
+
+- Exported contracts now live in `app/src/types/api.ts`,
+  `app/src/types/dictionary.ts`, and `app/src/types/practice.ts`.
+- Existing route/adaptor code type-checks against the exported V2 dictionary
+  lookup, dict session, practice snapshot, operation, captions, and phrase
+  translation shapes where practical.
+- Representative compile-time fixtures live in
+  `app/src/types/fixtures/youtubeExtensionContracts.ts` and cover guest lookup,
+  connected learning/reviewing lookup, no-match, hidden/frozen/no-actions,
+  phrase translation ready/failed, practice snapshot rough/precise, operation
+  running/succeeded, and session authenticated/guest.
+- This slice does not add behavior, endpoint calls, storage, or network
+  dependencies.
 
 ## Phase 1: Practice Readiness Contract
 

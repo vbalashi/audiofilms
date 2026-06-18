@@ -33,6 +33,71 @@ export type DictionaryOverlayCardMeaning = {
   idioms: string[];
 };
 
+export type DictionaryOverlayCardV2Section = {
+  id: string;
+  sourcePath: string;
+  kind: 'meaning' | 'example' | 'idiom' | 'form' | 'note';
+  label?: string;
+  text: string;
+  translation?: string;
+};
+
+export type DictionaryOverlayCardV2 = {
+  id: string;
+  entryId?: string;
+  cardTypeId: 'word-to-definition';
+  clickedForm: string;
+  headword: string;
+  language: string;
+  match?: {
+    matchedForm?: string;
+    relation: 'exact' | 'inflection' | 'lemma' | 'fuzzy' | 'unknown';
+  };
+  contentFingerprint?: string;
+  chips: Array<{
+    kind: 'part-of-speech' | 'language' | 'dictionary' | 'list' | 'form' | 'other' | string;
+    label: string;
+    value?: string;
+  }>;
+  summary: {
+    definition: string;
+    example?: string;
+  };
+  sections: DictionaryOverlayCardV2Section[];
+  progress: {
+    phase:
+      | 'not-started'
+      | 'encountered'
+      | 'learning'
+      | 'reviewing'
+      | 'hidden'
+      | 'frozen';
+    seenCount?: number;
+    lastSeenAt?: string;
+    frozenUntil?: string | null;
+  } | null;
+  displayActions: Array<{
+    id: 'learn' | 'known' | 'again' | 'hard' | 'good' | 'easy' | 'translate';
+    label: 'Learn' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy' | 'Translate';
+    group: 'progress' | 'translation';
+    command:
+      | {
+          kind: 'platform-action';
+          action: 'start-learning' | 'mark-known' | 'review-card';
+          result?: 'fail' | 'hard' | 'success' | 'easy';
+          turnIdRequired?: boolean;
+        }
+      | { kind: 'card-translation' };
+  }>;
+  dictionary?: {
+    id?: string;
+    slug?: string;
+    name?: string;
+    kind?: string;
+  };
+  meanings: DictionaryOverlayCardMeaning[];
+};
+
 export type DictionaryOverlayCard = {
   id: string;
   entryId?: string;
@@ -60,6 +125,51 @@ export type DictionaryOverlayCard = {
 export type DictionaryRichLookup = {
   query: string;
   cards: DictionaryOverlayCard[];
+};
+
+export type DictionaryLookupV2SuccessResponse = {
+  contractVersion: 'dict-lookup-v2';
+  clickedForm: string;
+  query: string;
+  result: DictionaryResult;
+  definitions: string[];
+  cards: DictionaryOverlayCardV2[];
+  meta: {
+    provider: '2000nl';
+    fallbackUsed: false;
+    responseVersion: 'overlay-v2';
+  };
+};
+
+export type DictionaryLookupV2NoMatchResponse = {
+  contractVersion: 'dict-lookup-v2';
+  clickedForm: string;
+  query: string;
+  cards: [];
+  error: 'no_match';
+  code: 'no_match';
+  meta: {
+    provider: '2000nl';
+    responseVersion: 'overlay-v2';
+  };
+};
+
+export type DictionaryLookupV2Response =
+  | DictionaryLookupV2SuccessResponse
+  | DictionaryLookupV2NoMatchResponse;
+
+export type DictionarySessionResponse = {
+  authenticated: boolean;
+  user: {
+    id: string;
+    email: string | null;
+  } | null;
+  preferences: {
+    translationTargetLanguageCode: string;
+    source: string;
+    updatedAt: string | null;
+  } | null;
+  error?: 'platform_session_unavailable';
 };
 
 export interface DictionaryLookupSuccessResponse {

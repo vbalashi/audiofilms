@@ -2,58 +2,20 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { dataDirectory } from '@/lib/runtimePaths';
+import type {
+  PhraseTranslation,
+  PhraseTranslationRequest,
+  PlatformTextTranslationResponse,
+  StoredPhraseTranslationAssociation,
+} from '@/types/practice';
 
-export type PhraseTranslationStatus = 'missing' | 'pending' | 'ready' | 'failed' | string;
-
-export type PhraseTranslationRequest = {
-  phraseId: string;
-  sourceText: string;
-  sourceLanguageCode: string;
-  contextText?: string;
-  phraseSetRevisionId?: string;
-  snapshotRevisionId?: string;
-  targetLanguageCode?: string;
-  purpose: string;
-};
-
-export type PlatformTextTranslationResponse = {
-  translationId?: string;
-  status?: string;
-  sourceTextHash?: string;
-  sourceLanguageCode?: string;
-  targetLanguageCode?: string;
-  translatedText?: string;
-  translationPolicyVersion?: string;
-  cached?: boolean;
-  error?: string | null;
-  detail?: string | null;
-};
-
-export type PublicPhraseTranslation = {
-  phraseId: string;
-  phraseSetRevisionId?: string;
-  snapshotRevisionId?: string;
-  translationId?: string;
-  status: PhraseTranslationStatus;
-  sourceTextHash?: string;
-  sourceLanguageCode: string;
-  targetLanguageCode?: string;
-  translatedText?: string;
-  translationPolicyVersion?: string;
-  cached?: boolean;
-  error?: {
-    code: string;
-    message?: string;
-  };
-};
-
-export type StoredPhraseTranslationAssociation = PublicPhraseTranslation & {
-  purpose: string;
-  sourceTextHash?: string;
-  contextTextHash?: string;
-  createdAt: string;
-  updatedAt: string;
-};
+export type {
+  PhraseTranslation,
+  PhraseTranslationRequest,
+  PhraseTranslationStatus,
+  PlatformTextTranslationResponse,
+  StoredPhraseTranslationAssociation,
+} from '@/types/practice';
 
 const DEFAULT_PURPOSE = 'youtube-phrase-practice';
 const SAFE_PURPOSE_PATTERN = /^[a-z0-9][a-z0-9:_-]{0,63}$/i;
@@ -145,9 +107,9 @@ export function platformTextTranslationBody(input: PhraseTranslationRequest): Re
 export function projectPhraseTranslation(
   input: PhraseTranslationRequest,
   platform: PlatformTextTranslationResponse,
-): PublicPhraseTranslation {
+): PhraseTranslation {
   const status = platform.status || (platform.error ? 'failed' : 'missing');
-  const output: PublicPhraseTranslation = {
+  const output: PhraseTranslation = {
     phraseId: input.phraseId,
     phraseSetRevisionId: input.phraseSetRevisionId,
     snapshotRevisionId: input.snapshotRevisionId,
@@ -174,7 +136,7 @@ export function projectPhraseTranslation(
 
 export async function savePhraseTranslationAssociation(
   input: PhraseTranslationRequest,
-  translation: PublicPhraseTranslation,
+  translation: PhraseTranslation,
 ): Promise<void> {
   if (!translation.translationId) return;
 
@@ -202,7 +164,7 @@ export async function getPhraseTranslationAssociation(
 
 export function publicPhraseTranslationFromStored(
   stored: StoredPhraseTranslationAssociation,
-): PublicPhraseTranslation {
+): PhraseTranslation {
   return {
     phraseId: stored.phraseId,
     phraseSetRevisionId: stored.phraseSetRevisionId,

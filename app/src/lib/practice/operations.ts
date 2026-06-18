@@ -11,23 +11,18 @@ import {
 } from '@/lib/asr/asrJobs';
 import {
   buildPracticeSnapshot,
-  type PracticeSnapshot,
 } from '@/lib/practice/snapshot';
+import type {
+  PracticeOperation,
+  PracticeOperationState,
+  PracticeTimingOperationInput,
+} from '@/types/practice';
 
-export type PracticeOperationState = 'queued' | 'running' | 'succeeded' | 'failed';
-
-export type PracticeTimingOperationInput = {
-  language?: string;
-  sourceKind?: string;
-  textSource?: string;
-  engine?: string;
-  model?: string;
-  fullAudio?: boolean;
-  durationSec?: number;
-  snapshotRevisionId?: string;
-  textSourceRevisionId?: string;
-  timingEvidenceRevisionId?: string;
-};
+export type {
+  PracticeOperation,
+  PracticeOperationState,
+  PracticeTimingOperationInput,
+} from '@/types/practice';
 
 export type StoredPracticeTimingOperation = {
   id: string;
@@ -39,30 +34,7 @@ export type StoredPracticeTimingOperation = {
   updatedAt: string;
 };
 
-type PublicPracticeTimingOperation = {
-  id: string;
-  kind: 'improve-timing';
-  state: PracticeOperationState;
-  videoId: string;
-  input: PracticeTimingOperationInput;
-  pollUrl: string;
-  retryAfterMs: number;
-  result?: {
-    snapshot?: PracticeSnapshot;
-    snapshotRevisionId?: string;
-    textSourceRevisionId?: string;
-    timingEvidenceRevisionId?: string;
-    phraseSetRevisionId?: string;
-    resultUrl?: string;
-    diagnostics?: Record<string, unknown>;
-  };
-  error?: {
-    code: string;
-    message: string;
-    retryable: boolean;
-  };
-  diagnostics?: Record<string, unknown>;
-};
+type PublicPracticeTimingOperation = PracticeOperation;
 
 function nowIso(): string {
   return new Date().toISOString();

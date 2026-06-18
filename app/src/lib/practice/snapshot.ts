@@ -5,62 +5,23 @@ import type {
   SubtitleResponse,
   SubtitleSourceKind,
 } from '@/types/subtitles';
+import type {
+  PracticeActiveOperation,
+  PracticeSnapshot,
+  PracticeTextSourceKind,
+  PracticeTimingQuality,
+} from '@/types/practice';
 
-export type PracticeTextSourceKind = 'provided-captions' | 'auto-captions' | 'asr';
-
-export type PracticeTimingQuality =
-  | 'approximate'
-  | 'cue'
-  | 'word'
-  | 'aligned'
-  | 'accepted-cue';
-
-export type PracticeReadinessState = 'no-captions' | 'rough' | 'ready' | 'precise';
-export type PracticeDisplayState = PracticeReadinessState | 'improving';
-export type PracticeAction = 'get-captions' | 'improve-timing';
-
-export type PracticeTextSource = {
-  id: string;
-  revisionId: string;
-  contentFingerprint: string;
-  languageCode: string;
-  label: string;
-  kind: PracticeTextSourceKind;
-  status: 'ready' | 'aligning' | 'failed';
-  errorCode?: string;
-};
-
-export type PracticeSnapshot = {
-  snapshotRevisionId: string;
-  videoId: string;
-  textSource: PracticeTextSource | null;
-  availableTextSources: PracticeTextSource[];
-  timingEvidence: {
-    id: string;
-    revisionId: string;
-    quality: PracticeTimingQuality;
-  } | null;
-  phraseSet: {
-    id: string;
-    revisionId: string;
-    phrases: Phrase[];
-  } | null;
-  readiness: {
-    baseState: PracticeReadinessState;
-    displayState: PracticeDisplayState;
-    availableActions: PracticeAction[];
-    recommendedAction?: PracticeAction;
-    activeOperation?: {
-      id: string;
-      kind: 'get-captions' | 'improve-timing' | 'align-text';
-      state: 'queued' | 'running';
-      progress?: number;
-    };
-    diagnosticFlags?: string[];
-  };
-};
-
-export type PracticeActiveOperation = NonNullable<PracticeSnapshot['readiness']['activeOperation']>;
+export type {
+  PracticeAction,
+  PracticeActiveOperation,
+  PracticeDisplayState,
+  PracticeReadinessState,
+  PracticeSnapshot,
+  PracticeTextSource,
+  PracticeTextSourceKind,
+  PracticeTimingQuality,
+} from '@/types/practice';
 
 type BuildPracticeSnapshotOptions = {
   videoId: string;

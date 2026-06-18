@@ -6,6 +6,8 @@ import {
   type SubtitleLanguagePreference,
   type SubtitleSourceKind,
 } from '@/types/subtitles';
+import type { ApiErrorBody } from '@/types/api';
+import type { PracticeCaptionsResponse } from '@/types/practice';
 
 type PracticeCaptionsRequest = {
   videoId?: unknown;
@@ -126,8 +128,7 @@ export async function POST(request: Request) {
       videoId,
       requestedLanguage: language,
     });
-
-    return jsonResponse(request, {
+    const responseBody: PracticeCaptionsResponse = {
       state: 'ready',
       operation: {
         id: `get-captions:${snapshot.snapshotRevisionId}`,
@@ -135,7 +136,9 @@ export async function POST(request: Request) {
         state: 'succeeded',
       },
       snapshot,
-    });
+    };
+
+    return jsonResponse(request, responseBody);
   } catch (error) {
     if (error instanceof SubtitleProviderError) {
       console.warn(`[practice/captions] Caption fetch failed for ${videoId}: ${error.code}`);
@@ -144,14 +147,16 @@ export async function POST(request: Request) {
     }
 
     const failure = normalizeSubtitleFailure(error);
+    const responseBody: ApiErrorBody = {
+      error: failure.code,
+      message: failure.message,
+      recoverable: failure.recoverable,
+      suggestedAction: failure.suggestedAction,
+    };
+
     return jsonResponse(
       request,
-      {
-        error: failure.code,
-        message: failure.message,
-        recoverable: failure.recoverable,
-        suggestedAction: failure.suggestedAction,
-      },
+      responseBody,
       { status: failure.status },
     );
   }
