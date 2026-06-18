@@ -1,7 +1,7 @@
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import {
-  getBearerToken,
   postTwoThousandNlPlatformJson,
+  requireBearerToken,
 } from '@/lib/twoThousandNlPlatform';
 
 const CARD_TYPE_ID = 'word-to-definition';
@@ -29,6 +29,15 @@ export async function POST(request: Request) {
     return jsonResponse(request, { error: 'missing_entry_id' }, { status: 400 });
   }
 
+  const bearerToken = requireBearerToken(request);
+  if (!bearerToken) {
+    return jsonResponse(
+      request,
+      { error: 'missing_2000nl_user_token' },
+      { status: 401, headers: { 'Cache-Control': 'private, no-store' } },
+    );
+  }
+
   const platformBody: Record<string, unknown> = {
     action,
     entryId,
@@ -47,7 +56,10 @@ export async function POST(request: Request) {
   const outcome = await postTwoThousandNlPlatformJson(
     'actions',
     platformBody,
-    getBearerToken(request),
+    bearerToken,
   );
-  return jsonResponse(request, outcome.body, { status: outcome.status });
+  return jsonResponse(request, outcome.body, {
+    status: outcome.status,
+    headers: { 'Cache-Control': 'private, no-store' },
+  });
 }

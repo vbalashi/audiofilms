@@ -1,9 +1,13 @@
 try { importScripts("config.js"); } catch (_error) {}
 const CONNECT_SESSION_STORAGE_KEY = "af2000nlConnectSession";
+const DEFAULT_API_BASE = globalThis.__afShadowingConfig?.defaults?.apiBase || "https://audiofilms-api.dilum.io";
 const DEFAULT_CONNECT_BASE_URL = globalThis.__afShadowingConfig?.defaults?.connectBase || "https://2000.dilum.io";
 const DEFAULT_CONNECT_CLIENT_ID = "audiofilms_chrome_dev";
 const CONNECT_SCOPE = "platform:read platform:write offline_access";
 const REFRESH_SKEW_SECONDS = 90;
+const ALLOW_LOCAL_BEARER_TARGETS = globalThis.__afShadowingConfig?.defaults?.allowLocalBearerTargets === true;
+
+restrictChromeStorageToTrustedContexts();
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "af-fetch-backend-subtitles") {
@@ -22,7 +26,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "af-fetch-dictionary-lookup") {
-    fetchDictionaryLookup(message.url, message.options)
+    sendResponse({
+      ok: false,
+      status: 400,
+      text: "",
+      error: "Dictionary requests must use service-worker commands.",
+    });
+
+    return false;
+  }
+
+  if (message?.type === "af-dictionary-command") {
+    fetchDictionaryCommand(message.operation, message.body)
       .then(sendResponse)
       .catch((error) => {
         sendResponse({
@@ -37,8 +52,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "af-get-2000nl-session") {
-    getFreshConnectSession(message.options)
-      .then(sendResponse)
+    getFreshConnectSession()
+      .then((result) => {
+        sendResponse({
+          ok: result.ok,
+          session: result.session || null,
+          error: result.error || "",
+        });
+      })
       .catch((error) => {
         sendResponse({
           ok: false,
@@ -51,7 +72,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "af-connect-2000nl") {
-    connectTwoThousandNl(message.options)
+    connectTwoThousandNl()
       .then(sendResponse)
       .catch((error) => {
         sendResponse({
@@ -65,7 +86,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message?.type === "af-disconnect-2000nl") {
-    disconnectTwoThousandNl(message.options)
+    disconnectTwoThousandNl()
       .then(sendResponse)
       .catch((error) => {
         sendResponse({
@@ -103,18 +124,23 @@ async function fetchBackendSubtitles(url, options = {}) {
   };
 }
 
-async function fetchDictionaryLookup(url, options = {}) {
-  if (!url || typeof url !== "string") {
-    throw new Error("Missing dictionary lookup URL.");
+async function fetchDictionaryCommand(operation, body = null) {
+  const command = dictionaryCommand(operation);
+  const headers = {
+    accept: "application/json",
+    ...(command.method === "POST" ? { "content-type": "application/json" } : {}),
+  };
+
+  const session = await getFreshConnectSession();
+  if (session.ok && session.accessToken && shouldAttachDictionaryBearer(command.url)) {
+    headers.authorization = `Bearer ${session.accessToken}`;
   }
 
-  const response = await fetch(url, {
+  const response = await fetch(command.url, {
     credentials: "omit",
-    ...options,
-    headers: {
-      accept: "application/json",
-      ...(options.headers || {}),
-    },
+    method: command.method,
+    headers,
+    ...(command.method === "POST" ? { body: JSON.stringify(body || {}) } : {}),
   });
   const text = await response.text();
 
@@ -125,13 +151,30 @@ async function fetchDictionaryLookup(url, options = {}) {
   };
 }
 
-async function connectTwoThousandNl(options = {}) {
+function dictionaryCommand(operation) {
+  const routes = {
+    "dict-lookup": { method: "POST", path: "/api/dict/lookup" },
+    "dict-action": { method: "POST", path: "/api/dict/actions" },
+    "dict-translation": { method: "POST", path: "/api/dict/translation" },
+    "dict-session": { method: "GET", path: "/api/dict/session" },
+  };
+  const route = routes[operation];
+  if (!route) {
+    throw new Error("Unsupported dictionary command.");
+  }
+  return {
+    method: route.method,
+    url: new URL(route.path, `${trustedApiBase()}/`).toString(),
+  };
+}
+
+async function connectTwoThousandNl() {
   if (!chrome.identity?.launchWebAuthFlow) {
     throw new Error("Chrome identity API is unavailable.");
   }
 
-  const baseUrl = normalizeBaseUrl(options.baseUrl);
-  const clientId = normalizeClientId(options.clientId);
+  const baseUrl = normalizeConnectBaseUrl();
+  const clientId = normalizeClientId();
   const redirectUri = chrome.identity.getRedirectURL();
   const state = randomBase64Url(24);
   const codeVerifier = randomBase64Url(48);
@@ -172,27 +215,31 @@ async function connectTwoThousandNl(options = {}) {
   return { ok: true, session: publicConnectSession(session) };
 }
 
-async function getFreshConnectSession(options = {}) {
+async function getFreshConnectSession() {
   const stored = await readConnectSession();
   if (!stored?.refresh_token) {
+    return { ok: true, session: null };
+  }
+  if (!isPinnedConnectSession(stored)) {
+    await clearConnectSession();
     return { ok: true, session: null };
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (stored.access_token && Number(stored.expires_at || 0) > nowSeconds + REFRESH_SKEW_SECONDS) {
-    return { ok: true, session: publicConnectSession(stored) };
+    return { ok: true, session: publicConnectSession(stored), accessToken: stored.access_token };
   }
 
   try {
-    const baseUrl = normalizeBaseUrl(options.baseUrl || stored.baseUrl);
-    const clientId = normalizeClientId(options.clientId || stored.clientId);
+    const baseUrl = normalizeConnectBaseUrl();
+    const clientId = normalizeClientId();
     const refreshed = await exchangeConnectToken(baseUrl, {
       grant_type: "refresh_token",
       client_id: clientId,
       refresh_token: stored.refresh_token,
     });
     await storeConnectSession({ ...refreshed, baseUrl, clientId });
-    return { ok: true, session: publicConnectSession(refreshed) };
+    return { ok: true, session: publicConnectSession(refreshed), accessToken: refreshed.access_token };
   } catch (error) {
     await clearConnectSession();
     return {
@@ -203,11 +250,11 @@ async function getFreshConnectSession(options = {}) {
   }
 }
 
-async function disconnectTwoThousandNl(options = {}) {
+async function disconnectTwoThousandNl() {
   const stored = await readConnectSession();
-  if (stored?.refresh_token) {
-    const baseUrl = normalizeBaseUrl(options.baseUrl || stored.baseUrl);
-    const clientId = normalizeClientId(options.clientId || stored.clientId);
+  if (stored?.refresh_token && isPinnedConnectSession(stored)) {
+    const baseUrl = normalizeConnectBaseUrl();
+    const clientId = normalizeClientId();
     await fetch(`${baseUrl}/api/connect/revoke`, {
       method: "POST",
       headers: {
@@ -305,23 +352,63 @@ function chromeStorageRemove(key) {
   });
 }
 
-function normalizeBaseUrl(value) {
-  return String(value || DEFAULT_CONNECT_BASE_URL).trim().replace(/\/+$/, "") || DEFAULT_CONNECT_BASE_URL;
+function normalizeConnectBaseUrl() {
+  return String(DEFAULT_CONNECT_BASE_URL).trim().replace(/\/+$/, "") || "https://2000.dilum.io";
 }
 
-function normalizeClientId(value) {
-  return String(value || DEFAULT_CONNECT_CLIENT_ID).trim() || DEFAULT_CONNECT_CLIENT_ID;
+function trustedApiBase() {
+  return String(DEFAULT_API_BASE).trim().replace(/\/+$/, "") || "https://audiofilms-api.dilum.io";
+}
+
+function normalizeClientId() {
+  return String(DEFAULT_CONNECT_CLIENT_ID).trim() || "audiofilms_chrome_dev";
+}
+
+function isPinnedConnectSession(session) {
+  const sessionBaseUrl = String(session?.baseUrl || "").trim().replace(/\/+$/, "");
+  const sessionClientId = String(session?.clientId || "").trim();
+  return sessionBaseUrl === normalizeConnectBaseUrl() && sessionClientId === normalizeClientId();
 }
 
 function publicConnectSession(session) {
   return {
-    access_token: session.access_token,
     expires_at: session.expires_at || null,
     expires_in: session.expires_in || null,
     token_type: session.token_type || "bearer",
     scope: session.scope || "",
     user: session.user || null,
   };
+}
+
+function shouldAttachDictionaryBearer(url) {
+  try {
+    const parsed = new URL(url);
+    if (!/\/api\/dict(?:\/|$)/.test(parsed.pathname)) {
+      return false;
+    }
+    const allowedOrigins = new Set([
+      "https://audiofilms-api.dilum.io",
+    ]);
+    allowedOrigins.add(new URL(trustedApiBase()).origin);
+    if (ALLOW_LOCAL_BEARER_TARGETS) {
+      allowedOrigins.add("http://localhost:3000");
+      allowedOrigins.add("http://127.0.0.1:3000");
+    }
+    return allowedOrigins.has(parsed.origin);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function restrictChromeStorageToTrustedContexts() {
+  if (!chrome.storage?.local?.setAccessLevel) {
+    return;
+  }
+  chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }, () => {
+    if (chrome.runtime.lastError) {
+      console.warn("Failed to restrict chrome.storage.local access:", chrome.runtime.lastError.message);
+    }
+  });
 }
 
 function randomBase64Url(byteLength) {

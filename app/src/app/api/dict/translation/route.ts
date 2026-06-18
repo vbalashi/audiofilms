@@ -1,7 +1,7 @@
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import {
-  getBearerToken,
   postTwoThousandNlPlatformJson,
+  requireBearerToken,
 } from '@/lib/twoThousandNlPlatform';
 
 export async function OPTIONS(request: Request) {
@@ -11,19 +11,31 @@ export async function OPTIONS(request: Request) {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const entryId = typeof body?.entryId === 'string' ? body.entryId : '';
-  const targetLang = typeof body?.targetLang === 'string' ? body.targetLang : '';
+  const targetLang = typeof body?.targetLang === 'string' ? body.targetLang : undefined;
 
   if (!entryId) {
     return jsonResponse(request, { error: 'missing_entry_id' }, { status: 400 });
   }
-  if (!targetLang) {
-    return jsonResponse(request, { error: 'missing_target_lang' }, { status: 400 });
+  const bearerToken = requireBearerToken(request);
+  if (!bearerToken) {
+    return jsonResponse(
+      request,
+      { error: 'missing_2000nl_user_token' },
+      { status: 401, headers: { 'Cache-Control': 'private, no-store' } },
+    );
   }
 
-  const outcome = await postTwoThousandNlPlatformJson('translation', {
+  const platformBody: Record<string, unknown> = {
     entryId,
-    targetLang,
     force: body?.force === true,
-  }, getBearerToken(request));
-  return jsonResponse(request, outcome.body, { status: outcome.status });
+  };
+  if (targetLang) {
+    platformBody.targetLang = targetLang;
+  }
+
+  const outcome = await postTwoThousandNlPlatformJson('translation', platformBody, bearerToken);
+  return jsonResponse(request, outcome.body, {
+    status: outcome.status,
+    headers: { 'Cache-Control': 'private, no-store' },
+  });
 }

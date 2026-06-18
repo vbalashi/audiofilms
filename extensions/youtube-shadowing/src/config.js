@@ -75,6 +75,7 @@
     defaults: {
       apiBase: DEFAULT_API_BASE,
       connectBase: DEFAULT_2000NL_CONNECT_BASE,
+      allowLocalBearerTargets: false,
       endpointPaths: { ...ENDPOINT_PATHS },
     },
   };

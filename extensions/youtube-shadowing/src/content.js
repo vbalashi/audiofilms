@@ -918,29 +918,49 @@
   function renderReviewActions(parent, card = null) {
     const section = appendElement(parent, "div", "af-card-review");
     const label = appendElement(section, "div", "af-card-review-label");
-    label.textContent = card?.entryId ? "2000NL card actions" : "Connect 2000NL to grade memory";
+    label.textContent = card?.entryId ? "Progress" : "Connect 2000NL to grade memory";
     const actions = appendElement(section, "div", "af-review-actions");
+    const displayActions = Array.isArray(card?.displayActions) ? card.displayActions : [];
+
+    if (displayActions.length) {
+      for (const displayAction of displayActions) {
+        const button = appendButton(actions, displayAction.label || displayAction.id, `afAction-${displayAction.id}`);
+        button.disabled = !card?.entryId && displayAction.command?.kind !== "card-translation";
+        button.addEventListener("click", () => performDisplayAction(card, displayAction));
+      }
+      return;
+    }
+
     const available = new Set(card?.availableActions || []);
-
-    const start = appendButton(actions, "Start", "afStartLearning");
-    start.disabled = !card?.entryId || !available.has("start-learning");
-    start.addEventListener("click", () => performDictionaryCardAction(card, { action: "start-learning" }));
-
-    const known = appendButton(actions, "Known", "afKnown");
-    known.disabled = !card?.entryId || !available.has("mark-known");
-    known.addEventListener("click", () => performDictionaryCardAction(card, { action: "mark-known" }));
-
-    const again = appendButton(actions, "Again", "afAgain");
-    again.disabled = !card?.entryId || !available.has("review-card");
-    again.addEventListener("click", () => performDictionaryCardAction(card, { action: "review-card", result: "fail" }));
-
-    const good = appendButton(actions, "Good", "afGood");
-    good.disabled = !card?.entryId || !available.has("review-card");
-    good.addEventListener("click", () => performDictionaryCardAction(card, { action: "review-card", result: "success" }));
+    const legacyActions = [
+      ["Learn", "afStartLearning", { action: "start-learning" }, available.has("start-learning")],
+      ["Known", "afKnown", { action: "mark-known" }, available.has("mark-known")],
+      ["Again", "afAgain", { action: "review-card", result: "fail" }, available.has("review-card")],
+      ["Good", "afGood", { action: "review-card", result: "success" }, available.has("review-card")],
+    ];
+    for (const [text, command, payload, enabled] of legacyActions) {
+      const button = appendButton(actions, text, command);
+      button.disabled = !card?.entryId || !enabled;
+      button.addEventListener("click", () => performDictionaryCardAction(card, payload));
+    }
 
     const translate = appendButton(actions, "Translate", "afTranslate");
     translate.disabled = !card?.entryId;
     translate.addEventListener("click", () => requestDictionaryCardTranslation(card));
+  }
+
+  function performDisplayAction(card, displayAction) {
+    const command = displayAction?.command;
+    if (command?.kind === "card-translation") {
+      requestDictionaryCardTranslation(card);
+      return;
+    }
+    if (command?.kind === "platform-action") {
+      performDictionaryCardAction(card, {
+        action: command.action,
+        ...(command.result ? { result: command.result } : {}),
+      });
+    }
   }
 
   function selectLookupWord(word, phraseIndex) {
@@ -1015,6 +1035,14 @@
     if (!card?.entryId || !state.selectedWord) return;
 
     const selectedWord = state.selectedWord;
+    const action = actionPayload?.action || "";
+    const payload = {
+      ...actionPayload,
+      ...((action === "review-card" || action === "mark-known" || action === "mark-unknown") && !actionPayload.turnId
+        ? { turnId: createMutationTurnId() }
+        : {}),
+      entryId: card.entryId,
+    };
     state.selectedWord = {
       ...state.selectedWord,
       cardActionStatus: "Saving action...",
@@ -1023,10 +1051,7 @@
     render();
 
     try {
-      await postDictionaryBackend(dictionaryBackendEndpoint("actions"), {
-        ...actionPayload,
-        entryId: card.entryId,
-      });
+      await postDictionaryCommand("dict-action", payload);
       if (!isCurrentLookup(selectedWord)) return;
       state.selectedWord = {
         ...state.selectedWord,
@@ -1051,7 +1076,6 @@
     if (!card?.entryId || !state.selectedWord) return;
 
     const selectedWord = state.selectedWord;
-    const targetLang = window.localStorage.getItem("afShadowingTranslationLang") || "en";
     state.selectedWord = {
       ...state.selectedWord,
       cardActionStatus: "Loading translation...",
@@ -1060,9 +1084,8 @@
     render();
 
     try {
-      const translation = await postDictionaryBackend(dictionaryBackendEndpoint("translation"), {
+      const translation = await postDictionaryCommand("dict-translation", {
         entryId: card.entryId,
-        targetLang,
       });
       if (!isCurrentLookup(selectedWord)) return;
       state.selectedWord = {
@@ -1097,15 +1120,10 @@
       throw new Error("Dictionary lookup is disabled.");
     }
 
-    const url = new URL(endpoint);
-    url.searchParams.set("word", word);
-    url.searchParams.set("language", language || "auto");
-    if (context) {
-      url.searchParams.set("context", context);
-    }
-
-    const response = await requestDictionaryLookup(url.toString(), {
-      headers: await dictionaryAuthHeaders(),
+    const response = await requestDictionaryCommand("dict-lookup", {
+      clickedForm: word,
+      sourceLanguageCode: language || "auto",
+      ...(context ? { contextText: context } : {}),
     });
     const text = response.text || "";
     let payload = null;
@@ -1136,33 +1154,8 @@
     return "https://audiofilms-api.dilum.io/api/dict";
   }
 
-  function dictionaryBackendEndpoint(kind) {
-    const endpoint = dictionaryLookupEndpoint();
-    if (!endpoint) return "";
-    const url = new URL(endpoint);
-    url.pathname = url.pathname.replace(/\/dict\/?$/, `/dict/${kind}`);
-    return url.toString();
-  }
-
-  async function dictionaryAuthHeaders() {
-    const session = await getFreshTwoThousandNlSession();
-    return session?.access_token ? { authorization: `Bearer ${session.access_token}` } : {};
-  }
-
-  async function postDictionaryBackend(url, payload) {
-    if (!url) {
-      throw new Error("Dictionary backend is disabled.");
-    }
-
-    const response = await requestDictionaryLookup(url, {
-      method: "POST",
-      body: JSON.stringify(payload),
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        ...(await dictionaryAuthHeaders()),
-      },
-    });
+  async function postDictionaryCommand(operation, payload) {
+    const response = await requestDictionaryCommand(operation, payload);
     const text = response.text || "";
     let body = null;
     try {
@@ -1194,7 +1187,6 @@
     try {
       const response = await sendRuntimeMessage({
         type: "af-connect-2000nl",
-        options: twoThousandNlConnectOptions(),
       });
       if (!response?.ok) {
         throw new Error(response?.error || "2000NL authorization failed.");
@@ -1220,7 +1212,6 @@
     try {
       await sendRuntimeMessage({
         type: "af-disconnect-2000nl",
-        options: twoThousandNlConnectOptions(),
       });
       setTwoThousandNlSessionState(null, "");
       if (state.selectedWord) {
@@ -1241,7 +1232,6 @@
     }
     const response = await sendRuntimeMessage({
       type: "af-get-2000nl-session",
-      options: twoThousandNlConnectOptions(),
     });
     if (!response?.ok) {
       setTwoThousandNlSessionState(null, response?.error || "2000NL session is unavailable.");
@@ -1254,7 +1244,7 @@
   function setTwoThousandNlSessionState(session, error) {
     state.accountUser = session?.user || null;
     state.accountError = error || "";
-    if (session?.access_token) {
+    if (session?.user) {
       state.accountStatus = "signed-in";
     } else if (error) {
       state.accountStatus = "expired";
@@ -1263,11 +1253,11 @@
     }
   }
 
-  function twoThousandNlConnectOptions() {
-    return {
-      baseUrl: window.__afShadowingConfig?.connectBase?.() || window.localStorage.getItem("afShadowing2000nlBaseUrl") || "https://2000.dilum.io",
-      clientId: window.localStorage.getItem("afShadowing2000nlClientId") || "audiofilms_chrome_dev",
-    };
+  function createMutationTurnId() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `af-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
   function sendRuntimeMessage(message) {
@@ -1282,12 +1272,29 @@
     });
   }
 
-  function requestDictionaryLookup(url, options = {}) {
+  function requestDictionaryCommand(operation, body = null) {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-      return fetch(url, {
+      const endpoint = dictionaryLookupEndpoint();
+      if (!endpoint) {
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          text: JSON.stringify({ error: "Dictionary backend is disabled." }),
+        });
+      }
+      const url = new URL(endpoint);
+      if (operation === "dict-lookup") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/lookup");
+      } else if (operation === "dict-action") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/actions");
+      } else if (operation === "dict-translation") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/translation");
+      }
+      return fetch(url.toString(), {
         credentials: "omit",
-        ...options,
-        headers: { accept: "application/json", ...(options.headers || {}) },
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify(body || {}),
       }).then(async (response) => ({
         ok: response.ok,
         status: response.status,
@@ -1295,18 +1302,10 @@
       }));
     }
 
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: "af-fetch-dictionary-lookup", url, options }, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        if (!response) {
-          reject(new Error("Dictionary lookup returned no response."));
-          return;
-        }
-        resolve(response);
-      });
+    return sendRuntimeMessage({
+      type: "af-dictionary-command",
+      operation,
+      body,
     });
   }
 

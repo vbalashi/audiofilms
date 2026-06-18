@@ -11,19 +11,21 @@ export function getBearerToken(request: Request) {
   return match?.[1]?.trim() || undefined;
 }
 
+export function requireBearerToken(request: Request) {
+  return getBearerToken(request);
+}
+
 export async function postTwoThousandNlPlatformJson(
-  path: 'actions' | 'translation',
+  path: 'actions' | 'translation' | 'lookup',
   body: unknown,
-  accessTokenOverride?: string,
+  accessToken: string,
 ): Promise<PlatformProxyOutcome> {
-  const accessToken =
-    accessTokenOverride || process.env.DICTIONARY_2000NL_ACCESS_TOKEN?.trim();
   if (!accessToken) {
     return {
-      status: 500,
+      status: 401,
       body: {
-        error: 'missing_2000nl_access_token',
-        detail: 'DICTIONARY_2000NL_ACCESS_TOKEN is required for 2000NL platform proxy calls.',
+        error: 'missing_2000nl_user_token',
+        detail: 'A forwarded 2000NL user Bearer token is required for this platform write.',
       },
     };
   }
@@ -39,6 +41,38 @@ export async function postTwoThousandNlPlatformJson(
       'content-type': 'application/json',
     },
     body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => null);
+
+  return {
+    status: response.status,
+    body: payload || { error: `2000NL ${path} returned HTTP ${response.status}` },
+  };
+}
+
+export async function getTwoThousandNlPlatformJson(
+  path: 'session',
+  accessToken: string,
+): Promise<PlatformProxyOutcome> {
+  if (!accessToken) {
+    return {
+      status: 401,
+      body: {
+        error: 'missing_2000nl_user_token',
+        detail: 'A forwarded 2000NL user Bearer token is required for this platform read.',
+      },
+    };
+  }
+
+  const apiBase = (
+    process.env.DICTIONARY_2000NL_API_BASE?.trim() || DEFAULT_2000NL_API_BASE
+  ).replace(/\/+$/, '');
+  const response = await fetch(`${apiBase}/${path}`, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${accessToken}`,
+    },
   });
   const payload = await response.json().catch(() => null);
 

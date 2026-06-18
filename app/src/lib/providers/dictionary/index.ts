@@ -143,8 +143,7 @@ function getDictionaryProviderConfig(
     twoThousandNlAccessToken:
       overrides.twoThousandNlAccessToken ||
       process.env.DICTIONARY_2000NL_ACCESS_TOKEN?.trim(),
-    twoThousandNlIncludeUserState:
-      process.env.DICTIONARY_2000NL_INCLUDE_USER_STATE !== 'false',
+    twoThousandNlIncludeUserState: false,
   };
 }
 

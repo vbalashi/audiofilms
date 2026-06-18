@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   const word = searchParams.get('word');
   const language = searchParams.get('language') || 'en';
   const context = searchParams.get('context') || undefined;
+  const bearerToken = getBearerToken(request);
 
   if (!word) {
     return jsonResponse(request, { error: 'Missing word' }, { status: 400 });
@@ -21,9 +22,12 @@ export async function GET(request: Request) {
       word,
       language,
       context,
-      platformAccessToken: getBearerToken(request),
+      platformAccessToken: bearerToken,
     });
-    return jsonResponse(request, outcome.body, { status: outcome.status });
+    return jsonResponse(request, outcome.body, {
+      status: outcome.status,
+      headers: bearerToken ? { 'Cache-Control': 'private, no-store' } : undefined,
+    });
   } catch {
     return jsonResponse(request, { error: 'Failed to fetch definition' }, { status: 500 });
   }
