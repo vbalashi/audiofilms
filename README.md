@@ -22,8 +22,8 @@ Phrase-based listening practice for YouTube videos. The app lets a learner move 
 
 Current runtime defaults are:
 
-- Subtitle provider: `yt-dlp`
-- Subtitle fallback: `supadata` when `SUPADATA_API_KEY` is configured
+- Subtitle extractor/default retrieval path: `yt-dlp`
+- Subtitle provider fallback: `supadata` when `SUPADATA_API_KEY` is configured
 - Dictionary provider: `openrouter`
 - Dictionary candidates: `2000nl`, `openai`, `openrouter`, and English-only `free-dictionary` where configured
 
@@ -69,13 +69,13 @@ npm run build
 
 - Embedded YouTube playback
 - Experimental Chrome extension for direct YouTube-page phrase navigation
-- Subtitle retrieval through configurable providers
-- Phrase-based playback and blind/read modes
+- Subtitle retrieval through configurable extractors/providers
+- Phrase-based playback and Shadow/Recall-oriented practice modes
 - Dictionary lookups through configurable providers
 - File-backed subtitle and video metadata caches
 
 ## Notes
 
-- `yt-dlp` is the default subtitle path for local and small-host deployments. Supadata is the paid fallback when configured.
+- `yt-dlp` is the default subtitle extractor path for local and small-host deployments. Supadata is the paid provider fallback when configured.
 - `free-dictionary` remains an English-only dictionary fallback.
 - Historical implementation notes have been moved under [docs/archive/dictionary](docs/archive/dictionary).

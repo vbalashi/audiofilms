@@ -20,5 +20,16 @@ Consequences:
 
 - AudioFilms `/api/dict` must grow beyond the legacy flat `definition` result for rich-card consumers.
 - AudioFilms backend may derive labels, collapsed content, examples, and ordering for its overlay, but it must not invent dictionary meanings, action IDs, review result IDs, progress states, or card types.
-- The extension does not own 2000NL auth or tokens in the first architecture. It calls AudioFilms backend for lookup, actions, and translation; AudioFilms proxies to 2000NL.
-- Button localization is intentionally separate from this boundary. The first slice can display technical action/result IDs until a global UI localization decision exists.
+- The extension may own the 2000NL Connect session and store/refresh the current
+  2000NL access token because the YouTube runtime needs a browser-side connect
+  flow. It still calls AudioFilms backend for lookup, actions, and translation;
+  AudioFilms remains the proxy/orchestrator that calls 2000NL platform APIs with
+  the forwarded Bearer token.
+- Write identity is fail-closed: `/api/dict/actions` and authenticated
+  `/api/dict/translation` require a forwarded user Bearer token and must never
+  fall back to `DICTIONARY_2000NL_ACCESS_TOKEN`. Any environment credential is
+  read-only dogfood/service fallback only.
+- Button localization is intentionally separate from 2000NL payload IDs. The
+  polished YouTube extension UI should display `Learn`, `Known`, `Again`,
+  `Hard`, `Good`, and `Easy`; submitted action/result IDs remain 2000NL platform
+  values.

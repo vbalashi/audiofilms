@@ -24,8 +24,8 @@ Primary flow:
 1. User lands on the app and submits a YouTube URL.
 2. The watch route loads video-specific data.
 3. `/api/video-info` returns available subtitle language metadata.
-4. `/api/get-subs` fetches and caches subtitle phrases through the configured subtitle provider.
-5. The client playback UI uses Zustand state to loop phrases and switch between blind/read modes.
+4. `/api/get-subs` fetches and caches subtitle phrases through the configured subtitle retrieval path.
+5. The client playback UI uses Zustand state to loop phrases and switch between practice/display modes.
 6. `/api/dict` resolves clicked-word definitions through the configured dictionary provider.
 7. `/api/dict/actions` and `/api/dict/translation` proxy explicit 2000NL card actions and per-card translation requests when the selected dictionary provider returns platform-backed cards.
 
@@ -61,7 +61,7 @@ This is an isolated MVP experiment. It may duplicate small pieces of subtitle pa
 - `app/src/lib/subtitleCache.ts`
 - `app/src/types/subtitles.ts`
 
-The API route is the HTTP boundary only. `subtitleService.ts` owns cache lookup/write, provider execution, and the sample-video fallback path. Provider selection is environment-driven and provider-specific response handling must stay below the route boundary.
+The API route is the HTTP boundary only. `subtitleService.ts` owns cache lookup/write, subtitle extractor/provider execution, and the sample-video fallback path. Retrieval selection is environment-driven and provider/extractor-specific response handling must stay below the route boundary.
 
 ### Video Metadata
 
@@ -101,7 +101,7 @@ Runtime dependencies currently include:
 
 - Next.js / React
 - YouTube embed via `react-youtube`
-- subtitle providers: Supadata or `yt-dlp`
+- subtitle provider/extractor paths: Supadata and `yt-dlp`
 - dictionary providers: 2000NL, OpenRouter, OpenAI, or Free Dictionary
 
 Environment selection currently happens through `app/env.example` keys:
@@ -119,7 +119,6 @@ Environment selection currently happens through `app/env.example` keys:
 - `OPENAI_DICTIONARY_PROMPT`
 - `DICTIONARY_2000NL_API_BASE`
 - `DICTIONARY_2000NL_ACCESS_TOKEN`
-- `DICTIONARY_2000NL_INCLUDE_USER_STATE`
 - `DICTIONARY_2000NL_TIMEOUT_MS`
 
 ## Safe Change Patterns

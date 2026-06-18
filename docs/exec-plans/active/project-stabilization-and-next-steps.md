@@ -118,13 +118,19 @@ Only start after priorities 1-4 are in acceptable shape.
 
 Once priorities 1-4 are complete, the codebase should be stable enough to resume product work instead of continuing platform repair. The next feature choices should favor direct user-facing value and use the service boundaries already established by the stabilization work.
 
-Recommended feature directions:
+Recommended feature directions after the YouTube extension redesign brief:
 
-1. `dictionary result caching`
-2. `provider fallback policy and user-facing error states`
+1. `YouTube extension backend/UI contract review`
+2. `dictionary result caching`
+3. `provider fallback policy and user-facing error states`
 
 Why this order:
 
+- `YouTube extension backend/UI contract review` should happen before splitting
+  work between UI and backend agents. The redesign depends on Practice
+  Readiness, Get Captions, Improve Timing, Recall phrase translation, pairwise
+  alignment cache, and state-aware dictionary actions. The active contract plan
+  is `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md`.
 - `dictionary result caching` is the fastest product win because the dictionary flow is already normalized behind server-side orchestration and app-facing contracts. Adding cache behavior at `/api/dict` and the service layer improves lookup latency, reduces repeated provider calls, and lowers sensitivity to OpenRouter cost and rate behavior without pushing vendor logic back into UI components.
 - `provider fallback policy and user-facing error states` should follow immediately after. The provider and service structure now exists, but the product-level degradation policy is still implicit. The next step is to make fallback rules explicit across subtitle and dictionary providers and pair them with recoverable, user-readable UI states.
 
@@ -141,4 +147,6 @@ Lower-priority follow-ons after those two items:
 2. Align provider defaults and setup docs.
 3. Refactor module boundaries where current work is leaking across layers.
 4. Consolidate docs.
-5. Resume feature development.
+5. Review YouTube extension backend/UI contracts with an architect.
+6. Implement UI/backend work in parallel only after the shared state machine and field names are agreed.
+7. Resume broader feature development.

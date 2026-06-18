@@ -1,5 +1,14 @@
 # YouTube Extension Stabilization And Rebuild
 
+> Status note, June 18, 2026: this remains useful as an operational and
+> architecture history for the extension spike/rebuild. Do not use its older
+> visible badge examples, shortcut labels, or `No ASR pipeline` non-goal as the
+> current product UI contract. The current learner-facing vocabulary and
+> backend/UI contract are in `docs/intent/youtube-extension-designer-brief.md`
+> and `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md`.
+> Any detailed UI phase below, including old `Show/Hide text` or auto-pause
+> toggle language, is historical implementation evidence only.
+
 ## Goal
 
 Turn the current YouTube shadowing extension spike into a stable, reviewable product direction without continuing to pile product code onto fragile YouTube DOM rewrites.

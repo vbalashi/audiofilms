@@ -4,11 +4,17 @@ Chrome extension spike for phrase-by-phrase YouTube listening practice.
 
 ## Status
 
-This is a post-review spike, not product architecture. The next stabilization path is tracked in:
+This is a post-review spike, not product architecture. Current product/design
+intent is tracked in:
 
 ```text
-docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md
+docs/intent/youtube-extension-designer-brief.md
+docs/exec-plans/active/youtube-extension-backend-ui-contracts.md
 ```
+
+The older stabilization/rebuild plan remains useful as operational history, but
+it is not the source of truth for learner-facing labels, shortcut behavior,
+practice modes, or ASR scope.
 
 Current cleanup has passed boot reproducibility, code splitting, retrieval metadata, provider fallback, Shadow DOM isolation, the first compact UI pass, playback/keyboard hardening, deliberate retrieval-ladder work, and the first app/extension metadata alignment pass.
 
@@ -18,6 +24,18 @@ Operational handoff for agents is in:
 docs/intent/youtube-extension-agent-runbook.md
 ```
 
+Current UI labels and buttons in this spike are operational, not final product
+language. The current redesign intent is documented in:
+
+```text
+docs/intent/youtube-extension-designer-brief.md
+docs/exec-plans/active/youtube-extension-backend-ui-contracts.md
+```
+
+In that redesign target, default learner-facing labels should avoid technical
+terms such as `manual`, `exact`, `timedtext`, `yt-dlp`, and `provider`; those
+belong in details/debug surfaces.
+
 ## Purpose
 
 This extension validates whether AudioFilms can run directly on YouTube pages, use the caption tracks already available to the YouTube player, and replace rough time seeking with phrase navigation.
@@ -26,16 +44,16 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
 
 - Runs on YouTube watch pages.
 - Finds available caption tracks for the current video.
-- Chooses the default caption source by preferred language first (`navigator.languages`, then `nl`, then `en`) and source quality second.
+- Chooses the default caption source by preferred language first (`navigator.languages`, then `nl`, then `en`) and caption type/availability second.
 - Falls back to another manual or auto-generated caption source when no preferred-language source is available.
 - Tries caption retrieval in this order:
   - YouTube `timedtext` caption URL from the player track;
-  - AudioFilms backend/provider API via the shared extension config; default `https://audiofilms-api.dilum.io/api/get-subs`;
+  - AudioFilms backend API via the shared extension config; default `https://audiofilms-api.dilum.io/api/get-subs`;
   - optional diagnostic YouTube transcript API metadata on the page;
   - optional diagnostic opened transcript panel DOM segments.
 - Tracks subtitle source and quality separately from the selected language:
   - direct timedtext captions show as manual/auto with exact timing;
-  - backend/provider captions show as manual/auto when the backend proves source kind;
+  - backend-orchestrated captions show as manual/auto when the backend proves source kind;
   - transcript fallback is marked with rough timing and a source warning when it cannot prove the selected track;
   - debug output includes each retrieval attempt and whether it failed, succeeded, or was skipped.
 - Builds phrase units from timed caption cues.
@@ -55,14 +73,25 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
 - In guided phrase navigation, Previous and Next advance from the visible phrase in the AudioFilms panel, not from the current YouTube playhead.
 - Adds a `Mark Issue` control that copies a navigation incident report with recent phrase commands, playback timings, selected source, and current phrase context.
 - Adds an `AudioFilms On/Off` page toggle that restores the normal YouTube layout when disabled.
-- Treats lookup as backend-capable by default; 2000NL account/progress data depends on the AudioFilms dictionary backend provider configuration.
+- Treats lookup as backend-capable by default; 2000NL account/progress data depends on the AudioFilms dictionary backend and provider configuration.
 - Uses YouTube's own transcript panel as a caption extraction fallback and debug fallback, not as the final learning UI.
 - Supports:
   - `Space`: toggle normal continuous YouTube play/pause and leave guided phrase playback;
   - `ArrowRight`: next phrase;
   - `ArrowLeft`: previous phrase;
   - `ArrowDown`: replay current phrase;
-  - `ArrowUp`: hide phrase text.
+  - `ArrowUp`: target redesign behavior is temporary reveal/hide of the current
+    original phrase text;
+  - `S`: target redesign behavior is sticky `Show Original` in Shadow Mode;
+  - `T`: target redesign behavior is inline `Show Translation` for the current
+    phrase;
+  - `1`: target redesign behavior switches to Shadow Mode;
+  - `2`: target redesign behavior switches to Recall Mode.
+
+The current spike implementation may differ from the target shortcut contract in
+`docs/intent/youtube-extension-designer-brief.md`. Treat this README section as
+operational current-state guidance plus redesign targets, not as a reason to
+change the product contract.
 
 
 ## Remote API Configuration
@@ -177,7 +206,10 @@ Remote ASR job creation requires a tester token when the backend has `ASR_AUTH_R
 localStorage.afShadowingTesterToken = "<tester-token>";
 ```
 
-Keep `afShadowingLocalAsrDuration` bounded for tester jobs unless the backend explicitly allows full audio. For a quick bounded smoke, set a duration:
+Private local dogfood may use full-video ASR when explicitly enabled in the
+local backend. Remote tester jobs should keep `afShadowingLocalAsrDuration`
+bounded unless the backend explicitly allows full audio. For a quick bounded
+smoke, set a duration:
 
 ```js
 localStorage.afShadowingLocalAsrDuration = "300";
@@ -205,7 +237,7 @@ The default fixture sequence checks:
 - manual Dutch captions: `4EE7m94mJpk`;
 - legacy manual Dutch fixture: `ZNQWWW-vvfM`;
 - app sample with browser-visible auto captions: `iDi5MhglYks`;
-- manual captions through backend provider fallback warning: `KrdVIUmBoE4`;
+- manual captions through backend-orchestrated fallback warning: `KrdVIUmBoE4`;
 - English manual captions on a multilingual video: `aircAruvnKk`;
 - multilingual source switch from English to Arabic on `aircAruvnKk`;
 - Dutch auto-caption-only fixture: `xymyDvCgWDA`;
@@ -223,7 +255,7 @@ It also verifies:
 - preferred-language default source selection on multilingual videos;
 - manual source switching on multilingual/non-Latin caption tracks;
 - Unicode word lookup on multilingual/non-Latin caption tracks;
-- backend-provider retrieval path for captioned fixtures;
+- backend-orchestrated retrieval path for captioned fixtures;
 - source menu availability on a video with manual and auto-generated tracks;
 - switching from manual to auto-generated captions and back to manual;
 - Replay enters `Shortcuts active` and seeks near the current phrase;
@@ -279,7 +311,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 
 - `manifest.json`: Chrome extension manifest.
 - `scripts/smoke-chrome.mjs`: local Chrome multi-video smoke checker for manual, auto-only, no-captions, recovery, SPA, backend-off, backend-failed, failed source-switch, multilingual source-switch, and viewport geometry cases.
-- `src/serviceWorker.js`: extension-origin backend/provider fetch bridge for local AudioFilms API calls and 2000NL Connect session management.
+- `src/serviceWorker.js`: extension-origin backend fetch bridge for AudioFilms API calls and 2000NL Connect session management.
 - `src/pageBridge.js`: minimal main-world bridge for YouTube UI clicks that do not respond reliably from the isolated content-script world.
 - `src/bootDiagnostics.js`: boot sentinel, page-readable diagnostics, and visible boot failure badge.
 - `src/phrases.js`: cue-to-phrase builder used by the content script.
@@ -293,14 +325,25 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 ## Current Limits
 
 - No build step.
-- 2000NL Connect exists in the extension service worker for local dogfood. It stores and refreshes a Connect session through Chrome extension storage, then forwards the current access token to AudioFilms `/api/dict*` calls.
-- Dictionary lookup goes through `https://audiofilms-api.dilum.io/api/dict` by default. Set `localStorage.afShadowingApiBase`, `localStorage.afShadowingDictionaryUrl`, or `off` for diagnostics.
-- 2000NL-backed dictionary results require either the extension Connect session token or a valid short-lived `DICTIONARY_2000NL_ACCESS_TOKEN` fallback in the AudioFilms app environment.
+- 2000NL Connect exists in the extension service worker for local dogfood. It
+  stores and refreshes a Connect session through Chrome extension storage, then
+  attaches the current access token to allowlisted AudioFilms `/api/dict*`
+  requests. The content script receives account metadata only, not the access
+  token.
+- Dictionary lookup goes through the service worker command path to
+  `https://audiofilms-api.dilum.io/api/dict/lookup` by default. The content
+  script sends only a command and body; it does not choose the authenticated
+  request URL.
+- 2000NL-backed guest lookup must not use a shared end-user token in production.
+  `DICTIONARY_2000NL_ACCESS_TOKEN` is only a short-lived local dogfood fallback
+  when the AudioFilms app explicitly enables it. Write routes such as
+  `/api/dict/actions` require a forwarded Connect token and must not use the
+  environment fallback.
 - Plain lookup is read-only. Explicit card actions go through `/api/dict/actions`, then refresh lookup state. Per-card translation goes through `/api/dict/translation`.
 - Stable unpacked dev extension ID: `hhdkchoccmikoefhenobdjipgdppdpoc`.
 - 2000NL Connect dev redirect URI: `https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/`.
 - 2000NL Connect dev origin: `chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc`.
 - No word-level alignment.
 - Uses YouTube web-player metadata, which can change.
-- Backend/provider fallback expects `https://audiofilms-api.dilum.io/api/get-subs` by default. Set `localStorage.afShadowingApiBase = "http://localhost:3000"` for local development, or set `localStorage.afShadowingBackendSubtitlesUrl` to a specific endpoint or `off`.
+- Backend fallback expects `https://audiofilms-api.dilum.io/api/get-subs` by default. Set `localStorage.afShadowingApiBase = "http://localhost:3000"` for local development, or set `localStorage.afShadowingBackendSubtitlesUrl` to a specific endpoint or `off`.
 - YouTube transcript API / DOM probing is disabled by default. Set `localStorage.afShadowingTranscriptFallback = "on"` only for diagnostics.

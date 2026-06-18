@@ -9,8 +9,28 @@ The caption track the system intends to use for a YouTube video after applying l
 _Avoid_: Source of truth, active transcript
 
 **Cue Source**:
-The mechanism that actually supplies the timed cues used to build practice phrases. For the YouTube extension, this should be visible at MVP level as `timedtext` or `fallback` when it differs from the selected caption track path.
+The mechanism that actually supplies the timed cues used to build practice phrases. Cue source is diagnostic provenance and should not be used as the default learner-facing source label.
 _Avoid_: Selected track, caption track
+
+**YouTube Timed Text**:
+YouTube's browser-visible caption data path exposed through signed `api/timedtext` URLs on caption tracks. It can provide caption cues directly from the current YouTube page, but it is an unstable implementation path and can return empty data even when YouTube displays captions.
+_Avoid_: User-facing captions label, source quality
+
+**Subtitle Provider**:
+A source system that can supply subtitle or transcript data as a product dependency. Examples include YouTube captions, Supadata, or a future paid transcript API; the AudioFilms backend is not itself a subtitle provider when it only orchestrates retrieval.
+_Avoid_: Backend provider, extractor, API host
+
+**Subtitle Extractor**:
+A backend-side tool that extracts subtitle data from a source system. `yt-dlp` is a subtitle extractor, not a user-facing provider label.
+_Avoid_: Provider, local extractor, backend provider
+
+**AudioFilms Backend**:
+The AudioFilms API layer that orchestrates subtitle providers, subtitle extractors, cache, normalization, practice phrase building, dictionary proxying, and ASR jobs. It is not a subtitle provider unless it is the actual source of authored subtitle content.
+_Avoid_: Backend provider, source
+
+**Retrieval Path**:
+The diagnostic route by which AudioFilms obtained timed text or metadata, such as browser caption URL, AudioFilms backend through `yt-dlp`, Supadata through the backend, transcript-panel diagnostic, or an ASR job. Retrieval path is useful for details/debug surfaces, not as the default learner-facing source label.
+_Avoid_: User source label, readiness, caption language
 
 **Practice Source**:
 A user-selectable source of timed text for a video practice session. Practice sources are grouped by caption language and shown with factual metadata such as display name, language code, caption type, and availability, without recommendation labels.
@@ -36,9 +56,61 @@ _Avoid_: Practice phrase, cue source, selected source
 The timing information used to place practice phrase boundaries. Timing evidence can come from provider phrase boundaries, caption cue boundaries, ASR word timings, projected ASR timings, proportional estimates, or later forced alignment. It is distinct from the display text shown to the learner.
 _Avoid_: Display text, caption source, provider
 
+**Cue Timing**:
+Timing evidence that uses the start and end times already attached to caption cues. Cue timing can be usable when cues are short and phrase-sized, but it can be too coarse when a single cue contains a long sentence or paragraph.
+_Avoid_: Exact timing, ASR timing
+
+**Approximate Split Timing**:
+Timing evidence created by splitting a longer caption cue into smaller practice phrases and estimating internal boundaries, usually by text length or phrase position. It is a degraded fallback because the internal timings are guessed rather than measured.
+_Avoid_: ASR timing, exact timing
+
+**Auto-Caption Timing**:
+Timing evidence from YouTube auto-generated captions. It may be denser than uploaded caption cue timing and can include useful word or rolling-caption timing, but it can also include recognition errors, overlap, and rolling-caption artifacts.
+_Avoid_: Manual timing, aligned timing
+
+**Practice Readiness**:
+A compact learner-facing status for how ready the current video is for phrase-by-phrase practice. It summarizes whether usable practice phrases exist, whether timing evidence is degraded or high confidence, whether relevant ASR/alignment data is available, and whether blocking warnings exist; it does not replace practice source, cue source, timing evidence, or display text metadata.
+_Avoid_: Source quality, ASR status, caption quality
+
+**Get Captions**:
+A user-initiated action that asks AudioFilms to retrieve usable subtitle text through backend retrieval, extraction, provider fallback, or cache. It is distinct from improving phrase timing and should not start ASR by implication.
+_Avoid_: Improve timing, refresh cache, run ASR
+
+**Improve Timing**:
+A user-initiated action that asks AudioFilms to improve practice phrase boundaries using ASR, alignment, word timing, or a later timing-specific backend process. It is distinct from retrieving captions and may take minutes.
+_Avoid_: Get captions, refresh cache, translate
+
 **Display Text**:
 The learner-visible text for a practice phrase. Display text can come from manual captions, ASR captions, provider-cleaned text, or aligned text, and it does not by itself define practice phrase timing.
 _Avoid_: Timing evidence, cue source, provider
+
+**Text Source**:
+The source selected for learner-visible display text, such as uploaded captions, YouTube auto-captions, or an ASR transcript. The selected text source does not necessarily determine timing evidence after ASR/alignment is available.
+_Avoid_: Timing source, source selector, practice readiness
+
+**Practice Mode**:
+The learner's active exercise mode for a practice phrase. Initial modes are Shadow and Recall; they change what prompt is shown and what the learner is trying to produce, without changing the underlying video.
+_Avoid_: Scenario, caption source, playback mode
+
+**Shadow Mode**:
+A practice mode where the learner listens to and repeats the original phrase. The original text can be sticky-visible or sticky-hidden through Show Original, but the exercise remains shadowing.
+_Avoid_: Default mode, subtitles mode
+
+**Recall Mode**:
+A practice mode where a translated prompt is shown and the learner recalls or produces the original-language phrase.
+_Avoid_: Translate mode, translation action
+
+**Phrase Translation**:
+A translation of the whole current practice phrase into the learner's target language. It is a comprehension aid in Shadow Mode and the prompt source in Recall Mode; it is distinct from dictionary card translation.
+_Avoid_: Word translation, dictionary translation, gloss
+
+**Show Translation**:
+A user action that reveals or hides Phrase Translation for the current practice phrase while staying in Shadow Mode. It does not switch to Recall Mode.
+_Avoid_: Recall Mode, dictionary translate, word lookup
+
+**Show Original**:
+A sticky visibility setting for whether the original phrase text is shown automatically during phrase navigation. It can be toggled with a small reveal/eye control or shortcut and is distinct from switching practice modes.
+_Avoid_: Auto Reveal, Listen mode, subtitles mode
 
 **Guided Phrase Navigation**:
 The deliberate practice mode where Replay, Previous, and Next operate on the currently selected visible practice phrase. In this mode button and shortcut navigation should advance from the visible phrase index, not from the YouTube playhead.
@@ -57,5 +129,17 @@ A normalized language hint sent with dictionary lookup when the selected caption
 _Avoid_: Target language, definition language
 
 **Dictionary Meaning Card**:
-A learner-facing dictionary candidate for one specific meaning/card identity returned by the dictionary authority. Learning actions such as remembered, forgot, known, or unknown apply to this card, not to the clicked word globally.
+A learner-facing dictionary candidate for one specific meaning/card identity returned by the dictionary authority. Learning and review actions such as Learn, Known, Again, Hard, Good, and Easy apply to this card, not to the clicked word globally.
 _Avoid_: Word card, lookup result, definition
+
+**Clicked Form**:
+The exact word form the learner clicked in the phrase text. It can differ from the dictionary lemma or headword, for example an inflected verb form.
+_Avoid_: Lemma, headword
+
+**Lemma**:
+The dictionary headword or base form used to render a Dictionary Meaning Card for a clicked form. Lemma detection may come from the dictionary authority or a backend NLP step, not from the extension UI.
+_Avoid_: Clicked form, selected word
+
+**Personal Encounter Signal**:
+A quiet per-card signal showing the learner's prior active encounters with this dictionary card, such as seen count and last seen time. It is a lightweight memory cue, not a primary learning action or analytics dashboard.
+_Avoid_: Progress dashboard, review grade, list membership

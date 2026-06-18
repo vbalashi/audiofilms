@@ -1,17 +1,28 @@
 # Subtitle Retrieval Strategy Notes
 
-Status: working note, May 9, 2026.
+Status: working note, May 9, 2026. Updated June 18, 2026 with current glossary boundaries.
 
 ## Why This Exists
 
 AudioFilms depends on phrase timing quality. For shadowing, a transcript that is textually correct but poorly aligned can be worse than no transcript because the user practices against the wrong audio window.
 
-The app currently has two subtitle providers in code:
+The app currently has two subtitle retrieval implementations in code:
 
-- `supadata`: primary API provider, configured by `SUPADATA_API_KEY`.
-- `yt-dlp`: local fallback provider, configured by `YT_DLP_PATH`.
+- `supadata`: subtitle provider, configured by `SUPADATA_API_KEY`.
+- `yt-dlp`: subtitle extractor used by the AudioFilms backend, configured by `YT_DLP_PATH`.
 
 There are no other subtitle providers currently implemented. Other provider references in the repo are mostly dictionary providers.
+
+Current terminology:
+
+- A `Subtitle Provider` is a source system or API such as YouTube captions,
+  Supadata, or a future paid transcript API.
+- A `Subtitle Extractor` is a backend-side tool such as `yt-dlp`.
+- The `AudioFilms Backend` orchestrates providers, extractors, cache, and
+  practice phrase building. It should not be called a backend provider.
+- User-facing UI should prefer text-source and readiness labels such as `Dutch
+  captions` and `Ready`, not technical retrieval labels such as `manual`,
+  `exact`, `timedtext`, or `yt-dlp`.
 
 ## Observations From Current Testing
 
@@ -55,7 +66,7 @@ Do not assume "caption track exists on YouTube" means "our server can fetch it."
 
 Treat subtitle retrieval as a quality- and availability-ranked pipeline:
 
-1. Prefer manual/editorial captions when a provider can retrieve them.
+1. Prefer uploaded/provided captions as the default display text when a provider or extractor can retrieve them.
 2. Use auto captions only when their timing structure is usable.
 3. Detect rolling/overlapping auto-caption chunks and mark them as degraded.
 4. Consider local or worker-based ASR only for missing or degraded auto captions, not as a blanket replacement for good manual captions.
@@ -171,9 +182,13 @@ Parakeet remains interesting for word-level ASR, but the NeMo-based local path i
 
 - Whether to add explicit `sourceType` metadata: `manual`, `auto`, `generated-asr`.
 - Whether to add quality flags such as `overlapRate`, `rollingCaptions`, `longCueRate`, and `wordTimestampAvailable`.
-- Whether to expose degraded subtitle state in the UI before playback starts.
+- How to expose degraded subtitle state as product-level Practice Readiness:
+  `No captions`, `Rough`, `Ready`, `Precise`, or `Improving...`.
 - Whether to pursue a compliant third-party transcript provider that handles YouTube access and licensing on its side.
 - Whether to build an ASR worker for cases where audio can be retrieved through an allowed path.
+- Whether backend subtitle retrieval should stay user-initiated through `Get
+  Captions` during dogfood/testing or become automatic once cache/quota controls
+  are strong enough.
 
 ## References
 

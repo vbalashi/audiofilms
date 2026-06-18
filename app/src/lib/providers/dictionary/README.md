@@ -18,9 +18,18 @@ This is the preferred provider for AudioFilms Dutch shadowing because it returns
 ```bash
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
-DICTIONARY_2000NL_ACCESS_TOKEN=your_supabase_user_access_token_here
-DICTIONARY_2000NL_INCLUDE_USER_STATE=true
+DICTIONARY_2000NL_ACCESS_TOKEN=your_short_lived_local_dogfood_token_here
+DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=false
 ```
+
+`DICTIONARY_2000NL_ACCESS_TOKEN` is a local read/dogfood fallback only. Do not
+configure a shared end-user token as production guest lookup identity.
+Authenticated write routes must receive a forwarded user Bearer token and must
+not use this environment token as write identity.
+
+Current `/api/dict` lookup does not request 2000NL user state. State-aware
+dictionary cards require the V2 contract described in the extension
+backend/UI contract notes.
 
 ### OpenAI Dictionary Provider
 

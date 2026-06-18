@@ -23,14 +23,17 @@ The current implementation is centered on:
 
 After the current stabilization work, product development should resume in this order:
 
-1. `dictionary result caching` to improve lookup UX and reduce provider cost/latency,
-2. `provider fallback policy and user-facing error states` to make degradation explicit and reliable.
+1. `YouTube extension backend/UI contract review` so UI and backend agents share one state model,
+2. `dictionary result caching` to improve lookup UX and reduce provider cost/latency,
+3. `provider fallback policy and user-facing error states` to make degradation explicit and reliable.
 
-Other feature work should stay secondary until those two areas are in place.
+Other feature work should stay secondary until those areas are in place.
 
 ## Current Non-Goals
 
-- authentication and persistence,
+- broad first-party AudioFilms authentication and persistence; the YouTube
+  extension may still use a scoped 2000NL Connect session for dictionary
+  progress/actions,
 - mobile-first support,
 - broad workflow/process overhead,
 - complex deployment orchestration inside this repo.
@@ -43,3 +46,12 @@ Other feature work should stay secondary until those two areas are in place.
 - Use `app/README.md` for setup and local runbook steps.
 - Use `docs/dictionary/index.md` for current dictionary-specific guidance.
 - Use `docs/intent/subtitle-retrieval-strategy.md` for current subtitle access, manual-vs-auto, and ASR fallback notes.
+- Use `docs/intent/youtube-extension-designer-brief.md` when handing the current YouTube extension UI to a designer for regrouping, hierarchy, and state-model review.
+- Use `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md` when handing backend/API gaps from the YouTube extension redesign to an architect or backend agent.
+
+For the YouTube extension redesign, the designer brief and backend/UI contracts
+are the current source of truth. Older active plans such as
+`docs/exec-plans/active/youtube-shadowing-extension-mvp.md`,
+`docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md`, and
+`docs/exec-plans/active/shadowing-mvp-ui-todo.md` are historical or operational
+context only when they conflict with the current brief/contracts.

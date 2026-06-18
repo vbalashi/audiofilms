@@ -10,8 +10,14 @@ Read these files in order:
 
 1. `AGENTS.md` for repository rules.
 2. `extensions/youtube-shadowing/README.md` for extension behavior and smoke command flags.
-3. `docs/intent/youtube-extension-validation-matrix.md` for current fixtures and latest pass/fail evidence.
-4. `docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md` for architecture direction and completed phases.
+3. `docs/intent/youtube-extension-designer-brief.md` for current product/UI intent and terminology.
+4. `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md` when backend/API fields are involved.
+5. `docs/intent/youtube-extension-validation-matrix.md` for current fixtures and latest pass/fail evidence.
+6. Optional historical context only:
+   `docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md`.
+   Do not implement old UI labels, shortcut maps, source badges, or ASR
+   non-goals from that file when they conflict with the designer brief or
+   backend/UI contract.
 
 Keep extension spike changes inside `extensions/youtube-shadowing/` unless the work explicitly changes provider contracts or shared practice/subtitle behavior.
 
@@ -119,7 +125,7 @@ normal Google Chrome and supports `--reload-extension`.
 
 ## Backend Requirement
 
-Most smoke fixtures expect the local AudioFilms app API at:
+Local smoke fixtures expect the local AudioFilms app API at:
 
 ```text
 http://localhost:3000/api/get-subs
@@ -133,10 +139,14 @@ http://localhost:3000/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
 
 If the backend is intentionally unavailable for browser-only diagnostics, pass `--skip-backend-check`. Do not use that for normal regression validation.
 
-Dictionary lookup defaults to the local AudioFilms app API:
+Tester builds may default to the remote API configured in
+`extensions/youtube-shadowing/README.md`. Treat this section as local regression
+smoke guidance, not as the remote tester deployment default.
+
+Dictionary lookup defaults to the local AudioFilms app API command path:
 
 ```text
-http://localhost:3000/api/dict
+http://localhost:3000/api/dict/lookup
 ```
 
 The extension sends dictionary requests through its service worker. To use 2000NL-backed Dutch lookup, run the AudioFilms app with:
@@ -144,11 +154,13 @@ The extension sends dictionary requests through its service worker. To use 2000N
 ```text
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
-DICTIONARY_2000NL_ACCESS_TOKEN=<supabase-user-access-token>
+DICTIONARY_2000NL_ACCESS_TOKEN=<short-lived-local-dogfood-token>
+DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true
 ```
 
-`DICTIONARY_2000NL_ACCESS_TOKEN` is only a short-lived dogfood fallback. The
-durable path is 2000NL Connect:
+`DICTIONARY_2000NL_ACCESS_TOKEN` is only a short-lived local dogfood fallback
+and must not be configured as production guest identity. The durable path is
+2000NL Connect with AudioFilms forwarding the current user Bearer token:
 
 - AudioFilms extension manifest has a stable unpacked dev ID:
   `hhdkchoccmikoefhenobdjipgdppdpoc`.
@@ -199,19 +211,25 @@ current 2000NL Bearer token to `https://2000.dilum.io/api/platform/v1/*`.
 
 Current subtitle backend expectation:
 
-- The app/provider default is `yt-dlp`, with Supadata as an explicit fallback path.
-- The extension still tries YouTube page `timedtext` first. If YouTube returns `HTTP 429`, it falls back to `http://localhost:3000/api/get-subs`.
-- For local ASR dogfood, set `localStorage.afShadowingLocalAsr = "on"` on the
+- The app default subtitle extractor is `yt-dlp`, with Supadata as an explicit subtitle provider fallback when configured.
+- The extension still tries YouTube page timed text first. If YouTube returns `HTTP 429`, it falls back to `http://localhost:3000/api/get-subs`.
+- For private local ASR dogfood, set `localStorage.afShadowingLocalAsr = "on"` on the
   YouTube watch page. This deliberately tries
   `http://localhost:3000/api/local-asr-practice` before YouTube `timedtext`,
   so the extension is testing the local transcript/alignment path rather than
   the ordinary caption path.
-- Local ASR dogfood uses the full video by default. Do not set
+- Private local ASR dogfood can use the full video by default. Do not set
   `localStorage.afShadowingLocalAsrDuration` unless you explicitly want a
-  bounded smoke. Use `localStorage.afShadowingLocalAsrTextSource = "asr"` for
-  literal ASR segments and `"manual"` for clean subtitles projected onto ASR
-  word timings.
-- Backend auto captions should show `via yt-dlp` when local `yt-dlp` is available.
+  bounded smoke. Remote tester jobs should stay duration-bounded unless the
+  backend explicitly allows full audio jobs. Use
+  `localStorage.afShadowingLocalAsrTextSource = "asr"` for literal ASR segments
+  and `"manual"` for clean subtitles projected onto ASR word timings.
+- Current debug/source badges may still show implementation details such as
+  `via yt-dlp`, `Manual`, `Auto`, or `exact`. That is current operational
+  evidence, not the redesign target. The redesign target is documented in
+  `docs/intent/youtube-extension-designer-brief.md`: default learner-facing
+  labels should be `Dutch captions`, `Dutch auto-captions`, `ASR transcript`,
+  and readiness chips such as `Ready` or `Precise`.
 - If the UI still shows `via Supadata`, check for:
   - an old Next dev server that was not restarted after provider changes;
   - `.env.local` explicitly setting `SUBTITLE_PROVIDER=supadata`;
@@ -318,11 +336,15 @@ Use the extension UI `Debug` button first. It includes:
 - per-source errors and retrieval attempts;
 - recent extension events.
 
+For the redesigned UI, Debug, Copy Debug, Refresh Cache, and Mark Issue should
+move behind a quiet overflow/debug surface. Until that redesign lands, use the
+current visible controls for validation.
+
 Use `Mark Issue` while manually testing phrase navigation. Press it immediately after a wrong Replay/Previous/Next/Space behavior. It copies a navigation incident report to the clipboard with:
 
 - current video and URL;
 - selected practice source;
-- fetch origin/provider and retrieval path, so page-loaded captions can be distinguished from backend provider captions;
+- fetch origin/provider and retrieval path, so page-loaded captions can be distinguished from backend-orchestrated captions;
 - guided/auto-pause state;
 - current YouTube playback time;
 - visible phrase index and text;
@@ -348,6 +370,10 @@ For page injection failures, check:
 
 Do not rebuild the expert-review zip after every iteration. It is an on-demand handoff artifact for sending the current source/docs/screenshots to an external reviewer.
 
+This zip is not the senior architect package for the AudioFilms + 2000NL
+boundary review. Use the separate two-repo architect package list below when the
+handoff is about cross-project API/auth/dictionary contracts.
+
 Rebuild it only when:
 
 - the user explicitly asks for an expert-review package;
@@ -364,9 +390,9 @@ zip -r -q "$zip_path" \
   docs/design-handoff/youtube-extension-expert-review/REVIEW_BRIEF_RU.md \
   docs/design-handoff/youtube-extension-expert-review/RELATED_EXTENSION_RESEARCH_RU.md \
   docs/design-handoff/youtube-extension-expert-review/screenshots \
-  docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md \
-  docs/exec-plans/active/youtube-shadowing-extension-mvp.md \
   docs/intent/index.md \
+  docs/intent/youtube-extension-designer-brief.md \
+  docs/exec-plans/active/youtube-extension-backend-ui-contracts.md \
   docs/intent/subtitle-retrieval-strategy.md \
   docs/intent/subtitle-practice-contract.md \
   docs/intent/youtube-extension-validation-matrix.md \
@@ -387,6 +413,51 @@ unzip -t "$zip_path"
 ```
 
 Do not treat the zip as a substitute for commits. Commit source/docs changes at coherent checkpoints; rebuild the zip only when the archive itself is needed.
+
+## Architect Two-Repo Package
+
+For a senior architect reviewing AudioFilms and 2000NL together, do not rely on
+the expert-review zip. Provide the two repositories plus this focused file list:
+
+AudioFilms:
+
+- `docs/intent/youtube-extension-designer-brief.md`
+- `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md`
+- `CONTEXT.md`
+- `ARCHITECTURE.md`
+- `docs/intent/subtitle-practice-contract.md`
+- `docs/intent/youtube-extension-agent-runbook.md`
+- `extensions/youtube-shadowing/README.md`
+- `docs/exec-plans/active/2000nl-platform-dictionary-integration.md`
+- `docs/adr/0002-2000nl-dictionary-platform-boundary.md`
+- `app/src/types/dictionary.ts`
+- `app/src/lib/twoThousandNlPlatform.ts`
+- `app/src/lib/providers/dictionary/index.ts`
+- `app/src/lib/providers/dictionary/TwoThousandNlDictionaryProvider.ts`
+- `app/src/app/api/dict/route.ts`
+- `app/src/app/api/dict/actions/route.ts`
+- `app/src/app/api/dict/translation/route.ts`
+- `app/src/app/api/get-subs/route.ts`
+- `app/src/app/api/asr/jobs/route.ts`
+- `app/src/app/api/asr/jobs/[jobId]/route.ts`
+- `extensions/youtube-shadowing/src/serviceWorker.js`
+- `extensions/youtube-shadowing/src/content.js`
+
+2000NL:
+
+- `docs/reference/platform-api.md`
+- `docs/reference/connect-api.md`
+- `packages/shared/types/platform.ts`
+- `apps/ui/lib/platform/platformApi.ts`
+- `apps/ui/app/api/platform/v1/*`
+- `apps/ui/tests/api/platformV1Routes.test.ts`
+- `apps/ui/tests/api/platformActionsRoute.test.ts`
+- `apps/ui/tests/api/platformTranslationRoute.test.ts`
+- `db/migrations/004_user_features.sql`
+- `db/migrations/064_multilanguage_scope_rpcs.sql`
+
+Do not include older active plans as baseline material unless they are explicitly
+marked and used as historical/operational references.
 
 ## Commit Discipline
 

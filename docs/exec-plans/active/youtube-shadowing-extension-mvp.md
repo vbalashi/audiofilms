@@ -1,6 +1,12 @@
 # YouTube Shadowing Extension MVP
 
 > Post-review note: this document describes the original extension spike. The stabilization/rebuild path after expert review is tracked in `docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md`.
+>
+> June 18, 2026 update: do not use the old shortcut map, no-translation/no-ASR
+> scope, or source labels below as current product intent. For the current
+> YouTube extension redesign, use
+> `docs/intent/youtube-extension-designer-brief.md` and
+> `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md`.
 
 ## Goal
 

@@ -60,7 +60,7 @@ Request:
 ```json
 {
   "query": "huis",
-  "includeUserState": true
+  "includeUserState": false
 }
 ```
 
@@ -124,7 +124,7 @@ Explicit later actions:
 
 - record view;
 - start learning;
-- mark known / unknown;
+- mark known / hide from learning scope, pending final 2000NL state naming;
 - review card;
 - add to list;
 - copy to user dictionary.
@@ -156,7 +156,7 @@ Options:
 
 Current decision:
 
-Use **AudioFilms backend proxy** for lookup, actions, and translation. The extension may own a 2000NL Connect session for dogfood, but it still calls AudioFilms `/api/dict*`; AudioFilms forwards the current Bearer token to 2000NL. `DICTIONARY_2000NL_ACCESS_TOKEN` remains a short-lived local fallback. Revisit direct extension-to-2000NL platform calls only if the product intentionally changes the proxy boundary.
+Use **AudioFilms backend proxy** for lookup, actions, and translation. The extension may own a 2000NL Connect session for dogfood, but it still calls AudioFilms `/api/dict*`; AudioFilms forwards the current Bearer token to 2000NL. `DICTIONARY_2000NL_ACCESS_TOKEN` remains a short-lived local read/dogfood fallback only and must not be used for write routes. Revisit direct extension-to-2000NL platform calls only if the product intentionally changes the proxy boundary.
 
 ## AudioFilms Runtime Shape
 
@@ -179,7 +179,7 @@ with:
 ```json
 {
   "query": "huis",
-  "includeUserState": true
+  "includeUserState": false
 }
 ```
 
@@ -224,7 +224,11 @@ Current production smoke, June 16, 2026:
 - `GET https://2000.dilum.io/api/health?deep=1` returned `status=ok`, `database.target=remote`, and `platformRpcContract.status=ok`.
 - `POST /api/platform/v1/lookup` without Bearer token returned `401 missing_bearer_token`.
 - Server-side lookup with a minted Supabase user token returned one `huis` match from `nl-vandale`.
-- `includeUserState=true` returned `progressSummary.status=new` for the test user.
+- Historical smoke also proved the 2000NL platform can return
+  `progressSummary.status=new` for a test user when explicitly asked for user
+  state. The current AudioFilms `/api/dict` lookup path intentionally sends
+  `includeUserState=false`; stateful dictionary cards belong to the planned V2
+  contract.
 - CORS preflight from YouTube and the local unpacked extension origin returned `204` but no `access-control-allow-origin`, so direct browser/extension calls need production CORS configuration before they can work.
 
 ### Stage 1: AudioFilms 2000NL Provider
@@ -293,7 +297,7 @@ Target behavior:
 2. The response preserves a list of candidate cards instead of collapsing everything into the first definition.
 3. The UI renders each candidate as its own compact card.
 4. Each candidate card owns its own learning buttons, because the learner is judging that specific meaning/card, not the headword globally.
-5. Plain lookup remains read-only; remembered/forgotten/known/unknown actions are explicit mutations.
+5. Plain lookup remains read-only; Learn/Known/review actions are explicit mutations.
 
 Candidate card content should be biased toward fast shadowing use:
 
@@ -301,7 +305,8 @@ Candidate card content should be biased toward fast shadowing use:
 - compact labels for part of speech, grammatical metadata, dictionary/source, and progress state;
 - primary definition;
 - one high-value example when available;
-- per-card action buttons such as remembered / forgot or known / unknown, using the 2000NL action vocabulary once confirmed;
+- per-card action buttons such as `Learn`, `Known`, `Again`, `Hard`, `Good`,
+  and `Easy`, backed by 2000NL action/result payload values;
 - an expand affordance for longer content.
 
 Action visibility rule:
@@ -311,11 +316,20 @@ Action visibility rule:
 - All progress changes require an explicit learner action on one specific overlay card.
 - After a successful action, refresh lookup for the same clicked word instead of locally simulating the new progress state.
 - AudioFilms overlay actions always target `cardTypeId=word-to-definition`. This surface is for checking a clicked word's meaning/definition or optional translation, not for reverse cards, listening cards, or typing cards.
-- For a new/untracked meaning card, the first learner-facing UI should show two primary actions when available: "Learn" backed by `start-learning`, and "I already know this" backed by `mark-known`.
+- For a new/untracked meaning card, the first learner-facing UI should show two
+  primary actions when available: `Learn` backed by `start-learning`, and
+  `Known` backed by `mark-known`.
 - Do not show `mark-unknown` as a primary action for a new/untracked card in the first UI slice; choosing "Learn" already communicates that the card is not known well enough.
-- For a meaning card already in learning/review flow, show all four review grades used by 2000NL flash cards: `fail`, `hard`, `success`, and `easy`. Do not simplify this state to two remembered/forgot buttons.
-- The exact learner-facing labels can be localized/adapted for AudioFilms, but the submitted action IDs and review result IDs must remain 2000NL platform values.
-- In the first slice, do not introduce a dedicated localization layer or local label mapping for these buttons. Display the technical action/result IDs such as `start-learning`, `mark-known`, `fail`, `hard`, `success`, and `easy`. Treat UI localization as a separate product setting later.
+- For a meaning card already in learning/review flow, show all four review
+  grades used by 2000NL flash cards: `Again`, `Hard`, `Good`, and `Easy`. Do
+  not simplify this state to two binary outcome buttons.
+- The learner-facing labels for the YouTube extension redesign are `Learn`,
+  `Known`, `Again`, `Hard`, `Good`, and `Easy`. Submitted action IDs and review
+  result IDs remain 2000NL platform values: `start-learning`, `mark-known`,
+  `fail`, `hard`, `success`, and `easy`.
+- Technical action/result IDs are API payload values only. Do not display
+  `start-learning`, `mark-known`, `fail`, `hard`, `success`, or `easy` as button
+  labels in the polished YouTube extension UI.
 - If 2000NL later returns a more restrictive `availableActions` set per status, AudioFilms should follow it rather than maintaining its own competing permission model.
 
 Expanded content can include:
@@ -410,6 +424,8 @@ Not implemented in this slice:
 Exit criteria:
 
 - No mutation happens on plain lookup.
+- Write routes fail closed without a forwarded user Bearer token; no shared
+  environment token can mutate a fallback user's progress.
 - Every mutation goes through `/api/platform/v1/actions` and is reflected in refreshed lookup state.
 - The YouTube extension sends action requests to AudioFilms backend, and AudioFilms backend proxies them to 2000NL.
 - The extension can store a 2000NL Connect session and forward its current Bearer token to AudioFilms. It does not call 2000NL platform lookup/actions/translation directly in the first architecture.
@@ -432,7 +448,11 @@ Decision recorded:
 
 ## Open Questions
 
-1. Should lookup include phrase context in the 2000NL request once 2000NL supports context-aware ranking? Today AudioFilms preserves context locally but sends only `query` and `includeUserState`.
+1. Should lookup include phrase context in the 2000NL request once 2000NL supports context-aware ranking? Today AudioFilms preserves context locally, and current `/api/dict` lookup sends only `query` with `includeUserState=false`.
 2. What is the product fallback policy when 2000NL is down: show LLM provider result, show no result, or show both with source labels?
 3. Is the extension-owned 2000NL Connect session the durable product model, or should the web app also gain its own first-party 2000NL session/connect UX?
-4. Should the extension expose all review results (`fail`, `hard`, `success`, `easy`) in the first polished action surface, or keep the current narrower Start/Known/Again/Good dogfood controls?
+4. Resolved for the YouTube extension redesign: the polished action surface
+   should show `Learn`/`Known` for not-started cards and `Again`/`Hard`/`Good`/
+   `Easy` for reviewable cards. Platform result ids should map as
+   `fail -> Again`, `hard -> Hard`, `success -> Good`, and `easy -> Easy`.
+   `Translate` stays separate from the review row.

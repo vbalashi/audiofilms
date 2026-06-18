@@ -2,6 +2,17 @@
 
 Status: active validation note, June 11, 2026.
 
+Note: this file records observed behavior from the current extension and older
+smoke runs. Labels such as `Dutch · Manual · exact`, `via yt-dlp`,
+`backend-provider`, and `timedtext` are historical/debug evidence. They are not
+the redesign target. Current product language for new UI work is in
+`docs/intent/youtube-extension-designer-brief.md` and
+`docs/exec-plans/active/youtube-extension-backend-ui-contracts.md`.
+
+Do not copy the visible badge wording from historical expected-results cells
+into new UI work. Treat those strings as validation evidence for the current
+spike only.
+
 This matrix keeps AudioFilms YouTube extension testing broader than one happy-path video. It covers the extension plus the local app API because the extension now uses `/api/get-subs` as its provider fallback.
 
 ## Failure Categories

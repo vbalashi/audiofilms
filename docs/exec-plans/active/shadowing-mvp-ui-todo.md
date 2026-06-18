@@ -1,5 +1,14 @@
 # Shadowing MVP UI Todo
 
+> Status note, June 18, 2026: this is an older main-app MVP UI note. For the
+> YouTube extension redesign, use
+> `docs/intent/youtube-extension-designer-brief.md` and
+> `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md` as the
+> current source of truth. In particular, the older `Shadowing` / `Listening` /
+> `Reading`, `Show text`, and shortcut suggestions below are superseded for the
+> extension by the two-mode model: `Shadow`, `Recall`, sticky `Show Original`,
+> and inline `Show Translation`.
+
 ## Goal
 
 Turn the current AudioFilms session screen into a usable desktop-first MVP for phrase-by-phrase listening and shadowing practice.

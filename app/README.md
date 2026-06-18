@@ -6,13 +6,13 @@ This is the canonical setup and local development document for the application.
 
 ## Runtime Defaults
 
-- Subtitle provider default: `yt-dlp`
-- Subtitle fallback provider: `supadata`
+- Subtitle extractor/default retrieval path: `yt-dlp`
+- Subtitle provider fallback: `supadata`
 - Dictionary provider default: `openrouter`
 - Supported dictionary providers: `2000nl`, `openrouter`, `openai`, `free-dictionary`
 - 2000NL is the preferred Dutch lookup authority when user progress or curated dictionary cards are needed.
 
-These defaults are defined in the provider factories and mirrored in [`env.example`](/Users/khrustal/dev/audiofilms/app/env.example).
+These defaults are defined in the subtitle/dictionary factories and mirrored in [`env.example`](/Users/khrustal/dev/audiofilms/app/env.example).
 
 ## Prerequisites
 
@@ -22,7 +22,12 @@ These defaults are defined in the provider factories and mirrored in [`env.examp
 
 A Supadata API key is optional. Configure it only if you want the paid API fallback path.
 
-For 2000NL-backed Dutch lookup, use a 2000NL user access token through the app environment or send a Bearer token from the extension Connect flow. The env token is a short-lived dogfood fallback, not a durable product session model.
+For 2000NL-backed Dutch read lookup, use a 2000NL user access token through the
+app environment or send a Bearer token from the extension Connect flow. The env
+token is a short-lived dogfood fallback, not a durable product session model,
+and must not be used for write routes such as `/api/dict/actions`.
+Current `/api/dict` lookup does not request 2000NL user state; state-aware cards
+are part of the planned V2 contract.
 
 ## Setup
 
@@ -83,18 +88,20 @@ For 2000NL-backed Dutch lookup and progress-aware cards:
 ```bash
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
-DICTIONARY_2000NL_ACCESS_TOKEN=...
-DICTIONARY_2000NL_INCLUDE_USER_STATE=true
+DICTIONARY_2000NL_ACCESS_TOKEN=... # local dogfood only
+DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true
 ```
 
-The YouTube extension can also obtain a 2000NL Connect session and forward its current Bearer token to the AudioFilms `/api/dict*` backend routes.
+The YouTube extension obtains a 2000NL Connect session and forwards its current
+Bearer token to the AudioFilms `/api/dict*` backend routes. Do not configure a
+shared end-user token as production guest lookup identity.
 
 ## Current Behavior
 
 - Uses embedded YouTube playback via `react-youtube`
-- Fetches subtitles through the configured provider
-- Preserves the actual subtitle language returned by the provider
-- Supports blind/read playback modes
+- Fetches subtitles through the configured subtitle extractor/provider path
+- Preserves the actual subtitle language returned by the retrieval path
+- Supports phrase playback modes; the YouTube extension redesign now uses Shadow/Recall terminology
 - Looks up clicked words through the configured dictionary provider
 - Returns rich `cards[]` for 2000NL dictionary results while keeping legacy flat definitions for older consumers
 - Proxies explicit 2000NL card actions through `/api/dict/actions`
