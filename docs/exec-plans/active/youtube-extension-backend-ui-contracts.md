@@ -288,6 +288,7 @@ Endpoint:
 
 ```http
 POST /api/practice/timing-jobs
+GET  /api/practice/operations/{operationId}
 GET  /api/practice/timing-jobs/{jobId}
 ```
 
@@ -295,19 +296,58 @@ Do not expose `/api/asr/jobs` directly to the extension as the product
 contract. `Improve Timing` may use cached ASR, fresh ASR, forced alignment, word
 timing, or cheap pairwise alignment; ASR is an implementation detail.
 
-Candidate job state:
+Implemented first wrapper:
 
 ```ts
-type TimingJob = {
+type PracticeOperation = {
   id: string;
+  kind: 'improve-timing';
   state: 'queued' | 'running' | 'succeeded' | 'failed';
-  progress?: number;
-  etaSeconds?: number;
   videoId: string;
-  textSourceId?: string;
-  timingEvidenceId?: string;
+  input: {
+    language?: string;
+    sourceKind?: string;
+    textSource?: string;
+    engine?: string;
+    model?: string;
+    fullAudio?: boolean;
+    durationSec?: number;
+    snapshotRevisionId?: string;
+    textSourceRevisionId?: string;
+    timingEvidenceRevisionId?: string;
+  };
+  progress?: number;
+  pollUrl: string;
+  retryAfterMs: number;
+  result?: {
+    timingEvidenceRevisionId?: string;
+    phraseSetRevisionId?: string;
+    resultUrl?: string;
+    diagnostics?: Record<string, unknown>;
+  };
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  };
 };
 ```
+
+- `POST /api/practice/timing-jobs` is the product-level `Improve Timing`
+  command. It currently wraps the existing ASR job implementation, including
+  tester-token auth, queue limits, deduplication, and polling cadence.
+- `GET /api/practice/operations/{operationId}` is the required polling surface
+  for extension and UI workers. The optional
+  `GET /api/practice/timing-jobs/{jobId}` alias returns the same envelope.
+- The operation id is distinct from the low-level route contract. Current
+  implementation uses a `timing:{asrJobId}` id, but callers should treat it as
+  opaque and follow `pollUrl`.
+- Completed operations read the ASR result artifact when it is cheap and expose
+  derived `timingEvidenceRevisionId` and `phraseSetRevisionId`. If the ASR job
+  is complete but the artifact is unavailable or unreadable, the envelope
+  returns diagnostics and a low-level result URL for troubleshooting rather than
+  pretending a timing revision exists.
+- Progress is omitted until a worker exposes a reliable progress value.
 
 ## Phase 4: Text Source And Pairwise Alignment
 
