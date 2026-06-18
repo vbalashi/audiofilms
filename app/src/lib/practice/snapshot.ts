@@ -22,9 +22,12 @@ export type PracticeAction = 'get-captions' | 'improve-timing';
 export type PracticeTextSource = {
   id: string;
   revisionId: string;
+  contentFingerprint: string;
   languageCode: string;
   label: string;
   kind: PracticeTextSourceKind;
+  status: 'ready' | 'aligning' | 'failed';
+  errorCode?: string;
 };
 
 export type PracticeSnapshot = {
@@ -57,9 +60,12 @@ export type PracticeSnapshot = {
   };
 };
 
+export type PracticeActiveOperation = NonNullable<PracticeSnapshot['readiness']['activeOperation']>;
+
 type BuildPracticeSnapshotOptions = {
   videoId: string;
   requestedLanguage: string;
+  activeOperation?: PracticeActiveOperation;
 };
 
 const ROUGH_TIMING_FLAGS = new Set<SubtitleQualityFlag>([
@@ -93,13 +99,18 @@ export function buildPracticeSnapshot(
   const phraseSet = phrases.length
     ? buildPhraseSet(options.videoId, languageCode, phrases)
     : null;
-  const readiness = derivePracticeReadiness(response, phrases, timingEvidence);
+  const readiness = applyActiveOperationOverlay(
+    derivePracticeReadiness(response, phrases, timingEvidence),
+    options.activeOperation,
+  );
   const revisionPayload = {
     videoId: options.videoId,
     textSourceRevisionId: textSource?.revisionId || null,
     timingEvidenceRevisionId: timingEvidence?.revisionId || null,
     phraseSetRevisionId: phraseSet?.revisionId || null,
     readiness: readiness.baseState,
+    displayState: readiness.displayState,
+    activeOperation: readiness.activeOperation || null,
   };
 
   return {
@@ -136,22 +147,28 @@ function buildTextSource(
   const sourceKind = response.meta?.sourceKind || 'unknown';
   const retrievalPath = response.meta?.retrievalPath || provider;
   const kind = practiceTextSourceKind(sourceKind, retrievalPath);
+  const contentFingerprint = revisionId(
+    'text-content',
+    response.phrases.map((phrase) => phrase.text),
+  );
   const revisionPayload = {
     videoId,
     languageCode,
     provider,
     sourceKind,
     retrievalPath,
-    phraseTextHash: revisionId('source-text', response.phrases.map((phrase) => phrase.text)),
+    contentFingerprint,
   };
   const sourceKey = safeId(`${videoId}:${languageCode}:${kind}:${provider}:${sourceKind}`);
 
   return {
     id: `text-source:${sourceKey}`,
     revisionId: revisionId('text-source', revisionPayload),
+    contentFingerprint,
     languageCode,
     label: textSourceLabel(kind, languageCode),
     kind,
+    status: 'ready',
   };
 }
 
@@ -246,6 +263,22 @@ function derivePracticeReadiness(
     availableActions: ['improve-timing'],
     recommendedAction: 'improve-timing',
     diagnosticFlags,
+  };
+}
+
+function applyActiveOperationOverlay(
+  readiness: PracticeSnapshot['readiness'],
+  activeOperation?: PracticeActiveOperation,
+): PracticeSnapshot['readiness'] {
+  if (!activeOperation) return readiness;
+
+  return {
+    ...readiness,
+    displayState:
+      activeOperation.kind === 'get-captions'
+        ? readiness.displayState
+        : 'improving',
+    activeOperation,
   };
 }
 

@@ -100,8 +100,8 @@ them.
 | --- | --- | --- | --- | --- |
 | Initial subtitle read | existing | `GET /api/get-subs` plus direct browser caption attempts | Load cheap/browser-visible captions automatically; do not show provider names by default. | Confirm which metadata fields are stable enough to drive `Text Source` and diagnostics. |
 | `Get Captions` | first slice implemented | `POST /api/practice/captions`, backed by existing subtitle service/cache. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | First slice returns a synchronous `state: "ready"` envelope with a minimal `PracticeSnapshot`; queued/polling remains deferred. |
-| `Improve Timing` | proposed | `POST /api/practice/timing-jobs` and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` becomes `improving` while base quality remains visible. | Confirm job fields, polling URL, progress/ETA reliability, and cache key. |
-| Text Source switch | proposed | Backend/app metadata for available caption/transcript text sources. | Keep previous working source if selected source fails; pairwise alignment may run in background. | Confirm source ids, source text hashes, and alignment cache key. |
+| `Improve Timing` | first slice implemented | `POST /api/practice/timing-jobs`, `GET /api/practice/operations/{operationId}`, and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` can become `improving` while base quality remains visible. | Progress/ETA and pairwise alignment cache key remain deferred. |
+| Text Source switch | first slice implemented | `POST /api/practice/source-selection`, backed by active/cached subtitle source metadata. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | First slice validates active source/revision only; multi-source inventory and alignment cache key remain deferred. |
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
 | Translation target | proposed | 2000NL `GET /api/platform/v1/session` exposed through AudioFilms `GET /api/dict/session`. | Extension uses 2000NL target language; local override is dogfood-only fallback. | Confirm preference field name and unauthenticated fallback. |
 | Dictionary lookup V2 | proposed | `POST /api/dict/lookup` backed by 2000NL lookup V2 request/body. | UI sends clicked form, language, and phrase context without URL query leakage. | Confirm normalized 2000NL content, match relation, and content fingerprint. |
@@ -155,13 +155,8 @@ Target practice snapshot:
 ```ts
 type PracticeSnapshot = {
   videoId: string;
-  textSource: {
-    id: string;
-    revisionId: string;
-    languageCode: string;
-    label: string;
-    kind: 'provided-captions' | 'auto-captions' | 'asr';
-  } | null;
+  textSource: PracticeTextSource | null;
+  availableTextSources: PracticeTextSource[];
   timingEvidence: {
     id: string;
     revisionId: string;
@@ -185,6 +180,17 @@ type PracticeSnapshot = {
     };
     diagnosticFlags?: string[];
   };
+};
+
+type PracticeTextSource = {
+    id: string;
+    revisionId: string;
+    contentFingerprint: string;
+    languageCode: string;
+    label: string;
+    kind: 'provided-captions' | 'auto-captions' | 'asr';
+    status: 'ready' | 'aligning' | 'failed';
+    errorCode?: string;
 };
 ```
 
@@ -262,6 +268,10 @@ type PracticeCaptionsResponse = {
 
 - The returned snapshot includes `snapshotRevisionId`, active `textSource`,
   `availableTextSources`, `timingEvidence`, `phraseSet`, and `readiness`.
+- `PracticeTextSource` includes `contentFingerprint`, `status`, and optional
+  `errorCode`. In the first slice, `availableTextSources` intentionally
+  enumerates only the active source, but it uses the same complete
+  `PracticeTextSource` shape as `textSource`.
 - `Get Captions` never starts ASR and never reports
   `readiness.displayState = "improving"`. Readiness is derived from the
   returned subtitle artifact: no usable practice phrases becomes
@@ -320,6 +330,9 @@ type PracticeOperation = {
   pollUrl: string;
   retryAfterMs: number;
   result?: {
+    snapshot?: PracticeSnapshot;
+    snapshotRevisionId?: string;
+    textSourceRevisionId?: string;
     timingEvidenceRevisionId?: string;
     phraseSetRevisionId?: string;
     resultUrl?: string;
@@ -342,11 +355,13 @@ type PracticeOperation = {
 - The operation id is distinct from the low-level route contract. Current
   implementation uses a `timing:{asrJobId}` id, but callers should treat it as
   opaque and follow `pollUrl`.
-- Completed operations read the ASR result artifact when it is cheap and expose
-  derived `timingEvidenceRevisionId` and `phraseSetRevisionId`. If the ASR job
-  is complete but the artifact is unavailable or unreadable, the envelope
-  returns diagnostics and a low-level result URL for troubleshooting rather than
-  pretending a timing revision exists.
+- Completed operations read the ASR result artifact when it is available and
+  readable, build a full `PracticeSnapshot`, and expose
+  `snapshotRevisionId`, `textSourceRevisionId`, `timingEvidenceRevisionId`, and
+  `phraseSetRevisionId`. If the ASR job is complete but the artifact is
+  unavailable or unreadable, the envelope returns diagnostics and a low-level
+  result URL for troubleshooting rather than pretending a timing revision
+  exists.
 - Progress is omitted until a worker exposes a reliable progress value.
 
 ## Phase 4: Text Source And Pairwise Alignment
@@ -368,6 +383,44 @@ Rules:
   transition.
 - Do not assume one ASR timing artifact can safely align every text source.
 
+First implementation:
+
+```http
+POST /api/practice/source-selection
+```
+
+Request accepts `videoId`, optional `language` or `lang`, and one of:
+`selectedTextSource.id`, `selectedTextSource.revisionId`,
+`selectedTextSource.kind`, top-level `textSourceId`,
+`textSourceRevisionId`, `textSourceKind`, or legacy subtitle
+`sourceKind: "manual" | "auto"`.
+
+Response on an active-source match:
+
+```ts
+type PracticeSourceSelectionResponse = {
+  state: 'ready';
+  selection: {
+    textSourceId: string;
+    textSourceRevisionId: string;
+    status: 'ready' | 'aligning' | 'failed';
+  };
+  snapshot: PracticeSnapshot;
+  limitations: Array<'first-slice-source-selection-only-active-source-is-enumerated'>;
+};
+```
+
+Typed non-success responses:
+
+- `source_not_available`: requested source id/revision does not match the
+  current active source, or no source exists for the video/language.
+- `selection_not_supported_yet`: requested source kind is recognized but not
+  selectable in this slice, such as `asr`.
+
+This endpoint deliberately does not invent multi-source storage. It gives UI
+workers an executable backend contract and a clear failure shape while the
+backend still only knows the active/cached source.
+
 ## Phase 5: Recall Mode Phrase Translation
 
 Goal:
@@ -385,6 +438,10 @@ Rules:
 - 2000NL should own provider/prompt policy and translation semantics through a
   generic text-translation operation. AudioFilms owns the media-specific
   association between translated text and YouTube phrase artifacts.
+- `GET /api/dict/session` preserves 2000NL preference provenance. If 2000NL
+  returns `preferences.source`, such as `platform-default`, AudioFilms forwards
+  that value; otherwise it falls back to `user-setting` for older platform
+  responses that only expose a target language.
 - Cache translations next to phrase/caption artifacts by stable text/context
   hashes, not by video id alone.
 - Extension should request a phrase prompt and render it; it should not own

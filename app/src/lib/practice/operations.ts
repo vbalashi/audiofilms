@@ -9,7 +9,10 @@ import {
   readAsrJobResult,
   type AsrJobRecord,
 } from '@/lib/asr/asrJobs';
-import { buildPracticeSnapshot } from '@/lib/practice/snapshot';
+import {
+  buildPracticeSnapshot,
+  type PracticeSnapshot,
+} from '@/lib/practice/snapshot';
 
 export type PracticeOperationState = 'queued' | 'running' | 'succeeded' | 'failed';
 
@@ -45,6 +48,9 @@ type PublicPracticeTimingOperation = {
   pollUrl: string;
   retryAfterMs: number;
   result?: {
+    snapshot?: PracticeSnapshot;
+    snapshotRevisionId?: string;
+    textSourceRevisionId?: string;
     timingEvidenceRevisionId?: string;
     phraseSetRevisionId?: string;
     resultUrl?: string;
@@ -254,6 +260,9 @@ async function buildCompletedResult(
     });
 
     return {
+      snapshot,
+      snapshotRevisionId: snapshot.snapshotRevisionId,
+      textSourceRevisionId: snapshot.textSource?.revisionId,
       timingEvidenceRevisionId: snapshot.timingEvidence?.revisionId,
       phraseSetRevisionId: snapshot.phraseSet?.revisionId,
       diagnostics,

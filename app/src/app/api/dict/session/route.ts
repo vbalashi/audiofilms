@@ -11,6 +11,7 @@ type PlatformSessionBody = {
   } | null;
   preferences?: {
     translationTargetLanguageCode?: string | null;
+    source?: string | null;
     updatedAt?: string | null;
   } | null;
 };
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
       preferences: targetLanguage
         ? {
             translationTargetLanguageCode: targetLanguage,
-            source: 'user-setting',
+            source: body.preferences?.source || 'user-setting',
             updatedAt: body.preferences?.updatedAt || null,
           }
         : null,
