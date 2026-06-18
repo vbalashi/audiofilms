@@ -3,6 +3,7 @@ export type ApiErrorCode =
   | 'caption_fetch_failed'
   | 'guest_lookup_unavailable'
   | 'invalid_phrase_translation_request'
+  | 'invalid_turn_id'
   | 'invalid_video'
   | 'missing_2000nl_user_token'
   | 'missing_clicked_form'

@@ -723,8 +723,17 @@ Rules:
 - For the first redesign, use `Learn`/`Known` for `not-started` and
   `encountered`, the four review grades for `learning` and `reviewing`, and no
   progress row for `hidden` or `frozen`.
-- Explicit review actions should include a client-generated `turnId` and reuse
-  it across retries to prevent double reviews.
+- Explicit mutation actions that can review or complete a card (`review-card`,
+  `mark-known`, and `mark-unknown`) must include a client-generated `turnId` and
+  reuse it across retries to prevent duplicate reviews. AudioFilms rejects
+  missing, empty, or malformed `turnId` values for those actions at
+  `/api/dict/actions` before forwarding to 2000NL. The current 2000NL
+  `start-learning` action is not marked `turnId`-required by AudioFilms
+  `displayActions`, so AudioFilms still allows it without `turnId`.
+- `record-view` must not be emitted from default YouTube lookup
+  `displayActions`. `/api/dict/actions` may continue to accept it as a
+  non-default diagnostic/future explicit encounter command, but ordinary card
+  rendering and word clicks stay read-only.
 - Personal encounter signals should stay quiet in the card footer. Do not make
   YouTube lookup become an analytics dashboard.
 - Return `lastSeenAt`; the UI should format the relative label.

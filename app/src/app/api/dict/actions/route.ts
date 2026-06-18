@@ -12,6 +12,8 @@ const SUPPORTED_ACTIONS = new Set([
   'mark-unknown',
   'review-card',
 ]);
+const TURN_ID_REQUIRED_ACTIONS = new Set(['mark-known', 'mark-unknown', 'review-card']);
+const TURN_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 export async function OPTIONS(request: Request) {
   return optionsResponse(request, { methods: ['POST', 'OPTIONS'] });
@@ -27,6 +29,18 @@ export async function POST(request: Request) {
   }
   if (!entryId) {
     return jsonResponse(request, { error: 'missing_entry_id' }, { status: 400 });
+  }
+  const turnId = normalizedTurnId(body?.turnId);
+  if (TURN_ID_REQUIRED_ACTIONS.has(action) && !turnId) {
+    return jsonResponse(
+      request,
+      {
+        error: 'invalid_turn_id',
+        detail:
+          'A non-empty turnId idempotency token is required for this dictionary action.',
+      },
+      { status: 400 },
+    );
   }
 
   const bearerToken = requireBearerToken(request);
@@ -46,11 +60,9 @@ export async function POST(request: Request) {
 
   if (action === 'review-card') {
     platformBody.result = body?.result;
-    if (typeof body?.turnId === 'string') {
-      platformBody.turnId = body.turnId;
-    }
-  } else if (typeof body?.turnId === 'string') {
-    platformBody.turnId = body.turnId;
+  }
+  if (turnId) {
+    platformBody.turnId = turnId;
   }
 
   const outcome = await postTwoThousandNlPlatformJson(
@@ -62,4 +74,10 @@ export async function POST(request: Request) {
     status: outcome.status,
     headers: { 'Cache-Control': 'private, no-store' },
   });
+}
+
+function normalizedTurnId(value: unknown) {
+  if (typeof value !== 'string') return undefined;
+  const turnId = value.trim();
+  return TURN_ID_PATTERN.test(turnId) ? turnId : undefined;
 }
