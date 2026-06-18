@@ -175,6 +175,19 @@ short-lived end-user token can still be used with
 `DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true`; do not configure that as
 production guest identity.
 
+Before treating a deployment as ready for unauthenticated extension lookup,
+check `/api/health` and inspect `providers.dictionary.guestLookup`:
+
+- `status: "available"` and `productionReady: true` means
+  `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN` is configured and guest lookup uses
+  `catalog/lookup`.
+- `status: "degraded"` means AudioFilms is using
+  `DICTIONARY_2000NL_ACCESS_TOKEN` only through the explicit non-production
+  local dogfood fallback. This is never production-ready.
+- `status: "unavailable"` with `DICTIONARY_PROVIDER=2000nl` means guest lookup
+  is not deploy-ready. Forwarded user Bearer lookup can still work, but public
+  guest lookup requires `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`.
+
 The user-state path is 2000NL Connect with AudioFilms forwarding the current
 user Bearer token:
 
