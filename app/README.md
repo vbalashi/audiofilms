@@ -88,13 +88,15 @@ For 2000NL-backed Dutch lookup and progress-aware cards:
 ```bash
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
-DICTIONARY_2000NL_ACCESS_TOKEN=... # local dogfood only
-DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true
+DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=... # guest read-only catalog lookup
 ```
 
 The YouTube extension obtains a 2000NL Connect session and forwards its current
-Bearer token to the AudioFilms `/api/dict*` backend routes. Do not configure a
-shared end-user token as production guest lookup identity.
+Bearer token to the AudioFilms `/api/dict*` backend routes for user-state lookup,
+actions, and translation. Do not configure a shared end-user token as production
+guest lookup identity; `DICTIONARY_2000NL_ACCESS_TOKEN` is only a local dogfood
+fallback when `DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true` outside
+production.
 
 ## Current Behavior
 

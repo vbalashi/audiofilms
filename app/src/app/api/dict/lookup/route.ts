@@ -59,6 +59,14 @@ type PlatformLookupResponse = {
   detail?: string;
 };
 
+type LookupMode = {
+  endpoint: 'lookup' | 'catalog/lookup';
+  accessToken: string;
+  includeUserState: boolean;
+  allowProgressActions: boolean;
+  cacheControl?: string;
+};
+
 export async function OPTIONS(request: Request) {
   return optionsResponse(request, { methods: ['POST', 'OPTIONS'] });
 }
@@ -77,36 +85,28 @@ export async function POST(request: Request) {
     return jsonResponse(request, { error: 'missing_source_language_code' }, { status: 400 });
   }
 
-  const forwardedBearer = getBearerToken(request);
-  const guestToken = forwardedBearer ? undefined : getLocalDogfoodGuestLookupToken();
-  const accessToken = forwardedBearer || guestToken;
-  if (!accessToken) {
+  const lookupMode = resolveLookupMode(request);
+  if (!lookupMode) {
     return jsonResponse(
       request,
       {
-        error: 'authentication_required',
-        code: 'authentication_required',
+        error: 'guest_lookup_unavailable',
+        code: 'guest_lookup_unavailable',
         detail:
-          'Guest 2000NL lookup is disabled until a public catalog credential or endpoint is available.',
+          'Guest 2000NL lookup requires DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN, or a forwarded 2000NL user Bearer token.',
       },
       { status: 401 },
     );
   }
 
-  const platformResponse = await fetch(`${platformApiBase()}/lookup`, {
+  const platformResponse = await fetch(`${platformApiBase()}/${lookupMode.endpoint}`, {
     method: 'POST',
     headers: {
       accept: 'application/json',
-      authorization: `Bearer ${accessToken}`,
+      authorization: `Bearer ${lookupMode.accessToken}`,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      query: clickedForm,
-      languageCode: sourceLanguageCode,
-      contextText,
-      includeUserState: Boolean(forwardedBearer),
-      intent: 'external-click',
-    }),
+    body: JSON.stringify(platformLookupRequest(clickedForm, sourceLanguageCode, contextText, lookupMode)),
   });
   const platformBody = (await platformResponse.json().catch(() => null)) as
     | PlatformLookupResponse
@@ -122,13 +122,15 @@ export async function POST(request: Request) {
       },
       {
         status: platformResponse.status === 429 ? 429 : 502,
-        headers: forwardedBearer ? { 'Cache-Control': 'private, no-store' } : undefined,
+        headers: responseHeaders(lookupMode),
       },
     );
   }
 
   const cards = (platformBody?.items || []).map((item, index) =>
-    projectOverlayCard(item, clickedForm, sourceLanguageCode, index),
+    projectOverlayCard(item, clickedForm, sourceLanguageCode, index, {
+      allowProgressActions: lookupMode.allowProgressActions,
+    }),
   );
 
   if (!cards.length) {
@@ -145,7 +147,7 @@ export async function POST(request: Request) {
       },
       {
         status: 404,
-        headers: forwardedBearer ? { 'Cache-Control': 'private, no-store' } : undefined,
+        headers: responseHeaders(lookupMode),
       },
     );
   }
@@ -173,7 +175,7 @@ export async function POST(request: Request) {
     },
     {
       status: 200,
-      headers: forwardedBearer ? { 'Cache-Control': 'private, no-store' } : undefined,
+      headers: responseHeaders(lookupMode),
     },
   );
 }
@@ -193,11 +195,78 @@ function getLocalDogfoodGuestLookupToken() {
   return process.env.DICTIONARY_2000NL_ACCESS_TOKEN?.trim() || undefined;
 }
 
+function getCatalogLookupToken() {
+  return process.env.DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN?.trim() || undefined;
+}
+
+function resolveLookupMode(request: Request): LookupMode | null {
+  const forwardedBearer = getBearerToken(request);
+  if (forwardedBearer) {
+    return {
+      endpoint: 'lookup',
+      accessToken: forwardedBearer,
+      includeUserState: true,
+      allowProgressActions: true,
+      cacheControl: 'private, no-store',
+    };
+  }
+
+  const catalogToken = getCatalogLookupToken();
+  if (catalogToken) {
+    return {
+      endpoint: 'catalog/lookup',
+      accessToken: catalogToken,
+      includeUserState: false,
+      allowProgressActions: false,
+    };
+  }
+
+  const localDogfoodToken = getLocalDogfoodGuestLookupToken();
+  if (localDogfoodToken) {
+    return {
+      endpoint: 'lookup',
+      accessToken: localDogfoodToken,
+      includeUserState: false,
+      allowProgressActions: false,
+    };
+  }
+
+  return null;
+}
+
+function platformLookupRequest(
+  clickedForm: string,
+  sourceLanguageCode: string,
+  contextText: string | undefined,
+  lookupMode: LookupMode,
+) {
+  const baseRequest: Record<string, unknown> = {
+    query: clickedForm,
+    languageCode: sourceLanguageCode,
+    contextText,
+  };
+
+  if (lookupMode.includeUserState) {
+    return {
+      ...baseRequest,
+      includeUserState: true,
+      intent: 'external-click',
+    };
+  }
+
+  return baseRequest;
+}
+
+function responseHeaders(lookupMode: LookupMode) {
+  return lookupMode.cacheControl ? { 'Cache-Control': lookupMode.cacheControl } : undefined;
+}
+
 function projectOverlayCard(
   item: PlatformLookupItem,
   clickedForm: string,
   sourceLanguageCode: string,
   index: number,
+  options: { allowProgressActions: boolean },
 ) {
   const content = item.entry?.content || {};
   const headword =
@@ -210,7 +279,7 @@ function projectOverlayCard(
   const example = sections.find((section) => section.kind === 'example')?.text;
   const capabilities = item.cardCapabilitiesByType?.[CARD_TYPE_ID];
   const phase = normalizedPhase(capabilities?.phase);
-  const progress = phase
+  const progress = options.allowProgressActions && phase
     ? {
         phase,
         ...progressFields(item.userStateByCardType?.[CARD_TYPE_ID], capabilities),
@@ -233,7 +302,7 @@ function projectOverlayCard(
     summary: { definition, example },
     sections,
     progress,
-    displayActions: displayActionsForCapabilities(capabilities),
+    displayActions: displayActionsForCapabilities(capabilities, options.allowProgressActions),
     dictionary: item.dictionary
       ? {
           id: item.dictionary.id,
@@ -309,23 +378,28 @@ function chip(kind: string, label?: string | null) {
   return label ? { kind, label } : null;
 }
 
-function displayActionsForCapabilities(capabilities: PlatformCardCapabilities | undefined) {
+function displayActionsForCapabilities(
+  capabilities: PlatformCardCapabilities | undefined,
+  allowProgressActions: boolean,
+) {
   const phase = normalizedPhase(capabilities?.phase);
   const actions = new Set(capabilities?.actions || []);
   const reviewResults = new Set(capabilities?.reviewResults || []);
   const displayActions = [];
 
-  if ((phase === 'not-started' || phase === 'encountered') && actions.has('start-learning')) {
-    displayActions.push(progressAction('learn', 'Learn', 'start-learning'));
-  }
-  if ((phase === 'not-started' || phase === 'encountered') && actions.has('mark-known')) {
-    displayActions.push(progressAction('known', 'Known', 'mark-known', undefined, true));
-  }
-  if ((phase === 'learning' || phase === 'reviewing') && actions.has('review-card')) {
-    if (reviewResults.has('fail')) displayActions.push(progressAction('again', 'Again', 'review-card', 'fail', true));
-    if (reviewResults.has('hard')) displayActions.push(progressAction('hard', 'Hard', 'review-card', 'hard', true));
-    if (reviewResults.has('success')) displayActions.push(progressAction('good', 'Good', 'review-card', 'success', true));
-    if (reviewResults.has('easy')) displayActions.push(progressAction('easy', 'Easy', 'review-card', 'easy', true));
+  if (allowProgressActions) {
+    if ((phase === 'not-started' || phase === 'encountered') && actions.has('start-learning')) {
+      displayActions.push(progressAction('learn', 'Learn', 'start-learning'));
+    }
+    if ((phase === 'not-started' || phase === 'encountered') && actions.has('mark-known')) {
+      displayActions.push(progressAction('known', 'Known', 'mark-known', undefined, true));
+    }
+    if ((phase === 'learning' || phase === 'reviewing') && actions.has('review-card')) {
+      if (reviewResults.has('fail')) displayActions.push(progressAction('again', 'Again', 'review-card', 'fail', true));
+      if (reviewResults.has('hard')) displayActions.push(progressAction('hard', 'Hard', 'review-card', 'hard', true));
+      if (reviewResults.has('success')) displayActions.push(progressAction('good', 'Good', 'review-card', 'success', true));
+      if (reviewResults.has('easy')) displayActions.push(progressAction('easy', 'Easy', 'review-card', 'easy', true));
+    }
   }
 
   displayActions.push({

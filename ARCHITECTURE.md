@@ -118,6 +118,7 @@ Environment selection currently happens through `app/env.example` keys:
 - `OPENAI_MODEL`
 - `OPENAI_DICTIONARY_PROMPT`
 - `DICTIONARY_2000NL_API_BASE`
+- `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`
 - `DICTIONARY_2000NL_ACCESS_TOKEN`
 - `DICTIONARY_2000NL_TIMEOUT_MS`
 
@@ -181,6 +182,8 @@ The first overlay card model follows these rules:
 - `app/src/app/api/dict/route.ts` accepts an optional incoming Bearer token and passes it to the provider layer.
 - `app/src/app/api/dict/actions/route.ts` proxies explicit platform actions.
 - `app/src/app/api/dict/translation/route.ts` proxies per-card translation requests.
+- `app/src/app/api/dict/lookup/route.ts` uses forwarded user Bearer tokens for
+  user-state lookup and the dedicated catalog token for read-only guest lookup.
 - The extension has a 2000NL Connect flow in its service worker and forwards the current access token to AudioFilms `/api/dict*` calls when available.
 - `DICTIONARY_2000NL_ACCESS_TOKEN` remains a local dogfood fallback, not the final product auth model.
 

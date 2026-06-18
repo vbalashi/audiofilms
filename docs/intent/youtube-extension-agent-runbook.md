@@ -163,13 +163,20 @@ The extension sends dictionary requests through its service worker. To use 2000N
 ```text
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
-DICTIONARY_2000NL_ACCESS_TOKEN=<short-lived-local-dogfood-token>
-DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true
+DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=<2000nl-catalog-lookup-token>
 ```
 
-`DICTIONARY_2000NL_ACCESS_TOKEN` is only a short-lived local dogfood fallback
-and must not be configured as production guest identity. The durable path is
-2000NL Connect with AudioFilms forwarding the current user Bearer token:
+Without a forwarded user Bearer token, AudioFilms calls
+`POST /api/platform/v1/catalog/lookup` with
+`DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`. This guest path is read-only and does
+not surface progress actions. For private non-production dogfood only, a
+short-lived end-user token can still be used with
+`DICTIONARY_2000NL_ACCESS_TOKEN` plus
+`DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true`; do not configure that as
+production guest identity.
+
+The user-state path is 2000NL Connect with AudioFilms forwarding the current
+user Bearer token:
 
 - AudioFilms extension manifest has a stable unpacked dev ID:
   `hhdkchoccmikoefhenobdjipgdppdpoc`.
