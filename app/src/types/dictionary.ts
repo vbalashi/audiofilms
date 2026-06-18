@@ -95,7 +95,6 @@ export type DictionaryOverlayCardV2 = {
     name?: string;
     kind?: string;
   };
-  meanings: DictionaryOverlayCardMeaning[];
 };
 
 export type DictionaryOverlayCard = {

@@ -2,7 +2,9 @@
 
 Status: active planning note, June 18, 2026. Shared V2 contract types and
 representative fixtures are frozen in `app/src/types/` for the first backend/UI
-contract slice; endpoint behavior is unchanged.
+contract slice; endpoint behavior is unchanged. Dictionary V2 projection is now
+isolated in `app/src/lib/dictionary/overlayProjection.ts` and covered by the
+pure `npm run test:dictionary` contract test slice.
 
 This plan turns the designer brief into backend/API work that can be reviewed by
 an architect and then split between UI and backend agents. It is about contracts,
@@ -106,8 +108,8 @@ them.
 | Text Source switch | first slice implemented | `POST /api/practice/source-selection`, backed by active/cached subtitle source metadata. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | First slice validates active source/revision only; multi-source inventory and alignment cache key remain deferred. |
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
 | Translation target | proposed | 2000NL `GET /api/platform/v1/session` exposed through AudioFilms `GET /api/dict/session`. | Extension uses 2000NL target language; local override is dogfood-only fallback. | Confirm preference field name and unauthenticated fallback. |
-| Dictionary lookup V2 | proposed | `POST /api/dict/lookup` backed by 2000NL lookup V2 request/body. | UI sends clicked form, language, and phrase context without URL query leakage. | Confirm normalized 2000NL content, match relation, and content fingerprint. |
-| Dictionary card V2 | proposed | Explicit V2 card contract with `displayActions.command`; raw platform capabilities stay diagnostic. | UI renders clicked form, headword, chips, sections, state-aware actions, quiet encounter signals. | Confirm typed fields and action/result mapping from 2000NL. |
+| Dictionary lookup V2 | contract-tested projection | `POST /api/dict/lookup` backed by 2000NL lookup V2 request/body. | UI sends clicked form, language, and phrase context without URL query leakage. | Exact/inflection/no-match projection is covered by pure tests; normalized 2000NL content, match relation, and content fingerprint still depend on platform contract stability. |
+| Dictionary card V2 | contract-tested projection | Explicit V2 card contract with `displayActions.command`; raw platform capabilities stay diagnostic. | UI renders clicked form, headword, chips, sections, state-aware actions, quiet encounter signals. | AudioFilms projection tests cover nullable fields, `sourcePath`, progress-action filtering, review grades, and no legacy/fallback card shape. |
 | Encounter logging | proposed | 2000NL/action-log boundary through AudioFilms. | Learn/Known/review are explicit mutations; passive card rendering should not silently become review. | Decide whether click/card-view creates a `seen` encounter and how it affects `Seen`/`Last`. |
 | Write identity | required | `/api/dict/actions` and authenticated `/api/dict/translation` require a forwarded 2000NL Connect Bearer token. | Guest lookup can be read-only; progress/translation writes are fail-closed. | Confirm service credential model for guest public catalog lookup, if needed. |
 | Guest lookup deploy readiness | implemented | `GET /api/health` exposes `providers.dictionary.guestLookup`. | Deployer verifies guest lookup separately from forwarded-Bearer user lookup. | Production-ready guest lookup requires `status: "available"`, `productionReady: true`, and `mode: "catalog-token"` from `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`; local dogfood fallback reports `status: "degraded"` and is never production-ready. |
@@ -158,6 +160,14 @@ Slice 1 status:
   connected learning/reviewing lookup, no-match, hidden/frozen/no-actions,
   phrase translation ready/failed, practice snapshot rough/precise, operation
   running/succeeded, and session authenticated/guest.
+- Dictionary V2 projection logic now lives in
+  `app/src/lib/dictionary/overlayProjection.ts`; `app/src/app/api/dict/lookup/route.ts`
+  keeps HTTP/auth/provider handling and delegates response projection.
+- `npm run test:dictionary` runs mocked Vitest contract coverage for exact,
+  inflection, no-match, nullable platform fields, hidden/frozen/guest no-progress
+  actions, learning/reviewing four-grade actions, `contentFingerprint`,
+  `sections[].sourcePath`, and absence of fallback LLM/legacy provider card
+  fields in V2 projection.
 - This slice does not add behavior, endpoint calls, storage, or network
   dependencies.
 

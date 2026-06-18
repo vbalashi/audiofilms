@@ -53,13 +53,6 @@ const baseCard = {
     name: '2000NL Core',
     kind: 'platform',
   },
-  meanings: [
-    {
-      definition: 'to walk; to run',
-      examples: [],
-      idioms: [],
-    },
-  ],
 } satisfies Omit<DictionaryOverlayCardV2, 'progress' | 'displayActions'>;
 
 export const guestLookupFixture = {
