@@ -119,3 +119,53 @@ For architecture and module ownership, use [ARCHITECTURE.md](/Users/khrustal/dev
 - [yt-dlp-wrap](https://github.com/foxesdocode/yt-dlp-wrap)
 - [react-youtube](https://github.com/tjallingt/react-youtube)
 - [Zustand](https://github.com/pmndrs/zustand)
+
+## Remote Dogfood Surface
+
+The backend can be exposed as one public API facade while ASR remains disabled or worker-backed behind it.
+
+Expected public base:
+
+```bash
+NEXT_PUBLIC_AUDIOFILMS_API_BASE=https://audiofilms-api.dilum.io
+```
+
+Stable tester-facing routes:
+
+```text
+GET  /api/health
+GET  /api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
+GET  /api/dict?word=voorbeeld&language=nl
+POST /api/asr/jobs
+GET  /api/asr/jobs/{jobId}
+GET  /api/asr/jobs/{jobId}/result
+```
+
+`/api/local-asr-practice` is now a private compatibility endpoint. It is enabled by default only for non-production localhost requests. Set `LOCAL_ASR_PRACTICE_ENABLED=true` only for private dogfood; external tester builds should use `/api/asr/jobs`.
+
+For 1-4 remote testers, keep ASR disabled until a worker and tester token are configured:
+
+```bash
+ASR_MODE=disabled
+LOCAL_ASR_PRACTICE_ENABLED=false
+```
+
+To enable the first file-backed worker mode on one host:
+
+```bash
+ASR_MODE=file-queue
+ASR_AUTH_REQUIRED=true
+ASR_TESTER_TOKENS=<random-long-token>
+ASR_QUEUE_DIR=/data/audiofilms/asr-jobs
+ASR_ARTIFACT_STORE=file:///data/audiofilms/asr-artifacts
+ASR_MAX_DURATION_SEC=900
+ASR_MAX_ACTIVE_JOBS=4
+```
+
+Run the worker separately:
+
+```bash
+npm run asr:worker
+```
+
+The Docker/Compose runbook is in [`../docs/runbooks/audiofilms-backend-deployment.md`](../docs/runbooks/audiofilms-backend-deployment.md).

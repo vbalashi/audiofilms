@@ -1,9 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { cacheDirectory } from '@/lib/runtimePaths';
 import type { YouTubeLanguageInfo } from './youtubeMetadata';
 
 const CACHE_VERSION = "v1";
-const CACHE_DIR = path.join(process.cwd(), '.video-info-cache');
+const CACHE_DIR = cacheDirectory('video-info-cache', '.video-info-cache');
 const TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days (video metadata rarely changes)
 
 /**

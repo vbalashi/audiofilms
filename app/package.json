@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "subtitle:shootout": "node scripts/subtitle-source-shootout.mjs",
-    "subtitle:shootout:supadata": "node scripts/subtitle-source-shootout.mjs --include-supadata"
+    "subtitle:shootout:supadata": "node scripts/subtitle-source-shootout.mjs --include-supadata",
+    "asr:align:smoke": "node scripts/local-asr-alignment-smoke.mjs",
+    "asr:align:stable-smoke": "node scripts/local-asr-alignment-smoke.mjs --engine stable-ts",
+    "asr:practice-preview": "node scripts/build-practice-preview.mjs",
+    "asr:worker": "node scripts/asr-worker.mjs",
+    "asr:worker:once": "node scripts/asr-worker.mjs --once"
   },
   "dependencies": {
     "@supadata/js": "^1.3.2",

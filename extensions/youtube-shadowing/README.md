@@ -30,7 +30,7 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
 - Falls back to another manual or auto-generated caption source when no preferred-language source is available.
 - Tries caption retrieval in this order:
   - YouTube `timedtext` caption URL from the player track;
-  - local AudioFilms backend/provider API via `http://localhost:3000/api/get-subs`;
+  - AudioFilms backend/provider API via the shared extension config; default `https://audiofilms-api.dilum.io/api/get-subs`;
   - optional diagnostic YouTube transcript API metadata on the page;
   - optional diagnostic opened transcript panel DOM segments.
 - Tracks subtitle source and quality separately from the selected language:
@@ -49,7 +49,7 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
   - an open Shadow DOM root with `#audiofilms-shadow-container`;
   - compact current-phrase bar and controls inside the shadow container;
   - visible `Passive sync` / `Shortcuts active` mode indicator;
-  - dictionary/lookup panel appears only after clicking a word and loads results through the local AudioFilms `/api/dict` backend;
+  - dictionary/lookup panel appears only after clicking a word and loads results through the configured AudioFilms `/api/dict` backend;
   - YouTube player size and recommendations are not changed by default.
 - Keeps normal YouTube playback passive by default. Replay, Previous, and Next enter guided phrase mode; auto-pause only affects guided mode.
 - In guided phrase navigation, Previous and Next advance from the visible phrase in the AudioFilms panel, not from the current YouTube playhead.
@@ -64,6 +64,30 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
   - `ArrowDown`: replay current phrase;
   - `ArrowUp`: hide phrase text.
 
+
+## Remote API Configuration
+
+The extension has a single shared resolver in `src/config.js`. Tester builds default to:
+
+```text
+AF_API_BASE=https://audiofilms-api.dilum.io
+AF_BACKEND_SUBTITLES_URL=$AF_API_BASE/api/get-subs
+AF_LOCAL_ASR_URL=$AF_API_BASE/api/asr/jobs
+AF_DICTIONARY_URL=$AF_API_BASE/api/dict
+AF_2000NL_CONNECT_BASE=https://2000.dilum.io
+```
+
+Local development keeps the existing overrides:
+
+```js
+localStorage.afShadowingApiBase = "http://localhost:3000";
+localStorage.afShadowingBackendSubtitlesUrl = "off"; // disable backend fallback
+localStorage.afShadowingLocalAsrUrl = "http://localhost:3000/api/local-asr-practice"; // private compatibility only
+localStorage.afShadowingDictionaryUrl = "http://localhost:3000/api/dict";
+```
+
+The manifest grants the specific remote host `https://audiofilms-api.dilum.io/*`, not a wildcard `*.dilum.io`, so service movement should happen behind DNS or through `afShadowingApiBase` rather than new extension code.
+
 ## Load Locally
 
 1. Open Chrome extensions.
@@ -72,7 +96,7 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
 4. Select this folder:
 
 ```text
-/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing
+extensions/youtube-shadowing
 ```
 
 Then open:
@@ -125,7 +149,56 @@ The smoke check expects:
 
 - Chrome is installed and can be controlled by AppleScript;
 - this unpacked extension is loaded with id `hhdkchoccmikoefhenobdjipgdppdpoc`;
-- the local AudioFilms app API is reachable at `http://localhost:3000`.
+- for local-only smoke tests, set `localStorage.afShadowingApiBase = "http://localhost:3000"`; otherwise the tester build defaults to `https://audiofilms-api.dilum.io`.
+
+## Local ASR Dogfood
+
+For local ASR testing in the extension, use the YouTube watch page rather than
+the app `/watch` page. Enable the local ASR retrieval path from the YouTube page
+console:
+
+```js
+localStorage.afShadowingLocalAsr = "on";
+localStorage.afShadowingLocalAsrTextSource = "asr";
+location.reload();
+```
+
+By default this now uses the ASR job endpoint from the shared extension config:
+
+```text
+https://audiofilms-api.dilum.io/api/asr/jobs
+```
+
+For private local compatibility with the old synchronous endpoint, set `localStorage.afShadowingLocalAsrUrl = "http://localhost:3000/api/local-asr-practice"` and enable `LOCAL_ASR_PRACTICE_ENABLED=true` in the app environment. External tester builds should use `/api/asr/jobs`.
+
+Remote ASR job creation requires a tester token when the backend has `ASR_AUTH_REQUIRED=true`:
+
+```js
+localStorage.afShadowingTesterToken = "<tester-token>";
+```
+
+Keep `afShadowingLocalAsrDuration` bounded for tester jobs unless the backend explicitly allows full audio. For a quick bounded smoke, set a duration:
+
+```js
+localStorage.afShadowingLocalAsrDuration = "300";
+```
+
+Useful mode switches:
+
+```js
+localStorage.afShadowingLocalAsrTextSource = "asr";    // literal ASR transcript
+localStorage.afShadowingLocalAsrTextSource = "manual"; // clean subtitles projected onto ASR timing
+localStorage.afShadowingLocalAsrEngine = "stable-ts";
+localStorage.afShadowingLocalAsrModel = "large-v3-turbo";
+```
+
+Return to normal caption retrieval with:
+
+```js
+localStorage.removeItem("afShadowingLocalAsr");
+localStorage.removeItem("afShadowingLocalAsrDuration");
+location.reload();
+```
 
 The default fixture sequence checks:
 
@@ -221,7 +294,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 
 - No build step.
 - 2000NL Connect exists in the extension service worker for local dogfood. It stores and refreshes a Connect session through Chrome extension storage, then forwards the current access token to AudioFilms `/api/dict*` calls.
-- Dictionary lookup goes through `http://localhost:3000/api/dict` by default. Set `localStorage.afShadowingDictionaryUrl` to another endpoint or `off` for diagnostics.
+- Dictionary lookup goes through `https://audiofilms-api.dilum.io/api/dict` by default. Set `localStorage.afShadowingApiBase`, `localStorage.afShadowingDictionaryUrl`, or `off` for diagnostics.
 - 2000NL-backed dictionary results require either the extension Connect session token or a valid short-lived `DICTIONARY_2000NL_ACCESS_TOKEN` fallback in the AudioFilms app environment.
 - Plain lookup is read-only. Explicit card actions go through `/api/dict/actions`, then refresh lookup state. Per-card translation goes through `/api/dict/translation`.
 - Stable unpacked dev extension ID: `hhdkchoccmikoefhenobdjipgdppdpoc`.
@@ -229,5 +302,5 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - 2000NL Connect dev origin: `chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc`.
 - No word-level alignment.
 - Uses YouTube web-player metadata, which can change.
-- Backend/provider fallback expects the local AudioFilms app API at `http://localhost:3000/api/get-subs` unless `localStorage.afShadowingBackendSubtitlesUrl` is set to another URL or `off`.
+- Backend/provider fallback expects `https://audiofilms-api.dilum.io/api/get-subs` by default. Set `localStorage.afShadowingApiBase = "http://localhost:3000"` for local development, or set `localStorage.afShadowingBackendSubtitlesUrl` to a specific endpoint or `off`.
 - YouTube transcript API / DOM probing is disabled by default. Set `localStorage.afShadowingTranscriptFallback = "on"` only for diagnostics.

@@ -1,0 +1,71 @@
+services:
+  audiofilms-api:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    image: audiofilms-api:local
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      AUDIOFILMS_PUBLIC_API_BASE: ${AUDIOFILMS_PUBLIC_API_BASE:-}
+      AUDIOFILMS_DATA_DIR: /data/audiofilms
+      AUDIOFILMS_CACHE_DIR: /data/audiofilms/cache
+      SUBTITLE_PROVIDER: ${SUBTITLE_PROVIDER:-yt-dlp}
+      YT_DLP_PATH: ${YT_DLP_PATH:-/usr/local/bin/yt-dlp}
+      SUPADATA_API_KEY: ${SUPADATA_API_KEY:-}
+      DICTIONARY_PROVIDER: ${DICTIONARY_PROVIDER:-2000nl}
+      DICTIONARY_2000NL_API_BASE: ${DICTIONARY_2000NL_API_BASE:-https://2000.dilum.io/api/platform/v1}
+      DICTIONARY_2000NL_ACCESS_TOKEN: ${DICTIONARY_2000NL_ACCESS_TOKEN:-}
+      DICTIONARY_2000NL_INCLUDE_USER_STATE: ${DICTIONARY_2000NL_INCLUDE_USER_STATE:-true}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      ALLOWED_EXTENSION_ORIGINS: ${ALLOWED_EXTENSION_ORIGINS:-chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc}
+      ALLOWED_WEB_ORIGINS: ${ALLOWED_WEB_ORIGINS:-https://www.youtube.com,https://youtube.com}
+      ASR_MODE: ${ASR_MODE:-disabled}
+      ASR_AUTH_REQUIRED: ${ASR_AUTH_REQUIRED:-true}
+      ASR_TESTER_TOKENS: ${ASR_TESTER_TOKENS:-}
+      ASR_QUEUE_DIR: /data/audiofilms/asr-jobs
+      ASR_ARTIFACT_STORE: file:///data/audiofilms/asr-artifacts
+      ASR_MAX_DURATION_SEC: ${ASR_MAX_DURATION_SEC:-900}
+      ASR_MAX_ACTIVE_JOBS: ${ASR_MAX_ACTIVE_JOBS:-4}
+      ASR_RATE_LIMIT_MAX: ${ASR_RATE_LIMIT_MAX:-4}
+      LOCAL_ASR_PRACTICE_ENABLED: ${LOCAL_ASR_PRACTICE_ENABLED:-false}
+    volumes:
+      - audiofilms-data:/data/audiofilms
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  audiofilms-asr-worker:
+    image: audiofilms-api:local
+    restart: unless-stopped
+    profiles: ["asr"]
+    command: ["node", "scripts/asr-worker.mjs"]
+    environment:
+      NODE_ENV: production
+      AUDIOFILMS_DATA_DIR: /data/audiofilms
+      AUDIOFILMS_CACHE_DIR: /data/audiofilms/cache
+      YT_DLP_PATH: ${YT_DLP_PATH:-/usr/local/bin/yt-dlp}
+      ASR_QUEUE_DIR: /data/audiofilms/asr-jobs
+      ASR_ARTIFACT_STORE: file:///data/audiofilms/asr-artifacts
+      ASR_WORKER_POLL_MS: ${ASR_WORKER_POLL_MS:-3000}
+      ASR_ENGINE: ${ASR_ENGINE:-faster-whisper}
+      ASR_MODEL: ${ASR_MODEL:-mobiuslabsgmbh/faster-whisper-large-v3-turbo}
+      ASR_DEVICE: ${ASR_DEVICE:-cpu}
+      ASR_COMPUTE_TYPE: ${ASR_COMPUTE_TYPE:-int8}
+    volumes:
+      - audiofilms-data:/data/audiofilms
+    depends_on:
+      - audiofilms-api
+
+volumes:
+  audiofilms-data:

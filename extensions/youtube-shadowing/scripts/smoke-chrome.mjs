@@ -11,7 +11,7 @@ const FIXTURES = [
     expect: {
       minTracks: 1,
       sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 185$/,
+      countPattern: /\/ 189$/,
       retrievalPath: "backend-provider",
       empty: false,
       checkReplay: true,
@@ -99,7 +99,7 @@ const FIXTURES = [
     expect: {
       minTracks: 1,
       sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 185$/,
+      countPattern: /\/ 189$/,
       retrievalPath: "backend-provider",
       empty: false,
       checkReplay: true,
@@ -126,7 +126,7 @@ const SPA_FIXTURES = [
     expect: {
       minTracks: 1,
       sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 185$/,
+      countPattern: /\/ 189$/,
       retrievalPath: "backend-provider",
       empty: false,
     },
@@ -171,7 +171,7 @@ const SOURCE_SWITCH_FAILED_FIXTURE = {
   expect: {
     minTracks: 1,
     sourceIncludes: ["Manual", "exact"],
-    countPattern: /\/ 185$/,
+    countPattern: /\/ 189$/,
     retrievalPath: "backend-provider",
     empty: false,
   },

@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "standalone",
+  experimental: {
+    cpus: Number(process.env.NEXT_BUILD_CPUS || 1),
+  },
 };
 
 export default nextConfig;

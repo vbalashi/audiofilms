@@ -50,7 +50,15 @@ export type SubtitleQualityMeta = {
 };
 
 export type SubtitleResponse = {
+  /**
+   * Provider/source subtitle units. Kept separate from learner-facing practice
+   * phrases so diagnostics can still inspect the original provider shape.
+   */
   phrases: Phrase[];
+  /**
+   * Backend-owned replay/navigation units for the learner.
+   */
+  practicePhrases?: Phrase[];
   language?: string; // The actual language of the fetched subtitles
   meta?: {
     provider: string;

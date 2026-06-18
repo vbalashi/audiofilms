@@ -29,6 +29,7 @@
         "https://youtube.com/*"
       ],
       "js": [
+        "src/config.js",
         "src/bootDiagnostics.js",
         "src/phrases.js",
         "src/captionTracks.js",
@@ -46,6 +47,7 @@
     "https://www.youtube.com/*",
     "https://youtube.com/*",
     "https://2000.dilum.io/*",
+    "https://audiofilms-api.dilum.io/*",
     "http://localhost:*/*",
     "http://127.0.0.1:*/*"
   ],

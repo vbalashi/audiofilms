@@ -1,12 +1,13 @@
+try { importScripts("config.js"); } catch (_error) {}
 const CONNECT_SESSION_STORAGE_KEY = "af2000nlConnectSession";
-const DEFAULT_CONNECT_BASE_URL = "https://2000.dilum.io";
+const DEFAULT_CONNECT_BASE_URL = globalThis.__afShadowingConfig?.defaults?.connectBase || "https://2000.dilum.io";
 const DEFAULT_CONNECT_CLIENT_ID = "audiofilms_chrome_dev";
 const CONNECT_SCOPE = "platform:read platform:write offline_access";
 const REFRESH_SKEW_SECONDS = 90;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "af-fetch-backend-subtitles") {
-    fetchBackendSubtitles(message.url)
+    fetchBackendSubtitles(message.url, message.options)
       .then(sendResponse)
       .catch((error) => {
         sendResponse({
@@ -79,15 +80,18 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-async function fetchBackendSubtitles(url) {
+async function fetchBackendSubtitles(url, options = {}) {
   if (!url || typeof url !== "string") {
     throw new Error("Missing backend subtitles URL.");
   }
 
   const response = await fetch(url, {
     credentials: "omit",
+    method: options.method || "GET",
+    body: options.body,
     headers: {
       accept: "application/json",
+      ...(options.headers || {}),
     },
   });
   const text = await response.text();

@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server';
+import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import {
   getBearerToken,
   postTwoThousandNlPlatformJson,
 } from '@/lib/twoThousandNlPlatform';
+
+export async function OPTIONS(request: Request) {
+  return optionsResponse(request, { methods: ['POST', 'OPTIONS'] });
+}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -10,10 +14,10 @@ export async function POST(request: Request) {
   const targetLang = typeof body?.targetLang === 'string' ? body.targetLang : '';
 
   if (!entryId) {
-    return NextResponse.json({ error: 'missing_entry_id' }, { status: 400 });
+    return jsonResponse(request, { error: 'missing_entry_id' }, { status: 400 });
   }
   if (!targetLang) {
-    return NextResponse.json({ error: 'missing_target_lang' }, { status: 400 });
+    return jsonResponse(request, { error: 'missing_target_lang' }, { status: 400 });
   }
 
   const outcome = await postTwoThousandNlPlatformJson('translation', {
@@ -21,5 +25,5 @@ export async function POST(request: Request) {
     targetLang,
     force: body?.force === true,
   }, getBearerToken(request));
-  return NextResponse.json(outcome.body, { status: outcome.status });
+  return jsonResponse(request, outcome.body, { status: outcome.status });
 }

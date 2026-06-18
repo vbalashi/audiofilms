@@ -35,6 +35,7 @@ yarn-error.log*
 
 # subtitle cache
 .subtitle-cache/
+.asr-cache/
 
 # video info cache
 .video-info-cache/

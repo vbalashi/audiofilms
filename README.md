@@ -5,37 +5,37 @@ Phrase-based listening practice for YouTube videos. The app lets a learner move 
 ## Canonical Docs
 
 - Repo overview and navigation: this file
-- Setup and local runbook: [app/README.md](/home/khrustal/dev/audiofilms/app/README.md)
-- Architecture, boundaries, and validation expectations: [ARCHITECTURE.md](/home/khrustal/dev/audiofilms/ARCHITECTURE.md)
-- Product intent and scope: [docs/intent/index.md](/home/khrustal/dev/audiofilms/docs/intent/index.md)
-- Current dictionary guidance: [docs/dictionary/index.md](/home/khrustal/dev/audiofilms/docs/dictionary/index.md)
+- Setup and local runbook: [app/README.md](app/README.md)
+- Architecture, boundaries, and validation expectations: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Product intent and scope: [docs/intent/index.md](docs/intent/index.md)
+- Current dictionary guidance: [docs/dictionary/index.md](docs/dictionary/index.md)
 
 ## Repo Layout
 
-- `/home/khrustal/dev/audiofilms/app`: Next.js application
-- `/home/khrustal/dev/audiofilms/extensions/youtube-shadowing`: Chrome extension spike for YouTube-page shadowing controls
-- `/home/khrustal/dev/audiofilms/docs/intent`: product intent and scope notes
-- `/home/khrustal/dev/audiofilms/docs/exec-plans`: active and completed execution plans
-- `/home/khrustal/dev/audiofilms/docs/tech-debt`: known cleanup targets
+- `app`: Next.js application
+- `extensions/youtube-shadowing`: Chrome extension spike for YouTube-page shadowing controls
+- `docs/intent`: product intent and scope notes
+- `docs/exec-plans`: active and completed execution plans
+- `docs/tech-debt`: known cleanup targets
 
 ## Provider Defaults
 
 Current runtime defaults are:
 
-- Subtitle provider: `supadata`
-- Subtitle fallback: `yt-dlp`
+- Subtitle provider: `yt-dlp`
+- Subtitle fallback: `supadata` when `SUPADATA_API_KEY` is configured
 - Dictionary provider: `openrouter`
-- Dictionary fallback: `free-dictionary`
+- Dictionary candidates: `2000nl`, `openai`, `openrouter`, and English-only `free-dictionary` where configured
 
 These defaults are implemented in:
 
-- [providers/index.ts](/home/khrustal/dev/audiofilms/app/src/lib/providers/index.ts)
-- [providers/dictionary/index.ts](/home/khrustal/dev/audiofilms/app/src/lib/providers/dictionary/index.ts)
-- [env.example](/home/khrustal/dev/audiofilms/app/env.example)
+- [providers/index.ts](app/src/lib/providers/index.ts)
+- [providers/dictionary/index.ts](app/src/lib/providers/dictionary/index.ts)
+- [env.example](app/env.example)
 
 ## Setup
 
-Application setup lives in [app/README.md](/home/khrustal/dev/audiofilms/app/README.md) and should be treated as the canonical setup path.
+Application setup lives in [app/README.md](app/README.md) and should be treated as the canonical setup path.
 
 Quick start:
 
@@ -46,18 +46,19 @@ cp env.example .env.local
 npm run dev
 ```
 
-For the default runtime path, set:
+For the default local runtime path, set:
 
 ```bash
-SUBTITLE_PROVIDER=supadata
-SUPADATA_API_KEY=...
+SUBTITLE_PROVIDER=yt-dlp
 DICTIONARY_PROVIDER=openrouter
 OPENROUTER_API_KEY=...
 ```
 
+For first remote dogfood, use the container runbook in [docs/runbooks/audiofilms-backend-deployment.md](docs/runbooks/audiofilms-backend-deployment.md). The public facade is expected at `https://audiofilms-api.dilum.io`, with `/api/health`, `/api/get-subs`, `/api/dict`, and `/api/asr/jobs` as the stable API surface.
+
 ## Validation
 
-Run from `/home/khrustal/dev/audiofilms/app`:
+Run from `app`:
 
 ```bash
 npm run lint
@@ -75,6 +76,6 @@ npm run build
 
 ## Notes
 
-- `yt-dlp` is no longer the primary subtitle path; it is the explicit local fallback provider.
-- `free-dictionary` is no longer the primary dictionary path; it is the explicit English-only fallback.
-- Historical implementation notes have been moved under [docs/archive/dictionary](/home/khrustal/dev/audiofilms/docs/archive/dictionary).
+- `yt-dlp` is the default subtitle path for local and small-host deployments. Supadata is the paid fallback when configured.
+- `free-dictionary` remains an English-only dictionary fallback.
+- Historical implementation notes have been moved under [docs/archive/dictionary](docs/archive/dictionary).

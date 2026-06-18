@@ -1,4 +1,5 @@
 import { getSubtitleProviderCandidates } from '@/lib/providers';
+import { normalizePracticePhrases } from '@/lib/practice/phrases';
 import { getCachedSubtitles, setCachedSubtitles } from '@/lib/subtitleCache';
 import type {
   Phrase,
@@ -54,9 +55,22 @@ function getDemoSubtitleFallback(videoId: string): SubtitleResponse | null {
     return null;
   }
 
+  const phrases = getMockPhrases();
   return {
-    phrases: getMockPhrases(),
+    phrases,
+    practicePhrases: normalizePracticePhrases(phrases),
     language: 'en',
+  };
+}
+
+function withPracticePhrases(response: SubtitleResponse): SubtitleResponse {
+  if (Array.isArray(response.practicePhrases) && response.practicePhrases.length > 0) {
+    return response;
+  }
+
+  return {
+    ...response,
+    practicePhrases: normalizePracticePhrases(response.phrases),
   };
 }
 
@@ -125,7 +139,7 @@ export async function loadSubtitles(
       console.log(
         `[SubtitleService] Returning cached subtitles for ${videoId} (language: ${cached.language})`,
       );
-      return {
+      return withPracticePhrases({
         ...cached,
         meta: cached.meta
           ? {
@@ -137,7 +151,7 @@ export async function loadSubtitles(
             fallbackUsed: false,
             cacheStatus: 'hit',
           },
-      };
+      });
     }
   }
 
@@ -178,6 +192,7 @@ export async function loadSubtitles(
       const lastFailedAttempt = failedAttempts[failedAttempts.length - 1];
       const response: SubtitleResponse = {
         phrases: result.phrases,
+        practicePhrases: normalizePracticePhrases(result.phrases),
         language: result.language,
         meta: {
           provider: candidate.type,

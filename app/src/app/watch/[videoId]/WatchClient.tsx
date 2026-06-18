@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { PlayerLayout } from '@/components/PlayerLayout';
 import { normalizePracticePhrases } from '@/lib/practice/phrases';
@@ -12,6 +13,12 @@ type Props = {
 };
 
 export function WatchClient({ videoId }: Props) {
+  const searchParams = useSearchParams();
+  const useLocalAsr = searchParams.get('localAsr') === '1';
+  const localAsrDuration = searchParams.get('duration') || '300';
+  const localAsrEngine = searchParams.get('engine') || 'faster-whisper';
+  const localAsrModel = searchParams.get('model') || 'mobiuslabsgmbh/faster-whisper-large-v3-turbo';
+  const localAsrTextSource = searchParams.get('textSource') || 'manual';
   // Select each field separately so Zustand returns stable references.
   // This avoids React 19's getServerSnapshot caching warnings and
   // prevents effects from re-running on every render.
@@ -38,8 +45,12 @@ export function WatchClient({ videoId }: Props) {
       try {
         // Fetch subtitles with selected language
         const langParam = selectedLanguage !== 'auto' ? `&lang=${selectedLanguage}` : '';
+        const endpoint = useLocalAsr ? '/api/local-asr-practice' : '/api/get-subs';
+        const localAsrParams = useLocalAsr
+          ? `&duration=${encodeURIComponent(localAsrDuration)}&engine=${encodeURIComponent(localAsrEngine)}&model=${encodeURIComponent(localAsrModel)}&textSource=${encodeURIComponent(localAsrTextSource)}`
+          : '';
         const response = await fetch(
-          `/api/get-subs?videoId=${encodeURIComponent(videoId)}${langParam}`,
+          `${endpoint}?videoId=${encodeURIComponent(videoId)}${langParam}${localAsrParams}`,
           { cache: 'no-store' }
         );
 
@@ -73,7 +84,9 @@ export function WatchClient({ videoId }: Props) {
         // This is the language the provider actually retrieved, not what user requested
         const actualLanguage = data.language || selectedLanguage;
         setSubtitleWarning(data.meta?.warning || null);
-        const practicePhrases = normalizePracticePhrases(data.phrases);
+        const practicePhrases = Array.isArray(data.practicePhrases)
+          ? data.practicePhrases
+          : normalizePracticePhrases(data.phrases);
         console.log(
           `[WatchClient] Loaded ${data.phrases.length} captions as ${practicePhrases.length} practice phrases in language: ${actualLanguage}`,
         );
@@ -95,7 +108,7 @@ export function WatchClient({ videoId }: Props) {
     return () => {
       active = false;
     };
-  }, [videoId, selectedLanguage, setVideoId, setPhrases]);
+  }, [videoId, selectedLanguage, setVideoId, setPhrases, useLocalAsr, localAsrDuration, localAsrEngine, localAsrModel, localAsrTextSource]);
 
   // Fetch available languages when video loads
   useEffect(() => {
@@ -138,7 +151,8 @@ export function WatchClient({ videoId }: Props) {
 
       {status === 'loading' && (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center text-sm text-white/70">
-          Fetching captions for <span className="font-semibold text-white">{videoId}</span>…
+          {useLocalAsr ? 'Preparing local ASR practice phrases' : 'Fetching captions'} for{' '}
+          <span className="font-semibold text-white">{videoId}</span>…
         </div>
       )}
 

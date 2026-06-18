@@ -1,13 +1,14 @@
 import fs from 'fs';
 import path from 'path';
+import { cacheDirectory } from '@/lib/runtimePaths';
 import type { SubtitleResponse } from "@/types/subtitles";
 
 // Bump this when we change the subtitle response structure or selection logic
 // so old cached entries don't cause confusing behaviour.
-const CACHE_VERSION = "v6";
+const CACHE_VERSION = "v7";
 
 // Cache directory - will be created if it doesn't exist
-const CACHE_DIR = path.join(process.cwd(), '.subtitle-cache');
+const CACHE_DIR = cacheDirectory('subtitle-cache', '.subtitle-cache');
 
 /**
  * Ensure cache directory exists
@@ -71,7 +72,9 @@ export function setCachedSubtitles(
     };
 
     fs.writeFileSync(filePath, JSON.stringify(cacheEntry, null, 2), 'utf-8');
-    console.log(`[SubtitleCache] Cached subtitles for ${videoId} (${value.phrases.length} phrases)`);
+    console.log(
+      `[SubtitleCache] Cached subtitles for ${videoId} (${value.phrases.length} source phrases, ${value.practicePhrases?.length || 0} practice phrases)`,
+    );
   } catch (error) {
     console.error(`[SubtitleCache] Error writing cache for ${videoId}:`, error);
     // Don't throw - caching is optional, shouldn't break the app

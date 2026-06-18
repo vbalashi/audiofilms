@@ -1,6 +1,10 @@
-import { NextResponse } from 'next/server';
+import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import { lookupDictionaryEntry } from '@/lib/dictionaryLookup';
 import { getBearerToken } from '@/lib/twoThousandNlPlatform';
+
+export async function OPTIONS(request: Request) {
+  return optionsResponse(request, { methods: ['GET', 'OPTIONS'] });
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,7 +13,7 @@ export async function GET(request: Request) {
   const context = searchParams.get('context') || undefined;
 
   if (!word) {
-    return NextResponse.json({ error: 'Missing word' }, { status: 400 });
+    return jsonResponse(request, { error: 'Missing word' }, { status: 400 });
   }
 
   try {
@@ -19,8 +23,8 @@ export async function GET(request: Request) {
       context,
       platformAccessToken: getBearerToken(request),
     });
-    return NextResponse.json(outcome.body, { status: outcome.status });
+    return jsonResponse(request, outcome.body, { status: outcome.status });
   } catch {
-    return NextResponse.json({ error: 'Failed to fetch definition' }, { status: 500 });
+    return jsonResponse(request, { error: 'Failed to fetch definition' }, { status: 500 });
   }
 }

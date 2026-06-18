@@ -1126,10 +1126,14 @@
   }
 
   function dictionaryLookupEndpoint() {
+    if (window.__afShadowingConfig?.dictionaryEndpoint) {
+      return window.__afShadowingConfig.dictionaryEndpoint();
+    }
+
     const configured = window.localStorage.getItem("afShadowingDictionaryUrl") || "";
     if (configured === "off") return "";
     if (configured) return configured;
-    return "http://localhost:3000/api/dict";
+    return "https://audiofilms-api.dilum.io/api/dict";
   }
 
   function dictionaryBackendEndpoint(kind) {
@@ -1261,7 +1265,7 @@
 
   function twoThousandNlConnectOptions() {
     return {
-      baseUrl: window.localStorage.getItem("afShadowing2000nlBaseUrl") || "https://2000.dilum.io",
+      baseUrl: window.__afShadowingConfig?.connectBase?.() || window.localStorage.getItem("afShadowing2000nlBaseUrl") || "https://2000.dilum.io",
       clientId: window.localStorage.getItem("afShadowing2000nlClientId") || "audiofilms_chrome_dev",
     };
   }
@@ -1523,12 +1527,20 @@
         refreshCache: Boolean(options.refreshCache),
       });
       const cues = transcriptResult.cues;
-      const phrases = phraseApi.buildPhrases(cues, {
-        maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
-        longPauseMs: LONG_PAUSE_MS,
-        maxWords: 18,
-        maxCharacters: 140,
-      });
+      const phrases = transcriptResult.practicePhraseSource === "backend"
+        ? cues.map((cue, index) => ({
+          startMs: cue.startMs,
+          endMs: cue.endMs,
+          text: phraseApi.cleanPhraseText(cue.text),
+          cues: [cue],
+          index,
+        }))
+        : phraseApi.buildPhrases(cues, {
+          maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
+          longPauseMs: LONG_PAUSE_MS,
+          maxWords: 18,
+          maxCharacters: 140,
+        });
       if (loadToken !== state.loadToken) return;
       if (!phrases.length) {
         throw new Error("Caption track loaded, but no timed phrases were parsed.");
@@ -1667,6 +1679,7 @@
       primaryProvider: result?.primaryProvider || "",
       failedProvider: result?.failedProvider || "",
       fallbackReason: result?.fallbackReason || "",
+      practicePhraseSource: result?.practicePhraseSource || "",
     };
     state.cueSource = normalized.retrievalPath;
     return normalized;
@@ -1694,6 +1707,7 @@
       primaryProvider: result.primaryProvider || "",
       failedProvider: result.failedProvider || "",
       fallbackReason: result.fallbackReason || "",
+      practicePhraseSource: result.practicePhraseSource || "",
     };
   }
 
@@ -1718,7 +1732,7 @@
   function fetchOriginFromRetrievalPath(retrievalPath) {
     if (!retrievalPath) return "";
     if (String(retrievalPath).startsWith("timedtext")) return "youtube-page";
-    if (retrievalPath === "backend-provider") return "backend";
+    if (retrievalPath === "backend-provider" || retrievalPath === "local-asr-backend") return "backend";
     if (retrievalPath === "youtubei-transcript") return "youtube-transcript-api";
     if (retrievalPath === "transcript-dom") return "youtube-transcript-dom";
     return "";
@@ -1728,6 +1742,7 @@
     const provider = String(result?.provider || "").trim();
     if (provider === "supadata") return "Supadata";
     if (provider === "yt-dlp") return "yt-dlp";
+    if (provider === "local-asr-practice") return "local ASR";
     if (provider === "youtube-timedtext") return "YouTube page";
     if (provider === "youtubei-transcript") return "YouTube transcript API";
     if (provider === "youtube-transcript-panel") return "YouTube transcript DOM";

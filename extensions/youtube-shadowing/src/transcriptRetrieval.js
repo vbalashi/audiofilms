@@ -5,6 +5,43 @@
     const attempts = [];
     const errors = [];
 
+    if (localAsrBackendEnabled()) {
+      try {
+        options.updateRetrievalPath?.("local-asr-backend");
+        const backendResult = await fetchBackendProviderCues(track, {
+          ...options,
+          backendMode: "local-asr",
+        });
+        attempts.push(successfulAttempt("local-asr-backend", backendResult.cues));
+        const backendAttempts = Array.isArray(backendResult.retrievalAttempts)
+          ? backendResult.retrievalAttempts
+          : [];
+        return buildTranscriptResult(backendResult.cues, {
+          sourceKind: backendResult.sourceKind || "provider",
+          retrievalPath: "local-asr-backend",
+          fetchOrigin: "backend",
+          provider: backendResult.provider || "local-asr-practice",
+          selectedTrackId: trackId(track),
+          actualTrackId: backendResult.provider || "",
+          languageCode: backendResult.languageCode || track?.languageCode || "",
+          timingExactness: backendResult.timingExactness || "word-level",
+          qualityFlags: backendResult.qualityFlags,
+          warnings: backendResult.warnings,
+          retrievalAttempts: [...attempts, ...backendAttempts],
+          cacheStatus: backendResult.cacheStatus,
+          fallbackUsed: backendResult.fallbackUsed,
+          primaryProvider: backendResult.primaryProvider,
+          failedProvider: backendResult.failedProvider,
+          fallbackReason: backendResult.fallbackReason,
+          practicePhraseSource: backendResult.practicePhraseSource,
+        });
+      } catch (error) {
+        const message = errorMessage(error);
+        attempts.push(failedAttempt("local-asr-backend", message));
+        errors.push(message);
+      }
+    }
+
     try {
       options.updateRetrievalPath?.("timedtext-json3");
       const captionResult = await fetchCaptionCues(track);
@@ -203,22 +240,37 @@
       throw new Error("Backend provider fallback needs a video id.");
     }
 
-    const endpoint = backendProviderEndpoint();
+    const endpoint = backendProviderEndpoint(options.backendMode);
     if (!endpoint) {
       throw new Error("Backend provider fallback is disabled.");
     }
 
     const requestedLanguage = track?.languageCode || "auto";
     const requestedSourceKind = track?.kind === "asr" ? "auto" : "manual";
+
+    if (options.backendMode === "local-asr" && isAsrJobsEndpoint(endpoint)) {
+      return fetchBackendAsrJobCues(endpoint, {
+        videoId,
+        requestedLanguage,
+        requestedSourceKind,
+        refresh: Boolean(options.refreshCache),
+      });
+    }
+
     const url = new URL(endpoint);
     url.searchParams.set("videoId", videoId);
     url.searchParams.set("lang", requestedLanguage || "auto");
     url.searchParams.set("sourceKind", requestedSourceKind);
+    if (options.backendMode === "local-asr") {
+      applyLocalAsrParams(url);
+    }
     if (options.refreshCache) {
       url.searchParams.set("refresh", "1");
     }
 
-    const response = await requestBackendSubtitles(url.toString());
+    const response = await requestBackendSubtitles(url.toString(), {
+      timeoutMs: options.backendMode === "local-asr" ? localAsrTimeoutMs() : 15000,
+    });
     const text = response.text || "";
     let payload = null;
     try {
@@ -232,7 +284,20 @@
       throw new Error(`Backend provider request failed: HTTP ${response.status} ${message}`);
     }
 
-    const phrases = Array.isArray(payload?.phrases) ? payload.phrases : [];
+    return backendSubtitlePayloadToResult(payload, {
+      requestedLanguage,
+      requestedSourceKind,
+      backendMode: options.backendMode || "",
+    });
+  }
+
+  function backendSubtitlePayloadToResult(payload, options = {}) {
+    const hasBackendPracticePhrases = Array.isArray(payload?.practicePhrases);
+    const phrases = hasBackendPracticePhrases
+      ? payload.practicePhrases
+      : Array.isArray(payload?.phrases)
+        ? payload.phrases
+        : [];
     const cues = phrases
       .map((phrase) => ({
         startMs: Number(phrase.startSec) * 1000,
@@ -246,21 +311,34 @@
       throw new Error("Backend provider returned no timed phrases.");
     }
 
+    const requestedLanguage = options.requestedLanguage || "auto";
+    const requestedSourceKind = options.requestedSourceKind || "manual";
+    const backendMode = options.backendMode || "";
     const languageCode = payload?.language || "";
     const meta = payload?.meta || {};
     const provider = meta.provider || "audiofilms-backend";
-    const returnedSourceKind = meta.sourceKind || payload?.sourceKind || "";
+    const returnedSourceKind = backendMode === "local-asr"
+      ? localAsrSourceKind()
+      : meta.sourceKind || payload?.sourceKind || "";
     const warnings = [];
     const qualityFlags = [];
 
-    if (meta.warning) {
+    if (meta.warning && backendMode !== "local-asr") {
       warnings.push(meta.warning);
+    }
+    if (Array.isArray(meta.warnings)) {
+      warnings.push(...meta.warnings);
+    }
+    if (Array.isArray(meta.qualityFlags)) {
+      qualityFlags.push(...meta.qualityFlags);
     }
     if (languageCode && requestedLanguage !== "auto" && languageCode !== requestedLanguage) {
       qualityFlags.push("language-mismatch");
       warnings.push(`Backend provider returned ${languageCode}, requested ${requestedLanguage}.`);
     }
-    if (returnedSourceKind && returnedSourceKind !== requestedSourceKind) {
+    if (backendMode === "local-asr") {
+      // ASR is an intentional diagnostic/job source, not the selected YouTube track.
+    } else if (returnedSourceKind && returnedSourceKind !== requestedSourceKind) {
       qualityFlags.push("source-kind-mismatch");
       warnings.push(`Backend provider returned ${returnedSourceKind} captions, requested ${requestedSourceKind}.`);
     } else if (!returnedSourceKind) {
@@ -273,38 +351,193 @@
       languageCode,
       provider,
       sourceKind: returnedSourceKind,
+      timingExactness: meta.timingExactness || "",
       cacheStatus: meta.cacheStatus || "",
       fallbackUsed: Boolean(meta.fallbackUsed),
       primaryProvider: meta.primaryProvider || "",
       failedProvider: meta.failedProvider || "",
       fallbackReason: meta.fallbackReason || "",
       retrievalAttempts: Array.isArray(meta.retrievalAttempts) ? meta.retrievalAttempts : [],
-      qualityFlags,
-      warnings,
+      qualityFlags: Array.from(new Set(qualityFlags)),
+      warnings: Array.from(new Set(warnings)),
+      practicePhraseSource: hasBackendPracticePhrases ? "backend" : "",
     };
   }
 
-  function backendProviderEndpoint() {
+  async function fetchBackendAsrJobCues(endpoint, options = {}) {
+    const createResponse = await requestBackendSubtitles(endpoint, {
+      method: "POST",
+      timeoutMs: 15000,
+      headers: {
+        "content-type": "application/json",
+        ...testerAuthHeaders(),
+      },
+      body: JSON.stringify(buildAsrJobPayload(options)),
+    });
+    const createPayload = parseJsonResponse(createResponse);
+    if (!createResponse.ok) {
+      const message = createResponse.error || createPayload?.error || `HTTP ${createResponse.status}`;
+      throw new Error(`ASR job create failed: ${message}`);
+    }
+
+    const deadlineAt = Date.now() + localAsrTimeoutMs();
+    let job = createPayload;
+    while (Date.now() < deadlineAt) {
+      if (job?.status === "completed") {
+        const resultUrl = resolveAsrJobUrl(endpoint, job.resultUrl || `${job.statusUrl || ""}/result`);
+        const resultResponse = await requestBackendSubtitles(resultUrl, {
+          timeoutMs: 15000,
+          headers: testerAuthHeaders(),
+        });
+        const resultPayload = parseJsonResponse(resultResponse);
+        if (!resultResponse.ok) {
+          const message = resultResponse.error || resultPayload?.error || `HTTP ${resultResponse.status}`;
+          throw new Error(`ASR result fetch failed: ${message}`);
+        }
+        return backendSubtitlePayloadToResult(resultPayload, {
+          requestedLanguage: options.requestedLanguage,
+          requestedSourceKind: options.requestedSourceKind,
+          backendMode: "local-asr",
+        });
+      }
+
+      if (job?.status === "failed" || job?.status === "unavailable" || job?.status === "rejected") {
+        throw new Error(`ASR job ${job.status}: ${job.error || job.detail || "no detail"}`);
+      }
+
+      const pollAfterMs = Number(job?.pollAfterMs || 3000);
+      await sleep(Math.max(500, Math.min(pollAfterMs, 10000)));
+      const statusUrl = resolveAsrJobUrl(endpoint, job?.statusUrl || job?.jobId || "");
+      const statusResponse = await requestBackendSubtitles(statusUrl, {
+        timeoutMs: 15000,
+        headers: testerAuthHeaders(),
+      });
+      job = parseJsonResponse(statusResponse);
+      if (!statusResponse.ok) {
+        const message = statusResponse.error || job?.error || `HTTP ${statusResponse.status}`;
+        throw new Error(`ASR job status failed: ${message}`);
+      }
+    }
+
+    throw new Error("ASR job timed out before completion.");
+  }
+
+  function buildAsrJobPayload(options = {}) {
+    const params = localAsrParams();
+    const payload = {
+      videoId: options.videoId,
+      lang: options.requestedLanguage || "auto",
+      sourceKind: options.requestedSourceKind || "manual",
+      textSource: params.textSource,
+      refresh: Boolean(options.refresh),
+    };
+    if (params.engine) payload.engine = params.engine;
+    if (params.model) payload.model = params.model;
+    if (params.duration) payload.durationSec = Number(params.duration);
+    return payload;
+  }
+
+  function localAsrParams() {
+    return {
+      textSource: window.localStorage.getItem("afShadowingLocalAsrTextSource") || "asr",
+      engine: window.localStorage.getItem("afShadowingLocalAsrEngine") || "",
+      model: window.localStorage.getItem("afShadowingLocalAsrModel") || "",
+      duration: window.localStorage.getItem("afShadowingLocalAsrDuration") || "",
+    };
+  }
+
+  function parseJsonResponse(response) {
+    const text = response?.text || "";
+    try {
+      return text ? JSON.parse(text) : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function resolveAsrJobUrl(endpoint, value) {
+    if (!value) throw new Error("ASR job response did not include a status URL.");
+    if (/^https?:\/\//i.test(value)) return value;
+    if (/^asr_[a-z0-9_-]+/i.test(value)) {
+      return new URL(`${endpoint.replace(/\/+$/, "")}/${encodeURIComponent(value)}`).toString();
+    }
+    return new URL(value, endpoint).toString();
+  }
+
+  function isAsrJobsEndpoint(endpoint) {
+    return /\/api\/asr\/jobs\/?$/i.test(new URL(endpoint).pathname);
+  }
+
+  function testerAuthHeaders() {
+    const config = afConfig();
+    if (config?.testerAuthHeaders) return config.testerAuthHeaders();
+    const token = window.localStorage.getItem("afShadowingTesterToken") || window.localStorage.getItem("afShadowingAsrToken") || "";
+    return token ? { authorization: `Bearer ${token}` } : {};
+  }
+
+  function afConfig() {
+    return window.__afShadowingConfig || null;
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  function localAsrBackendEnabled() {
+    return window.localStorage.getItem("afShadowingLocalAsr") === "on";
+  }
+
+  function backendProviderEndpoint(mode = "") {
+    const config = afConfig();
+    if (mode === "local-asr") {
+      if (config?.asrJobsEndpoint) return config.asrJobsEndpoint();
+      const configured = window.localStorage.getItem("afShadowingLocalAsrUrl") || "";
+      if (configured === "off") return "";
+      if (configured) return configured;
+      return "https://audiofilms-api.dilum.io/api/asr/jobs";
+    }
+
+    if (config?.subtitlesEndpoint) return config.subtitlesEndpoint();
     const configured = window.localStorage.getItem("afShadowingBackendSubtitlesUrl") || "";
     if (configured === "off") return "";
     if (configured) return configured;
-    return "http://localhost:3000/api/get-subs";
+    return "https://audiofilms-api.dilum.io/api/get-subs";
   }
 
-  function requestBackendSubtitles(url) {
+  function applyLocalAsrParams(url) {
+    const params = localAsrParams();
+    url.searchParams.set("textSource", params.textSource);
+    if (params.engine) url.searchParams.set("engine", params.engine);
+    if (params.model) url.searchParams.set("model", params.model);
+    if (params.duration) url.searchParams.set("duration", params.duration);
+  }
+
+  function localAsrSourceKind() {
+    return (window.localStorage.getItem("afShadowingLocalAsrTextSource") || "asr") === "manual"
+      ? "manual"
+      : "asr";
+  }
+
+  function localAsrTimeoutMs() {
+    const configured = Number(window.localStorage.getItem("afShadowingLocalAsrTimeoutMs") || "");
+    return Number.isFinite(configured) && configured > 0 ? configured : 30 * 60 * 1000;
+  }
+
+  function requestBackendSubtitles(url, options = {}) {
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-      return fetchBackendSubtitlesDirect(url);
+      return fetchBackendSubtitlesDirect(url, options);
     }
 
     return new Promise((resolve, reject) => {
       const timeoutId = window.setTimeout(() => {
         reject(new Error("Backend provider request timed out."));
-      }, 15000);
+      }, options.timeoutMs || 15000);
 
       chrome.runtime.sendMessage(
         {
           type: "af-fetch-backend-subtitles",
           url,
+          options: fetchOptionsForBackend(options),
         },
         (response) => {
           window.clearTimeout(timeoutId);
@@ -323,13 +556,8 @@
     });
   }
 
-  async function fetchBackendSubtitlesDirect(url) {
-    const response = await fetch(url, {
-      credentials: "omit",
-      headers: {
-        accept: "application/json",
-      },
-    });
+  async function fetchBackendSubtitlesDirect(url, options = {}) {
+    const response = await fetch(url, fetchOptionsForBackend(options));
     const text = await response.text();
     return {
       ok: response.ok,
@@ -337,6 +565,18 @@
       text,
     };
   }
+  function fetchOptionsForBackend(options = {}) {
+    return {
+      credentials: "omit",
+      method: options.method || "GET",
+      body: options.body,
+      headers: {
+        accept: "application/json",
+        ...(options.headers || {}),
+      },
+    };
+  }
+
 
   function buildTranscriptResult(cues, metadata) {
     const quality = analyzeCueQuality(cues, metadata);
@@ -358,6 +598,7 @@
       primaryProvider: metadata.primaryProvider || "",
       failedProvider: metadata.failedProvider || "",
       fallbackReason: metadata.fallbackReason || "",
+      practicePhraseSource: metadata.practicePhraseSource || "",
     };
   }
 

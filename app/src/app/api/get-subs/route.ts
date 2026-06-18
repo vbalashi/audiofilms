@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonResponse, optionsResponse } from "@/lib/http/apiResponse";
 import { loadSubtitles } from "@/lib/subtitleService";
 import {
   SubtitleProviderError,
@@ -84,6 +84,10 @@ function normalizeSubtitleFailure(error: unknown): {
   };
 }
 
+export async function OPTIONS(request: Request) {
+  return optionsResponse(request, { methods: ["GET", "OPTIONS"] });
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const videoId = searchParams.get("videoId");
@@ -100,15 +104,15 @@ export async function GET(request: Request) {
   );
 
   if (!videoId) {
-    return NextResponse.json({ error: "Missing videoId" }, { status: 400 });
+    return jsonResponse(request, { error: "Missing videoId" }, { status: 400 });
   }
 
   try {
     const response = await loadSubtitles(videoId, language, { sourceKind, refresh });
     console.log(
-      `[get-subs] Returning ${response.phrases.length} phrases in language ${response.language} for ${videoId}`,
+      `[get-subs] Returning ${response.phrases.length} source phrases and ${response.practicePhrases?.length || 0} practice phrases in language ${response.language} for ${videoId}`,
     );
-    return NextResponse.json(response);
+    return jsonResponse(request, response);
   } catch (error) {
     if (error instanceof SubtitleProviderError) {
       console.warn(`[get-subs] Subtitle fetch failed for ${videoId}: ${error.code}`);
@@ -117,7 +121,8 @@ export async function GET(request: Request) {
     }
     const failure = normalizeSubtitleFailure(error);
 
-    return NextResponse.json(
+    return jsonResponse(
+      request,
       {
         error: failure.message,
         recoverable: failure.recoverable,

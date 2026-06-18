@@ -201,6 +201,16 @@ Current subtitle backend expectation:
 
 - The app/provider default is `yt-dlp`, with Supadata as an explicit fallback path.
 - The extension still tries YouTube page `timedtext` first. If YouTube returns `HTTP 429`, it falls back to `http://localhost:3000/api/get-subs`.
+- For local ASR dogfood, set `localStorage.afShadowingLocalAsr = "on"` on the
+  YouTube watch page. This deliberately tries
+  `http://localhost:3000/api/local-asr-practice` before YouTube `timedtext`,
+  so the extension is testing the local transcript/alignment path rather than
+  the ordinary caption path.
+- Local ASR dogfood uses the full video by default. Do not set
+  `localStorage.afShadowingLocalAsrDuration` unless you explicitly want a
+  bounded smoke. Use `localStorage.afShadowingLocalAsrTextSource = "asr"` for
+  literal ASR segments and `"manual"` for clean subtitles projected onto ASR
+  word timings.
 - Backend auto captions should show `via yt-dlp` when local `yt-dlp` is available.
 - If the UI still shows `via Supadata`, check for:
   - an old Next dev server that was not restarted after provider changes;

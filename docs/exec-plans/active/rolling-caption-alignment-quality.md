@@ -22,6 +22,16 @@ cd app
 npm run subtitle:shootout
 ```
 
+Local ASR alignment smoke command:
+
+```bash
+cd app
+npm run asr:align:smoke -- --video RJrjzCuCHpo --lang nl --duration 90
+npm run asr:align:stable-smoke -- --video RJrjzCuCHpo --lang nl --duration 90 --model small
+npm run asr:align:smoke -- --video RJrjzCuCHpo --lang nl --duration 300
+npm run asr:align:stable-smoke -- --video RJrjzCuCHpo --lang nl --duration 300 --model large-v3-turbo
+```
+
 This command does not call Supadata.
 
 Current report:
@@ -29,6 +39,63 @@ Current report:
 ```text
 docs/exec-plans/active/subtitle-source-quality-shootout-report.md
 ```
+
+First local ASR/manual-alignment smoke result:
+
+| Fixture | Window | Engine | Model | Manual coverage | ASR coverage | Projected cues | Meaning |
+| --- | ---: | --- | --- | ---: | ---: | ---: | --- |
+| `RJrjzCuCHpo` | `90s` | `faster-whisper` | `mobiuslabsgmbh/faster-whisper-large-v3-turbo`, CPU `int8` | `0.962` | `0.681` | `16/17` ASR-aligned | Current baseline. Local ASR word timings look viable as timing evidence for this Dutch manual-caption sample. One cue correctly fell back after the density/span gate caught an over-stretched LCS match caused by extra ASR words. |
+| `RJrjzCuCHpo` | `90s` | `stable-ts` | `base`, CPU dynamic quantization | `0.695` | `0.489` | `8/17` ASR-aligned | Too weak for this Dutch sample; transcription errors dominate alignment. |
+| `RJrjzCuCHpo` | `90s` | `stable-ts` | `small`, CPU dynamic quantization | `0.893` | `0.650` | `14/17` ASR-aligned | Better than `base`, but still below `faster-whisper-large-v3-turbo` on this fixture. Keep as a comparison path, not the default yet. |
+| `RJrjzCuCHpo` | `300s` | `faster-whisper` | `mobiuslabsgmbh/faster-whisper-large-v3-turbo`, CPU `int8` | `0.959` | `0.905` | `73/76` ASR-aligned | Best current 5-minute result. Keep as the default baseline for now. |
+| `RJrjzCuCHpo` | `300s` | `stable-ts` | `large-v3-turbo`, CPU dynamic quantization | `0.953` | `0.906` | `71/76` ASR-aligned | Very close to the baseline and slightly higher ASR coverage, but fewer manual cues pass the confidence gate. Useful comparison path; not a clear replacement yet. |
+
+Report artifact:
+
+```text
+app/.asr-cache/RJrjzCuCHpo-nl-90s/alignment-report.md
+app/.asr-cache/RJrjzCuCHpo-nl-90s/stable-ts-alignment-report.md
+app/.asr-cache/RJrjzCuCHpo-nl-90s/stable-ts-small-alignment-report.md
+app/.asr-cache/RJrjzCuCHpo-nl-300s/faster-whisper-mobiuslabsgmbh-faster-whisper-large-v3-turbo-alignment-report.md
+app/.asr-cache/RJrjzCuCHpo-nl-300s/stable-ts-large-v3-turbo-alignment-report.md
+```
+
+Playable local ASR dogfood targets:
+
+Extension-first dogfood happens on the real YouTube watch page:
+
+```text
+https://www.youtube.com/watch?v=RJrjzCuCHpo
+```
+
+Enable local ASR in that page's console:
+
+```js
+localStorage.afShadowingLocalAsr = "on";
+localStorage.afShadowingLocalAsrTextSource = "asr";
+location.reload();
+```
+
+This uses the full video by default. Do not set
+`localStorage.afShadowingLocalAsrDuration` unless a bounded smoke is intentional.
+The first full run for `RJrjzCuCHpo` produced `126` raw ASR segments, ending at
+`494.53s` with `Tot dan.`. The playable ASR phrase list currently has `125`
+phrases after merging one zero-gap ellipsis continuation:
+`En veel van wat ze meenemen is oranje, oranje en oranje.`
+
+The app URLs remain useful as backend diagnostics:
+
+```text
+http://localhost:3000/watch/RJrjzCuCHpo?localAsr=1&duration=300&lang=nl&textSource=asr
+http://localhost:3000/watch/RJrjzCuCHpo?localAsr=1&duration=300&lang=nl&textSource=manual
+http://localhost:3000/watch/RJrjzCuCHpo?localAsr=1&duration=300&lang=nl&engine=stable-ts&model=large-v3-turbo&textSource=asr
+http://localhost:3000/watch/RJrjzCuCHpo?localAsr=1&duration=300&lang=nl&engine=stable-ts&model=large-v3-turbo&textSource=manual
+```
+
+Use `textSource=asr` to judge literal transcript segmentation and stop timing.
+Use `textSource=manual` to judge clean manual subtitle text projected onto local
+ASR word timings. If the manual subtitle stream omits spoken words, this mode can
+fall back to wider manual cue spans even when token coverage looks high.
 
 First clean-text/ASR-timing feasibility result:
 
