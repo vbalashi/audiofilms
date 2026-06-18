@@ -225,6 +225,7 @@ export const phraseTranslationReadyFixture = {
   translationId: 'translation:ready',
   status: 'ready',
   sourceTextHash: 'sha256:source',
+  contextTextHash: 'sha256:context',
   sourceLanguageCode: 'nl',
   targetLanguageCode: 'ru',
   translatedText: 'Он идет домой.',

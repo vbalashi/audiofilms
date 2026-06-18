@@ -136,6 +136,7 @@ export type PlatformTextTranslationResponse = {
   translationId?: string;
   status?: string;
   sourceTextHash?: string;
+  contextTextHash?: string;
   sourceLanguageCode?: string;
   targetLanguageCode?: string;
   translatedText?: string;
@@ -152,6 +153,7 @@ export type PhraseTranslation = {
   translationId?: string;
   status: PhraseTranslationStatus;
   sourceTextHash?: string;
+  contextTextHash?: string;
   sourceLanguageCode: string;
   targetLanguageCode?: string;
   translatedText?: string;

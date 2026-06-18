@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:dictionary": "vitest run tests/dictionary/overlayProjection.test.ts",
+    "test:dictionary": "vitest run tests/dictionary/overlayProjection.test.ts tests/practice/phraseTranslations.test.ts",
     "subtitle:shootout": "node scripts/subtitle-source-shootout.mjs",
     "subtitle:shootout:supadata": "node scripts/subtitle-source-shootout.mjs --include-supadata",
     "asr:align:smoke": "node scripts/local-asr-alignment-smoke.mjs",

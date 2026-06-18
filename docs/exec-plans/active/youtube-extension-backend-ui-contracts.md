@@ -472,6 +472,10 @@ Rules:
   responses that only expose a target language.
 - Cache translations next to phrase/caption artifacts by stable text/context
   hashes, not by video id alone.
+- 2000NL text translation treats `contextText` as semantic when a provider
+  supports context-aware translation. Its `translationId` includes
+  `contextTextHash` when context is supplied, and AudioFilms preserves both
+  `sourceTextHash` and `contextTextHash` on phrase translation artifacts.
 - Extension should request a phrase prompt and render it; it should not own
   translation provider policy.
 
@@ -512,6 +516,7 @@ type PhraseTranslation = {
   translationId?: string;
   status: 'missing' | 'pending' | 'ready' | 'failed' | string;
   sourceTextHash?: string;
+  contextTextHash?: string;
   sourceLanguageCode: string;
   targetLanguageCode?: string;
   translatedText?: string;
@@ -540,7 +545,9 @@ Safe first-implementation defaults:
 - Use an explicit phrase-translation endpoint or action wrapper; do not reuse
   dictionary-card translation as an implicit substitute.
 - Cache phrase translations by source language + target language + normalized
-  source text hash + optional context hash + translation policy version.
+  source text hash + optional context hash + purpose + translation policy
+  version. AudioFilms stores the source and context hashes separately so the UI
+  and backend can distinguish "same text, different context" artifacts.
 - Recall should show the phrase row with a compact `Translating...` state while
   translation is missing; it should not silently fall back to original text.
 - Shadow `Show Translation` should translate on first `T` press for the current
@@ -557,6 +564,7 @@ type PhraseTranslation = {
   translationId?: string;
   status: 'missing' | 'pending' | 'ready' | 'failed' | string;
   sourceTextHash?: string;
+  contextTextHash?: string;
   sourceLanguageCode: string;
   targetLanguageCode?: string;
   translatedText?: string;
