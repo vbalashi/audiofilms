@@ -364,6 +364,20 @@ type PracticeOperation = {
     timingEvidenceRevisionId?: string;
     phraseSetRevisionId?: string;
     resultUrl?: string;
+    applicability: {
+      appliesToCurrentSnapshot: boolean;
+      staleReason?:
+        | 'missing-requested-snapshot-revision'
+        | 'result-snapshot-unavailable'
+        | 'text-source-revision-mismatch';
+      requestedSnapshotRevisionId?: string;
+      requestedTextSourceRevisionId?: string;
+      requestedTimingEvidenceRevisionId?: string;
+      resultSnapshotRevisionId?: string;
+      resultTextSourceRevisionId?: string;
+      resultTimingEvidenceRevisionId?: string;
+      diagnostics?: string[];
+    };
     diagnostics?: Record<string, unknown>;
   };
   error?: {
@@ -386,10 +400,23 @@ type PracticeOperation = {
 - Completed operations read the ASR result artifact when it is available and
   readable, build a full `PracticeSnapshot`, and expose
   `snapshotRevisionId`, `textSourceRevisionId`, `timingEvidenceRevisionId`, and
-  `phraseSetRevisionId`. If the ASR job is complete but the artifact is
-  unavailable or unreadable, the envelope returns diagnostics and a low-level
-  result URL for troubleshooting rather than pretending a timing revision
-  exists.
+  `phraseSetRevisionId`. They also expose `result.applicability`, the
+  backend's conservative auto-apply guard. `requestedSnapshotRevisionId` is the
+  UI snapshot anchor from job creation; `resultSnapshotRevisionId` is the newly
+  built result snapshot and may differ for a valid timing-improvement result.
+  The UI must only auto-apply when `appliesToCurrentSnapshot` is true and the
+  currently selected UI snapshot still equals `requestedSnapshotRevisionId`.
+  If the request omitted `snapshotRevisionId`, `appliesToCurrentSnapshot` is
+  false with `staleReason: 'missing-requested-snapshot-revision'`; callers may
+  fall back to a current-video/manual check, but must not treat the result as
+  safe auto-apply. `textSourceRevisionId` is compared to the result text source
+  when both sides are available; mismatch means the result is stale. Requested
+  `timingEvidenceRevisionId` is an input baseline for the timing job, while the
+  result timing evidence is a new output, so a difference is reported as a
+  diagnostic rather than a stale condition. If the ASR job is complete but the
+  artifact is unavailable or unreadable, the envelope returns diagnostics and a
+  low-level result URL for troubleshooting rather than pretending a timing
+  revision exists.
 - Progress is omitted until a worker exposes a reliable progress value.
 
 ## Phase 4: Text Source And Pairwise Alignment

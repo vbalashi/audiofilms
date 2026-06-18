@@ -81,6 +81,23 @@ export type PracticeTimingOperationInput = {
   timingEvidenceRevisionId?: string;
 };
 
+export type PracticeOperationStaleReason =
+  | 'missing-requested-snapshot-revision'
+  | 'result-snapshot-unavailable'
+  | 'text-source-revision-mismatch';
+
+export type PracticeOperationResultApplicability = {
+  appliesToCurrentSnapshot: boolean;
+  staleReason?: PracticeOperationStaleReason;
+  requestedSnapshotRevisionId?: string;
+  requestedTextSourceRevisionId?: string;
+  requestedTimingEvidenceRevisionId?: string;
+  resultSnapshotRevisionId?: string;
+  resultTextSourceRevisionId?: string;
+  resultTimingEvidenceRevisionId?: string;
+  diagnostics?: string[];
+};
+
 export type PracticeOperation = {
   id: string;
   kind: 'improve-timing';
@@ -97,6 +114,7 @@ export type PracticeOperation = {
     timingEvidenceRevisionId?: string;
     phraseSetRevisionId?: string;
     resultUrl?: string;
+    applicability: PracticeOperationResultApplicability;
     diagnostics?: Record<string, unknown>;
   };
   error?: {

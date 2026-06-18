@@ -14,12 +14,15 @@ import {
 } from '@/lib/practice/snapshot';
 import type {
   PracticeOperation,
+  PracticeOperationResultApplicability,
   PracticeOperationState,
+  PracticeSnapshot,
   PracticeTimingOperationInput,
 } from '@/types/practice';
 
 export type {
   PracticeOperation,
+  PracticeOperationResultApplicability,
   PracticeOperationState,
   PracticeTimingOperationInput,
 } from '@/types/practice';
@@ -184,7 +187,7 @@ export async function publicPracticeTimingOperation(
   };
 
   if (job.status === 'completed') {
-    output.result = await buildCompletedResult(job, request);
+    output.result = await buildCompletedResult(job, operation.input, request);
   }
 
   if (job.status === 'failed') {
@@ -206,6 +209,7 @@ function practiceStateFromAsrStatus(status: AsrJobRecord['status']): PracticeOpe
 
 async function buildCompletedResult(
   job: AsrJobRecord,
+  input: PracticeTimingOperationInput,
   request: Request,
 ): Promise<NonNullable<PublicPracticeTimingOperation['result']>> {
   const origin = publicApiOrigin(request);
@@ -219,6 +223,7 @@ async function buildCompletedResult(
     if (!result) {
       return {
         resultUrl: `${origin}/api/asr/jobs/${encodeURIComponent(job.jobId)}/result`,
+        applicability: practiceOperationResultApplicability(input, null),
         diagnostics: {
           ...diagnostics,
           artifact: 'missing',
@@ -237,11 +242,13 @@ async function buildCompletedResult(
       textSourceRevisionId: snapshot.textSource?.revisionId,
       timingEvidenceRevisionId: snapshot.timingEvidence?.revisionId,
       phraseSetRevisionId: snapshot.phraseSet?.revisionId,
+      applicability: practiceOperationResultApplicability(input, snapshot),
       diagnostics,
     };
   } catch (error) {
     return {
       resultUrl: `${origin}/api/asr/jobs/${encodeURIComponent(job.jobId)}/result`,
+      applicability: practiceOperationResultApplicability(input, null),
       diagnostics: {
         ...diagnostics,
         artifact: 'unreadable',
@@ -249,4 +256,58 @@ async function buildCompletedResult(
       },
     };
   }
+}
+
+export function practiceOperationResultApplicability(
+  input: PracticeTimingOperationInput,
+  snapshot: PracticeSnapshot | null,
+): PracticeOperationResultApplicability {
+  const resultSnapshotRevisionId = snapshot?.snapshotRevisionId;
+  const resultTextSourceRevisionId = snapshot?.textSource?.revisionId;
+  const resultTimingEvidenceRevisionId = snapshot?.timingEvidence?.revisionId;
+  const applicability: PracticeOperationResultApplicability = {
+    appliesToCurrentSnapshot: false,
+    requestedSnapshotRevisionId: input.snapshotRevisionId,
+    requestedTextSourceRevisionId: input.textSourceRevisionId,
+    requestedTimingEvidenceRevisionId: input.timingEvidenceRevisionId,
+    resultSnapshotRevisionId,
+    resultTextSourceRevisionId,
+    resultTimingEvidenceRevisionId,
+  };
+  const diagnostics: string[] = [];
+
+  if (!input.snapshotRevisionId) {
+    applicability.staleReason = 'missing-requested-snapshot-revision';
+    diagnostics.push('Auto-apply is unsafe because the timing job was created without a requested snapshot revision.');
+  } else if (!snapshot) {
+    applicability.staleReason = 'result-snapshot-unavailable';
+    diagnostics.push('Auto-apply is unsafe because the completed timing job did not expose a readable result snapshot.');
+  } else if (
+    input.textSourceRevisionId &&
+    resultTextSourceRevisionId &&
+    input.textSourceRevisionId !== resultTextSourceRevisionId
+  ) {
+    applicability.staleReason = 'text-source-revision-mismatch';
+    diagnostics.push('The result snapshot is based on a different text source revision than the timing job requested.');
+  } else {
+    applicability.appliesToCurrentSnapshot = true;
+    if (input.textSourceRevisionId && !resultTextSourceRevisionId) {
+      diagnostics.push('Requested text source revision was supplied, but the result snapshot has no text source revision to compare.');
+    }
+    if (input.timingEvidenceRevisionId && !resultTimingEvidenceRevisionId) {
+      diagnostics.push('Requested timing evidence revision was supplied, but the result snapshot has no timing evidence revision to compare.');
+    } else if (
+      input.timingEvidenceRevisionId &&
+      resultTimingEvidenceRevisionId &&
+      input.timingEvidenceRevisionId !== resultTimingEvidenceRevisionId
+    ) {
+      diagnostics.push('Requested timing evidence revision is an input baseline; the result timing evidence revision is a new output and is not a stale check.');
+    }
+  }
+
+  if (diagnostics.length) {
+    applicability.diagnostics = diagnostics;
+  }
+
+  return applicability;
 }

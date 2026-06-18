@@ -314,6 +314,8 @@ export const runningPracticeOperationFixture = {
     language: 'nl',
     sourceKind: 'auto',
     snapshotRevisionId: 'practice-snapshot:rough',
+    textSourceRevisionId: 'text-source:rough-rev',
+    timingEvidenceRevisionId: 'timing-evidence:rough-rev',
   },
   pollUrl: 'http://localhost:3000/api/practice/operations/timing%3Ajob-running',
   retryAfterMs: 3000,
@@ -330,6 +332,18 @@ export const succeededPracticeOperationFixture = {
     textSourceRevisionId: precisePracticeSnapshotFixture.textSource?.revisionId,
     timingEvidenceRevisionId: precisePracticeSnapshotFixture.timingEvidence?.revisionId,
     phraseSetRevisionId: precisePracticeSnapshotFixture.phraseSet?.revisionId,
+    applicability: {
+      appliesToCurrentSnapshot: true,
+      requestedSnapshotRevisionId: 'practice-snapshot:rough',
+      requestedTextSourceRevisionId: 'text-source:rough-rev',
+      requestedTimingEvidenceRevisionId: 'timing-evidence:rough-rev',
+      resultSnapshotRevisionId: precisePracticeSnapshotFixture.snapshotRevisionId,
+      resultTextSourceRevisionId: precisePracticeSnapshotFixture.textSource?.revisionId,
+      resultTimingEvidenceRevisionId: precisePracticeSnapshotFixture.timingEvidence?.revisionId,
+      diagnostics: [
+        'Requested timing evidence revision is an input baseline; the result timing evidence revision is a new output and is not a stale check.',
+      ],
+    },
     diagnostics: {
       asrJobId: 'job-succeeded',
       completedAt: '2026-06-18T09:20:00.000Z',
