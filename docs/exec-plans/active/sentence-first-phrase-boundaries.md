@@ -33,6 +33,14 @@ For `NQjgLK4HLp0`, manual Dutch and auto Dutch currently look very similar becau
 
 This makes the fixture useful for display-text experiments, but not enough by itself to prove that auto timing is better than manual timing.
 
+For `4EE7m94mJpk`, a manual Dutch provider cue ended with `...` and the next
+cue began with `...of` after a `0.28s` gap. The backend treated the ellipsis as
+a final sentence boundary, so learner phrase 13 ended at `ter wereld...` instead
+of continuing into `of ter universum.` This is now covered by a narrow
+continuation-cue merge rule, but broader subtitle/NLP segmentation remains a
+low-priority area for corpus testing rather than a solved language model
+problem.
+
 ## Desired Phrase Policy
 
 Use a sentence-first policy:

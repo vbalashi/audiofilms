@@ -2,10 +2,12 @@ import type { Phrase } from '@/types/subtitles';
 
 export const DEFAULT_MAX_WORDS_PER_PRACTICE_PHRASE = 18;
 export const DEFAULT_MAX_CHARACTERS_PER_PRACTICE_PHRASE = 140;
+export const DEFAULT_MAX_CONTINUATION_GAP_SEC = 0.5;
 
 export type PracticePhraseOptions = {
   maxWords?: number;
   maxCharacters?: number;
+  maxContinuationGapSec?: number;
 };
 
 export function wordCount(text: string) {
@@ -80,6 +82,65 @@ function splitPhraseIntoTimedParts(
   });
 }
 
+function hasTrailingEllipsis(text: string) {
+  return /(?:\.\.\.|…)\s*$/.test(text.trim());
+}
+
+function stripTrailingEllipsis(text: string) {
+  return text.trim().replace(/\s*(?:\.\.\.|…)\s*$/, '');
+}
+
+function stripLeadingEllipsis(text: string) {
+  return text.trim().replace(/^(?:\.\.\.|…)\s*/, '');
+}
+
+function startsWithContinuationCue(text: string) {
+  const cleanText = text.trim();
+  if (/^(?:\.\.\.|…)/.test(cleanText)) return true;
+
+  const firstLetter = cleanText.match(/\p{L}/u)?.[0];
+  return Boolean(firstLetter && firstLetter === firstLetter.toLocaleLowerCase());
+}
+
+function mergeContinuationPhrases(
+  phrases: Phrase[],
+  options: Required<PracticePhraseOptions>,
+) {
+  const merged: Phrase[] = [];
+
+  for (const phrase of phrases) {
+    const previous = merged.at(-1);
+
+    if (!previous) {
+      merged.push({ ...phrase });
+      continue;
+    }
+
+    const gapSec = phrase.startSec - previous.endSec;
+    const nextText = stripLeadingEllipsis(phrase.text);
+    const combinedText = `${stripTrailingEllipsis(previous.text)} ${nextText}`
+      .trim()
+      .replace(/\s+/g, ' ');
+
+    const shouldMerge =
+      hasTrailingEllipsis(previous.text) &&
+      startsWithContinuationCue(phrase.text) &&
+      gapSec >= 0 &&
+      gapSec <= options.maxContinuationGapSec &&
+      wordCount(combinedText) <= options.maxWords &&
+      combinedText.length <= options.maxCharacters;
+
+    if (shouldMerge) {
+      previous.endSec = Math.max(previous.endSec, phrase.endSec);
+      previous.text = combinedText;
+    } else {
+      merged.push({ ...phrase });
+    }
+  }
+
+  return merged;
+}
+
 export function normalizePracticePhrases(
   phrases: Phrase[],
   options: PracticePhraseOptions = {},
@@ -87,6 +148,7 @@ export function normalizePracticePhrases(
   const resolvedOptions = {
     maxWords: options.maxWords ?? DEFAULT_MAX_WORDS_PER_PRACTICE_PHRASE,
     maxCharacters: options.maxCharacters ?? DEFAULT_MAX_CHARACTERS_PER_PRACTICE_PHRASE,
+    maxContinuationGapSec: options.maxContinuationGapSec ?? DEFAULT_MAX_CONTINUATION_GAP_SEC,
   };
   const normalized: Phrase[] = [];
   let buffer = '';
@@ -107,7 +169,7 @@ export function normalizePracticePhrases(
     bufferStart = null;
   };
 
-  for (const phrase of phrases) {
+  for (const phrase of mergeContinuationPhrases(phrases, resolvedOptions)) {
     const parts = splitPhraseIntoTimedParts(phrase, resolvedOptions);
 
     for (const part of parts) {
