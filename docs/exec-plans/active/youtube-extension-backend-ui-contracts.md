@@ -104,7 +104,7 @@ them.
 | --- | --- | --- | --- | --- |
 | Initial subtitle read | existing | `GET /api/get-subs` plus direct browser caption attempts | Load cheap/browser-visible captions automatically; do not show provider names by default. | Confirm which metadata fields are stable enough to drive `Text Source` and diagnostics. |
 | `Get Captions` | pollable completed operation | `POST /api/practice/captions`, backed by existing subtitle service/cache, plus `GET /api/practice/operations/{operationId}` for the completed operation. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | Retrieval is currently synchronous; the result is still stored as a product operation with `pollUrl` so UI code can use the same operation surface. |
-| `Improve Timing` | first slice implemented | `POST /api/practice/timing-jobs`, `GET /api/practice/operations/{operationId}`, and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` can become `improving` while base quality remains visible. | Progress/ETA remains omitted until workers expose reliable progress. Pairwise alignment cache keys are now defined separately. |
+| `Improve Timing` | implemented wrapper | `POST /api/practice/timing-jobs`, `GET /api/practice/operations/{operationId}`, and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` can become `improving` while base quality remains visible. | Progress/ETA is a non-goal until workers expose reliable progress. Pairwise alignment cache keys are defined separately. |
 | Text Source switch | partial inventory implemented | `POST /api/practice/source-selection`, backed by active source, cached manual/auto caption artifacts, and readable completed ASR artifacts. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | Full durable multi-source storage remains separate work; current inventory only exposes artifacts the backend can actually read. |
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
 | Translation target | proposed | 2000NL `GET /api/platform/v1/session` exposed through AudioFilms `GET /api/dict/session`. | Extension uses 2000NL target language; local override is dogfood-only fallback. | Confirm preference field name and unauthenticated fallback. |
@@ -436,7 +436,8 @@ type PracticeOperation = {
   artifact is unavailable or unreadable, the envelope returns diagnostics and a
   low-level result URL for troubleshooting rather than pretending a timing
   revision exists.
-- Progress is omitted until a worker exposes a reliable progress value.
+- Progress/ETA is intentionally omitted from the contract until a worker emits
+  reliable progress data. Do not synthesize fake progress in the UI or BFF.
 
 ## Phase 4: Text Source And Pairwise Alignment
 
