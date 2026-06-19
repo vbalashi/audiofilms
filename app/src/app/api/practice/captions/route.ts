@@ -1,4 +1,8 @@
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
+import {
+  publicPracticeCaptionsOperation,
+  upsertPracticeCaptionsOperation,
+} from '@/lib/practice/operations';
 import { buildPracticeSnapshot } from '@/lib/practice/snapshot';
 import { buildPracticeSourceInventory } from '@/lib/practice/sourceInventory';
 import { loadSubtitles } from '@/lib/subtitleService';
@@ -135,13 +139,18 @@ export async function POST(request: Request) {
       requestedLanguage: language,
       availableTextSources,
     });
+    const operation = await upsertPracticeCaptionsOperation(
+      videoId,
+      {
+        language,
+        sourceKind,
+        refresh,
+      },
+      snapshot,
+    );
     const responseBody: PracticeCaptionsResponse = {
       state: 'ready',
-      operation: {
-        id: `get-captions:${snapshot.snapshotRevisionId}`,
-        kind: 'get-captions',
-        state: 'succeeded',
-      },
+      operation: publicPracticeCaptionsOperation(operation, request),
       snapshot,
     };
 

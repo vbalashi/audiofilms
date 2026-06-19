@@ -1,7 +1,9 @@
 import { authorizeAsrRequest } from '@/lib/asr/asrAuth';
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import {
+  getPracticeCaptionsOperation,
   getPracticeTimingOperation,
+  publicPracticeCaptionsOperation,
   publicPracticeTimingOperation,
 } from '@/lib/practice/operations';
 
@@ -14,13 +16,19 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function GET(request: Request, context: RouteContext) {
+  const { operationId } = await context.params;
+  const decodedOperationId = decodeURIComponent(operationId);
+  const captionsOperation = await getPracticeCaptionsOperation(decodedOperationId);
+  if (captionsOperation) {
+    return jsonResponse(request, publicPracticeCaptionsOperation(captionsOperation, request));
+  }
+
   const auth = authorizeAsrRequest(request);
   if (!auth.ok) {
     return jsonResponse(request, auth.body, { status: auth.status });
   }
 
-  const { operationId } = await context.params;
-  const operation = await getPracticeTimingOperation(decodeURIComponent(operationId));
+  const operation = await getPracticeTimingOperation(decodedOperationId);
   if (!operation) {
     return jsonResponse(
       request,

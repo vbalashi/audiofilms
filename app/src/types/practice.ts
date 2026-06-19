@@ -60,12 +60,15 @@ export type PracticeSnapshot = {
 
 export type PracticeCaptionsResponse = {
   state: 'ready';
-  operation: {
-    id: string;
-    kind: 'get-captions';
-    state: 'succeeded';
-  };
+  operation: PracticeCaptionsOperation;
   snapshot: PracticeSnapshot;
+};
+
+export type PracticeCaptionsOperationInput = {
+  language?: string;
+  sourceKind?: 'manual' | 'auto';
+  refresh?: boolean;
+  snapshotRevisionId?: string;
 };
 
 export type PracticeTimingOperationInput = {
@@ -98,7 +101,7 @@ export type PracticeOperationResultApplicability = {
   diagnostics?: string[];
 };
 
-export type PracticeOperation = {
+export type PracticeTimingOperation = {
   id: string;
   kind: 'improve-timing';
   state: PracticeOperationState;
@@ -124,6 +127,30 @@ export type PracticeOperation = {
   };
   diagnostics?: Record<string, unknown>;
 };
+
+export type PracticeCaptionsOperation = {
+  id: string;
+  kind: 'get-captions';
+  state: Extract<PracticeOperationState, 'succeeded' | 'failed'>;
+  videoId: string;
+  input: PracticeCaptionsOperationInput;
+  pollUrl: string;
+  retryAfterMs: number;
+  result?: {
+    snapshot: PracticeSnapshot;
+    snapshotRevisionId: string;
+    textSourceRevisionId?: string;
+    timingEvidenceRevisionId?: string;
+    phraseSetRevisionId?: string;
+  };
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  };
+};
+
+export type PracticeOperation = PracticeTimingOperation | PracticeCaptionsOperation;
 
 export type RejectedPracticeOperation = {
   id: null;

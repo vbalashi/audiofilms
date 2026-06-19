@@ -103,7 +103,7 @@ them.
 | Area | Status | Endpoint / owner | UI behavior | Architect decision still needed |
 | --- | --- | --- | --- | --- |
 | Initial subtitle read | existing | `GET /api/get-subs` plus direct browser caption attempts | Load cheap/browser-visible captions automatically; do not show provider names by default. | Confirm which metadata fields are stable enough to drive `Text Source` and diagnostics. |
-| `Get Captions` | first slice implemented | `POST /api/practice/captions`, backed by existing subtitle service/cache. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | First slice returns a synchronous `state: "ready"` envelope with a minimal `PracticeSnapshot`; queued/polling remains deferred. |
+| `Get Captions` | pollable completed operation | `POST /api/practice/captions`, backed by existing subtitle service/cache, plus `GET /api/practice/operations/{operationId}` for the completed operation. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | Retrieval is currently synchronous; the result is still stored as a product operation with `pollUrl` so UI code can use the same operation surface. |
 | `Improve Timing` | first slice implemented | `POST /api/practice/timing-jobs`, `GET /api/practice/operations/{operationId}`, and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` can become `improving` while base quality remains visible. | Progress/ETA and pairwise alignment cache key remain deferred. |
 | Text Source switch | partial inventory implemented | `POST /api/practice/source-selection`, backed by active source, cached manual/auto caption artifacts, and readable completed ASR artifacts. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | Full durable multi-source storage and alignment cache key remain separate work; current inventory only exposes artifacts the backend can actually read. |
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
@@ -268,9 +268,11 @@ Endpoint:
 POST /api/practice/captions
 ```
 
-This operation should internally reuse the existing subtitle service. It may
-return immediately with `state: "ready"` and a `PracticeSnapshot`, or return
-`queued`/`running` with an operation id and polling metadata. Do not hide
+This operation internally reuses the existing subtitle service and currently
+returns synchronously with `state: "ready"`, a completed `get-captions`
+operation, and a `PracticeSnapshot`. The completed operation is stored and can
+be read through `GET /api/practice/operations/{operationId}` so the extension
+can use one product operation surface for captions and timing work. Do not hide
 user-initiated retrieval behind `GET /api/get-subs?refresh=1`; keep
 `GET /api/get-subs` as the cached/read path for initial loading.
 
@@ -279,8 +281,8 @@ First implementation:
 - Route: `app/src/app/api/practice/captions/route.ts`.
 - Request body accepts `videoId`, optional `language` or `lang`, optional
   `sourceKind: "manual" | "auto"`, and optional `refresh`.
-- The route calls `loadSubtitles(videoId, language, { sourceKind, refresh })`
-  and returns a synchronous envelope:
+- The route calls `loadSubtitles(videoId, language, { sourceKind, refresh })`,
+  stores a completed captions operation, and returns:
 
 ```ts
 type PracticeCaptionsResponse = {
@@ -289,6 +291,22 @@ type PracticeCaptionsResponse = {
     id: string;
     kind: 'get-captions';
     state: 'succeeded';
+    videoId: string;
+    input: {
+      language?: string;
+      sourceKind?: 'manual' | 'auto';
+      refresh?: boolean;
+      snapshotRevisionId?: string;
+    };
+    pollUrl: string;
+    retryAfterMs: 0;
+    result: {
+      snapshot: PracticeSnapshot;
+      snapshotRevisionId: string;
+      textSourceRevisionId?: string;
+      timingEvidenceRevisionId?: string;
+      phraseSetRevisionId?: string;
+    };
   };
   snapshot: PracticeSnapshot;
 };

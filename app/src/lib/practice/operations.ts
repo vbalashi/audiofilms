@@ -12,18 +12,24 @@ import {
 import {
   buildPracticeSnapshot,
 } from '@/lib/practice/snapshot';
+import { dataDirectory } from '@/lib/runtimePaths';
 import type {
-  PracticeOperation,
+  PracticeCaptionsOperation,
+  PracticeCaptionsOperationInput,
   PracticeOperationResultApplicability,
   PracticeOperationState,
   PracticeSnapshot,
+  PracticeTimingOperation,
   PracticeTimingOperationInput,
 } from '@/types/practice';
 
 export type {
+  PracticeCaptionsOperation,
+  PracticeCaptionsOperationInput,
   PracticeOperation,
   PracticeOperationResultApplicability,
   PracticeOperationState,
+  PracticeTimingOperation,
   PracticeTimingOperationInput,
 } from '@/types/practice';
 
@@ -37,7 +43,17 @@ export type StoredPracticeTimingOperation = {
   updatedAt: string;
 };
 
-type PublicPracticeTimingOperation = PracticeOperation;
+export type StoredPracticeCaptionsOperation = {
+  id: string;
+  kind: 'get-captions';
+  videoId: string;
+  input: PracticeCaptionsOperationInput;
+  snapshot: PracticeSnapshot;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PublicPracticeTimingOperation = PracticeTimingOperation;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -57,6 +73,14 @@ function operationsDir(config: AsrRuntimeConfig): string {
 
 function operationPath(config: AsrRuntimeConfig, operationId: string): string {
   return path.join(operationsDir(config), `${safeOperationFilePart(operationId)}.json`);
+}
+
+function captionOperationsDir(): string {
+  return dataDirectory('practice-caption-operations', '.practice-caption-operations');
+}
+
+function captionOperationPath(operationId: string): string {
+  return path.join(captionOperationsDir(), `${safeOperationFilePart(operationId)}.json`);
 }
 
 async function writeJson(filePath: string, value: unknown) {
@@ -136,6 +160,61 @@ export async function upsertPracticeTimingOperation(
 
   await writeJson(operationPath(config, id), operation);
   return operation;
+}
+
+export async function upsertPracticeCaptionsOperation(
+  videoId: string,
+  input: PracticeCaptionsOperationInput,
+  snapshot: PracticeSnapshot,
+): Promise<StoredPracticeCaptionsOperation> {
+  const id = `get-captions:${snapshot.snapshotRevisionId}`;
+  const existing = await readJson<StoredPracticeCaptionsOperation>(captionOperationPath(id));
+  const timestamp = nowIso();
+  const operation: StoredPracticeCaptionsOperation = {
+    id,
+    kind: 'get-captions',
+    videoId,
+    input: {
+      ...input,
+      snapshotRevisionId: snapshot.snapshotRevisionId,
+    },
+    snapshot,
+    createdAt: existing?.createdAt || timestamp,
+    updatedAt: timestamp,
+  };
+
+  await writeJson(captionOperationPath(id), operation);
+  return operation;
+}
+
+export async function getPracticeCaptionsOperation(
+  operationId: string,
+): Promise<StoredPracticeCaptionsOperation | null> {
+  if (!operationId.startsWith('get-captions:')) return null;
+  return readJson<StoredPracticeCaptionsOperation>(captionOperationPath(operationId));
+}
+
+export function publicPracticeCaptionsOperation(
+  operation: StoredPracticeCaptionsOperation,
+  request: Request,
+): PracticeCaptionsOperation {
+  const origin = publicApiOrigin(request);
+  return {
+    id: operation.id,
+    kind: 'get-captions',
+    state: 'succeeded',
+    videoId: operation.videoId,
+    input: operation.input,
+    pollUrl: `${origin}/api/practice/operations/${encodeURIComponent(operation.id)}`,
+    retryAfterMs: 0,
+    result: {
+      snapshot: operation.snapshot,
+      snapshotRevisionId: operation.snapshot.snapshotRevisionId,
+      textSourceRevisionId: operation.snapshot.textSource?.revisionId,
+      timingEvidenceRevisionId: operation.snapshot.timingEvidence?.revisionId,
+      phraseSetRevisionId: operation.snapshot.phraseSet?.revisionId,
+    },
+  };
 }
 
 export async function getPracticeTimingOperation(
