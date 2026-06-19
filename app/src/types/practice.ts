@@ -217,3 +217,28 @@ export type StoredPhraseTranslationAssociation = PhraseTranslation & {
   createdAt: string;
   updatedAt: string;
 };
+
+export type PracticeAlignmentInput = {
+  videoId: string;
+  textSourceRevisionId: string;
+  timingEvidenceRevisionId: string;
+  phraseSetRevisionId?: string;
+  alignerVersion: string;
+  normalizationVersion: string;
+};
+
+export type PracticeAlignmentArtifact = PracticeAlignmentInput & {
+  id: string;
+  revisionId: string;
+  status: 'ready' | 'failed';
+  quality: Extract<PracticeTimingQuality, 'aligned'>;
+  createdAt: string;
+  updatedAt: string;
+  outputTimingEvidenceRevisionId?: string;
+  outputPhraseSetRevisionId?: string;
+  failure?: {
+    code: 'alignment_unavailable' | 'alignment_failed' | 'alignment_low_confidence';
+    message: string;
+    retryable: boolean;
+  };
+};

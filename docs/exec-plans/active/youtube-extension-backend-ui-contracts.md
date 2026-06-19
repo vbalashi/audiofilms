@@ -104,8 +104,8 @@ them.
 | --- | --- | --- | --- | --- |
 | Initial subtitle read | existing | `GET /api/get-subs` plus direct browser caption attempts | Load cheap/browser-visible captions automatically; do not show provider names by default. | Confirm which metadata fields are stable enough to drive `Text Source` and diagnostics. |
 | `Get Captions` | pollable completed operation | `POST /api/practice/captions`, backed by existing subtitle service/cache, plus `GET /api/practice/operations/{operationId}` for the completed operation. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | Retrieval is currently synchronous; the result is still stored as a product operation with `pollUrl` so UI code can use the same operation surface. |
-| `Improve Timing` | first slice implemented | `POST /api/practice/timing-jobs`, `GET /api/practice/operations/{operationId}`, and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` can become `improving` while base quality remains visible. | Progress/ETA and pairwise alignment cache key remain deferred. |
-| Text Source switch | partial inventory implemented | `POST /api/practice/source-selection`, backed by active source, cached manual/auto caption artifacts, and readable completed ASR artifacts. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | Full durable multi-source storage and alignment cache key remain separate work; current inventory only exposes artifacts the backend can actually read. |
+| `Improve Timing` | first slice implemented | `POST /api/practice/timing-jobs`, `GET /api/practice/operations/{operationId}`, and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` can become `improving` while base quality remains visible. | Progress/ETA remains omitted until workers expose reliable progress. Pairwise alignment cache keys are now defined separately. |
+| Text Source switch | partial inventory implemented | `POST /api/practice/source-selection`, backed by active source, cached manual/auto caption artifacts, and readable completed ASR artifacts. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | Full durable multi-source storage remains separate work; current inventory only exposes artifacts the backend can actually read. |
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
 | Translation target | proposed | 2000NL `GET /api/platform/v1/session` exposed through AudioFilms `GET /api/dict/session`. | Extension uses 2000NL target language; local override is dogfood-only fallback. | Confirm preference field name and unauthenticated fallback. |
 | Dictionary lookup V2 | contract-tested projection | `POST /api/dict/lookup` backed by 2000NL lookup V2 request/body. | UI sends clicked form, language, and phrase context without URL query leakage. | Exact/inflection/no-match projection is covered by pure tests; normalized 2000NL content, match relation, and content fingerprint still depend on platform contract stability. |
@@ -456,6 +456,26 @@ Rules:
 - If alignment is cheap, run it automatically and show a brief `Improving...`
   transition.
 - Do not assume one ASR timing artifact can safely align every text source.
+
+Pairwise alignment artifact contract:
+
+- Cache key fields are `videoId`, `textSourceRevisionId`,
+  `timingEvidenceRevisionId`, optional `phraseSetRevisionId`, `alignerVersion`,
+  and `normalizationVersion`.
+- The current constants are
+  `PRACTICE_PAIRWISE_ALIGNER_VERSION = "pairwise-alignment-contract-v1"` and
+  `PRACTICE_ALIGNMENT_NORMALIZATION_VERSION = "practice-text-normalization-v1"`.
+- Artifacts live behind `app/src/lib/practice/pairwiseAlignment.ts` and have a
+  stable `id`, `revisionId`, `status: "ready" | "failed"`, `quality:
+  "aligned"`, and typed `failure` for unavailable/failed/low-confidence
+  alignment.
+- A ready artifact points at `outputTimingEvidenceRevisionId` and optionally
+  `outputPhraseSetRevisionId`. Source switching may use an artifact only after
+  it has actually been created; the backend must not invent aligned timing for a
+  source pair that has no artifact.
+- The contract and cache key are covered by `npm run test:dictionary`
+  (`tests/practice/pairwiseAlignment.test.ts`). The actual alignment algorithm
+  remains a worker/service implementation detail behind this artifact shape.
 
 Implemented source inventory:
 
