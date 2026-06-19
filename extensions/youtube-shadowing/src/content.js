@@ -686,7 +686,8 @@
 
   async function startImproveTiming() {
     const source = getSelectedPracticeSource();
-    if (!source || !state.videoId || timingOperationState().active) return;
+    const readiness = practiceReadiness();
+    if (!source || !state.videoId || timingOperationState(readiness).active || readiness.state === "precise") return;
 
     state.timingOperationError = "";
     state.timingOperationApiBase = apiBaseForBackendCommands();
@@ -916,7 +917,7 @@
     return { state: "ready", label: "Ready" };
   }
 
-  function timingOperationState() {
+  function timingOperationState(readiness = practiceReadiness()) {
     const operation = state.timingOperation;
     if (operation?.state === "queued" || operation?.state === "running") {
       return {
@@ -924,6 +925,9 @@
         status: operation.state,
         copy: operation.state === "queued" ? "Timing improvement is queued." : "Timing improvement is running.",
       };
+    }
+    if (readiness.state === "precise") {
+      return { active: false, status: "", copy: "" };
     }
     if (operation?.state === "succeeded") {
       return {
@@ -1038,12 +1042,15 @@
       state.sourceMenuOpen = false;
       refreshSelectedSourceCache();
     });
-    const timingState = timingOperationState();
+    const timingState = timingOperationState(readiness);
+    const timingAlreadyPrecise = readiness.state === "precise";
     const improveTiming = appendButton(actions, timingState.active ? "Improving Timing" : "Improve Timing", "afReadinessImproveTiming");
-    improveTiming.disabled = state.loading || !selectedSource || timingState.active;
+    improveTiming.disabled = state.loading || !selectedSource || timingState.active || timingAlreadyPrecise;
     improveTiming.title = timingState.active
       ? "Timing improvement is running."
-      : selectedSource
+      : timingAlreadyPrecise
+        ? "This source already has the best available timing."
+        : selectedSource
         ? "Improve phrase timing with backend timing evidence."
         : "Load captions before improving timing.";
     improveTiming.addEventListener("click", (event) => {
@@ -1095,11 +1102,20 @@
           const error = appendElement(sourceMenu, "div", "af-source-option-error");
           error.textContent = source.error;
         } else if (source.loadedTranscriptResult?.warnings?.length) {
-          const warning = appendElement(sourceMenu, "div", "af-source-option-error");
-          warning.textContent = source.loadedTranscriptResult.warnings[0];
+          const warningText = source.loadedTranscriptResult.warnings[0];
+          const warning = appendElement(
+            sourceMenu,
+            "div",
+            sourceWarningIsInformational(warningText) ? "af-source-option-note" : "af-source-option-error",
+          );
+          warning.textContent = warningText;
         }
       }
     }
+  }
+
+  function sourceWarningIsInformational(text) {
+    return /^ASR job completed:/i.test(String(text || "").trim());
   }
 
   function readinessCopy(stateName) {

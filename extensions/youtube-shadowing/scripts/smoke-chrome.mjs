@@ -559,21 +559,26 @@ function assertImproveTimingUi() {
   clickShadowButton("[data-af-source-toggle]");
   sleep(200);
   const openGeometry = readGeometrySnapshot();
-  clickShadowButton("[data-af-readiness-improve-timing]");
-  sleep(1400);
+  const hasImproveAction = openGeometry.readinessMenu?.actions?.includes("Improve Timing");
+  if (hasImproveAction && !openGeometry.readinessMenu?.improveDisabled) {
+    clickShadowButton("[data-af-readiness-improve-timing]");
+    sleep(1400);
+  }
   const afterClickGeometry = readGeometrySnapshot();
   pressKey("Escape", "Escape");
   sleep(200);
 
   const placeholderRemoved = !/needs the practice-timing contract/i.test(openGeometry.readinessMenu?.improveTitle || "");
+  const alreadyPrecise = openGeometry.readinessChip?.state === "precise";
   const hasFeedback = Boolean(afterClickGeometry.readinessMenu?.timingStatusCopy) ||
-    afterClickGeometry.readinessChip?.state === "improving";
+    afterClickGeometry.readinessChip?.state === "improving" ||
+    alreadyPrecise;
 
   return [
-    assertion("improve timing action is available", openGeometry.readinessMenu?.improveDisabled === false, JSON.stringify(openGeometry.readinessMenu)),
+    assertion("improve timing action state matches timing quality", hasImproveAction && (alreadyPrecise ? openGeometry.readinessMenu?.improveDisabled === true : openGeometry.readinessMenu?.improveDisabled === false), JSON.stringify({ chip: openGeometry.readinessChip, menu: openGeometry.readinessMenu })),
     assertion("readiness actions are scoped", openGeometry.readinessMenu?.actions?.join("|") === "Get Captions|Improve Timing", (openGeometry.readinessMenu?.actions || []).join("|")),
     assertion("improve timing is not placeholder copy", placeholderRemoved, openGeometry.readinessMenu?.improveTitle || ""),
-    assertion("improve timing click shows operation feedback", hasFeedback, JSON.stringify(afterClickGeometry.readinessMenu)),
+    assertion("improve timing state is explainable", hasFeedback, JSON.stringify(afterClickGeometry.readinessMenu)),
   ];
 }
 

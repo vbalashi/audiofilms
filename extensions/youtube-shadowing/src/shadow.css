@@ -993,6 +993,13 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   white-space: normal;
 }
 
+.af-source-option-note {
+  margin: -3px 7px 7px;
+  color: var(--af-muted);
+  font-size: 11px;
+  white-space: normal;
+}
+
 .af-ribbon-list {
   display: grid;
   gap: 2px;
