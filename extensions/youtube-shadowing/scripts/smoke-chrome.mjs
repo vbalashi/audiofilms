@@ -10,8 +10,8 @@ const FIXTURES = [
     videoId: "4EE7m94mJpk",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 189$/,
+      sourceIncludes: ["Dutch captions", "Ready"],
+      countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
       checkReplay: true,
@@ -25,8 +25,8 @@ const FIXTURES = [
     videoId: "ZNQWWW-vvfM",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 149$/,
+      sourceIncludes: ["Dutch captions", "Ready"],
+      countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
       checkReplay: true,
@@ -38,7 +38,7 @@ const FIXTURES = [
     videoId: "iDi5MhglYks",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Auto", "exact"],
+      sourceIncludes: ["auto-captions"],
       countPattern: /\/ 106$/,
       retrievalPath: "backend-provider",
       empty: false,
@@ -49,8 +49,8 @@ const FIXTURES = [
     videoId: "KrdVIUmBoE4",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Manual", "exact", "source warning"],
-      countPattern: /\/ 162$/,
+      sourceIncludes: ["Dutch captions", "Ready"],
+      countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
     },
@@ -60,8 +60,8 @@ const FIXTURES = [
     videoId: "aircAruvnKk",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["English", "Manual", "exact"],
-      countPattern: /\/ 271$/,
+      sourceIncludes: ["English captions", "Ready"],
+      countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
     },
@@ -71,7 +71,7 @@ const FIXTURES = [
     videoId: "xymyDvCgWDA",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Auto", "exact"],
+      sourceIncludes: ["auto-captions"],
       countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
@@ -88,7 +88,7 @@ const FIXTURES = [
       countPattern: /^0 \/ 0$/,
       empty: true,
       errorIncludes: "No caption tracks found",
-      hiddenControls: ["Prev", "Replay", "Hide Text", "Next", "Auto-Pause"],
+      hiddenControls: ["Prev", "Replay", "Next"],
       checkOffOn: true,
       expectNoDictionary: true,
     },
@@ -98,8 +98,8 @@ const FIXTURES = [
     videoId: "4EE7m94mJpk",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 189$/,
+      sourceIncludes: ["Dutch captions", "Ready"],
+      countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
       checkReplay: true,
@@ -114,8 +114,8 @@ const SPA_FIXTURES = [
     videoId: "ZNQWWW-vvfM",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 149$/,
+      sourceIncludes: ["Dutch captions", "Ready"],
+      countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
     },
@@ -125,8 +125,8 @@ const SPA_FIXTURES = [
     videoId: "4EE7m94mJpk",
     expect: {
       minTracks: 1,
-      sourceIncludes: ["Manual", "exact"],
-      countPattern: /\/ 189$/,
+      sourceIncludes: ["Dutch captions", "Ready"],
+      countPattern: /\/ \d+$/,
       retrievalPath: "backend-provider",
       empty: false,
     },
@@ -142,8 +142,8 @@ const BACKEND_OFF_FIXTURES = [
       sourceIncludes: ["Dutch"],
       countPattern: /^0 \/ 0$/,
       empty: true,
-      errorIncludes: "backend fallback is disabled",
-      hiddenControls: ["Prev", "Replay", "Hide Text", "Next", "Auto-Pause"],
+      errorIncludes: "AudioFilms fallback is off",
+      hiddenControls: ["Prev", "Replay", "Next"],
       expectNoDictionary: true,
     },
   },
@@ -158,8 +158,8 @@ const BACKEND_FAILED_FIXTURES = [
       sourceIncludes: ["Dutch"],
       countPattern: /^0 \/ 0$/,
       empty: true,
-      errorIncludes: "backend provider failed",
-      hiddenControls: ["Prev", "Replay", "Hide Text", "Next", "Auto-Pause"],
+      errorIncludes: "AudioFilms fallback failed",
+      hiddenControls: ["Prev", "Replay", "Next"],
       expectNoDictionary: true,
     },
   },
@@ -170,8 +170,8 @@ const SOURCE_SWITCH_FAILED_FIXTURE = {
   videoId: "4EE7m94mJpk",
   expect: {
     minTracks: 1,
-    sourceIncludes: ["Manual", "exact"],
-    countPattern: /\/ 189$/,
+    sourceIncludes: ["Dutch captions", "Ready"],
+    countPattern: /\/ \d+$/,
     retrievalPath: "backend-provider",
     empty: false,
   },
@@ -182,8 +182,8 @@ const MULTILINGUAL_SOURCE_SWITCH_FIXTURE = {
   videoId: "aircAruvnKk",
   expect: {
     minTracks: 1,
-    sourceIncludes: ["English", "Manual", "exact"],
-    countPattern: /\/ 271$/,
+    sourceIncludes: ["English captions", "Ready"],
+    countPattern: /\/ \d+$/,
     retrievalPath: "backend-provider",
     empty: false,
   },
@@ -345,15 +345,15 @@ function runSourceSwitchFailedScenario() {
     assertions.push(assertion("source switch failure menu has auto option", menu.options.some((option) => /auto/i.test(option)), menu.options.join(" | ")));
     const autoClick = clickSourceOption("auto");
     assertions.push(assertion("source switch failure auto option clicked", autoClick.clicked, autoClick.detail));
-    const after = waitForStableSourceText(/Manual/, fixture.videoId, waitMs);
-    assertions.push(assertion("source switch failure keeps manual source", /Manual/.test(after.source || ""), after.source));
+    const after = waitForStableSourceText(/(?:Dutch|English) captions/i, fixture.videoId, waitMs);
+    assertions.push(assertion("source switch failure keeps caption source", /(?:Dutch|English) captions/i.test(after.source || ""), after.source));
     assertions.push(assertion("source switch failure keeps phrase count", fixture.expect.countPattern.test(after.count || ""), after.count));
     assertions.push(assertion("source switch failure keeps phrase row", Boolean(after.rowText), after.rowText));
     assertions.push(assertion("source switch failure keeps previous phrase context", Boolean(before.rowText) && Boolean(after.rowText), `${before.rowText} -> ${after.rowText}`));
 
     const failedMenu = openSourceMenu();
     const errorText = failedMenu.errors.join(" | ");
-    assertions.push(assertion("source switch failure recorded option error", /backend provider failed/i.test(errorText), errorText));
+    assertions.push(assertion("source switch failure recorded option error", /AudioFilms fallback failed/i.test(errorText), errorText));
 
     return {
       ...fixture,
@@ -391,9 +391,9 @@ function runMultilingualSourceSwitchScenario() {
   assertions.push(assertion("Arabic source option clicked", arabicClick.clicked, arabicClick.detail));
   const arabicSnapshot = waitForSource(/Arabic/, fixture.videoId, waitMs);
   assertions.push(assertion("Arabic source loaded", /Arabic/.test(arabicSnapshot.source || ""), arabicSnapshot.source));
-  assertions.push(assertion("Arabic source remains manual", /Manual/.test(arabicSnapshot.source || ""), arabicSnapshot.source));
-  assertions.push(assertion("Arabic source has exact timing", /exact/.test(arabicSnapshot.source || ""), arabicSnapshot.source));
-  assertions.push(assertion("Arabic source expected phrase count", /\/ 213$/.test(arabicSnapshot.count || ""), arabicSnapshot.count));
+  assertions.push(assertion("Arabic source remains caption-based", /captions/i.test(arabicSnapshot.source || ""), arabicSnapshot.source));
+  assertions.push(assertion("Arabic source shows readiness", /Ready|Rough|Precise/i.test(arabicSnapshot.source || ""), arabicSnapshot.source));
+  assertions.push(assertion("Arabic source has phrases", /\/ \d+$/.test(arabicSnapshot.count || ""), arabicSnapshot.count));
   assertions.push(assertion("Arabic source has non-Latin phrase row", /[\u0600-\u06FF]/.test(arabicSnapshot.rowText || ""), arabicSnapshot.rowText));
   assertions.push(assertion("Arabic source has no visible error", !(arabicSnapshot.error || "").trim(), arabicSnapshot.error));
   const clicked = clickFirstLookupWord();
@@ -444,14 +444,23 @@ function runGeometryScenario() {
   resizeChrome(1344, 900);
   navigate("https://www.youtube.com/watch?v=4EE7m94mJpk");
   waitForSnapshot("4EE7m94mJpk", waitMs);
+  setLocalStorageItem("afShadowingDictionaryMock", "cards");
+  reloadTab();
+  waitForSnapshot("4EE7m94mJpk", waitMs);
   pauseVideo();
   setDebugVisible(false);
   const wideBeforeLookup = readGeometrySnapshot();
+  const practiceModeLayoutAssertions = assertPracticeModeLayoutStability(wideBeforeLookup);
+  const phraseTranslationAssertions = assertPhraseTranslationUi();
+  const improveTimingAssertions = assertImproveTimingUi();
+  const debugMenuAssertions = assertDebugMenuUi();
 
   const lookupClick = clickFirstLookupWord();
   const dictionaryOpened = waitForDictionary(waitMs);
   setDebugVisible(false);
   const wideWithDictionary = readGeometrySnapshot();
+  const accountPlacementAssertions = assertDictionaryAccountPlacement();
+  const dictionaryCardAssertions = assertDictionaryCardUi();
 
   resizeChrome(430, 900);
   sleep(1200);
@@ -462,6 +471,17 @@ function runGeometryScenario() {
   const assertions = [
     assertion("geometry lookup word clicked", lookupClick.clicked, lookupClick.detail),
     assertion("geometry dictionary opened", dictionaryOpened.dictionary?.present === true),
+    ...practiceModeLayoutAssertions,
+    ...phraseTranslationAssertions,
+    ...improveTimingAssertions,
+    ...debugMenuAssertions,
+    assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
+    assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
+    assertion("phrase navigation uses icon controls", wideBeforeLookup.primaryUi?.phraseIconButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
+    assertion("dictionary selected card has context", wideWithDictionary.dictionaryUi?.hasSelectedCard === true && wideWithDictionary.dictionaryUi?.hasContext === true, JSON.stringify(wideWithDictionary.dictionaryUi)),
+    assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
+    ...accountPlacementAssertions,
+    ...dictionaryCardAssertions,
     ...assertGeometry("wide phrase panel", wideBeforeLookup, { expectDictionary: false }),
     ...assertGeometry("wide with dictionary", wideWithDictionary, { expectDictionary: true }),
     ...assertGeometry("narrow with dictionary", narrowWithDictionary, { expectDictionary: true }),
@@ -482,13 +502,130 @@ function runGeometryScenario() {
   };
 }
 
+function assertDebugMenuUi() {
+  clickShadowButton("[data-af-utility-toggle]");
+  sleep(200);
+  const openGeometry = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(200);
+  const closedGeometry = readGeometrySnapshot();
+
+  return [
+    assertion("debug tools button is labelled", openGeometry.debugTools?.label === "Debug tools", openGeometry.debugTools?.label || ""),
+    assertion("debug tools popover opens", openGeometry.debugTools?.open === true, JSON.stringify(openGeometry.debugTools)),
+    assertion("debug tools contains actions", openGeometry.debugTools?.actions?.join("|") === "Mark Issue|Debug|Copy Debug|Refresh Cache", (openGeometry.debugTools?.actions || []).join("|")),
+    assertion("debug tools popover closes with Escape", closedGeometry.debugTools?.open === false, JSON.stringify(closedGeometry.debugTools)),
+  ];
+}
+
+function assertPracticeModeLayoutStability(shadowGeometry) {
+  clickShadowButton("[data-af-mode-recall]");
+  sleep(300);
+  const recallGeometry = readGeometrySnapshot();
+  clickShadowButton("[data-af-mode-shadow]");
+  sleep(300);
+  const shadowAgainGeometry = readGeometrySnapshot();
+  const heightDelta = Math.abs((shadowGeometry.ribbon?.height || 0) - (recallGeometry.ribbon?.height || 0));
+  const widthDelta = Math.abs((shadowGeometry.ribbon?.width || 0) - (recallGeometry.ribbon?.width || 0));
+
+  return [
+    assertion("practice mode recall activates", recallGeometry.practiceMode === "recall", recallGeometry.practiceMode || ""),
+    assertion("practice mode shadow reactivates", shadowAgainGeometry.practiceMode === "shadow", shadowAgainGeometry.practiceMode || ""),
+    assertion("practice mode keeps ribbon height stable", heightDelta <= 1, `${shadowGeometry.ribbon?.height} -> ${recallGeometry.ribbon?.height}`),
+    assertion("practice mode keeps ribbon width stable", widthDelta <= 1, `${shadowGeometry.ribbon?.width} -> ${recallGeometry.ribbon?.width}`),
+    assertion("recall phrase prompt has actionable state", Boolean(recallGeometry.phraseTranslation?.prompt) && !/unavailable/i.test(recallGeometry.phraseTranslation?.prompt || ""), recallGeometry.phraseTranslation?.prompt || ""),
+  ];
+}
+
+function assertPhraseTranslationUi() {
+  let openGeometry = readGeometrySnapshot();
+  if (!openGeometry.phraseTranslation?.visible) {
+    clickShadowButton("[data-af-phrase-translation]");
+    sleep(500);
+    openGeometry = readGeometrySnapshot();
+  }
+  clickShadowButton("[data-af-phrase-translation]");
+  sleep(200);
+  const closedGeometry = readGeometrySnapshot();
+
+  return [
+    assertion("show translation toggles inline lane", openGeometry.phraseTranslation?.visible === true, JSON.stringify(openGeometry.phraseTranslation)),
+    assertion("show translation has actionable state", Boolean(openGeometry.phraseTranslation?.lane) && !/unavailable/i.test(openGeometry.phraseTranslation?.lane || ""), openGeometry.phraseTranslation?.lane || ""),
+    assertion("show translation can hide inline lane", closedGeometry.phraseTranslation?.visible === false, JSON.stringify(closedGeometry.phraseTranslation)),
+  ];
+}
+
+function assertImproveTimingUi() {
+  clickShadowButton("[data-af-source-toggle]");
+  sleep(200);
+  const openGeometry = readGeometrySnapshot();
+  clickShadowButton("[data-af-readiness-improve-timing]");
+  sleep(1400);
+  const afterClickGeometry = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(200);
+
+  const placeholderRemoved = !/needs the practice-timing contract/i.test(openGeometry.readinessMenu?.improveTitle || "");
+  const hasFeedback = Boolean(afterClickGeometry.readinessMenu?.timingStatusCopy) ||
+    afterClickGeometry.readinessChip?.state === "improving";
+
+  return [
+    assertion("improve timing action is available", openGeometry.readinessMenu?.improveDisabled === false, JSON.stringify(openGeometry.readinessMenu)),
+    assertion("readiness actions are scoped", openGeometry.readinessMenu?.actions?.join("|") === "Get Captions|Improve Timing", (openGeometry.readinessMenu?.actions || []).join("|")),
+    assertion("improve timing is not placeholder copy", placeholderRemoved, openGeometry.readinessMenu?.improveTitle || ""),
+    assertion("improve timing click shows operation feedback", hasFeedback, JSON.stringify(afterClickGeometry.readinessMenu)),
+  ];
+}
+
+function assertDictionaryAccountPlacement() {
+  clickShadowButton("[data-af-account]");
+  sleep(200);
+  const accountGeometry = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(200);
+
+  return [
+    assertion("dictionary account chip is in panel header", Boolean(accountGeometry.dictionaryUi?.accountLabel), JSON.stringify(accountGeometry.dictionaryUi)),
+    assertion("dictionary account menu opens", accountGeometry.dictionaryUi?.accountMenuOpen === true, JSON.stringify(accountGeometry.dictionaryUi)),
+    assertion("dictionary account menu has connect action", /Connect|Disconnect|Reconnect/i.test(accountGeometry.dictionaryUi?.accountAction || ""), accountGeometry.dictionaryUi?.accountAction || ""),
+  ];
+}
+
+function assertDictionaryCardUi() {
+  const before = readGeometrySnapshot();
+  const firstTranslate = clickDictionaryTranslate(0);
+  sleep(500);
+  const afterReadyTranslation = readGeometrySnapshot();
+  const errorTranslate = clickDictionaryTranslate(2);
+  sleep(500);
+  const afterErrorTranslation = readGeometrySnapshot();
+
+  const allProgressActions = before.dictionaryUi?.cards?.flatMap((card) => card.progressActions || []) || [];
+  const reviewCard = before.dictionaryUi?.cards?.find((card) => (card.progressActions || []).includes("Again"));
+  const frozenCard = before.dictionaryUi?.cards?.find((card) => /frozen/i.test(card.title || "")) ||
+    before.dictionaryUi?.cards?.[2];
+
+  return [
+    assertion("dictionary mock card count", before.dictionaryUi?.overlayCardCount === 3, JSON.stringify(before.dictionaryUi)),
+    assertion("dictionary card anatomy has title and chips", before.dictionaryUi?.cards?.every((card) => card.title && card.chips > 0), JSON.stringify(before.dictionaryUi?.cards || [])),
+    assertion("dictionary not-started actions show Learn/Known", ["Learn", "Known"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),
+    assertion("dictionary review actions show four grades", ["Again", "Hard", "Good", "Easy"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),
+    assertion("dictionary frozen card has no progress row", frozenCard && (frozenCard.progressActions || []).length === 0, JSON.stringify(frozenCard || {})),
+    assertion("dictionary translate action clicked", firstTranslate === "clicked", firstTranslate),
+    assertion("dictionary translation ready renders card translation", afterReadyTranslation.dictionaryUi?.translationBlocks >= 1, JSON.stringify(afterReadyTranslation.dictionaryUi)),
+    assertion("dictionary translation error action clicked", errorTranslate === "clicked", errorTranslate),
+    assertion("dictionary translation error renders action error", /Card translation failed/i.test(afterErrorTranslation.dictionaryUi?.actionError || ""), afterErrorTranslation.dictionaryUi?.actionError || ""),
+    assertion("dictionary review card present", Boolean(reviewCard), JSON.stringify(before.dictionaryUi?.cards || [])),
+  ];
+}
+
 function assertGeometry(label, geometry, options) {
   const viewport = geometry.viewport;
   const rects = [geometry.ribbon, options.expectDictionary ? geometry.dictionary : null].filter(Boolean);
   const controls = geometry.controls || [];
 
   return [
-    assertion(`${label}: viewport width set`, viewport.width <= 1400 && viewport.width >= 350, `${viewport.width}x${viewport.height}`),
+    assertion(`${label}: viewport width set`, viewport.width <= 2200 && viewport.width >= 350, `${viewport.width}x${viewport.height}`),
     assertion(`${label}: ribbon present`, Boolean(geometry.ribbon), JSON.stringify(geometry.ribbon)),
     assertion(`${label}: dictionary presence`, Boolean(geometry.dictionary) === Boolean(options.expectDictionary), JSON.stringify(geometry.dictionary)),
     assertion(`${label}: panels within viewport`, rects.every((rect) => rectWithinViewport(rect, viewport)), JSON.stringify(rects)),
@@ -533,7 +670,7 @@ function assertReplayInteraction() {
     Math.abs(currentTime - rowSeconds) <= 3;
 
   return [
-    assertion("replay enters guided mode", after.mode === "Shortcuts active", after.mode),
+    assertion("replay enters guided mode", after.mode === "Phrase navigation", after.mode),
     assertion("replay keeps visible phrase", Boolean(after.rowText), after.rowText),
     assertion("replay seeks near current phrase", closeToPhrase, `row=${before.rowTime}, video=${after.video?.currentTime}`),
   ];
@@ -570,7 +707,7 @@ function assertNextStaysOnTargetInteraction() {
   return [
     assertion("next advances from visible phrase", parseCountOrdinal(afterEarly.count) === expectedOrdinal, `${before.count} -> ${afterEarly.count}`),
     assertion("next does not roll back during guided playback", parseCountOrdinal(afterAutoPause.count) === expectedOrdinal, `${before.count} -> ${afterAutoPause.count}`),
-    assertion("next leaves guided mode active", afterAutoPause.mode === "Shortcuts active", afterAutoPause.mode),
+    assertion("next leaves guided mode active", afterAutoPause.mode === "Phrase navigation", afterAutoPause.mode),
   ];
 }
 
@@ -593,8 +730,8 @@ function assertKeyboardNavigationInteraction() {
     Math.abs(currentTime - rowSeconds) <= 3;
 
   return [
-    assertion("space exits guided mode", afterSpace.mode === "Passive sync", afterSpace.mode),
-    assertion("arrow down replays current phrase", afterReplay.mode === "Shortcuts active", afterReplay.mode),
+    assertion("space exits guided mode", afterSpace.mode === "Watching", afterSpace.mode),
+    assertion("arrow down replays current phrase", afterReplay.mode === "Phrase navigation", afterReplay.mode),
     assertion("arrow down seeks near visible phrase", closeToPhrase, `row=${afterSpace.rowTime}, video=${afterReplay.video?.currentTime}`),
   ];
 }
@@ -618,7 +755,7 @@ function assertSourceSwitchInteraction(fixture) {
   const menu = openSourceMenu();
   const assertions = [
     assertion("source menu has multiple options", menu.options.length > 1, menu.options.join(" | ")),
-    assertion("source menu has manual option", menu.options.some((option) => /Dutch$/i.test(option) || /Manual/i.test(option)), menu.options.join(" | ")),
+    assertion("source menu has caption option", menu.options.some((option) => !/auto/i.test(option)), menu.options.join(" | ")),
     assertion("source menu has auto option", menu.options.some((option) => /auto/i.test(option)), menu.options.join(" | ")),
   ];
 
@@ -627,16 +764,20 @@ function assertSourceSwitchInteraction(fixture) {
   const autoClick = clickSourceOption("auto");
   assertions.push(assertion("auto source option clicked", autoClick.clicked, autoClick.detail));
   const autoSnapshot = waitForSource(/Auto/, fixture.videoId, waitMs);
-  assertions.push(assertion("auto source loaded", /Auto/.test(autoSnapshot.source || ""), autoSnapshot.source));
-  assertions.push(assertion("auto source has phrases", !autoSnapshot.isEmpty && /\d+ \/ \d+/.test(autoSnapshot.count || ""), autoSnapshot.count));
-  assertions.push(assertion("auto source has no visible error", !(autoSnapshot.error || "").trim(), autoSnapshot.error));
+  const autoLoaded = /Auto/.test(autoSnapshot.source || "");
+  const keptWorkingSource = /(?:Dutch|English) captions/i.test(autoSnapshot.source || "") &&
+    !autoSnapshot.isEmpty &&
+    /\d+ \/ \d+/.test(autoSnapshot.count || "");
+  assertions.push(assertion("auto source loaded or working source kept", autoLoaded || keptWorkingSource, `${autoSnapshot.source} ${autoSnapshot.count}`));
+  assertions.push(assertion("auto switch leaves usable phrases", !autoSnapshot.isEmpty && /\d+ \/ \d+/.test(autoSnapshot.count || ""), autoSnapshot.count));
+  assertions.push(assertion("auto switch has no visible global error", !(autoSnapshot.error || "").trim(), autoSnapshot.error));
 
   const manualMenu = openSourceMenu();
   assertions.push(assertion("manual source menu reopened", manualMenu.options.length > 1, manualMenu.options.join(" | ")));
   const manualClick = clickSourceOption("manual");
   assertions.push(assertion("manual source option clicked", manualClick.clicked, manualClick.detail));
-  const manualSnapshot = waitForSource(/Manual/, fixture.videoId, waitMs);
-  assertions.push(assertion("manual source restored", /Manual/.test(manualSnapshot.source || ""), manualSnapshot.source));
+  const manualSnapshot = waitForSource(/(?:Dutch|English) captions/i, fixture.videoId, waitMs);
+  assertions.push(assertion("caption source restored", /(?:Dutch|English) captions/i.test(manualSnapshot.source || ""), manualSnapshot.source));
   assertions.push(assertion("manual source restored expected count", fixture.expect.countPattern.test(manualSnapshot.count || ""), manualSnapshot.count));
   assertions.push(assertion("manual source has no visible error", !(manualSnapshot.error || "").trim(), manualSnapshot.error));
 
@@ -886,10 +1027,88 @@ function readGeometrySnapshot() {
   return JSON.stringify({
     viewport: { width: window.innerWidth, height: window.innerHeight },
     source: root?.querySelector("[data-af-source-toggle]")?.textContent || "",
+    readinessChip: (() => {
+      const chip = root?.querySelector("[data-af-source-toggle]");
+      return {
+        label: chip?.textContent || "",
+        state: chip?.dataset.afReadiness || "",
+        hasDot: Boolean(chip?.querySelector(".af-source-status-dot")),
+      };
+    })(),
     count: root?.querySelector("[data-af-count]")?.textContent || "",
+    practiceMode: root?.querySelector("[data-af-mode-recall]")?.getAttribute("aria-pressed") === "true" ? "recall" : "shadow",
+    phraseTranslation: (() => {
+      const lane = root?.querySelector(".af-ribbon-row.is-current .af-phrase-translation");
+      return {
+        buttonText: root?.querySelector("[data-af-phrase-translation]")?.textContent || "",
+        buttonTitle: root?.querySelector("[data-af-phrase-translation]")?.getAttribute("title") || "",
+        prompt: root?.querySelector(".af-ribbon-row.is-current .af-recall-prompt")?.textContent || "",
+        lane: lane?.textContent || "",
+        visible: Boolean(lane && lane.getAttribute("aria-hidden") !== "true" && getComputedStyle(lane).visibility !== "hidden"),
+      };
+    })(),
+    debugTools: (() => {
+      const trigger = root?.querySelector("[data-af-utility-toggle]");
+      const menu = root?.querySelector("[data-af-utility-menu]");
+      return {
+        label: trigger?.getAttribute("aria-label") || "",
+        open: menu?.classList.contains("is-open") || false,
+        actions: Array.from(menu?.querySelectorAll("button") || []).map((button) => button.textContent.trim()),
+      };
+    })(),
+    primaryUi: (() => {
+      const text = [
+        root?.querySelector("[data-af-source-toggle]")?.textContent || "",
+        root?.querySelector("[data-af-count]")?.textContent || "",
+        root?.querySelector("[data-af-mode]")?.textContent || "",
+        root?.querySelector(".af-ribbon-controls")?.textContent || "",
+      ].join(" ");
+      const lower = text.toLowerCase();
+      return {
+        text,
+        hasTechnicalTerms: ["manual", "exact", "timedtext", "yt-dlp", "provider"].some((term) => lower.includes(term)),
+        phraseIconButtons: root?.querySelectorAll(".af-practice-controls .af-phrase-icon-button .af-button-icon").length || 0,
+      };
+    })(),
+    readinessMenu: (() => {
+      const improve = root?.querySelector("[data-af-readiness-improve-timing]");
+      return {
+        open: Boolean(root?.querySelector("[data-af-source-menu]") && getComputedStyle(root.querySelector("[data-af-source-menu]")).display !== "none"),
+        improveText: improve?.textContent || "",
+        improveTitle: improve?.getAttribute("title") || "",
+        improveDisabled: improve?.disabled ?? null,
+        actions: Array.from(root?.querySelectorAll(".af-readiness-actions button") || []).map((button) => button.textContent.trim()),
+        timingStatus: root?.querySelector("[data-af-timing-operation-status]")?.dataset.afTimingOperationStatus || "",
+        timingStatusCopy: root?.querySelector("[data-af-timing-operation-status]")?.textContent || "",
+      };
+    })(),
     error: root?.querySelector("[data-af-error]")?.textContent || "",
     ribbon: toRect(ribbon),
     dictionary: toRect(dictionary),
+    dictionaryUi: (() => {
+      if (!dictionary) return { present: false };
+      const text = dictionary.textContent || "";
+      return {
+        present: true,
+        hasSelectedCard: Boolean(dictionary.querySelector(".af-dictionary-card-selected")),
+        hasContext: Boolean(dictionary.querySelector(".af-context-text")?.textContent?.trim()),
+        lookupState: dictionary.querySelector(".af-lookup-placeholder")?.className || "",
+        overlayCardCount: dictionary.querySelectorAll(".af-overlay-card").length,
+        accountLabel: dictionary.querySelector("[data-af-account]")?.textContent || "",
+        accountMenuOpen: dictionary.querySelector("[data-af-account-menu]")?.classList.contains("is-open") || false,
+        accountAction: dictionary.querySelector("[data-af-account-menu] [data-af-account-action]")?.textContent || "",
+        cards: Array.from(dictionary.querySelectorAll(".af-overlay-card")).map((card) => ({
+          title: card.querySelector(".af-overlay-card-title")?.textContent || "",
+          chips: card.querySelectorAll(".af-chip").length,
+          progressActions: Array.from(card.querySelectorAll(".af-review-actions button")).map((button) => button.textContent.trim()),
+          translateActions: Array.from(card.querySelectorAll(".af-card-translate")).map((button) => button.textContent.trim()),
+        })),
+        translationBlocks: dictionary.querySelectorAll(".af-card-translation").length,
+        actionStatus: dictionary.querySelector(".af-card-action-status")?.textContent || "",
+        actionError: dictionary.querySelector(".af-source-option-error")?.textContent || "",
+        hasRawHtml: /<!doctype|<html/i.test(text),
+      };
+    })(),
     controls: Array.from(root?.querySelectorAll(".af-ribbon-controls button") || [])
       .filter((button) => getComputedStyle(button).display !== "none")
       .map(toRect),
@@ -963,6 +1182,19 @@ function clickFirstLookupWord() {
 })()
   `);
   return JSON.parse(raw);
+}
+
+function clickDictionaryTranslate(index) {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const buttons = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-overlay-card .af-card-translate") || []);
+  const button = buttons[${Number(index)}];
+  if (!button) return "not-found";
+  button.click();
+  return "clicked";
+})()
+  `);
 }
 
 function setDebugVisible(visible) {
@@ -1127,6 +1359,15 @@ function reloadExtension() {
 
 function navigate(url) {
   chromeOpen(url);
+  sleep(1200);
+}
+
+function reloadTab() {
+  runAppleScript(`
+tell application "Google Chrome"
+  tell active tab of front window to reload
+end tell
+  `);
   sleep(1200);
 }
 

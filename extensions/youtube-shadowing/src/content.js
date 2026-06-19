@@ -48,9 +48,16 @@
     currentIndex: 0,
     learningEnabled: readLearningEnabled(),
     textVisible: true,
+    shadowTextVisible: true,
     autoPause: true,
     practiceMode: "shadow",
     phraseTranslationVisible: false,
+    phraseTranslations: {},
+    phraseTranslationSeq: 0,
+    timingOperation: null,
+    timingOperationError: "",
+    timingOperationApiBase: "",
+    timingOperationPollTimer: null,
     utilityMenuOpen: false,
     lastMenuTrigger: null,
     guidedMode: false,
@@ -275,11 +282,13 @@
     mode.dataset.afMode = "";
     mode.textContent = "Passive";
     const utility = appendElement(metaRight, "div", "af-utility-menu");
-    const utilityButton = appendButton(utility, "More", "afUtilityToggle");
+    const utilityButton = appendButton(utility, "", "afUtilityToggle");
     utilityButton.className = "af-icon-button af-utility-toggle";
-    utilityButton.setAttribute("aria-label", "More AudioFilms actions");
+    utilityButton.innerHTML = `${bugIconSvg()}<span class="af-sr-only">Debug tools</span>`;
+    utilityButton.setAttribute("aria-label", "Debug tools");
     utilityButton.setAttribute("aria-haspopup", "menu");
     utilityButton.setAttribute("aria-expanded", "false");
+    utilityButton.title = "Debug tools";
     const utilityMenu = appendElement(utility, "div", "af-utility-popover");
     utilityMenu.dataset.afUtilityMenu = "";
     appendButton(utilityMenu, "Mark Issue", "afMarkIssue");
@@ -297,13 +306,19 @@
 
     const controls = appendElement(panel, "div", "af-ribbon-controls");
     const practiceControls = appendElement(controls, "div", "af-control-group af-practice-controls");
-    const prevButton = appendButton(practiceControls, "Prev", "afPrev");
+    const prevButton = appendButton(practiceControls, "", "afPrev");
+    prevButton.classList.add("af-phrase-icon-button");
+    prevButton.innerHTML = `${iconSvg("prev")}<span class="af-sr-only">Prev</span>`;
     prevButton.setAttribute("aria-label", "Previous phrase");
     prevButton.title = "Previous phrase (ArrowLeft)";
-    const replayButton = appendButton(practiceControls, "Replay", "afReplay");
+    const replayButton = appendButton(practiceControls, "", "afReplay");
+    replayButton.classList.add("af-phrase-icon-button");
+    replayButton.innerHTML = `${iconSvg("replay")}<span class="af-sr-only">Replay</span>`;
     replayButton.setAttribute("aria-label", "Replay current phrase");
     replayButton.title = "Replay current phrase (ArrowDown)";
-    const nextButton = appendButton(practiceControls, "Next", "afNext");
+    const nextButton = appendButton(practiceControls, "", "afNext");
+    nextButton.classList.add("af-phrase-icon-button");
+    nextButton.innerHTML = `${iconSvg("next")}<span class="af-sr-only">Next</span>`;
     nextButton.setAttribute("aria-label", "Next phrase");
     nextButton.title = "Next phrase (ArrowRight)";
 
@@ -318,11 +333,6 @@
     originalButton.title = "Show or hide original text (S)";
     const translationButton = appendButton(displayControls, "Show Translation", "afPhraseTranslation");
     translationButton.title = "Show phrase translation (T)";
-    const timingButton = appendButton(displayControls, "Improve Timing", "afImproveTiming");
-    timingButton.disabled = true;
-    timingButton.hidden = true;
-    timingButton.title = "Timing improvement needs the practice-timing contract.";
-
     const hints = appendElement(panel, "div", "af-shortcut-hints");
     hints.textContent = "Shortcuts: Arrow keys phrase navigation · S original · T translation · 1/2 modes";
 
@@ -377,13 +387,65 @@
     const button = appendElement(parent, "button");
     button.type = "button";
     button.textContent = text;
-    button.dataset[datasetKey] = "";
+    setDataFlag(button, datasetKey);
     return button;
+  }
+
+  function setDataFlag(element, datasetKey) {
+    if (/^[a-z][a-zA-Z0-9]*$/.test(datasetKey)) {
+      element.dataset[datasetKey] = "";
+      return;
+    }
+    const attributeName = datasetKey
+      .replace(/([A-Z])/g, "-$1")
+      .replace(/^-/, "")
+      .toLowerCase();
+    element.setAttribute(`data-${attributeName}`, "");
+  }
+
+  function bugIconSvg() {
+    return [
+      '<svg class="af-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+      '<path d="M8 2l2 2"/>',
+      '<path d="M16 2l-2 2"/>',
+      '<path d="M9 7V6a3 3 0 0 1 6 0v1"/>',
+      '<path d="M12 21a6 6 0 0 1-6-6v-4a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v4a6 6 0 0 1-6 6Z"/>',
+      '<path d="M12 11v10"/>',
+      '<path d="M6 13H3"/>',
+      '<path d="M21 13h-3"/>',
+      '<path d="M6.7 17.2 4.4 19.5"/>',
+      '<path d="m17.3 17.2 2.3 2.3"/>',
+      '</svg>',
+    ].join("");
+  }
+
+  function iconSvg(kind) {
+    const paths = {
+      prev: [
+        '<path d="m15 18-6-6 6-6"/>',
+        '<path d="M20 12H9"/>',
+      ],
+      next: [
+        '<path d="m9 18 6-6-6-6"/>',
+        '<path d="M4 12h11"/>',
+      ],
+      replay: [
+        '<path d="M3 12a9 9 0 1 0 3-6.7"/>',
+        '<path d="M3 3v6h6"/>',
+        '<path d="M12 8v4l3 2"/>',
+      ],
+    }[kind] || [];
+    return [
+      '<svg class="af-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+      ...paths,
+      '</svg>',
+    ].join("");
   }
 
   function render() {
     renderToggle();
     if (!state.learningEnabled) {
+      clearTimingOperationPoll();
       removeWorkspace();
       return;
     }
@@ -422,11 +484,11 @@
       panel.querySelector("[data-af-replay]"),
       panel.querySelector("[data-af-next]"),
     ].filter(Boolean);
-    const displayButtons = [toggle].filter(Boolean);
+    const displayButtons = [toggle, phraseTranslation].filter(Boolean);
     const hasPhrases = state.phrases.length > 0;
     const isEmpty = !state.loading && !hasPhrases;
     const readiness = practiceReadiness();
-    const phraseTranslationReady = phraseTranslationAvailable();
+    const currentPhraseTranslation = phraseTranslationState(state.phrases[state.currentIndex], state.currentIndex);
 
     renderSourceSelector(track, sourceToggle, sourceMenu);
     panel.classList.toggle("is-empty", isEmpty);
@@ -436,7 +498,7 @@
     count.textContent = hasPhrases
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
       : state.loading ? "Loading" : "0 / 0";
-    mode.textContent = state.guidedMode ? "Shortcuts active" : "Passive sync";
+    mode.textContent = state.guidedMode ? "Phrase navigation" : "Watching";
     mode.classList.toggle("is-guided", state.guidedMode);
     toggle.textContent = state.practiceMode === "recall"
       ? state.textVisible ? "Hide Original" : "Reveal Original"
@@ -445,14 +507,14 @@
     modeShadow.classList.toggle("is-active", state.practiceMode === "shadow");
     modeRecall.classList.toggle("is-active", state.practiceMode === "recall");
     modeRecall.disabled = false;
-    modeRecall.title = phraseTranslationReady ? "Recall mode" : "Recall mode (translation unavailable)";
+    modeRecall.title = phraseTranslationControlTitle(currentPhraseTranslation);
     modeShadow.setAttribute("aria-pressed", state.practiceMode === "shadow" ? "true" : "false");
     modeRecall.setAttribute("aria-pressed", state.practiceMode === "recall" ? "true" : "false");
     phraseTranslation.textContent = state.phraseTranslationVisible ? "Hide Translation" : "Show Translation";
     phraseTranslation.classList.toggle("is-active", state.phraseTranslationVisible);
     phraseTranslation.hidden = isEmpty;
     phraseTranslation.disabled = state.loading || !hasPhrases;
-    phraseTranslation.title = phraseTranslationReady ? "Show phrase translation" : "Phrase translation is not available yet.";
+    phraseTranslation.title = phraseTranslationControlTitle(currentPhraseTranslation);
     utilityToggle.setAttribute("aria-expanded", state.utilityMenuOpen ? "true" : "false");
     utilityToggle.classList.toggle("is-active", state.utilityMenuOpen);
     utilityMenu.classList.toggle("is-open", state.utilityMenuOpen);
@@ -495,21 +557,34 @@
   }
 
   function setPracticeMode(mode) {
+    if (state.practiceMode === "shadow") {
+      state.shadowTextVisible = state.textVisible;
+    }
     state.practiceMode = mode === "recall" ? "recall" : "shadow";
     if (state.practiceMode === "recall") {
       state.textVisible = false;
       state.phraseTranslationVisible = true;
+      ensureCurrentPhraseTranslation();
+    } else {
+      state.textVisible = state.shadowTextVisible;
     }
     render();
   }
 
   function togglePhraseTranslation() {
     state.phraseTranslationVisible = !state.phraseTranslationVisible;
+    if (state.phraseTranslationVisible) {
+      ensureCurrentPhraseTranslation();
+    }
     render();
   }
 
-  function phraseTranslationAvailable() {
-    return false;
+  function phraseTranslationControlTitle(translation) {
+    if (translation?.status === "ready") return "Show phrase translation";
+    if (translation?.status === "loading") return "Phrase translation is loading";
+    if (state.accountStatus !== "signed-in") return "Connect 2000NL to translate phrases";
+    if (translation?.status === "failed") return translation.error || "Phrase translation failed";
+    return "Show phrase translation";
   }
 
   function toggleUtilityMenu(event) {
@@ -607,6 +682,110 @@
       state.cacheRefreshRequested = false;
       render();
     }
+  }
+
+  async function startImproveTiming() {
+    const source = getSelectedPracticeSource();
+    if (!source || !state.videoId || timingOperationState().active) return;
+
+    state.timingOperationError = "";
+    state.timingOperationApiBase = apiBaseForBackendCommands();
+    state.timingOperation = {
+      id: "",
+      kind: "improve-timing",
+      state: "queued",
+    };
+    render();
+
+    try {
+      const operation = await postBackendJson("practice-timing-create", {
+        apiBase: state.timingOperationApiBase,
+        payload: buildPracticeTimingPayload(source),
+      });
+      applyTimingOperation(operation);
+    } catch (error) {
+      state.timingOperation = null;
+      state.timingOperationError = readableTimingError(error);
+      recordDebugEvent("timing-improve-failed", {
+        error: state.timingOperationError,
+      });
+    } finally {
+      render();
+    }
+  }
+
+  function buildPracticeTimingPayload(source) {
+    const result = source?.loadedTranscriptResult || state.transcriptResult || {};
+    const payload = {
+      videoId: state.videoId,
+      lang: result.languageCode || source?.languageCode || "auto",
+      sourceKind: result.sourceKind === "auto" || source?.track?.kind === "asr" ? "auto" : "manual",
+      textSource: "asr",
+      fullAudio: true,
+    };
+    return payload;
+  }
+
+  function applyTimingOperation(operation) {
+    if (!operation || operation.kind !== "improve-timing") {
+      throw new Error("Timing endpoint returned an unexpected response.");
+    }
+    state.timingOperation = operation;
+    state.timingOperationError = operation.state === "failed"
+      ? operation.error?.message || "Timing improvement failed."
+      : "";
+    recordDebugEvent("timing-improve-operation", {
+      operationId: operation.id || "",
+      state: operation.state || "",
+    });
+    if (operation.state === "queued" || operation.state === "running") {
+      scheduleTimingOperationPoll(operation);
+    } else {
+      clearTimingOperationPoll();
+    }
+  }
+
+  function scheduleTimingOperationPoll(operation) {
+    clearTimingOperationPoll();
+    if (!operation?.id) return;
+    const retryAfterMs = Number(operation.retryAfterMs || 3000);
+    state.timingOperationPollTimer = window.setTimeout(() => {
+      pollTimingOperation(operation.id);
+    }, Math.max(1000, Math.min(retryAfterMs, 10000)));
+  }
+
+  async function pollTimingOperation(operationId) {
+    try {
+      const operation = await getBackendJson("practice-operation", {
+        apiBase: state.timingOperationApiBase,
+        operationId,
+      });
+      applyTimingOperation(operation);
+    } catch (error) {
+      state.timingOperationError = readableTimingError(error);
+      clearTimingOperationPoll();
+      recordDebugEvent("timing-improve-poll-failed", {
+        operationId,
+        error: state.timingOperationError,
+      });
+    } finally {
+      render();
+    }
+  }
+
+  function clearTimingOperationPoll() {
+    if (state.timingOperationPollTimer) {
+      window.clearTimeout(state.timingOperationPollTimer);
+      state.timingOperationPollTimer = null;
+    }
+  }
+
+  function readableTimingError(error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    if (/missing|unauthorized|401|auth/i.test(message)) {
+      return "Timing improvement needs a tester token for this backend.";
+    }
+    return message || "Timing improvement failed.";
   }
 
   function markIssue() {
@@ -715,6 +894,9 @@
   }
 
   function practiceReadiness() {
+    if (timingOperationState().active) {
+      return { state: "improving", label: "Improving..." };
+    }
     if (state.loading || state.cacheRefreshRequested) {
       return { state: "improving", label: "Improving..." };
     }
@@ -732,6 +914,39 @@
       return { state: "rough", label: "Rough" };
     }
     return { state: "ready", label: "Ready" };
+  }
+
+  function timingOperationState() {
+    const operation = state.timingOperation;
+    if (operation?.state === "queued" || operation?.state === "running") {
+      return {
+        active: true,
+        status: operation.state,
+        copy: operation.state === "queued" ? "Timing improvement is queued." : "Timing improvement is running.",
+      };
+    }
+    if (operation?.state === "succeeded") {
+      return {
+        active: false,
+        status: "succeeded",
+        copy: "Timing improvement finished. Reload captions when you want to apply the latest timing.",
+      };
+    }
+    if (state.timingOperationError) {
+      return {
+        active: false,
+        status: "failed",
+        copy: state.timingOperationError,
+      };
+    }
+    if (operation?.state === "failed") {
+      return {
+        active: false,
+        status: "failed",
+        copy: operation.error?.message || "Timing improvement failed.",
+      };
+    }
+    return { active: false, status: "", copy: "" };
   }
 
   function userFacingSourceLabel(source) {
@@ -788,9 +1003,14 @@
   function renderSourceSelector(track, sourceToggle, sourceMenu) {
     const selectedSource = getSelectedPracticeSource();
     const readiness = practiceReadiness();
-    sourceToggle.textContent = selectedSource
+    const label = selectedSource
       ? `${userFacingSourceLabel(selectedSource)} · ${readiness.label}`
       : state.tracks.length ? "Captions: -" : "No captions";
+    clearElement(sourceToggle);
+    const dot = appendElement(sourceToggle, "span", "af-source-status-dot");
+    dot.setAttribute("aria-hidden", "true");
+    const text = appendElement(sourceToggle, "span", "af-source-toggle-label");
+    text.textContent = label;
     sourceToggle.disabled = state.loading;
     sourceToggle.setAttribute("aria-expanded", state.sourceMenuOpen ? "true" : "false");
     sourceToggle.dataset.afReadiness = readiness.state;
@@ -818,12 +1038,26 @@
       state.sourceMenuOpen = false;
       refreshSelectedSourceCache();
     });
-    const improveTiming = appendButton(actions, "Improve Timing", "afReadinessImproveTiming");
-    improveTiming.disabled = true;
-    improveTiming.title = "Timing improvement needs the practice-timing contract.";
-    const openTranscript = appendButton(actions, "Open Transcript", "afReadinessOpenTranscript");
-    openTranscript.disabled = true;
-    openTranscript.title = "YouTube transcript shortcut is not wired yet.";
+    const timingState = timingOperationState();
+    const improveTiming = appendButton(actions, timingState.active ? "Improving Timing" : "Improve Timing", "afReadinessImproveTiming");
+    improveTiming.disabled = state.loading || !selectedSource || timingState.active;
+    improveTiming.title = timingState.active
+      ? "Timing improvement is running."
+      : selectedSource
+        ? "Improve phrase timing with backend timing evidence."
+        : "Load captions before improving timing.";
+    improveTiming.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      startImproveTiming();
+    });
+    const actionHelp = appendElement(sourceMenu, "div", "af-readiness-action-help");
+    actionHelp.textContent = "Get Captions retrieves subtitle text. Improve Timing starts ASR alignment for tighter phrase boundaries.";
+    if (timingState.copy) {
+      const status = appendElement(sourceMenu, "div", "af-readiness-operation");
+      status.dataset.afTimingOperationStatus = timingState.status || "";
+      status.textContent = timingState.copy;
+    }
 
     if (state.practiceSources.length > 1) {
       const selectorLabel = appendElement(sourceMenu, "div", "af-source-group");
@@ -838,6 +1072,9 @@
     appendReadinessDetail(details, "Source", selectedSource ? userFacingSourceLabel(selectedSource) : "No captions");
     appendReadinessDetail(details, "Readiness", readiness.label);
     appendReadinessDetail(details, "Phrases", state.phrases.length ? String(state.phrases.length) : "0");
+    if (timingState.status) {
+      appendReadinessDetail(details, "Timing", timingState.status);
+    }
   }
 
   function renderSourceOptions(sourceMenu) {
@@ -911,9 +1148,12 @@
     const time = appendElement(row, "div", "af-ribbon-time");
     time.textContent = formatTimestamp(phrase.startMs);
 
+    const prompt = appendElement(row, "div", "af-recall-prompt");
     if (state.practiceMode === "recall" && index === state.currentIndex) {
-      const prompt = appendElement(row, "div", "af-recall-prompt");
-      prompt.textContent = phraseTranslationText(phrase) || "Phrase translation unavailable";
+      prompt.textContent = phraseTranslationCopy(phrase, index);
+    } else {
+      prompt.textContent = "Phrase prompt placeholder";
+      prompt.setAttribute("aria-hidden", "true");
     }
 
     const text = appendElement(row, "div", "af-ribbon-text");
@@ -925,18 +1165,142 @@
 
     const translation = appendElement(row, "div", "af-phrase-translation");
     if (state.practiceMode === "recall") {
-      translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase));
+      translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase, index));
       translation.textContent = state.textVisible ? "Original revealed" : "Reveal original when ready.";
     } else if (state.phraseTranslationVisible) {
-      translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase));
-      translation.textContent = phraseTranslationText(phrase) || "Phrase translation unavailable";
+      translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase, index));
+      translation.textContent = phraseTranslationCopy(phrase, index);
     } else {
       translation.setAttribute("aria-hidden", "true");
     }
   }
 
-  function phraseTranslationText(_phrase) {
-    return "";
+  function phraseTranslationText(phrase, index = state.currentIndex) {
+    const translation = phraseTranslationState(phrase, index);
+    return translation?.status === "ready" ? translation.translatedText || "" : "";
+  }
+
+  function phraseTranslationCopy(phrase, index = state.currentIndex) {
+    const translation = phraseTranslationState(phrase, index);
+    if (translation?.status === "ready" && translation.translatedText) {
+      return translation.translatedText;
+    }
+    if (translation?.status === "loading") {
+      return "Translating phrase...";
+    }
+    if (translation?.status === "failed") {
+      return translation.error || "Phrase translation failed.";
+    }
+    if (state.accountStatus !== "signed-in") {
+      return "Connect 2000NL to translate phrases.";
+    }
+    return "Translation not requested yet.";
+  }
+
+  function phraseTranslationState(phrase, index = state.currentIndex) {
+    const key = phraseTranslationKey(phrase, index);
+    return key ? state.phraseTranslations[key] || null : null;
+  }
+
+  function phraseTranslationKey(phrase, index = state.currentIndex) {
+    if (!phrase) return "";
+    return [
+      state.videoId || "video",
+      state.selectedSourceId || "source",
+      phrase.index ?? index,
+      phrase.startMs ?? "",
+      phrase.endMs ?? "",
+      String(phrase.text || "").slice(0, 80),
+    ].join("|");
+  }
+
+  function phraseTranslationId(phrase, index = state.currentIndex) {
+    return [
+      state.videoId || "video",
+      state.selectedSourceId || "source",
+      phrase.index ?? index,
+      phrase.startMs ?? 0,
+      phrase.endMs ?? 0,
+    ].join(":");
+  }
+
+  function ensureCurrentPhraseTranslation() {
+    const phrase = state.phrases[state.currentIndex];
+    if (!phrase) return;
+    const key = phraseTranslationKey(phrase, state.currentIndex);
+    const existing = state.phraseTranslations[key];
+    if (existing?.status === "ready" || existing?.status === "loading") return;
+    if (state.accountStatus !== "signed-in") {
+      state.phraseTranslations = {
+        ...state.phraseTranslations,
+        [key]: {
+          status: "failed",
+          error: "Connect 2000NL to translate phrases.",
+        },
+      };
+      return;
+    }
+    requestPhraseTranslation(phrase, state.currentIndex, key);
+  }
+
+  async function requestPhraseTranslation(phrase, index, key) {
+    const requestSeq = state.phraseTranslationSeq + 1;
+    state.phraseTranslationSeq = requestSeq;
+    state.phraseTranslations = {
+      ...state.phraseTranslations,
+      [key]: { status: "loading" },
+    };
+    render();
+
+    const source = getSelectedPracticeSource();
+    const sourceLanguageCode =
+      source?.loadedTranscriptResult?.languageCode ||
+      source?.languageCode ||
+      state.transcriptResult?.languageCode ||
+      "auto";
+    const targetLanguageCode = state.accountPreferences?.translationTargetLanguageCode || "";
+
+    try {
+      const translation = await postDictionaryCommand("phrase-translation", {
+        phraseId: phraseTranslationId(phrase, index),
+        sourceText: phrase.text || "",
+        sourceLanguageCode,
+        contextText: phrase.text || "",
+        ...(targetLanguageCode ? { targetLanguageCode } : {}),
+        purpose: "youtube-phrase-practice",
+      });
+      const translatedText = translation?.translatedText || "";
+      state.phraseTranslations = {
+        ...state.phraseTranslations,
+        [key]: translatedText
+          ? { ...translation, status: "ready", translatedText }
+          : {
+              ...translation,
+              status: "failed",
+              error: translation?.error?.message || translation?.error?.code || "Phrase translation returned no text.",
+            },
+      };
+      recordDebugEvent("phrase-translation-loaded", {
+        phraseId: phraseTranslationId(phrase, index),
+        status: state.phraseTranslations[key]?.status,
+        requestSeq,
+      });
+    } catch (error) {
+      state.phraseTranslations = {
+        ...state.phraseTranslations,
+        [key]: {
+          status: "failed",
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+      recordDebugEvent("phrase-translation-failed", {
+        phraseId: phraseTranslationId(phrase, index),
+        error: state.phraseTranslations[key]?.error || "",
+        requestSeq,
+      });
+    } finally {
+      render();
+    }
   }
 
   function shouldShowOriginalText(index) {
@@ -1683,6 +2047,9 @@
   }
 
   function requestDictionaryCommand(operation, body = null) {
+    const mockResponse = dictionaryMockResponse(operation, body);
+    if (mockResponse) return Promise.resolve(mockResponse);
+
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
       const endpoint = dictionaryLookupEndpoint();
       if (!endpoint) {
@@ -1699,6 +2066,8 @@
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/actions");
       } else if (operation === "dict-translation") {
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/translation");
+      } else if (operation === "phrase-translation") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/practice/phrase-translations");
       } else if (operation === "dict-session") {
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/session");
         return fetch(url.toString(), {
@@ -1728,6 +2097,231 @@
       operation,
       body,
     });
+  }
+
+  function dictionaryMockResponse(operation, body = null) {
+    if (window.localStorage.getItem("afShadowingDictionaryMock") !== "cards") return null;
+    if (operation === "dict-lookup") {
+      return jsonCommandResponse(mockDictionaryLookup(body));
+    }
+    if (operation === "dict-translation") {
+      if (body?.entryId === "entry-translate-error") {
+        return jsonCommandResponse({ error: "Card translation failed." }, false, 500);
+      }
+      return jsonCommandResponse({
+        status: "ready",
+        overlay: {
+          headword: "apple",
+          meanings: [{ definition: "яблоко" }],
+        },
+      });
+    }
+    if (operation === "dict-action") {
+      return jsonCommandResponse({ ok: true });
+    }
+    return null;
+  }
+
+  function jsonCommandResponse(body, ok = true, status = 200) {
+    return {
+      ok,
+      status,
+      text: JSON.stringify(body),
+    };
+  }
+
+  function mockDictionaryLookup(body = {}) {
+    const clickedForm = body?.clickedForm || "appel";
+    return {
+      request: {
+        clickedForm,
+        sourceLanguageCode: body?.sourceLanguageCode || "nl",
+        contextText: body?.contextText || "",
+      },
+      cards: [
+        mockDictionaryCard({
+          id: "mock-learn",
+          entryId: "entry-learn",
+          clickedForm,
+          headword: "appel",
+          phase: "encountered",
+          progressActions: [
+            progressDisplayAction("learn", "Learn", "start-learning"),
+            progressDisplayAction("known", "Known", "mark-known", undefined, true),
+          ],
+        }),
+        mockDictionaryCard({
+          id: "mock-review",
+          entryId: "entry-review",
+          clickedForm,
+          headword: "appel",
+          phase: "reviewing",
+          progressActions: [
+            progressDisplayAction("again", "Again", "review-card", "fail", true),
+            progressDisplayAction("hard", "Hard", "review-card", "hard", true),
+            progressDisplayAction("good", "Good", "review-card", "success", true),
+            progressDisplayAction("easy", "Easy", "review-card", "easy", true),
+          ],
+        }),
+        mockDictionaryCard({
+          id: "mock-frozen",
+          entryId: "entry-translate-error",
+          clickedForm,
+          headword: "appel",
+          phase: "frozen",
+          progressActions: [],
+        }),
+      ],
+      meta: {
+        provider: "mock",
+        version: "dictionary-card-ui-smoke",
+      },
+    };
+  }
+
+  function mockDictionaryCard({ id, entryId, clickedForm, headword, phase, progressActions }) {
+    return {
+      id,
+      entryId,
+      clickedForm,
+      headword,
+      language: "Dutch",
+      partOfSpeech: "noun",
+      match: { relation: "exact", confidence: 1 },
+      summary: {
+        definition: "A round fruit used in learner examples.",
+        example: `${clickedForm} valt niet ver van de boom.`,
+      },
+      chips: [
+        { kind: "part-of-speech", label: "noun" },
+        { kind: "language", label: "Dutch" },
+      ],
+      sections: [
+        { kind: "meaning", label: "Definition", text: "A round fruit used in learner examples." },
+        { kind: "example", label: "Example", text: `${clickedForm} valt niet ver van de boom.`, translation: "The apple does not fall far from the tree." },
+      ],
+      progress: {
+        phase,
+        seenCount: phase === "encountered" ? 1 : 4,
+        lastSeenAt: new Date().toISOString(),
+      },
+      displayActions: [
+        ...progressActions,
+        {
+          id: "translate",
+          label: "Translate",
+          group: "translation",
+          enabled: true,
+          command: { kind: "card-translation" },
+        },
+      ],
+    };
+  }
+
+  function progressDisplayAction(id, label, action, result, requiresTurnId = false) {
+    return {
+      id,
+      label,
+      group: "progress",
+      enabled: true,
+      command: {
+        kind: "platform-action",
+        action,
+        ...(result ? { result } : {}),
+        ...(requiresTurnId ? { requiresTurnId: true } : {}),
+      },
+    };
+  }
+
+  async function postBackendJson(operation, body = {}) {
+    return backendJson(operation, body);
+  }
+
+  async function getBackendJson(operation, body = {}) {
+    return backendJson(operation, body);
+  }
+
+  async function backendJson(operation, body = {}) {
+    const response = await requestBackendCommand(operation, body);
+    const text = response.text || "";
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch (_error) {
+      payload = null;
+    }
+    if (!response.ok) {
+      const message =
+        payload?.error?.message ||
+        payload?.error ||
+        payload?.detail ||
+        backendErrorFromText(response, text) ||
+        response.error ||
+        `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    return payload;
+  }
+
+  function backendErrorFromText(response, text) {
+    const body = String(text || "").trim();
+    if (/^<!doctype\s+html/i.test(body) || /<html[\s>]/i.test(body)) {
+      if (response.status === 404) {
+        return "Timing endpoint is unavailable on this AudioFilms API.";
+      }
+      return "Timing endpoint returned HTML instead of JSON.";
+    }
+    return "";
+  }
+
+  function requestBackendCommand(operation, body = {}) {
+    if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+      return requestBackendCommandDirect(operation, body);
+    }
+    return sendRuntimeMessage({
+      type: "af-backend-command",
+      operation,
+      body,
+    });
+  }
+
+  function requestBackendCommandDirect(operation, body = {}) {
+    const apiBase = apiBaseForBackendCommands();
+    if (!apiBase) {
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+        text: JSON.stringify({ error: "AudioFilms backend is disabled." }),
+      });
+    }
+    const fetchOptions = { credentials: "omit", method: "GET", headers: { accept: "application/json" } };
+    let url;
+    if (operation === "practice-timing-create") {
+      url = new URL("/api/practice/timing-jobs", `${apiBase}/`);
+      fetchOptions.method = "POST";
+      fetchOptions.headers["content-type"] = "application/json";
+      fetchOptions.body = JSON.stringify(body.payload || {});
+    } else if (operation === "practice-operation") {
+      url = new URL(`/api/practice/operations/${encodeURIComponent(body.operationId || "")}`, `${apiBase}/`);
+    } else {
+      return Promise.resolve({
+        ok: false,
+        status: 400,
+        text: JSON.stringify({ error: "Unsupported backend command." }),
+      });
+    }
+    return fetch(url.toString(), fetchOptions).then(async (response) => ({
+      ok: response.ok,
+      status: response.status,
+      text: await response.text(),
+    }));
+  }
+
+  function apiBaseForBackendCommands() {
+    if (window.__afShadowingConfig?.apiBase) {
+      return window.__afShadowingConfig.apiBase();
+    }
+    return "https://audiofilms-api.dilum.io";
   }
 
   function accountStatusLabel() {
@@ -1805,6 +2399,12 @@
     state.phrases = [];
     state.currentIndex = 0;
     state.textVisible = true;
+    state.shadowTextVisible = true;
+    state.phraseTranslationVisible = false;
+    state.phraseTranslations = {};
+    state.timingOperation = null;
+    state.timingOperationError = "";
+    clearTimingOperationPoll();
     state.selectedWord = null;
     state.guidedMode = false;
     state.error = "";
@@ -1973,6 +2573,8 @@
       state.phrases = phrases;
       state.currentIndex = findPhraseIndexForTime(phrases, currentMs);
       state.selectedWord = null;
+      state.phraseTranslations = {};
+      state.timingOperationError = "";
       source.loadedCueSource = transcriptResult.retrievalPath;
       source.loadedTranscriptResult = summarizeTranscriptResult(transcriptResult);
       source.lastRetrievalAttempts = transcriptResult.retrievalAttempts || [];
@@ -1998,7 +2600,7 @@
       source.lastError = message;
       source.error = summarizeError(message);
       source.lastRetrievalAttempts = Array.isArray(error?.retrievalAttempts) ? error.retrievalAttempts : [];
-      state.error = source.error;
+      state.error = options.keepExistingOnError && state.phrases.length ? "" : source.error;
       updateBootDiagnostics({ lastError: message });
       recordDebugEvent("source-failed", {
         source: captionTrackApi.sourceDisplayName(source),
@@ -2024,13 +2626,13 @@
 
   function summarizeError(message) {
     if (/Backend provider fallback is disabled/i.test(message)) {
-      return "Caption retrieval failed: YouTube timedtext was empty and backend fallback is disabled.";
+      return "Caption retrieval failed: YouTube captions were empty and AudioFilms fallback is off.";
     }
     if (/Backend provider request timed out|Backend provider returned no response|Backend provider request failed/i.test(message)) {
-      return "Caption retrieval failed: YouTube timedtext was empty and backend provider failed.";
+      return "Caption retrieval failed: YouTube captions were empty and AudioFilms fallback failed.";
     }
     if (/Diagnostic YouTube transcript fallback is disabled/i.test(message) && /empty response/i.test(message)) {
-      return "Caption retrieval failed: YouTube timedtext was empty and diagnostic transcript fallback is disabled.";
+      return "Caption retrieval failed: YouTube captions were empty and transcript fallback is off.";
     }
     const first = message.split("|")[0]?.split(";")[0]?.trim() || message;
     return first.length > 140 ? `${first.slice(0, 137)}...` : first;
@@ -2262,6 +2864,9 @@
       state.textVisible = false;
       state.phraseTranslationVisible = true;
     }
+    if (state.practiceMode === "recall" || state.phraseTranslationVisible) {
+      ensureCurrentPhraseTranslation();
+    }
     enterGuidedMode();
     render();
     const playResult = playPhrase(state.currentIndex, { command, navigationEventId: navigationEvent.id });
@@ -2279,6 +2884,9 @@
 
   function toggleText() {
     state.textVisible = !state.textVisible;
+    if (state.practiceMode === "shadow") {
+      state.shadowTextVisible = state.textVisible;
+    }
     render();
   }
 
@@ -2300,6 +2908,9 @@
 
   function showText() {
     state.textVisible = true;
+    if (state.practiceMode === "shadow") {
+      state.shadowTextVisible = true;
+    }
     render();
   }
 

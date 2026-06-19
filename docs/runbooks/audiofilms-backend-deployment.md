@@ -19,11 +19,15 @@ GET  /api/health
 GET  /api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
 GET  /api/video-info?videoId=4EE7m94mJpk
 GET  /api/dict?word=voorbeeld&language=nl
+POST /api/dict/lookup
 POST /api/dict/actions
 POST /api/dict/translation
 POST /api/asr/jobs
 GET  /api/asr/jobs/{jobId}
 GET  /api/asr/jobs/{jobId}/result
+POST /api/practice/phrase-translations
+POST /api/practice/timing-jobs
+GET  /api/practice/operations/{operationId}
 ```
 
 The extension should move service locations by changing `localStorage.afShadowingApiBase`, a tester package default in `extensions/youtube-shadowing/src/config.js`, or DNS. Do not bake NUC/Dell/local hostnames into content code.
@@ -73,6 +77,9 @@ YT_DLP_PATH=/usr/local/bin/yt-dlp
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
 DICTIONARY_2000NL_INCLUDE_USER_STATE=true
+# Required for unauthenticated guest lookup through /api/dict/lookup.
+# Without it, only forwarded signed-in 2000NL Bearer lookup works.
+DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=...
 ALLOWED_EXTENSION_ORIGINS=chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc
 ALLOWED_WEB_ORIGINS=https://www.youtube.com,https://youtube.com
 AUDIOFILMS_DATA_DIR=/data/audiofilms
@@ -217,7 +224,13 @@ Remote checks:
 curl -fsS https://audiofilms-api.dilum.io/api/health | jq .
 curl -fsS 'https://audiofilms-api.dilum.io/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual' | jq '.language, (.practicePhrases | length)'
 curl -fsS 'https://audiofilms-api.dilum.io/api/dict?word=voorbeeld&language=nl' | jq .
+curl -i -X POST https://audiofilms-api.dilum.io/api/dict/lookup \
+  -H 'content-type: application/json' \
+  -d '{"clickedForm":"voorbeeld","sourceLanguageCode":"nl","contextText":"voorbeeld"}'
 ```
+
+Without `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`, `/api/dict/lookup` should
+return JSON `guest_lookup_unavailable` rather than a Next.js HTML 404 page.
 
 ASR unavailable should be explicit when disabled:
 

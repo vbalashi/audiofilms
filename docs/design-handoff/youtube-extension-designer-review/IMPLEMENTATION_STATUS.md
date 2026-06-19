@@ -22,9 +22,14 @@ Current external API finding:
 
 - `https://audiofilms-api.dilum.io/api/health` works.
 - `https://audiofilms-api.dilum.io/api/get-subs?...` works.
-- `https://audiofilms-api.dilum.io/api/dict/lookup` currently returns a Next.js
-  HTML 404 page, not a JSON dictionary response. The UI now suppresses that raw
-  HTML and shows a concise endpoint-unavailable error instead.
+- After the June 19 redeploy, `https://audiofilms-api.dilum.io/api/dict/lookup`,
+  `/api/practice/phrase-translations`, and `/api/practice/timing-jobs` are
+  present on the public API and return JSON responses instead of Next.js HTML
+  404 pages.
+- Guest dictionary lookup is still not production-ready until the deployment has
+  `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`; without it, `/api/dict/lookup`
+  returns `guest_lookup_unavailable` unless the extension forwards a signed-in
+  2000NL user Bearer token.
 
 ## Checklist
 
@@ -34,7 +39,7 @@ Current external API finding:
 | Primary phrase control grouping | Closed for first redesign | `Prev`, `Replay`, and `Next` are grouped as the primary phrase controls with shortcut tooltips. Icon-first controls remain a later polish choice. |
 | Caption readiness/source chip | Closed for first redesign UI | Primary label uses learner-facing copy like `Dutch captions · Ready`; readiness states are `No captions`, `Rough`, `Ready`, `Precise`, and `Improving...`. The derivation is still UI-side heuristic until a backend `PracticeSnapshot` contract exists. |
 | `Get Captions` action | Closed for first redesign UI | `Get Captions` is available inside the readiness/source popover and reuses the existing cache-refresh flow. A dedicated captions operation contract would be a backend refinement. |
-| `Improve Timing` action | Closed as disabled contract state | `Improve Timing` is visible in the readiness/source popover as a separate disabled action with explanatory tooltip. It cannot perform work until the timing operation contract exists. |
+| `Improve Timing` action | Closed for first redesign UI | `Improve Timing` is visible and enabled in the readiness/source popover. After the June 19 redeploy, the public timing route accepts tester-token requests and returns operation JSON; unauthenticated calls correctly return `asr_unauthorized`. |
 | Utility/debug overflow | Closed for first redesign | `Mark Issue`, `Debug`, `Copy Debug`, and `Refresh Cache` live behind the utility overflow. Escape, click-away, mutual popover closing, `aria-haspopup`, and focus return are implemented. |
 | Practice modes: `Shadow` / `Recall` | Closed for first redesign UI | Segmented controls and shortcuts `1` / `2` exist. Recall is selectable and shows a recall prompt; when phrase translation is unavailable it uses a clear unavailable state. |
 | `Show Original` | Closed for first redesign UI | Renamed and wired to original visibility. In Recall it reveals/hides manually and resets on phrase navigation. In Shadow it remains the sticky display toggle. |
@@ -50,17 +55,17 @@ Current external API finding:
 | Lookup loading/no match/result/error | Closed for first redesign UI | Loading skeleton, no-match card, result card, retry action, and concise error state exist. Raw remote HTML/404 is suppressed. Successful result validation still needs a working remote route. |
 | Card translation loading/ready/error | Closed for existing UI contract | Card translation renders inside the card with pending/ready/error text from the action result. Needs real remote route validation for content quality. |
 | Responsive/narrow-width behavior | Closed for first redesign | Controls wrap by group, drawer remains visible in narrow geometry, and smoke geometry covers desktop/narrow viewports. Further visual polish is still useful. |
-| Keyboard discoverability | Closed for first redesign | Shortcuts are wired, primary buttons have title hints, and the ribbon has a compact shortcut hint line. |
+| Keyboard discoverability | Closed for first redesign | Shortcuts are wired, primary buttons have title hints, and the ribbon has a compact shortcut hint line. The header mode label now uses `Watching` / `Phrase navigation` instead of the less clear `Passive sync` / `Shortcuts active`. |
 | Accessibility/focus behavior | Closed for first redesign | Buttons have labels where needed; popovers expose menu semantics; Escape/click-away close and focus return are implemented. Fuller arrow-key menu navigation can be a later enhancement. |
 
 ## Next Recommended Iteration
 
-1. Fix or redeploy the external `/api/dict/lookup` route so dictionary UI can be
-   validated against real JSON responses.
-2. Add the phrase-level translation endpoint/cache so `Show Translation` and
+1. Configure `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN` on the deployment, or rely
+   only on signed-in forwarded-Bearer lookup during private dogfood.
+2. Validate signed-in `/api/dict/lookup` from the extension against real 2000NL
+   JSON responses.
+3. Add or complete the phrase-level translation backend behavior so `Show Translation` and
    Recall can display real translation text instead of the unavailable state.
-3. Add the timing-improvement operation contract so `Improve Timing` can become
-   enabled.
 4. Tighten visual polish in a second pass: icon-first phrase controls, stronger
    density tuning, and fuller arrow-key menu navigation.
 5. Run the original design checklist again after dictionary lookup works.

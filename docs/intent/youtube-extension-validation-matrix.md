@@ -42,6 +42,29 @@ For extension smoke checks:
 - Mark Issue copies a navigation incident report after a manual miss;
 - source mismatch or unknown source warning appears only when metadata is actually uncertain;
 - AudioFilms Off removes the learning layer and leaves YouTube visually normal.
+- Primary learner-facing UI does not show technical source terms such as
+  `manual`, `exact`, `timedtext`, `yt-dlp`, or `provider`.
+- Primary phrase navigation uses compact icon controls with accessible labels,
+  not large text-only tool buttons.
+- Shadow/Recall switching keeps the phrase panel width and height stable.
+- `Show Translation` and Recall prompt render an actionable state for the
+  current phrase: translated text, loading, connect-required, or failure; never
+  raw `unavailable` copy.
+- The debug tools trigger is a compact labelled icon button, opens the utility
+  menu, and closes with Escape.
+- The readiness chip includes a visual status dot and uses learner-facing
+  labels such as `Ready`, `Rough`, `Precise`, `Improving...`, or `No captions`.
+- `Improve Timing` is an enabled readiness action for a loaded caption source;
+  clicking it must show operation feedback or an actionable backend error, not a
+  disabled implementation placeholder.
+- The dictionary panel keeps clicked-word context visible and never exposes raw
+  HTML returned by an API failure.
+- The dictionary panel header carries account placement; the account chip opens
+  a popover with a connect/reconnect/disconnect action.
+- Dictionary V2 card UI is covered with a controlled smoke fixture: card title,
+  chips, sections, phase-dependent progress actions, card translation ready
+  state, card translation error state, and hidden/frozen cards with no progress
+  row.
 
 For local app API checks:
 
@@ -70,6 +93,63 @@ For local app API checks:
 | Viewport variants | `4EE7m94mJpk` | Compact UI responsiveness | No overlap at narrow/wide widths; YouTube recommendations not replaced | Passing DOM-geometry smoke; screenshots captured |
 
 ## Latest Run
+
+### 2026-06-19: Final UI Slice Smoke, Normal Chrome
+
+Fixture: `4EE7m94mJpk`, focused geometry/UI smoke.
+
+Result:
+
+- unpacked extension `hhdkchoccmikoefhenobdjipgdppdpoc` was reloaded;
+- `Shadow` -> `Recall` -> `Shadow` kept the ribbon stable at `236 x 760`;
+- Recall prompt and `Show Translation` showed the actionable logged-out state
+  `Connect 2000NL to translate phrases.`;
+- debug tools opened from the compact icon button and closed with Escape;
+- readiness chip showed `Dutch captions · Ready` with a status dot;
+- after the June 19 follow-up patch, the guided/passive header label uses
+  `Phrase navigation` / `Watching` instead of `Shortcuts active` /
+  `Passive sync`;
+- the readiness/source popover opens upward from the bottom ribbon and stayed
+  within the viewport in a focused Chrome check;
+- the readiness/source popover includes inline helper copy explaining that
+  `Get Captions` retrieves subtitle text while `Improve Timing` starts ASR
+  alignment for tighter phrase boundaries;
+- primary controls/source chip avoided technical source terms;
+- phrase navigation rendered three icon controls for previous, replay, and next;
+- `Improve Timing` opened as an enabled readiness action and showed operation
+  feedback. On the current deployed API it failed closed with
+  `Timing endpoint is unavailable on this AudioFilms API.`;
+- dictionary panel preserved clicked-word context and did not expose raw HTML;
+- dictionary account chip opened a popover with `Connect 2000NL`;
+- controlled dictionary-card fixture rendered three V2 cards:
+  not-started/encountered with `Learn` and `Known`, reviewing with
+  `Again`/`Hard`/`Good`/`Easy`, and frozen with no progress row;
+- card-level `Translate` rendered a ready translation block and a separate
+  error state without breaking the panel;
+- wide and narrow panel geometry stayed within viewport.
+
+Category: passing for the final UI slice.
+
+Notes:
+
+- Local `npm run build` lists `/api/dict/lookup` and
+  `/api/practice/phrase-translations` as available routes.
+- On June 19, 2026 the deployed `https://audiofilms-api.dilum.io` initially
+  returned Next.js 404 HTML for `POST /api/dict/lookup`,
+  `POST /api/practice/phrase-translations`, and
+  `POST /api/practice/timing-jobs`. The Docker image was redeployed later that
+  morning; those routes now return JSON.
+- After redeploy, guest dictionary lookup returns `guest_lookup_unavailable`
+  until `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN` is configured. Signed-in
+  forwarded-Bearer lookup remains the private dogfood path.
+- After redeploy, `POST /api/practice/timing-jobs` returns `asr_unauthorized`
+  without a tester token and accepts tester-token requests with operation JSON.
+- Full smoke still depends on live YouTube/remote-provider auto-caption
+  availability. Current auto-caption fixtures can degrade to the previous
+  working caption source when backend provider retrieval fails.
+- Degraded caption errors now use learner-facing copy such as
+  `AudioFilms fallback is off` or `AudioFilms fallback failed` instead of
+  exposing `timedtext` or `backend provider` in the panel.
 
 ### 2026-06-16: Local ASR Extension Dogfood, Normal Chrome
 

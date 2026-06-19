@@ -167,6 +167,22 @@ function backendCommand(operation, body) {
       testerToken: trustedTesterToken(),
     };
   }
+  if (operation === "practice-timing-create") {
+    return {
+      method: "POST",
+      url: new URL("/api/practice/timing-jobs", `${apiBase}/`).toString(),
+      payload: body.payload || {},
+      testerToken: trustedTesterToken(),
+    };
+  }
+  if (operation === "practice-operation") {
+    const operationId = normalizePracticeOperationId(body.operationId);
+    return {
+      method: "GET",
+      url: new URL(`/api/practice/operations/${encodeURIComponent(operationId)}`, `${apiBase}/`).toString(),
+      testerToken: trustedTesterToken(),
+    };
+  }
   if (operation === "asr-status") {
     const jobId = normalizeAsrJobId(body.jobId);
     return {
@@ -256,12 +272,21 @@ function normalizeAsrJobId(value) {
   return jobId;
 }
 
+function normalizePracticeOperationId(value) {
+  const operationId = String(value || "").trim();
+  if (!/^(?:timing|get-captions):[a-z0-9_:-]+$/i.test(operationId)) {
+    throw new Error("Invalid practice operation id.");
+  }
+  return operationId;
+}
+
 function dictionaryCommand(operation) {
   const routes = {
     "dict-lookup": { method: "POST", path: "/api/dict/lookup" },
     "dict-action": { method: "POST", path: "/api/dict/actions" },
     "dict-translation": { method: "POST", path: "/api/dict/translation" },
     "dict-session": { method: "GET", path: "/api/dict/session" },
+    "phrase-translation": { method: "POST", path: "/api/practice/phrase-translations" },
   };
   const route = routes[operation];
   if (!route) {
@@ -488,7 +513,7 @@ function publicConnectSession(session) {
 function shouldAttachDictionaryBearer(url) {
   try {
     const parsed = new URL(url);
-    if (!/\/api\/dict(?:\/|$)/.test(parsed.pathname)) {
+    if (!/\/api\/(?:dict|practice\/phrase-translations)(?:\/|$)/.test(parsed.pathname)) {
       return false;
     }
     const allowedOrigins = new Set([
