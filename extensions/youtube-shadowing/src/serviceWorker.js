@@ -1,5 +1,6 @@
 try { importScripts("config.js"); } catch (_error) {}
 const CONNECT_SESSION_STORAGE_KEY = "af2000nlConnectSession";
+const ASR_TESTER_TOKEN_STORAGE_KEY = "afAsrTesterToken";
 const DEFAULT_API_BASE = globalThis.__afShadowingConfig?.defaults?.apiBase || "https://audiofilms-api.dilum.io";
 const DEFAULT_CONNECT_BASE_URL = globalThis.__afShadowingConfig?.defaults?.connectBase || "https://2000.dilum.io";
 const DEFAULT_CONNECT_CLIENT_ID = "audiofilms_chrome_dev";
@@ -118,8 +119,11 @@ async function fetchBackendCommand(operation, body = {}) {
     accept: "application/json",
     ...(command.method === "POST" ? { "content-type": "application/json" } : {}),
   };
-  if (command.testerToken) {
-    headers.authorization = `Bearer ${command.testerToken}`;
+  if (backendCommandNeedsTesterToken(operation)) {
+    const testerToken = await trustedTesterToken();
+    if (testerToken) {
+      headers.authorization = `Bearer ${testerToken}`;
+    }
   }
 
   const response = await fetch(command.url, {
@@ -164,7 +168,6 @@ function backendCommand(operation, body) {
       method: "POST",
       url: new URL("/api/asr/jobs", `${apiBase}/`).toString(),
       payload: body.payload || {},
-      testerToken: trustedTesterToken(),
     };
   }
   if (operation === "practice-timing-create") {
@@ -172,7 +175,6 @@ function backendCommand(operation, body) {
       method: "POST",
       url: new URL("/api/practice/timing-jobs", `${apiBase}/`).toString(),
       payload: body.payload || {},
-      testerToken: trustedTesterToken(),
     };
   }
   if (operation === "practice-operation") {
@@ -180,7 +182,6 @@ function backendCommand(operation, body) {
     return {
       method: "GET",
       url: new URL(`/api/practice/operations/${encodeURIComponent(operationId)}`, `${apiBase}/`).toString(),
-      testerToken: trustedTesterToken(),
     };
   }
   if (operation === "asr-status") {
@@ -188,7 +189,6 @@ function backendCommand(operation, body) {
     return {
       method: "GET",
       url: new URL(`/api/asr/jobs/${encodeURIComponent(jobId)}`, `${apiBase}/`).toString(),
-      testerToken: trustedTesterToken(),
     };
   }
   if (operation === "asr-result") {
@@ -196,10 +196,17 @@ function backendCommand(operation, body) {
     return {
       method: "GET",
       url: new URL(`/api/asr/jobs/${encodeURIComponent(jobId)}/result`, `${apiBase}/`).toString(),
-      testerToken: trustedTesterToken(),
     };
   }
   throw new Error("Unsupported backend command.");
+}
+
+function backendCommandNeedsTesterToken(operation) {
+  return operation === "asr-create" ||
+    operation === "practice-timing-create" ||
+    operation === "practice-operation" ||
+    operation === "asr-status" ||
+    operation === "asr-result";
 }
 
 async function fetchDictionaryCommand(operation, body = null) {
@@ -255,13 +262,21 @@ function normalizeTesterToken(value) {
   return token;
 }
 
-function trustedTesterToken() {
+async function trustedTesterToken() {
   const configured =
     globalThis.__afShadowingConfig?.trustedTesterToken?.() ||
     globalThis.__afShadowingConfig?.defaults?.testerToken ||
     globalThis.__AF_ASR_TESTER_TOKEN ||
     "";
-  return normalizeTesterToken(configured);
+  const configuredToken = normalizeTesterToken(configured);
+  if (configuredToken) return configuredToken;
+
+  try {
+    const values = await chromeStorageGet(ASR_TESTER_TOKEN_STORAGE_KEY);
+    return normalizeTesterToken(values?.[ASR_TESTER_TOKEN_STORAGE_KEY]);
+  } catch (_error) {
+    return "";
+  }
 }
 
 function normalizeAsrJobId(value) {

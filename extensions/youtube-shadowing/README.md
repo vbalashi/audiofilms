@@ -202,12 +202,18 @@ For private local compatibility with the old synchronous endpoint, set `localSto
 
 Remote ASR job creation requires a tester token when the backend has
 `ASR_AUTH_REQUIRED=true`. This token must be owned by the extension trusted
-context, not YouTube page `localStorage`; set it in the extension/tester build
-configuration, for example in `src/config.js`:
+context, not YouTube page `localStorage`. For an unpacked dev extension, open
+the extension options page and save the token there:
 
-```js
-globalThis.__AF_ASR_TESTER_TOKEN = "<tester-token>";
+```text
+chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc/src/options.html
 ```
+
+The options page stores the value in `chrome.storage.local` under
+`afAsrTesterToken`. The service worker reads that value and sends it as
+`Authorization: Bearer ...` only for ASR/timing operation routes. Tester builds
+may still provide `globalThis.__AF_ASR_TESTER_TOKEN` from trusted extension
+configuration; do not commit real tokens into `src/config.js`.
 
 Private local dogfood may use full-video ASR when explicitly enabled in the
 local backend. Remote tester jobs should keep `afShadowingLocalAsrDuration`

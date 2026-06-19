@@ -41,6 +41,20 @@ Expected manual reload flow:
 
 The smoke script can do this reload automatically with `--reload-extension`.
 
+ASR timing jobs on the remote tester backend require the extension to hold the
+tester token in trusted extension storage. After loading or reloading the
+unpacked extension, open:
+
+```text
+chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc/src/options.html
+```
+
+Paste the server-side `ASR_TESTER_TOKENS` value and click Save. This writes
+`afAsrTesterToken` to `chrome.storage.local`, which the service worker reads
+when calling `/api/asr/jobs`, `/api/practice/timing-jobs`, and related polling
+routes. Do not put this token in YouTube `localStorage` and do not commit it to
+`src/config.js`.
+
 ## Real Google Chrome Profile Protocol
 
 Use the user's visible `/Applications/Google Chrome.app` profile for extension
