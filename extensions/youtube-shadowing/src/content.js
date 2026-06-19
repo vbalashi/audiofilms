@@ -2559,7 +2559,10 @@
     try {
       state.cueSource = "";
       state.transcriptResult = null;
-      const transcriptResult = await fetchBestAvailableCues(source.track, {
+      const cachedTimingResult = options.refreshCache
+        ? null
+        : await fetchReusableTimingTranscriptResult(source);
+      const transcriptResult = cachedTimingResult || await fetchBestAvailableCues(source.track, {
         refreshCache: Boolean(options.refreshCache),
       });
       const cues = transcriptResult.cues;
@@ -2638,6 +2641,65 @@
         render();
       }
     }
+  }
+
+  async function fetchReusableTimingTranscriptResult(source) {
+    if (!state.videoId) return null;
+
+    try {
+      const operation = await postBackendJson("practice-timing-create", {
+        apiBase: apiBaseForBackendCommands(),
+        payload: {
+          ...buildPracticeTimingPayload(source),
+          reuseOnly: true,
+        },
+      });
+      return transcriptResultFromPracticeTimingOperation(operation);
+    } catch (error) {
+      recordDebugEvent("timing-cache-miss", {
+        source: captionTrackApi.sourceDisplayName(source),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  function transcriptResultFromPracticeTimingOperation(operation) {
+    const snapshot = operation?.result?.snapshot;
+    const phrases = snapshot?.phraseSet?.phrases;
+    if (operation?.kind !== "improve-timing" || operation.state !== "succeeded" || !Array.isArray(phrases) || !phrases.length) {
+      return null;
+    }
+
+    const cues = phrases.map((phrase, index) => ({
+      startMs: Math.max(0, Number(phrase.startSec || 0) * 1000),
+      endMs: Math.max(0, Number(phrase.endSec || 0) * 1000),
+      text: phraseApi.cleanPhraseText(phrase.text || ""),
+      index,
+    })).filter((cue) => cue.text && cue.endMs >= cue.startMs);
+
+    if (!cues.length) return null;
+
+    return {
+      cues,
+      sourceKind: "asr",
+      retrievalPath: "practice-timing-cache",
+      fetchOrigin: "backend",
+      provider: "audiofilms-practice-timing",
+      selectedTrackId: "",
+      actualTrackId: operation.result?.diagnostics?.asrJobId || "",
+      languageCode: snapshot.textSource?.languageCode || operation.input?.language || "",
+      timingExactness: "word-level",
+      qualityFlags: [],
+      warnings: [`ASR job completed: ${cues.length} ASR transcript phrases.`],
+      retrievalAttempts: [{ path: "practice-timing-cache", status: "ok", cues: cues.length }],
+      cacheStatus: "hit",
+      fallbackUsed: false,
+      primaryProvider: "asr-cache",
+      failedProvider: "",
+      fallbackReason: "",
+      practicePhraseSource: "backend",
+    };
   }
 
   function summarizeError(message) {

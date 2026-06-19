@@ -77,7 +77,7 @@ For local app API checks:
 
 | Fixture | Video ID | Purpose | Expected Result | Current Status |
 | --- | --- | --- | --- | --- |
-| NOS TRAPPIST-1 manual Dutch | `4EE7m94mJpk` | Current extension happy path; manual Dutch captions; direct timedtext returns empty in Chrome | Extension falls back to backend/provider, shows `Dutch · Manual · exact`, `189` backend-owned practice phrases, no source warning | Passing in latest Chrome smoke |
+| NOS TRAPPIST-1 manual Dutch | `4EE7m94mJpk` | Current extension happy path; manual Dutch captions; direct timedtext returns empty in Chrome; completed ASR timing exists in backend cache | Extension first reuses cached ASR timing, shows `ASR transcript · Precise`, `143` practice phrases, and keeps `Improve Timing` disabled because timing is already best available | Passing in latest Chrome smoke |
 | App sample video | `iDi5MhglYks` | Main app sample and provider quality comparison video; browser-visible YouTube track differs from provider result | API returns Dutch manual phrases; extension follows browser-visible auto-generated source and labels it as auto | API passing: 213 manual phrases; extension smoke passing with 106 auto-visible phrases |
 | Provider fallback stress video | `KrdVIUmBoE4` | Browser-visible manual captions where the primary provider can be unavailable and fallback provider must carry the load | Extension shows manual exact phrases plus a source warning instead of stale phrases or a hard failure | API passing via `yt-dlp` fallback: 162 phrases; extension smoke passing |
 | Multilingual English manual video | `aircAruvnKk` | Many manual caption languages are available; first YouTube manual track is not the preferred language | Extension should choose preferred English manual captions instead of arbitrary first manual track | API passing: 286 English phrases; extension smoke passing with 271 phrase units |
@@ -144,6 +144,11 @@ Notes:
   forwarded-Bearer lookup remains the private dogfood path.
 - After redeploy, `POST /api/practice/timing-jobs` returns `asr_unauthorized`
   without a tester token and accepts tester-token requests with operation JSON.
+- The timing endpoint now checks reusable completed ASR jobs before spending a
+  rate-limit slot. `reuseOnly=true` returns a cached ASR snapshot when present
+  and returns `asr_cache_miss` without queueing work when absent. The extension
+  uses this on normal caption load so cached ASR timing can become the default
+  source at zero ASR cost.
 - Full smoke still depends on live YouTube/remote-provider auto-caption
   availability. Current auto-caption fixtures can degrade to the previous
   working caption source when backend provider retrieval fails.

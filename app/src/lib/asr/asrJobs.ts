@@ -164,6 +164,16 @@ async function readIndexedJob(config: AsrRuntimeConfig, dedupeKey: string): Prom
   return getAsrJob(indexed.jobId, config);
 }
 
+export async function getReusableAsrJob(
+  request: AsrJobRequest,
+  config = getAsrRuntimeConfig(),
+): Promise<AsrJobRecord | null> {
+  if (request.refresh) return null;
+  ensureAsrQueueDirectories(config);
+  const existing = await readIndexedJob(config, asrJobDedupeKey(request));
+  return existing && existing.status !== 'failed' ? existing : null;
+}
+
 export async function listAsrJobs(config = getAsrRuntimeConfig()): Promise<AsrJobRecord[]> {
   ensureAsrQueueDirectories(config);
   const dir = path.join(config.queueDir, 'jobs');

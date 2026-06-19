@@ -3,7 +3,9 @@ import { authorizeAsrRequest } from '@/lib/asr/asrAuth';
 import { checkAsrJobCreationRateLimit } from '@/lib/asr/asrRateLimit';
 import {
   createOrGetAsrJob,
+  getReusableAsrJob,
   normalizeAsrJobRequest,
+  type AsrJobRequest,
 } from '@/lib/asr/asrJobs';
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import {
@@ -33,28 +35,22 @@ export async function POST(request: Request) {
     return jsonResponse(request, auth.body, { status: auth.status });
   }
 
-  const rateLimit = checkAsrJobCreationRateLimit(auth.subject);
-  if (!rateLimit.ok) {
-    return jsonResponse(
-      request,
-      rejectedOperation('asr_rate_limited', 'Too many timing jobs were started recently.', true, {
-        retryAfterMs: rateLimit.retryAfterMs,
-      }),
-      {
-        status: 429,
-        headers: {
-          'Retry-After': String(Math.ceil(rateLimit.retryAfterMs / 1000)),
-        },
-      },
-    );
-  }
-
   const body = await request.json().catch(() => null);
   const record = body && typeof body === 'object' ? body as Record<string, unknown> : {};
 
   try {
     const jobRequest = normalizeAsrJobRequest(record, config);
-    const outcome = await createOrGetAsrJob(jobRequest, auth.subject, config);
+    const reusableJob = await getReusableAsrJob(jobRequest, config);
+    if (!reusableJob && parseBoolean(record.reuseOnly)) {
+      return jsonResponse(
+        request,
+        rejectedOperation('asr_cache_miss', 'No cached ASR timing is available for this request.', false),
+        { status: 404 },
+      );
+    }
+    const outcome = reusableJob
+      ? { job: reusableJob, created: false }
+      : await createRateLimitedAsrJob(jobRequest, auth.subject, config);
     const operation = await upsertPracticeTimingOperation(
       outcome.job,
       practiceTimingInputFromBody(record, outcome.job),
@@ -91,7 +87,8 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'asr_job_create_failed';
     const [code, detail] = message.split(':');
-    const status = code === 'asr_queue_full' ? 429 : 400;
+    const retryAfterMs = error instanceof RateLimitedTimingJobError ? error.retryAfterMs : undefined;
+    const status = code === 'asr_queue_full' || code === 'asr_rate_limited' ? 429 : 400;
 
     return jsonResponse(
       request,
@@ -99,9 +96,48 @@ export async function POST(request: Request) {
         code,
         practiceErrorMessage(code, detail),
         code === 'asr_queue_full' || code === 'full_audio_disabled',
+        retryAfterMs ? { retryAfterMs } : {},
       ),
-      { status },
+      {
+        status,
+        headers: retryAfterMs
+          ? { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) }
+          : undefined,
+      },
     );
+  }
+}
+
+function parseBoolean(value: unknown): boolean {
+  return value === true || value === '1' || value === 'true';
+}
+
+async function createRateLimitedAsrJob(
+  jobRequest: AsrJobRequest,
+  subject: string,
+  config: ReturnType<typeof getAsrRuntimeConfig>,
+) {
+  const rateLimit = checkAsrJobCreationRateLimit(subject);
+  if (!rateLimit.ok) {
+    return Promise.reject(new RateLimitedTimingJobError(rateLimit.retryAfterMs));
+  }
+
+  try {
+    return await createOrGetAsrJob(jobRequest, subject, config);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.startsWith('asr_queue_full')) {
+      throw error;
+    }
+
+    const reusableJob = await getReusableAsrJob(jobRequest, config);
+    if (reusableJob) return { job: reusableJob, created: false };
+    throw error;
+  }
+}
+
+class RateLimitedTimingJobError extends Error {
+  constructor(readonly retryAfterMs: number) {
+    super('asr_rate_limited');
   }
 }
 
@@ -130,6 +166,8 @@ function practiceErrorMessage(code: string, detail?: string): string {
   if (code === 'invalid_duration') return 'Invalid duration.';
   if (code === 'duration_exceeds_limit') return `Duration exceeds the configured limit of ${detail} seconds.`;
   if (code === 'full_audio_disabled') return 'Full-audio timing jobs are disabled for this deployment.';
+  if (code === 'asr_cache_miss') return 'No cached ASR timing is available for this request.';
+  if (code === 'asr_rate_limited') return 'Too many timing jobs were started recently.';
   if (code === 'asr_queue_full') return `The timing job queue is full${detail ? ` (${detail} active jobs)` : ''}.`;
   return 'Timing job creation failed.';
 }
