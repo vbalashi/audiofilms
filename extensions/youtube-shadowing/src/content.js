@@ -917,7 +917,7 @@
     return { state: "ready", label: "Ready" };
   }
 
-  function timingOperationState(readiness = practiceReadiness()) {
+  function timingOperationState(readiness = null) {
     const operation = state.timingOperation;
     if (operation?.state === "queued" || operation?.state === "running") {
       return {
@@ -926,7 +926,7 @@
         copy: operation.state === "queued" ? "Timing improvement is queued." : "Timing improvement is running.",
       };
     }
-    if (readiness.state === "precise") {
+    if (readiness?.state === "precise") {
       return { active: false, status: "", copy: "" };
     }
     if (operation?.state === "succeeded") {
