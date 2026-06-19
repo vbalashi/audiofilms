@@ -3,6 +3,10 @@ import {
   buildPracticeSnapshot,
   type PracticeTextSourceKind,
 } from '@/lib/practice/snapshot';
+import {
+  buildPracticeSourceInventory,
+  findPracticeSourceInventoryEntry,
+} from '@/lib/practice/sourceInventory';
 import { loadSubtitles } from '@/lib/subtitleService';
 import {
   SubtitleProviderError,
@@ -39,29 +43,24 @@ export async function POST(request: Request) {
     return jsonResponse(request, { error: 'missing_video_id' }, { status: 400 });
   }
 
-  if (requestedKind === 'asr') {
-    return jsonResponse(
-      request,
-      {
-        error: 'selection_not_supported_yet',
-        message: 'ASR transcript source selection is not available in this first backend slice.',
-        requested: requestedSelection(body),
-      },
-      { status: 409 },
-    );
-  }
-
   try {
-    const subtitleResponse = await loadSubtitles(videoId, language, {
+    const requested = requestedSelection(body);
+    const selectedEntry = await selectedInventoryEntry(videoId, language, requested);
+    const subtitleResponse = selectedEntry?.response || await loadSubtitles(videoId, language, {
       sourceKind: sourceKindForTextSource(requestedKind),
       refresh: false,
+    });
+    const availableTextSources = await buildPracticeSourceInventory({
+      videoId,
+      requestedLanguage: language,
+      activeResponse: subtitleResponse,
     });
     const snapshot = buildPracticeSnapshot(subtitleResponse, {
       videoId,
       requestedLanguage: language,
+      availableTextSources,
     });
     const activeSource = snapshot.textSource;
-    const requested = requestedSelection(body);
 
     if (!activeSource) {
       return jsonResponse(
@@ -78,7 +77,8 @@ export async function POST(request: Request) {
 
     if (
       (requested.id && requested.id !== activeSource.id) ||
-      (requested.revisionId && requested.revisionId !== activeSource.revisionId)
+      (requested.revisionId && requested.revisionId !== activeSource.revisionId) ||
+      (requested.kind && requested.kind !== activeSource.kind)
     ) {
       return jsonResponse(
         request,
@@ -101,9 +101,6 @@ export async function POST(request: Request) {
         status: activeSource.status,
       },
       snapshot,
-      limitations: [
-        'first-slice-source-selection-only-active-source-is-enumerated',
-      ],
     });
   } catch (error) {
     const failure = normalizeSubtitleFailure(error);
@@ -117,6 +114,18 @@ export async function POST(request: Request) {
       { status: failure.status },
     );
   }
+}
+
+async function selectedInventoryEntry(
+  videoId: string,
+  language: SubtitleLanguagePreference,
+  requested: ReturnType<typeof requestedSelection>,
+) {
+  if (!requested.id && !requested.revisionId && requested.kind !== 'asr') return null;
+  return findPracticeSourceInventoryEntry(
+    { videoId, requestedLanguage: language },
+    requested,
+  );
 }
 
 function normalizeLanguage(body: SourceSelectionRequest | null): SubtitleLanguagePreference {

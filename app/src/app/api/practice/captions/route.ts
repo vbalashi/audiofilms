@@ -1,5 +1,6 @@
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import { buildPracticeSnapshot } from '@/lib/practice/snapshot';
+import { buildPracticeSourceInventory } from '@/lib/practice/sourceInventory';
 import { loadSubtitles } from '@/lib/subtitleService';
 import {
   SubtitleProviderError,
@@ -124,9 +125,15 @@ export async function POST(request: Request) {
       sourceKind,
       refresh,
     });
+    const availableTextSources = await buildPracticeSourceInventory({
+      videoId,
+      requestedLanguage: language,
+      activeResponse: subtitleResponse,
+    });
     const snapshot = buildPracticeSnapshot(subtitleResponse, {
       videoId,
       requestedLanguage: language,
+      availableTextSources,
     });
     const responseBody: PracticeCaptionsResponse = {
       state: 'ready',

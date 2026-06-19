@@ -105,7 +105,7 @@ them.
 | Initial subtitle read | existing | `GET /api/get-subs` plus direct browser caption attempts | Load cheap/browser-visible captions automatically; do not show provider names by default. | Confirm which metadata fields are stable enough to drive `Text Source` and diagnostics. |
 | `Get Captions` | first slice implemented | `POST /api/practice/captions`, backed by existing subtitle service/cache. | User-initiated; does not start ASR; applies returned captions automatically if still on the same video. | First slice returns a synchronous `state: "ready"` envelope with a minimal `PracticeSnapshot`; queued/polling remains deferred. |
 | `Improve Timing` | first slice implemented | `POST /api/practice/timing-jobs`, `GET /api/practice/operations/{operationId}`, and `GET /api/practice/timing-jobs/{jobId}`. | User-initiated; existing practice remains usable; `displayState` can become `improving` while base quality remains visible. | Progress/ETA and pairwise alignment cache key remain deferred. |
-| Text Source switch | first slice implemented | `POST /api/practice/source-selection`, backed by active/cached subtitle source metadata. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | First slice validates active source/revision only; multi-source inventory and alignment cache key remain deferred. |
+| Text Source switch | partial inventory implemented | `POST /api/practice/source-selection`, backed by active source, cached manual/auto caption artifacts, and readable completed ASR artifacts. | Keep previous working source if selected source fails; pairwise alignment may run in background later. | Full durable multi-source storage and alignment cache key remain separate work; current inventory only exposes artifacts the backend can actually read. |
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
 | Translation target | proposed | 2000NL `GET /api/platform/v1/session` exposed through AudioFilms `GET /api/dict/session`. | Extension uses 2000NL target language; local override is dogfood-only fallback. | Confirm preference field name and unauthenticated fallback. |
 | Dictionary lookup V2 | contract-tested projection | `POST /api/dict/lookup` backed by 2000NL lookup V2 request/body. | UI sends clicked form, language, and phrase context without URL query leakage. | Exact/inflection/no-match projection is covered by pure tests; normalized 2000NL content, match relation, and content fingerprint still depend on platform contract stability. |
@@ -297,9 +297,10 @@ type PracticeCaptionsResponse = {
 - The returned snapshot includes `snapshotRevisionId`, active `textSource`,
   `availableTextSources`, `timingEvidence`, `phraseSet`, and `readiness`.
 - `PracticeTextSource` includes `contentFingerprint`, `status`, and optional
-  `errorCode`. In the first slice, `availableTextSources` intentionally
-  enumerates only the active source, but it uses the same complete
-  `PracticeTextSource` shape as `textSource`.
+  `errorCode`. `availableTextSources` is populated from the active source,
+  cached manual/auto caption artifacts, and readable completed ASR artifacts.
+  It deliberately does not invent sources that are not present in cache/job
+  artifacts.
 - `Get Captions` never starts ASR and never reports
   `readiness.displayState = "improving"`. Readiness is derived from the
   returned subtitle artifact: no usable practice phrases becomes
@@ -438,7 +439,7 @@ Rules:
   transition.
 - Do not assume one ASR timing artifact can safely align every text source.
 
-First implementation:
+Implemented source inventory:
 
 ```http
 POST /api/practice/source-selection
@@ -461,20 +462,20 @@ type PracticeSourceSelectionResponse = {
     status: 'ready' | 'aligning' | 'failed';
   };
   snapshot: PracticeSnapshot;
-  limitations: Array<'first-slice-source-selection-only-active-source-is-enumerated'>;
 };
 ```
 
 Typed non-success responses:
 
-- `source_not_available`: requested source id/revision does not match the
-  current active source, or no source exists for the video/language.
-- `selection_not_supported_yet`: requested source kind is recognized but not
-  selectable in this slice, such as `asr`.
+- `source_not_available`: requested source id/revision/kind does not match an
+  available source, or no source exists for the video/language.
 
-This endpoint deliberately does not invent multi-source storage. It gives UI
-workers an executable backend contract and a clear failure shape while the
-backend still only knows the active/cached source.
+This endpoint deliberately does not invent multi-source storage. It can select
+manual/auto subtitle sources when they are available through the subtitle
+service/cache, and it can select an ASR source only when a completed ASR job has
+a readable subtitle artifact for the requested video/language. Failed or
+missing non-active sources return `source_not_available` and do not degrade the
+active source's readiness.
 
 ## Phase 5: Recall Mode Phrase Translation
 

@@ -7,6 +7,7 @@ import type {
 } from '@/types/subtitles';
 import type {
   PracticeActiveOperation,
+  PracticeTextSource,
   PracticeSnapshot,
   PracticeTextSourceKind,
   PracticeTimingQuality,
@@ -27,6 +28,7 @@ type BuildPracticeSnapshotOptions = {
   videoId: string;
   requestedLanguage: string;
   activeOperation?: PracticeActiveOperation;
+  availableTextSources?: PracticeTextSource[];
 };
 
 const ROUGH_TIMING_FLAGS = new Set<SubtitleQualityFlag>([
@@ -78,7 +80,7 @@ export function buildPracticeSnapshot(
     snapshotRevisionId: revisionId('practice-snapshot', revisionPayload),
     videoId: options.videoId,
     textSource,
-    availableTextSources: textSource ? [textSource] : [],
+    availableTextSources: mergeTextSources(textSource, options.availableTextSources),
     timingEvidence,
     phraseSet,
     readiness,
@@ -99,11 +101,11 @@ function usablePracticePhrases(response: SubtitleResponse): Phrase[] {
   );
 }
 
-function buildTextSource(
+export function practiceTextSourceFromSubtitleResponse(
   response: SubtitleResponse,
   videoId: string,
   languageCode: string,
-): NonNullable<PracticeSnapshot['textSource']> {
+): PracticeTextSource {
   const provider = response.meta?.provider || 'subtitle-service';
   const sourceKind = response.meta?.sourceKind || 'unknown';
   const retrievalPath = response.meta?.retrievalPath || provider;
@@ -131,6 +133,26 @@ function buildTextSource(
     kind,
     status: 'ready',
   };
+}
+
+function buildTextSource(
+  response: SubtitleResponse,
+  videoId: string,
+  languageCode: string,
+): NonNullable<PracticeSnapshot['textSource']> {
+  return practiceTextSourceFromSubtitleResponse(response, videoId, languageCode);
+}
+
+function mergeTextSources(
+  activeSource: PracticeTextSource | null,
+  inventory: PracticeTextSource[] | undefined,
+): PracticeTextSource[] {
+  const byRevision = new Map<string, PracticeTextSource>();
+  for (const source of [activeSource, ...(inventory || [])]) {
+    if (!source) continue;
+    byRevision.set(source.revisionId, source);
+  }
+  return Array.from(byRevision.values());
 }
 
 function buildTimingEvidence(
