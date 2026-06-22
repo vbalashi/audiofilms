@@ -1755,8 +1755,9 @@
     }
     const header = appendElement(entry, "div", "af-overlay-card-header");
     const titleWrap = appendElement(header, "div", "af-overlay-title-wrap");
+    const cardTranslation = visibleCardTranslation(card);
     const title = appendElement(titleWrap, "div", "af-overlay-card-title");
-    renderOverlayCardTitle(title, card);
+    renderOverlayCardTitle(title, card, cardTranslation);
     renderChipList(titleWrap, overlayChips(card));
     const translationActions = displayActionsByGroup(card, "translation");
     if (translationActions.length) {
@@ -1773,20 +1774,25 @@
 
     const summary = card.summary || {};
     if (summary.definition) {
-      const definition = appendElement(entry, "p", "af-dictionary-copy af-overlay-definition");
-      definition.textContent = summary.definition;
+      renderTranslatedLine(
+        entry,
+        "p",
+        "af-dictionary-copy af-overlay-definition",
+        summary.definition,
+        translatedDefinition(cardTranslation, 0),
+      );
     }
     if (summary.example) {
-      const example = appendElement(entry, "p", "af-dictionary-copy af-overlay-example");
-      example.textContent = summary.example;
+      renderTranslatedLine(
+        entry,
+        "p",
+        "af-dictionary-copy af-overlay-example",
+        summary.example,
+        translatedExample(cardTranslation, 0),
+      );
     }
 
-    const translation = state.selectedWord?.translationsByCardId?.[card.id];
-    if (state.visibleTranslationsByCardId[card.id] === true && translation) {
-      renderCardTranslation(entry, translation);
-    }
-
-    renderOverlaySections(entry, card.sections || [], card);
+    renderOverlaySections(entry, card.sections || [], card, cardTranslation);
 
     const personal = progressSignal(card.progress);
     if (personal.length) {
@@ -1805,14 +1811,17 @@
     return card.headword || card.clickedForm || state.selectedWord?.word || "Dictionary card";
   }
 
-  function renderOverlayCardTitle(parent, card) {
+  function renderOverlayCardTitle(parent, card, translation = null) {
     clearElement(parent);
+    const titleText = appendElement(parent, "span", "af-overlay-card-title-text");
+    const titleLine = appendElement(titleText, "span", "af-overlay-card-title-line");
     if (card.article) {
-      const article = appendElement(parent, "span", "af-overlay-card-article");
+      const article = appendElement(titleLine, "span", "af-overlay-card-article");
       article.textContent = card.article;
     }
-    const headword = appendElement(parent, "span", "af-overlay-card-headword");
+    const headword = appendElement(titleLine, "span", "af-overlay-card-headword");
     headword.textContent = overlayTitle(card);
+    renderInlineTranslation(titleText, translatedHeadword(translation));
   }
 
   function overlayChips(card) {
@@ -1835,7 +1844,7 @@
     }
   }
 
-  function renderOverlaySections(parent, sections, card) {
+  function renderOverlaySections(parent, sections, card, translation = null) {
     const visibleSections = sections
       .filter((section) => section?.text)
       .filter((section, index) => index > 0 || section.kind !== "meaning")
@@ -1855,12 +1864,13 @@
     content.hidden = !expanded;
     for (const section of visibleSections) {
       const block = appendElement(content, "div", `af-overlay-section is-${section.kind || "meaning"}`);
-      const text = appendElement(block, "p", "af-dictionary-copy");
-      text.textContent = section.text;
-      if (section.translation) {
-        const translation = appendElement(block, "p", "af-dictionary-copy af-section-translation");
-        translation.textContent = section.translation;
-      }
+      renderTranslatedLine(
+        block,
+        "p",
+        "af-dictionary-copy",
+        section.text,
+        section.translation || translatedSection(section, sections, translation),
+      );
     }
   }
 
@@ -1891,22 +1901,99 @@
     return `${days}d`;
   }
 
-  function renderCardTranslation(parent, translation) {
-    const block = appendElement(parent, "div", "af-card-translation");
-    const text = appendElement(block, "p", "af-dictionary-copy");
-    text.textContent = summarizeTranslationOverlay(translation.overlay) || translation.note || translation.error || translation.status || "No translation text returned.";
+  function renderTranslatedLine(parent, tagName, className, text, translationText = "") {
+    const line = appendElement(parent, tagName, className);
+    line.textContent = text;
+    renderInlineTranslation(line, translationText);
+    return line;
   }
 
-  function summarizeTranslationOverlay(overlay) {
-    if (!overlay || typeof overlay !== "object") return "";
-    const parts = [];
-    if (typeof overlay.headword === "string") parts.push(overlay.headword);
-    if (Array.isArray(overlay.meanings)) {
-      for (const meaning of overlay.meanings) {
-        if (meaning?.definition) parts.push(String(meaning.definition));
-      }
+  function renderInlineTranslation(parent, text) {
+    const value = cleanTranslationText(text);
+    if (!value) return null;
+    const translation = appendElement(parent, "span", "af-inline-translation");
+    translation.textContent = `\n${value}`;
+    return translation;
+  }
+
+  function visibleCardTranslation(card) {
+    if (!card?.id || state.visibleTranslationsByCardId[card.id] !== true) return null;
+    const translation = state.selectedWord?.translationsByCardId?.[card.id];
+    if (!translation || translation.error) return null;
+    return translation;
+  }
+
+  function translatedHeadword(translation) {
+    const overlay = translationOverlay(translation);
+    return cleanTranslationText(overlay?.headword);
+  }
+
+  function translatedDefinition(translation, meaningIndex = 0) {
+    const meaning = translationMeaning(translation, meaningIndex);
+    return cleanTranslationText(meaning?.definition);
+  }
+
+  function translatedExample(translation, exampleIndex = 0) {
+    const examples = translationMeanings(translation).flatMap((meaning) =>
+      Array.isArray(meaning?.examples) ? meaning.examples : [],
+    );
+    return cleanTranslationText(examples[exampleIndex]);
+  }
+
+  function translatedSection(section, allSections, translation) {
+    if (!section || !translation) return "";
+    const peers = Array.isArray(allSections) ? allSections : [];
+    if (section.kind === "meaning") {
+      const meaningIndex = sectionKindIndex(section, peers, "meaning");
+      return meaningIndex >= 0 ? translatedDefinition(translation, meaningIndex) : "";
     }
-    return parts.filter(Boolean).join(" · ");
+    if (section.kind === "example") {
+      const exampleIndex = sectionKindIndex(section, peers, "example");
+      return exampleIndex >= 0 ? translatedExample(translation, exampleIndex) : "";
+    }
+    if (section.kind === "idiom") {
+      const idiomIndex = sectionKindIndex(section, peers, "idiom");
+      return idiomIndex >= 0 ? translatedIdiom(translation, idiomIndex) : "";
+    }
+    return "";
+  }
+
+  function translatedIdiom(translation, idiomIndex = 0) {
+    const idioms = translationMeanings(translation).flatMap((meaning) =>
+      Array.isArray(meaning?.idioms) ? meaning.idioms : [],
+    );
+    const idiom = idioms[idiomIndex];
+    if (typeof idiom === "string") return cleanTranslationText(idiom);
+    if (!idiom || typeof idiom !== "object") return "";
+    return [
+      idiom.translatedExpression,
+      idiom.translatedExplanation,
+      idiom.expression,
+      idiom.explanation,
+    ].map(cleanTranslationText).find(Boolean) || "";
+  }
+
+  function sectionKindIndex(section, allSections, kind) {
+    return allSections.filter((candidate) => candidate?.kind === kind).findIndex((candidate) =>
+      candidate === section || (candidate.id && candidate.id === section.id) || (candidate.sourcePath && candidate.sourcePath === section.sourcePath)
+    );
+  }
+
+  function translationMeaning(translation, meaningIndex = 0) {
+    return translationMeanings(translation)[Math.max(0, meaningIndex)] || null;
+  }
+
+  function translationMeanings(translation) {
+    const overlay = translationOverlay(translation);
+    return Array.isArray(overlay?.meanings) ? overlay.meanings : [];
+  }
+
+  function translationOverlay(translation) {
+    return translation?.overlay && typeof translation.overlay === "object" ? translation.overlay : null;
+  }
+
+  function cleanTranslationText(value) {
+    return typeof value === "string" ? value.trim() : "";
   }
 
   function renderReviewActions(parent, card = null) {
@@ -2411,7 +2498,12 @@
         status: "ready",
         overlay: {
           headword: "apple",
-          meanings: [{ definition: "яблоко" }],
+          meanings: [
+            {
+              definition: "круглый фрукт для учебных примеров",
+              examples: ["яблоко от яблони недалеко падает"],
+            },
+          ],
         },
       });
     }

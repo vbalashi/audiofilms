@@ -579,6 +579,19 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-weight: 850;
 }
 
+.af-overlay-card-title-text,
+.af-overlay-card-title-line {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.af-overlay-card-title-text {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
 .af-overlay-card-article {
   color: var(--af-muted);
   font-size: 12px;
@@ -643,13 +656,22 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   opacity: 0.55;
 }
 
-.af-overlay-meaning + .af-overlay-meaning,
-.af-card-translation {
+.af-overlay-meaning + .af-overlay-meaning {
   margin-top: 10px;
   padding: 9px;
   background: var(--af-accent-soft);
   border: 1px solid var(--af-border);
   border-radius: 8px;
+}
+
+.af-inline-translation {
+  display: block;
+  margin-top: 4px;
+  color: var(--af-translation);
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 .af-overlay-definition {
@@ -706,10 +728,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: var(--af-panel-soft);
   border: 1px solid var(--af-border);
   border-radius: 6px;
-}
-
-.af-section-translation {
-  color: var(--af-translation);
 }
 
 .af-lookup-placeholder-title,
