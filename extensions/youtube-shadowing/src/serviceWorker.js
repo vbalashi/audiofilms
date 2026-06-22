@@ -1,6 +1,7 @@
 try { importScripts("config.js"); } catch (_error) {}
 const CONNECT_SESSION_STORAGE_KEY = "af2000nlConnectSession";
 const ASR_TESTER_TOKEN_STORAGE_KEY = "afAsrTesterToken";
+const DISPLAY_PREFERENCES_STORAGE_KEY = "afShadowingDisplayPreferences";
 const DEFAULT_API_BASE = globalThis.__afShadowingConfig?.defaults?.apiBase || "https://audiofilms-api.dilum.io";
 const DEFAULT_CONNECT_BASE_URL = globalThis.__afShadowingConfig?.defaults?.connectBase || "https://2000.dilum.io";
 const DEFAULT_CONNECT_CLIENT_ID = "audiofilms_chrome_dev";
@@ -9,6 +10,14 @@ const REFRESH_SKEW_SECONDS = 90;
 const ALLOW_LOCAL_BEARER_TARGETS = globalThis.__afShadowingConfig?.defaults?.allowLocalBearerTargets === true;
 
 restrictChromeStorageToTrustedContexts();
+
+if (chrome.action?.onClicked) {
+  chrome.action.onClicked.addListener(() => {
+    toggleDisplayEnabledPreference().catch((error) => {
+      console.error("[AudioFilms] failed to toggle enabled state", error);
+    });
+  });
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "af-fetch-backend-subtitles") {
@@ -459,6 +468,56 @@ async function storeConnectSession(session) {
 
 async function clearConnectSession() {
   await chromeStorageRemove(CONNECT_SESSION_STORAGE_KEY);
+}
+
+async function toggleDisplayEnabledPreference() {
+  const values = await chromeStorageGet(DISPLAY_PREFERENCES_STORAGE_KEY);
+  const preferences = normalizeDisplayPreferences(values?.[DISPLAY_PREFERENCES_STORAGE_KEY]);
+  preferences.enabled = !preferences.enabled;
+  await chromeStorageSet({ [DISPLAY_PREFERENCES_STORAGE_KEY]: preferences });
+}
+
+function normalizeDisplayPreferences(value) {
+  const preferences = value && typeof value === "object" ? value : {};
+  const appearance = preferences.appearance && typeof preferences.appearance === "object"
+    ? preferences.appearance
+    : {};
+  const layout = preferences.layout && typeof preferences.layout === "object" ? preferences.layout : {};
+
+  return {
+    version: 1,
+    enabled: preferences.enabled !== false,
+    examplesExpanded: preferences.examplesExpanded === true,
+    theme: ["system", "light", "dark"].includes(preferences.theme) ? preferences.theme : "system",
+    appearance: {
+      learnerTextScale: clampNumber(appearance.learnerTextScale, 0.85, 1.35, 1),
+      panelBackgroundAlpha: clampNumber(appearance.panelBackgroundAlpha, 0.65, 1, 0.92),
+    },
+    layout: {
+      locked: layout.locked !== false,
+      phraseRibbon: normalizePanelGeometry(layout.phraseRibbon),
+      dictionaryPanel: normalizePanelGeometry(layout.dictionaryPanel),
+      zOrder: layout.zOrder === "dictionaryPanel" ? "dictionaryPanel" : "phraseRibbon",
+    },
+  };
+}
+
+function normalizePanelGeometry(value) {
+  const geometry = value && typeof value === "object" ? value : {};
+  return {
+    x: nullableFiniteNumber(geometry.x),
+    y: nullableFiniteNumber(geometry.y),
+    width: nullableFiniteNumber(geometry.width),
+    height: nullableFiniteNumber(geometry.height),
+  };
+}
+
+function nullableFiniteNumber(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function clampNumber(value, min, max, fallback) {
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }
 
 function chromeStorageGet(key) {

@@ -19,6 +19,7 @@
   const ROOT_ID = "audiofilms-root";
   const SHADOW_CONTAINER_ID = "audiofilms-shadow-container";
   const TOGGLE_ID = "af-shadowing-toggle";
+  const DISPLAY_PREFERENCES_STORAGE_KEY = "afShadowingDisplayPreferences";
   const LEARNING_ENABLED_STORAGE_KEY = "afShadowingLearningEnabled";
   const EXAMPLES_EXPANDED_STORAGE_KEY = "afDictionaryExamplesExpanded";
   const THEME_STORAGE_KEY = "afShadowingTheme";
@@ -27,6 +28,7 @@
   const PRE_ROLL_MS = 150;
   const POST_ROLL_MS = 250;
   const CONTIGUOUS_BOUNDARY_GUARD_MS = 120;
+  const initialDisplayPreferences = readInitialDisplayPreferences();
 
   const state = {
     videoId: null,
@@ -48,7 +50,8 @@
     cues: [],
     phrases: [],
     currentIndex: 0,
-    learningEnabled: readLearningEnabled(),
+    displayPreferences: initialDisplayPreferences,
+    learningEnabled: initialDisplayPreferences.enabled,
     textVisible: true,
     shadowTextVisible: true,
     autoPause: true,
@@ -65,11 +68,11 @@
     guidedMode: false,
     selectedWord: null,
     dictionaryLookupSeq: 0,
-    examplesExpanded: readExamplesExpanded(),
+    examplesExpanded: initialDisplayPreferences.examplesExpanded,
     exampleExpansionOverrides: {},
     visibleTranslationsByCardId: {},
     cardActionFeedbackByCardId: {},
-    themePreference: readThemePreference(),
+    themePreference: initialDisplayPreferences.theme,
     accountStatus: "guest",
     accountUser: null,
     accountPreferences: null,
@@ -88,6 +91,8 @@
     bootDiagnostics,
   };
   window.__afShadowingDebug = state;
+  initializeDisplayPreferences();
+  subscribeToDisplayPreferenceChanges();
   syncTwoThousandNlAccount();
 
   function updateBootDiagnostics(updates) {
@@ -101,29 +106,179 @@
     }
   }
 
-  function readLearningEnabled() {
-    return window.localStorage.getItem(LEARNING_ENABLED_STORAGE_KEY) !== "false";
+  function readInitialDisplayPreferences() {
+    return normalizeDisplayPreferences({
+      enabled: readLocalStorageValue(LEARNING_ENABLED_STORAGE_KEY) !== "false",
+      examplesExpanded: readLocalStorageValue(EXAMPLES_EXPANDED_STORAGE_KEY) === "true",
+      theme: normalizeTheme(readLocalStorageValue(THEME_STORAGE_KEY)),
+    });
   }
 
-  function writeLearningEnabled(value) {
-    window.localStorage.setItem(LEARNING_ENABLED_STORAGE_KEY, value ? "true" : "false");
+  function normalizeDisplayPreferences(value) {
+    const preferences = value && typeof value === "object" ? value : {};
+    const appearance = preferences.appearance && typeof preferences.appearance === "object"
+      ? preferences.appearance
+      : {};
+    const layout = preferences.layout && typeof preferences.layout === "object" ? preferences.layout : {};
+
+    return {
+      version: 1,
+      enabled: preferences.enabled !== false,
+      examplesExpanded: preferences.examplesExpanded === true,
+      theme: normalizeTheme(preferences.theme),
+      appearance: {
+        learnerTextScale: clampNumber(appearance.learnerTextScale, 0.85, 1.35, 1),
+        panelBackgroundAlpha: clampNumber(appearance.panelBackgroundAlpha, 0.65, 1, 0.92),
+      },
+      layout: {
+        locked: layout.locked !== false,
+        phraseRibbon: normalizePanelGeometry(layout.phraseRibbon),
+        dictionaryPanel: normalizePanelGeometry(layout.dictionaryPanel),
+        zOrder: layout.zOrder === "dictionaryPanel" ? "dictionaryPanel" : "phraseRibbon",
+      },
+    };
   }
 
-  function readExamplesExpanded() {
-    return window.localStorage.getItem(EXAMPLES_EXPANDED_STORAGE_KEY) === "true";
+  function normalizePanelGeometry(value) {
+    const geometry = value && typeof value === "object" ? value : {};
+    return {
+      x: nullableFiniteNumber(geometry.x),
+      y: nullableFiniteNumber(geometry.y),
+      width: nullableFiniteNumber(geometry.width),
+      height: nullableFiniteNumber(geometry.height),
+    };
   }
 
-  function writeExamplesExpanded(value) {
-    window.localStorage.setItem(EXAMPLES_EXPANDED_STORAGE_KEY, value ? "true" : "false");
+  function nullableFiniteNumber(value) {
+    return Number.isFinite(value) ? value : null;
   }
 
-  function readThemePreference() {
-    const value = window.localStorage.getItem(THEME_STORAGE_KEY);
+  function clampNumber(value, min, max, fallback) {
+    return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+  }
+
+  function normalizeTheme(value) {
     return value === "light" || value === "dark" ? value : "system";
   }
 
-  function writeThemePreference(value) {
-    window.localStorage.setItem(THEME_STORAGE_KEY, value);
+  function readLocalStorageValue(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  async function initializeDisplayPreferences() {
+    const stored = await readStoredDisplayPreferences();
+    const preferences = stored || state.displayPreferences;
+    applyDisplayPreferences(preferences);
+    if (!stored) {
+      try {
+        await writeDisplayPreferences(preferences);
+        clearMigratedDisplayLocalStorage();
+      } catch (error) {
+        recordDebugEvent("display-preferences-migration-failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } else {
+      clearMigratedDisplayLocalStorage();
+    }
+    render();
+  }
+
+  function subscribeToDisplayPreferenceChanges() {
+    if (!chrome.storage?.onChanged) return;
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "local" || !changes[DISPLAY_PREFERENCES_STORAGE_KEY]) return;
+
+      const wasEnabled = state.learningEnabled;
+      const next = normalizeDisplayPreferences(changes[DISPLAY_PREFERENCES_STORAGE_KEY].newValue);
+      applyDisplayPreferences(next);
+
+      if (wasEnabled && !state.learningEnabled) {
+        stopPlaybackTimer();
+        detachPassivePlaybackWatcher();
+        state.guidedMode = false;
+        removeWorkspace();
+        renderToggle();
+        return;
+      }
+
+      if (!wasEnabled && state.learningEnabled) {
+        handleCurrentLocation();
+        return;
+      }
+
+      render();
+    });
+  }
+
+  async function readStoredDisplayPreferences() {
+    try {
+      const values = await chromeStorageGet(DISPLAY_PREFERENCES_STORAGE_KEY);
+      const stored = values?.[DISPLAY_PREFERENCES_STORAGE_KEY];
+      return stored ? normalizeDisplayPreferences(stored) : null;
+    } catch (error) {
+      recordDebugEvent("display-preferences-read-failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  function applyDisplayPreferences(preferences) {
+    state.displayPreferences = normalizeDisplayPreferences(preferences);
+    state.learningEnabled = state.displayPreferences.enabled;
+    state.examplesExpanded = state.displayPreferences.examplesExpanded;
+    state.themePreference = state.displayPreferences.theme;
+  }
+
+  function updateDisplayPreferences(updater) {
+    const next = normalizeDisplayPreferences(updater({ ...state.displayPreferences }));
+    applyDisplayPreferences(next);
+    writeDisplayPreferences(next).catch((error) => {
+      recordDebugEvent("display-preferences-write-failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
+  function writeDisplayPreferences(preferences) {
+    return chromeStorageSet({ [DISPLAY_PREFERENCES_STORAGE_KEY]: normalizeDisplayPreferences(preferences) });
+  }
+
+  function clearMigratedDisplayLocalStorage() {
+    [LEARNING_ENABLED_STORAGE_KEY, EXAMPLES_EXPANDED_STORAGE_KEY, THEME_STORAGE_KEY].forEach((key) => {
+      try {
+        window.localStorage.removeItem(key);
+      } catch (_error) {}
+    });
+  }
+
+  function chromeStorageGet(key) {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.get(key, (values) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(values);
+      });
+    });
+  }
+
+  function chromeStorageSet(values) {
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set(values, () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve();
+      });
+    });
   }
 
   function ensureToggle() {
@@ -150,8 +305,10 @@
   }
 
   function toggleLearningMode() {
-    state.learningEnabled = !state.learningEnabled;
-    writeLearningEnabled(state.learningEnabled);
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      enabled: !state.learningEnabled,
+    }));
     if (!state.learningEnabled) {
       stopPlaybackTimer();
       detachPassivePlaybackWatcher();
@@ -709,7 +866,10 @@
       light: "dark",
       dark: "system",
     }[state.themePreference] || "system";
-    writeThemePreference(state.themePreference);
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      theme: state.themePreference,
+    }));
     render();
   }
 
@@ -727,7 +887,10 @@
     event.stopPropagation();
     state.examplesExpanded = !state.examplesExpanded;
     state.exampleExpansionOverrides = {};
-    writeExamplesExpanded(state.examplesExpanded);
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      examplesExpanded: state.examplesExpanded,
+    }));
     render();
   }
 
