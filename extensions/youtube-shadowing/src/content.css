@@ -1,6 +1,27 @@
 html.af-shadowing-workspace {
   --af-accent: #69b7ff;
   --af-accent-strong: #38a7ff;
+  --af-toggle-text: #e2e8f0;
+  --af-toggle-bg: rgba(15, 23, 42, 0.86);
+  --af-toggle-border: rgba(148, 163, 184, 0.38);
+}
+
+html.af-shadowing-workspace[data-af-theme="light"] {
+  --af-accent: #2563eb;
+  --af-accent-strong: #1d4ed8;
+  --af-toggle-text: #111827;
+  --af-toggle-bg: rgba(255, 255, 255, 0.92);
+  --af-toggle-border: rgba(17, 24, 39, 0.16);
+}
+
+@media (prefers-color-scheme: light) {
+  html.af-shadowing-workspace[data-af-theme="system"] {
+    --af-accent: #2563eb;
+    --af-accent-strong: #1d4ed8;
+    --af-toggle-text: #111827;
+    --af-toggle-bg: rgba(255, 255, 255, 0.92);
+    --af-toggle-border: rgba(17, 24, 39, 0.16);
+  }
 }
 
 #af-shadowing-toggle {
@@ -9,10 +30,10 @@ html.af-shadowing-workspace {
   bottom: 18px;
   z-index: 2147483647;
   padding: 8px 10px;
-  color: #e2e8f0;
-  background: rgba(15, 23, 42, 0.86);
-  border: 1px solid rgba(148, 163, 184, 0.38);
-  border-radius: 999px;
+  color: var(--af-toggle-text);
+  background: var(--af-toggle-bg);
+  border: 1px solid var(--af-toggle-border);
+  border-radius: 6px;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
   cursor: pointer;
   font: 700 12px/1.2 Roboto, Arial, Helvetica, sans-serif;

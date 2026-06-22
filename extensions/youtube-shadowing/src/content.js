@@ -21,6 +21,7 @@
   const TOGGLE_ID = "af-shadowing-toggle";
   const LEARNING_ENABLED_STORAGE_KEY = "afShadowingLearningEnabled";
   const EXAMPLES_EXPANDED_STORAGE_KEY = "afDictionaryExamplesExpanded";
+  const THEME_STORAGE_KEY = "afShadowingTheme";
   const MAX_PHRASE_DURATION_MS = 12000;
   const LONG_PAUSE_MS = 1000;
   const PRE_ROLL_MS = 150;
@@ -68,6 +69,7 @@
     exampleExpansionOverrides: {},
     visibleTranslationsByCardId: {},
     cardActionFeedbackByCardId: {},
+    themePreference: readThemePreference(),
     accountStatus: "guest",
     accountUser: null,
     accountPreferences: null,
@@ -115,6 +117,15 @@
     window.localStorage.setItem(EXAMPLES_EXPANDED_STORAGE_KEY, value ? "true" : "false");
   }
 
+  function readThemePreference() {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return value === "light" || value === "dark" ? value : "system";
+  }
+
+  function writeThemePreference(value) {
+    window.localStorage.setItem(THEME_STORAGE_KEY, value);
+  }
+
   function ensureToggle() {
     let button = document.getElementById(TOGGLE_ID);
     if (button) return button;
@@ -129,6 +140,7 @@
 
   function renderToggle() {
     const button = ensureToggle();
+    applyThemeAttributes();
     button.textContent = state.learningEnabled ? "AudioFilms On" : "AudioFilms Off";
     button.classList.toggle("is-enabled", state.learningEnabled);
     button.setAttribute(
@@ -153,7 +165,9 @@
 
   function ensureWorkspace() {
     document.documentElement.classList.add("af-shadowing-workspace", "af-shadowing-enabled");
+    applyThemeAttributes();
     const root = ensureAudioFilmsRoot();
+    applyThemeAttributes();
     const container = ensureShadowContainer(root);
 
     let ribbonPanel = root.querySelector(`#${RIBBON_PANEL_ID}`);
@@ -300,6 +314,9 @@
     const mode = appendElement(metaRight, "span", "af-ribbon-mode");
     mode.dataset.afMode = "";
     mode.textContent = "Passive";
+    const themeButton = appendButton(metaRight, "", "afThemeToggle");
+    themeButton.className = "af-icon-button af-theme-toggle";
+    themeButton.setAttribute("aria-label", "Theme");
     const utility = appendElement(metaRight, "div", "af-utility-menu");
     const utilityButton = appendButton(utility, "", "afUtilityToggle");
     utilityButton.className = "af-icon-button af-utility-toggle";
@@ -363,6 +380,7 @@
     panel.querySelector("[data-af-mode-recall]").addEventListener("click", () => setPracticeMode("recall"));
     panel.querySelector("[data-af-phrase-translation]").addEventListener("click", togglePhraseTranslation);
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
+    panel.querySelector("[data-af-theme-toggle]").addEventListener("click", cycleThemePreference);
     panel.querySelector("[data-af-utility-toggle]").addEventListener("click", toggleUtilityMenu);
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
@@ -480,6 +498,17 @@
         '<path d="m22 22-5-10-5 10"/>',
         '<path d="M14 18h6"/>',
       ],
+      theme: [
+        '<circle cx="12" cy="12" r="4"/>',
+        '<path d="M12 2v2"/>',
+        '<path d="M12 20v2"/>',
+        '<path d="m4.93 4.93 1.41 1.41"/>',
+        '<path d="m17.66 17.66 1.41 1.41"/>',
+        '<path d="M2 12h2"/>',
+        '<path d="M20 12h2"/>',
+        '<path d="m6.34 17.66-1.41 1.41"/>',
+        '<path d="m19.07 4.93-1.41 1.41"/>',
+      ],
     }[kind] || [];
     return [
       '<svg class="af-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
@@ -519,6 +548,7 @@
     const modeShadow = panel.querySelector("[data-af-mode-shadow]");
     const modeRecall = panel.querySelector("[data-af-mode-recall]");
     const phraseTranslation = panel.querySelector("[data-af-phrase-translation]");
+    const themeToggle = panel.querySelector("[data-af-theme-toggle]");
     const utilityToggle = panel.querySelector("[data-af-utility-toggle]");
     const utilityMenu = panel.querySelector("[data-af-utility-menu]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
@@ -545,7 +575,12 @@
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
       : state.loading ? "Loading" : "0 / 0";
     mode.textContent = state.guidedMode ? "Phrase navigation" : "Watching";
+    mode.hidden = true;
     mode.classList.toggle("is-guided", state.guidedMode);
+    const themeLabel = `Theme: ${state.themePreference}`;
+    themeToggle.innerHTML = `${iconSvg("theme")}<span class="af-sr-only">${themeLabel}</span>`;
+    themeToggle.setAttribute("aria-label", themeLabel);
+    themeToggle.title = themeLabel;
     toggle.textContent = state.practiceMode === "recall"
       ? state.textVisible ? "Hide Original" : "Reveal Original"
       : state.textVisible ? "Hide Original" : "Show Original";
@@ -655,6 +690,27 @@
       state.sourceMenuOpen = false;
     }
     render();
+  }
+
+  function cycleThemePreference(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.themePreference = {
+      system: "light",
+      light: "dark",
+      dark: "system",
+    }[state.themePreference] || "system";
+    writeThemePreference(state.themePreference);
+    render();
+  }
+
+  function applyThemeAttributes() {
+    const preference = state.themePreference || "system";
+    document.documentElement.dataset.afTheme = preference;
+    const root = document.getElementById(ROOT_ID);
+    if (root) {
+      root.dataset.afTheme = preference;
+    }
   }
 
   function toggleAllExamples(event) {
