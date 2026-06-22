@@ -478,7 +478,7 @@ function runGeometryScenario() {
     assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
     assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
     assertion("phrase navigation uses icon controls", wideBeforeLookup.primaryUi?.phraseIconButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
-    assertion("dictionary selected card has context", wideWithDictionary.dictionaryUi?.hasSelectedCard === true && wideWithDictionary.dictionaryUi?.hasContext === true, JSON.stringify(wideWithDictionary.dictionaryUi)),
+    assertion("dictionary ready body starts at cards", wideWithDictionary.dictionaryUi?.hasSelectedCard === false && wideWithDictionary.dictionaryUi?.overlayCardCount > 0, JSON.stringify(wideWithDictionary.dictionaryUi)),
     assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
     ...accountPlacementAssertions,
     ...dictionaryCardAssertions,
@@ -590,9 +590,10 @@ function assertDictionaryAccountPlacement() {
   sleep(200);
 
   return [
-    assertion("dictionary account chip is in panel header", Boolean(accountGeometry.dictionaryUi?.accountLabel), JSON.stringify(accountGeometry.dictionaryUi)),
-    assertion("dictionary account menu opens", accountGeometry.dictionaryUi?.accountMenuOpen === true, JSON.stringify(accountGeometry.dictionaryUi)),
-    assertion("dictionary account menu has connect action", /Connect|Disconnect|Reconnect/i.test(accountGeometry.dictionaryUi?.accountAction || ""), accountGeometry.dictionaryUi?.accountAction || ""),
+    assertion("account icon is in ribbon header", Boolean(accountGeometry.ribbonUi?.accountLabel), JSON.stringify(accountGeometry.ribbonUi)),
+    assertion("account icon is not in dictionary header", accountGeometry.dictionaryUi?.accountPresent === false, JSON.stringify(accountGeometry.dictionaryUi)),
+    assertion("ribbon account menu opens", accountGeometry.ribbonUi?.accountMenuOpen === true, JSON.stringify(accountGeometry.ribbonUi)),
+    assertion("ribbon account menu has connect action", /Connect|Disconnect|Reconnect/i.test(accountGeometry.ribbonUi?.accountAction || ""), accountGeometry.ribbonUi?.accountAction || ""),
   ];
 }
 
@@ -1089,19 +1090,24 @@ function readGeometrySnapshot() {
     })(),
     error: root?.querySelector("[data-af-error]")?.textContent || "",
     ribbon: toRect(ribbon),
+    ribbonUi: (() => ({
+      accountLabel: ribbon?.querySelector("[data-af-account]")?.textContent || "",
+      accountAriaLabel: ribbon?.querySelector("[data-af-account]")?.getAttribute("aria-label") || "",
+      accountMenuOpen: ribbon?.querySelector("[data-af-account-menu]")?.classList.contains("is-open") || false,
+      accountAction: ribbon?.querySelector("[data-af-account-menu] [data-af-account-action]")?.textContent || "",
+      modeText: ribbon?.querySelector("[data-af-mode]")?.textContent || "",
+    }))(),
     dictionary: toRect(dictionary),
     dictionaryUi: (() => {
       if (!dictionary) return { present: false };
       const text = dictionary.textContent || "";
       return {
         present: true,
+        accountPresent: Boolean(dictionary.querySelector("[data-af-account]")),
         hasSelectedCard: Boolean(dictionary.querySelector(".af-dictionary-card-selected")),
         hasContext: Boolean(dictionary.querySelector(".af-context-text")?.textContent?.trim()),
         lookupState: dictionary.querySelector(".af-lookup-placeholder")?.className || "",
         overlayCardCount: dictionary.querySelectorAll(".af-overlay-card").length,
-        accountLabel: dictionary.querySelector("[data-af-account]")?.textContent || "",
-        accountMenuOpen: dictionary.querySelector("[data-af-account-menu]")?.classList.contains("is-open") || false,
-        accountAction: dictionary.querySelector("[data-af-account-menu] [data-af-account-action]")?.textContent || "",
         cards: Array.from(dictionary.querySelectorAll(".af-overlay-card")).map((card) => ({
           title: card.querySelector(".af-overlay-card-title")?.textContent || "",
           chips: card.querySelectorAll(".af-chip").length,

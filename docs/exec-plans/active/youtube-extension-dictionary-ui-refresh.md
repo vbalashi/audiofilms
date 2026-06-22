@@ -309,7 +309,7 @@ move through these states:
 | Slice | Status | Required evidence | Open defects / notes |
 | --- | --- | --- | --- |
 | 0. Baseline evidence | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-0-baseline/README.md`; `opbouwen-ready-dom-snapshot.json`; `youtube-dom-snapshot.json`; screenshots for both states | Raw service-worker JSON capture was unavailable through AppleScript options-page context; use contract tests or a temporary debug helper before Slice 3 if raw payload is needed. |
-| 1. Header and account IA | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-1-header-account/README.md`; DOM smoke and desktop screenshot |  |
+| 1. Header and account IA | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-1-header-account/README.md`; DOM smoke and desktop screenshot; corrective `--only-geometry` Chrome smoke on June 22 confirmed account icon in the main ribbon and absent from dictionary header |  |
 | 2. Remove redundant intro blocks | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-2-ready-body/README.md`; DOM smoke proving first ready body item is a card |  |
 | 3. Card title and metadata chips | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-3-card-metadata/README.md`; fixture/contract test plus `zware` browser smoke | Remote API still showed old `VanDale Dutch`/no-article payload during browser smoke; local projection tests verify the intended backend shape. |
 | 4. Examples expand/collapse | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-4-examples/README.md`; DOM interaction smoke; page-reload persistence smoke |  |

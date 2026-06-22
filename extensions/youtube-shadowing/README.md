@@ -356,7 +356,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
   `/api/dict/actions` require a forwarded Connect token and must not use the
   environment fallback.
 - Plain lookup is read-only. Explicit card actions go through `/api/dict/actions`, show per-card pending/saved/error feedback, then refresh lookup state without replacing the ready cards with the loading/context layout. Per-card translation goes through `/api/dict/translation` and is toggled show/hide from a compact icon button after the first load.
-- The dictionary ready state starts directly at backend-projected cards. The header carries the clicked form plus card count, account identity is behind the account icon, examples use explicit `Examples` expand/collapse buttons, and the global examples preference is stored in `localStorage.afDictionaryExamplesExpanded`.
+- The dictionary ready state starts directly at backend-projected cards. The dictionary header carries only the clicked form plus card count and dictionary controls. Account identity lives behind the compact account icon in the main phrase ribbon header. Examples use explicit `Examples` expand/collapse buttons, and the global examples preference is stored in `localStorage.afDictionaryExamplesExpanded`.
 - Extension theme can be cycled with the ribbon theme icon and is stored in `localStorage.afShadowingTheme` as `system`, `light`, or `dark`. The ribbon, dictionary, and floating `AudioFilms On/Off` toggle share this theme surface.
 - Stable unpacked dev extension ID: `hhdkchoccmikoefhenobdjipgdppdpoc`.
 - 2000NL Connect dev redirect URI: `https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/`.

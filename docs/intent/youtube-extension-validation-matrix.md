@@ -59,8 +59,9 @@ For extension smoke checks:
   disabled implementation placeholder.
 - The dictionary panel keeps clicked-word context visible and never exposes raw
   HTML returned by an API failure.
-- The dictionary panel header carries account placement; the account chip opens
-  a popover with a connect/reconnect/disconnect action.
+- The main phrase ribbon header carries account placement; the dictionary header
+  stays lookup-focused. The account icon opens a popover with a
+  connect/reconnect/disconnect action.
 - Dictionary V2 card UI is covered with a controlled smoke fixture: card title,
   chips, sections, phase-dependent progress actions, card translation ready
   state, card translation error state, and hidden/frozen cards with no progress
@@ -121,7 +122,8 @@ Result:
   `Timing endpoint is unavailable on this AudioFilms API.`;
 - dictionary panel ready state opened directly on cards, with clicked form and
   card count in the header;
-- dictionary account icon opened a popover with `Connect 2000NL`;
+- main ribbon account icon opened a popover with `Connect 2000NL` or
+  `Disconnect`, and the dictionary header did not contain an account control;
 - controlled dictionary-card fixture rendered three V2 cards:
   not-started/encountered with `Learn` and `Known`, reviewing with
   `Again`/`Hard`/`Good`/`Easy`, and frozen with no progress row;

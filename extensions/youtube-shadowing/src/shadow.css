@@ -202,12 +202,12 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-weight: 650;
 }
 
-.af-dictionary-account-wrap {
+.af-account-wrap {
   position: relative;
   flex: 0 0 auto;
 }
 
-.af-dictionary-account {
+.af-account-button {
   display: grid;
   width: 30px;
   height: 30px;
@@ -221,7 +221,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-family: inherit;
 }
 
-.af-dictionary-account.is-connected {
+.af-account-button.is-connected {
   color: #067647;
   background: #ecfdf3;
   border-color: #abefc6;

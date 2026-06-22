@@ -252,19 +252,6 @@
     const subtitle = appendElement(heading, "div", "af-dictionary-subtitle");
     subtitle.dataset.afDictionarySubtitle = "";
     subtitle.textContent = "Contextual Lookup";
-    const accountWrap = appendElement(header, "div", "af-dictionary-account-wrap");
-    const account = appendElement(accountWrap, "button", "af-dictionary-account");
-    account.type = "button";
-    account.dataset.afAccount = "";
-    account.setAttribute("aria-label", "2000NL account");
-    account.setAttribute("aria-haspopup", "menu");
-    account.setAttribute("aria-expanded", "false");
-    const accountMenu = appendElement(accountWrap, "div", "af-account-popover");
-    accountMenu.dataset.afAccountMenu = "";
-    const accountCopy = appendElement(accountMenu, "div", "af-account-popover-copy");
-    accountCopy.dataset.afAccountCopy = "";
-    const accountAction = appendButton(accountMenu, "Connect 2000NL", "afAccountAction");
-    accountAction.className = "af-account-popover-action";
     const examplesToggle = appendElement(header, "button", "af-dictionary-examples-toggle");
     examplesToggle.type = "button";
     examplesToggle.dataset.afExamplesToggle = "";
@@ -278,16 +265,6 @@
       state.selectedWord = null;
       render();
     });
-    account.addEventListener("click", toggleAccountMenu);
-    accountAction.addEventListener("click", () => {
-      state.accountMenuOpen = false;
-      if (state.accountStatus === "signed-in") {
-        disconnectTwoThousandNlAccount();
-      } else {
-        connectTwoThousandNlAccount();
-      }
-    });
-
     const body = appendElement(panel, "div", "af-dictionary-body");
     body.dataset.afDictionaryBody = "";
 
@@ -314,6 +291,7 @@
     const mode = appendElement(metaRight, "span", "af-ribbon-mode");
     mode.dataset.afMode = "";
     mode.textContent = "Passive";
+    createAccountControl(metaRight);
     const themeButton = appendButton(metaRight, "", "afThemeToggle");
     themeButton.className = "af-icon-button af-theme-toggle";
     themeButton.setAttribute("aria-label", "Theme");
@@ -387,6 +365,32 @@
     panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
     panel.querySelector("[data-af-mark-issue]").addEventListener("click", markIssue);
     return panel;
+  }
+
+  function createAccountControl(parent) {
+    const accountWrap = appendElement(parent, "div", "af-account-wrap");
+    const account = appendElement(accountWrap, "button", "af-account-button");
+    account.type = "button";
+    account.dataset.afAccount = "";
+    account.setAttribute("aria-label", "2000NL account");
+    account.setAttribute("aria-haspopup", "menu");
+    account.setAttribute("aria-expanded", "false");
+    const accountMenu = appendElement(accountWrap, "div", "af-account-popover");
+    accountMenu.dataset.afAccountMenu = "";
+    const accountCopy = appendElement(accountMenu, "div", "af-account-popover-copy");
+    accountCopy.dataset.afAccountCopy = "";
+    const accountAction = appendButton(accountMenu, "Connect 2000NL", "afAccountAction");
+    accountAction.className = "af-account-popover-action";
+    account.addEventListener("click", toggleAccountMenu);
+    accountAction.addEventListener("click", () => {
+      state.accountMenuOpen = false;
+      if (state.accountStatus === "signed-in") {
+        disconnectTwoThousandNlAccount();
+      } else {
+        connectTwoThousandNlAccount();
+      }
+    });
+    return accountWrap;
   }
 
   function mountWorkspace(container, dictionaryPanel, ribbonPanel) {
@@ -548,6 +552,10 @@
     const modeShadow = panel.querySelector("[data-af-mode-shadow]");
     const modeRecall = panel.querySelector("[data-af-mode-recall]");
     const phraseTranslation = panel.querySelector("[data-af-phrase-translation]");
+    const account = panel.querySelector("[data-af-account]");
+    const accountMenu = panel.querySelector("[data-af-account-menu]");
+    const accountCopy = panel.querySelector("[data-af-account-copy]");
+    const accountAction = panel.querySelector("[data-af-account-action]");
     const themeToggle = panel.querySelector("[data-af-theme-toggle]");
     const utilityToggle = panel.querySelector("[data-af-utility-toggle]");
     const utilityMenu = panel.querySelector("[data-af-utility-menu]");
@@ -577,6 +585,7 @@
     mode.textContent = state.guidedMode ? "Phrase navigation" : "Watching";
     mode.hidden = true;
     mode.classList.toggle("is-guided", state.guidedMode);
+    renderAccountControl(account, accountMenu, accountCopy, accountAction);
     const themeLabel = `Theme: ${state.themePreference}`;
     themeToggle.innerHTML = `${iconSvg("theme")}<span class="af-sr-only">${themeLabel}</span>`;
     themeToggle.setAttribute("aria-label", themeLabel);
@@ -1509,31 +1518,12 @@
   function renderDictionary(panel) {
     const title = panel.querySelector("[data-af-dictionary-title]");
     const subtitle = panel.querySelector("[data-af-dictionary-subtitle]");
-    const account = panel.querySelector("[data-af-account]");
-    const accountMenu = panel.querySelector("[data-af-account-menu]");
-    const accountCopy = panel.querySelector("[data-af-account-copy]");
-    const accountAction = panel.querySelector("[data-af-account-action]");
     const examplesToggle = panel.querySelector("[data-af-examples-toggle]");
     const body = panel.querySelector("[data-af-dictionary-body]");
 
     const headerCopy = dictionaryHeaderCopy();
     title.textContent = headerCopy.title;
     subtitle.textContent = headerCopy.subtitle;
-    clearElement(account);
-    account.insertAdjacentHTML(
-      "beforeend",
-      iconSvg(state.accountStatus === "signed-in" ? "account-connected" : "account"),
-    );
-    const accountText = appendElement(account, "span", "af-sr-only");
-    accountText.textContent = accountStatusLabel();
-    account.classList.toggle("is-connected", state.accountStatus === "signed-in");
-    account.setAttribute("aria-label", accountStatusAriaLabel());
-    account.setAttribute("aria-expanded", state.accountMenuOpen ? "true" : "false");
-    account.title = accountStatusLabel();
-    accountMenu.classList.toggle("is-open", state.accountMenuOpen);
-    accountCopy.textContent = accountStatusCopy();
-    accountAction.textContent = accountConnectLabel();
-    accountAction.disabled = state.accountLoading;
     const canToggleExamples = Boolean(state.selectedWord?.lookupResult?.cards?.length);
     examplesToggle.hidden = !canToggleExamples;
     if (canToggleExamples) {
@@ -1550,6 +1540,25 @@
     } else {
       renderAccountCard(body);
     }
+  }
+
+  function renderAccountControl(account, accountMenu, accountCopy, accountAction) {
+    if (!account || !accountMenu || !accountCopy || !accountAction) return;
+    clearElement(account);
+    account.insertAdjacentHTML(
+      "beforeend",
+      iconSvg(state.accountStatus === "signed-in" ? "account-connected" : "account"),
+    );
+    const accountText = appendElement(account, "span", "af-sr-only");
+    accountText.textContent = accountStatusLabel();
+    account.classList.toggle("is-connected", state.accountStatus === "signed-in");
+    account.setAttribute("aria-label", accountStatusAriaLabel());
+    account.setAttribute("aria-expanded", state.accountMenuOpen ? "true" : "false");
+    account.title = accountStatusLabel();
+    accountMenu.classList.toggle("is-open", state.accountMenuOpen);
+    accountCopy.textContent = accountStatusCopy();
+    accountAction.textContent = accountConnectLabel();
+    accountAction.disabled = state.accountLoading;
   }
 
   function dictionaryHeaderCopy() {

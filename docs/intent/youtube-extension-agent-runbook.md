@@ -177,7 +177,8 @@ Dictionary UI smoke should verify the current learner-facing panel contract:
 - ready lookup body starts with `.af-overlay-card`, not the selected-word/context
   intro card;
 - header shows the clicked form and card count;
-- account identity is behind the account icon popover;
+- account identity is behind the account icon popover in the main phrase ribbon
+  header, not in the dictionary header;
 - examples use explicit `Examples` buttons plus the global examples toggle;
 - translation is an icon button and toggles show/hide after first load;
 - progress buttons render backend-provided labels only (`Learn`, `Known`,
