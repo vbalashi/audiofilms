@@ -313,7 +313,7 @@ move through these states:
 | 2. Remove redundant intro blocks | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-2-ready-body/README.md`; DOM smoke proving first ready body item is a card |  |
 | 3. Card title and metadata chips | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-3-card-metadata/README.md`; fixture/contract test plus `zware` browser smoke | Remote API still showed old `VanDale Dutch`/no-article payload during browser smoke; local projection tests verify the intended backend shape. |
 | 4. Examples expand/collapse | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-4-examples/README.md`; DOM interaction smoke; page-reload persistence smoke |  |
-| 5. Per-element translation reveal | planned | Show/hide interaction smoke; payload source-path check |  |
+| 5. Per-element translation reveal | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-5-translation/README.md`; show/hide/show-again smoke | Current translation response is card-level overlay text, so the UI renders a contained block under the card text; line-level placement needs stable section/source ids from the backend. |
 | 6. Progress actions and feedback | planned | Fixture/action-state test plus browser click evidence |  |
 | 7. Shared theme and control shape | planned | Light/dark screenshots; persistence test when storage slice lands |  |
 | 8. Documentation sync | planned | README/runbook/validation-matrix diff review |  |

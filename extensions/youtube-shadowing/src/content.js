@@ -66,6 +66,7 @@
     dictionaryLookupSeq: 0,
     examplesExpanded: readExamplesExpanded(),
     exampleExpansionOverrides: {},
+    visibleTranslationsByCardId: {},
     accountStatus: "guest",
     accountUser: null,
     accountPreferences: null,
@@ -470,6 +471,14 @@
       collapse: [
         '<path d="m18 15-6-6-6 6"/>',
       ],
+      translate: [
+        '<path d="m5 8 6 6"/>',
+        '<path d="m4 14 6-6 2-3"/>',
+        '<path d="M2 5h12"/>',
+        '<path d="M7 2h1"/>',
+        '<path d="m22 22-5-10-5 10"/>',
+        '<path d="M14 18h6"/>',
+      ],
     }[kind] || [];
     return [
       '<svg class="af-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
@@ -673,6 +682,27 @@
       return state.exampleExpansionOverrides[cardId] === true;
     }
     return state.examplesExpanded;
+  }
+
+  function toggleCardTranslation(card) {
+    if (!card?.id || !state.selectedWord) return;
+    const currentlyVisible = state.visibleTranslationsByCardId[card.id] === true;
+    state.visibleTranslationsByCardId = {
+      ...state.visibleTranslationsByCardId,
+      [card.id]: !currentlyVisible,
+    };
+    if (currentlyVisible) {
+      render();
+      return;
+    }
+
+    const cached = state.selectedWord.translationsByCardId?.[card.id];
+    if (cached) {
+      render();
+      return;
+    }
+
+    requestDictionaryCardTranslation(card);
   }
 
   function closeOpenMenus() {
@@ -1660,9 +1690,14 @@
     renderChipList(titleWrap, overlayChips(card));
     const translationActions = displayActionsByGroup(card, "translation");
     if (translationActions.length) {
-      const translateButton = appendButton(header, translationActions[0].label || "Translate", `afAction-${translationActions[0].id}`);
+      const translationVisible = state.visibleTranslationsByCardId[card.id] === true;
+      const translateButton = appendButton(header, "", `afAction-${translationActions[0].id}`);
       translateButton.className = "af-card-translate";
       translateButton.disabled = !card?.entryId;
+      translateButton.innerHTML = `${iconSvg("translate")}<span class="af-sr-only">${translationVisible ? "Hide translation" : "Show translation"}</span>`;
+      translateButton.title = translationVisible ? "Hide translation" : "Show translation";
+      translateButton.setAttribute("aria-label", translationVisible ? "Hide translation" : "Show translation");
+      translateButton.setAttribute("aria-pressed", translationVisible ? "true" : "false");
       translateButton.addEventListener("click", () => performDisplayAction(card, translationActions[0]));
     }
 
@@ -1676,16 +1711,16 @@
       example.textContent = summary.example;
     }
 
+    const translation = state.selectedWord?.translationsByCardId?.[card.id];
+    if (state.visibleTranslationsByCardId[card.id] === true && translation) {
+      renderCardTranslation(entry, translation);
+    }
+
     renderOverlaySections(entry, card.sections || [], card);
 
     const personal = progressSignal(card.progress);
     if (personal.length) {
       renderChipList(entry, personal, "af-personal-chips");
-    }
-
-    const translation = state.selectedWord?.translationsByCardId?.[card.id];
-    if (translation) {
-      renderCardTranslation(entry, translation);
     }
 
     renderReviewActions(entry, card);
@@ -1783,8 +1818,6 @@
 
   function renderCardTranslation(parent, translation) {
     const block = appendElement(parent, "div", "af-card-translation");
-    const label = appendElement(block, "div", "af-card-review-label");
-    label.textContent = translation.status === "pending" ? "Translation pending" : "Translation";
     const text = appendElement(block, "p", "af-dictionary-copy");
     text.textContent = summarizeTranslationOverlay(translation.overlay) || translation.note || translation.error || translation.status || "No translation text returned.";
   }
@@ -1843,7 +1876,7 @@
   function performDisplayAction(card, displayAction) {
     const command = displayAction?.command;
     if (command?.kind === "card-translation") {
-      requestDictionaryCardTranslation(card);
+      toggleCardTranslation(card);
       return;
     }
     if (command?.kind === "platform-action") {
@@ -1858,6 +1891,7 @@
     const lookupSeq = state.dictionaryLookupSeq + 1;
     state.dictionaryLookupSeq = lookupSeq;
     state.exampleExpansionOverrides = {};
+    state.visibleTranslationsByCardId = {};
     state.selectedWord = {
       word,
       phraseIndex,
