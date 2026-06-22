@@ -444,62 +444,72 @@ function runGeometryScenario() {
   resizeChrome(1344, 900);
   navigate("https://www.youtube.com/watch?v=4EE7m94mJpk");
   waitForSnapshot("4EE7m94mJpk", waitMs);
+  const previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
+  const hadPreviousDictionaryMock = previousDictionaryMock !== null;
   setLocalStorageItem("afShadowingDictionaryMock", "cards");
-  reloadTab();
-  waitForSnapshot("4EE7m94mJpk", waitMs);
-  pauseVideo();
-  setDebugVisible(false);
-  const wideBeforeLookup = readGeometrySnapshot();
-  const practiceModeLayoutAssertions = assertPracticeModeLayoutStability(wideBeforeLookup);
-  const phraseTranslationAssertions = assertPhraseTranslationUi();
-  const improveTimingAssertions = assertImproveTimingUi();
-  const debugMenuAssertions = assertDebugMenuUi();
+  try {
+    reloadTab();
+    waitForSnapshot("4EE7m94mJpk", waitMs);
+    pauseVideo();
+    setDebugVisible(false);
+    const wideBeforeLookup = readGeometrySnapshot();
+    const practiceModeLayoutAssertions = assertPracticeModeLayoutStability(wideBeforeLookup);
+    const phraseTranslationAssertions = assertPhraseTranslationUi();
+    const improveTimingAssertions = assertImproveTimingUi();
+    const debugMenuAssertions = assertDebugMenuUi();
 
-  const lookupClick = clickFirstLookupWord();
-  const dictionaryOpened = waitForDictionary(waitMs);
-  setDebugVisible(false);
-  const wideWithDictionary = readGeometrySnapshot();
-  const accountPlacementAssertions = assertDictionaryAccountPlacement();
-  const dictionaryCardAssertions = assertDictionaryCardUi();
+    const lookupClick = clickFirstLookupWord();
+    const dictionaryOpened = waitForDictionary(waitMs);
+    setDebugVisible(false);
+    const wideWithDictionary = readGeometrySnapshot();
+    const accountPlacementAssertions = assertDictionaryAccountPlacement();
+    const dictionaryCardAssertions = assertDictionaryCardUi();
 
-  resizeChrome(430, 900);
-  sleep(1200);
-  const narrowWithDictionary = readGeometrySnapshot();
+    resizeChrome(430, 900);
+    sleep(1200);
+    const narrowWithDictionary = readGeometrySnapshot();
 
-  resizeChrome(1344, 900);
+    resizeChrome(1344, 900);
 
-  const assertions = [
-    assertion("geometry lookup word clicked", lookupClick.clicked, lookupClick.detail),
-    assertion("geometry dictionary opened", dictionaryOpened.dictionary?.present === true),
-    ...practiceModeLayoutAssertions,
-    ...phraseTranslationAssertions,
-    ...improveTimingAssertions,
-    ...debugMenuAssertions,
-    assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
-    assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
-    assertion("phrase navigation uses icon controls", wideBeforeLookup.primaryUi?.phraseIconButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
-    assertion("dictionary ready body starts at cards", wideWithDictionary.dictionaryUi?.hasSelectedCard === false && wideWithDictionary.dictionaryUi?.overlayCardCount > 0, JSON.stringify(wideWithDictionary.dictionaryUi)),
-    assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
-    ...accountPlacementAssertions,
-    ...dictionaryCardAssertions,
-    ...assertGeometry("wide phrase panel", wideBeforeLookup, { expectDictionary: false }),
-    ...assertGeometry("wide with dictionary", wideWithDictionary, { expectDictionary: true }),
-    ...assertGeometry("narrow with dictionary", narrowWithDictionary, { expectDictionary: true }),
-  ];
+    const assertions = [
+      assertion("geometry lookup word clicked", lookupClick.clicked, lookupClick.detail),
+      assertion("geometry dictionary opened", dictionaryOpened.dictionary?.present === true),
+      ...practiceModeLayoutAssertions,
+      ...phraseTranslationAssertions,
+      ...improveTimingAssertions,
+      ...debugMenuAssertions,
+      assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
+      assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
+      assertion("phrase navigation uses icon controls", wideBeforeLookup.primaryUi?.phraseIconButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
+      assertion("dictionary ready body starts at cards", wideWithDictionary.dictionaryUi?.hasSelectedCard === false && wideWithDictionary.dictionaryUi?.overlayCardCount > 0, JSON.stringify(wideWithDictionary.dictionaryUi)),
+      assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
+      ...accountPlacementAssertions,
+      ...dictionaryCardAssertions,
+      ...assertGeometry("wide phrase panel", wideBeforeLookup, { expectDictionary: false }),
+      ...assertGeometry("wide with dictionary", wideWithDictionary, { expectDictionary: true }),
+      ...assertGeometry("narrow with dictionary", narrowWithDictionary, { expectDictionary: true }),
+    ];
 
-  return {
-    name: "viewport-geometry",
-    videoId: "4EE7m94mJpk",
-    expect: {},
-    ok: assertions.every((item) => item.ok),
-    assertions,
-    snapshot: {
-      source: `${wideBeforeLookup.viewport.width}x${wideBeforeLookup.viewport.height} -> ${narrowWithDictionary.viewport.width}x${narrowWithDictionary.viewport.height}`,
-      count: wideBeforeLookup.count,
-      message: "",
-      error: wideBeforeLookup.error,
-    },
-  };
+    return {
+      name: "viewport-geometry",
+      videoId: "4EE7m94mJpk",
+      expect: {},
+      ok: assertions.every((item) => item.ok),
+      assertions,
+      snapshot: {
+        source: `${wideBeforeLookup.viewport.width}x${wideBeforeLookup.viewport.height} -> ${narrowWithDictionary.viewport.width}x${narrowWithDictionary.viewport.height}`,
+        count: wideBeforeLookup.count,
+        message: "",
+        error: wideBeforeLookup.error,
+      },
+    };
+  } finally {
+    if (hadPreviousDictionaryMock) {
+      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
+    } else {
+      removeLocalStorageItem("afShadowingDictionaryMock");
+    }
+  }
 }
 
 function assertDebugMenuUi() {
