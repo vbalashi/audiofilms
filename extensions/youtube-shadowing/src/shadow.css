@@ -1,8 +1,14 @@
 html.af-shadowing-workspace {
   --af-bg: #16181d;
+  --af-bg-rgb: 22, 24, 29;
   --af-panel: #22252c;
+  --af-panel-rgb: 34, 37, 44;
   --af-panel-soft: #181b21;
+  --af-panel-soft-rgb: 24, 27, 33;
   --af-panel-strong: #2d313a;
+  --af-panel-alpha-bg: rgba(var(--af-panel-rgb), var(--af-panel-background-alpha, 1));
+  --af-bg-alpha: rgba(var(--af-bg-rgb), var(--af-panel-background-alpha, 1));
+  --af-panel-soft-alpha-bg: rgba(var(--af-panel-soft-rgb), var(--af-panel-background-alpha, 1));
   --af-control: #191c22;
   --af-control-hover: #30343d;
   --af-border: rgba(203, 213, 225, 0.28);
@@ -30,8 +36,11 @@ html.af-shadowing-workspace {
 html.af-shadowing-workspace[data-af-theme="dark"],
 :host([data-af-theme="dark"]) {
   --af-bg: #16181d;
+  --af-bg-rgb: 22, 24, 29;
   --af-panel: #22252c;
+  --af-panel-rgb: 34, 37, 44;
   --af-panel-soft: #181b21;
+  --af-panel-soft-rgb: 24, 27, 33;
   --af-panel-strong: #2d313a;
   --af-control: #191c22;
   --af-control-hover: #30343d;
@@ -58,8 +67,11 @@ html.af-shadowing-workspace[data-af-theme="dark"],
 
 html.af-shadowing-workspace[data-af-theme="light"] {
   --af-bg: #e9edf3;
+  --af-bg-rgb: 233, 237, 243;
   --af-panel: #f5f7fa;
+  --af-panel-rgb: 245, 247, 250;
   --af-panel-soft: #e1e6ee;
+  --af-panel-soft-rgb: 225, 230, 238;
   --af-panel-strong: #d3dae5;
   --af-control: #fbfcfe;
   --af-control-hover: #e8edf4;
@@ -86,8 +98,11 @@ html.af-shadowing-workspace[data-af-theme="light"] {
 
 :host([data-af-theme="light"]) {
   --af-bg: #e9edf3;
+  --af-bg-rgb: 233, 237, 243;
   --af-panel: #f5f7fa;
+  --af-panel-rgb: 245, 247, 250;
   --af-panel-soft: #e1e6ee;
+  --af-panel-soft-rgb: 225, 230, 238;
   --af-panel-strong: #d3dae5;
   --af-control: #fbfcfe;
   --af-control-hover: #e8edf4;
@@ -115,8 +130,11 @@ html.af-shadowing-workspace[data-af-theme="light"] {
 @media (prefers-color-scheme: light) {
   html.af-shadowing-workspace[data-af-theme="system"] {
     --af-bg: #e9edf3;
+    --af-bg-rgb: 233, 237, 243;
     --af-panel: #f5f7fa;
+    --af-panel-rgb: 245, 247, 250;
     --af-panel-soft: #e1e6ee;
+    --af-panel-soft-rgb: 225, 230, 238;
     --af-panel-strong: #d3dae5;
     --af-control: #fbfcfe;
     --af-control-hover: #e8edf4;
@@ -143,8 +161,11 @@ html.af-shadowing-workspace[data-af-theme="light"] {
 
   :host([data-af-theme="system"]) {
     --af-bg: #e9edf3;
+    --af-bg-rgb: 233, 237, 243;
     --af-panel: #f5f7fa;
+    --af-panel-rgb: 245, 247, 250;
     --af-panel-soft: #e1e6ee;
+    --af-panel-soft-rgb: 225, 230, 238;
     --af-panel-strong: #d3dae5;
     --af-control: #fbfcfe;
     --af-control-hover: #e8edf4;
@@ -177,7 +198,7 @@ html.af-shadowing-workspace[data-af-theme="light"] {
   z-index: 2147483647;
   padding: 8px 10px;
   color: var(--af-text);
-  background: var(--af-panel);
+  background: var(--af-panel-alpha-bg);
   border: 1px solid var(--af-border-strong);
   border-radius: 999px;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
@@ -263,7 +284,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   min-height: 0;
   max-height: min(420px, calc(100vh - 110px));
   overflow: hidden;
-  background: var(--af-panel);
+  background: var(--af-panel-alpha-bg);
   border: 1px solid var(--af-border);
   border-radius: 10px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
@@ -275,7 +296,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   justify-content: space-between;
   gap: 8px;
   padding: 12px 14px 10px;
-  background: var(--af-panel);
+  background: var(--af-panel-alpha-bg);
   border-bottom: 1px solid var(--af-border);
 }
 
@@ -853,7 +874,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   width: 100%;
   margin: 0;
   overflow: visible;
-  background: var(--af-bg);
+  background: var(--af-bg-alpha);
   border: 1px solid var(--af-border);
   border-radius: 8px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
@@ -1026,7 +1047,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   display: none;
   min-width: 178px;
   padding: 7px;
-  background: var(--af-panel);
+  background: var(--af-panel-alpha-bg);
   border: 1px solid var(--af-border-strong);
   border-radius: 6px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
@@ -1034,6 +1055,34 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-utility-popover.is-open {
   display: grid;
+  gap: 4px;
+}
+
+.af-settings-section {
+  display: grid;
+  gap: 6px;
+  padding: 4px;
+  border-bottom: 1px solid var(--af-border);
+}
+
+.af-settings-section + .af-settings-section {
+  border-top: 0;
+}
+
+.af-settings-section:last-child {
+  border-bottom: 0;
+}
+
+.af-settings-label {
+  color: var(--af-muted);
+  font-family: var(--af-mono);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.af-settings-button-row {
+  display: flex;
   gap: 4px;
 }
 
@@ -1049,6 +1098,13 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-size: 12px;
   font-weight: 750;
   text-align: left;
+}
+
+.af-settings-button-row button {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  text-align: center;
 }
 
 .af-utility-popover button::before {
@@ -1329,7 +1385,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   grid-row: 1;
   min-height: 22px;
   color: var(--af-accent);
-  font-size: 14px;
+  font-size: calc(14px * var(--af-learner-text-scale, 1));
   font-weight: 750;
   line-height: 1.25;
   overflow: hidden;
@@ -1347,7 +1403,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-ribbon-row.is-current .af-ribbon-text {
-  font-size: 14px;
+  font-size: calc(14px * var(--af-learner-text-scale, 1));
   line-height: 1.35;
   overflow: visible;
   white-space: normal;
@@ -1388,7 +1444,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   grid-row: 2;
   min-height: 16px;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--af-learner-text-scale, 1));
   font-weight: 550;
   line-height: 1.35;
   overflow: visible;

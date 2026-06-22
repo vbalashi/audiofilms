@@ -462,10 +462,24 @@
     utilityButton.title = "Debug tools";
     const utilityMenu = appendElement(utility, "div", "af-utility-popover");
     utilityMenu.dataset.afUtilityMenu = "";
-    appendButton(utilityMenu, "Mark Issue", "afMarkIssue");
-    appendButton(utilityMenu, "Debug", "afDebugToggle");
-    appendButton(utilityMenu, "Copy Debug", "afDebugCopy");
-    appendButton(utilityMenu, "Refresh Cache", "afRefreshCache");
+    const displaySection = appendElement(utilityMenu, "div", "af-settings-section");
+    const textLabel = appendElement(displaySection, "div", "af-settings-label");
+    textLabel.textContent = "Subtitle text";
+    const textControls = appendElement(displaySection, "div", "af-settings-button-row");
+    appendButton(textControls, "A-", "afLearnerTextSmaller");
+    appendButton(textControls, "Reset", "afLearnerTextReset");
+    appendButton(textControls, "A+", "afLearnerTextLarger");
+    const transparencyLabel = appendElement(displaySection, "div", "af-settings-label");
+    transparencyLabel.textContent = "Panel transparency";
+    const transparencyControls = appendElement(displaySection, "div", "af-settings-button-row");
+    appendButton(transparencyControls, "-", "afTransparencyLower");
+    appendButton(transparencyControls, "Reset", "afTransparencyReset");
+    appendButton(transparencyControls, "+", "afTransparencyHigher");
+    const debugSection = appendElement(utilityMenu, "div", "af-settings-section af-debug-actions");
+    appendButton(debugSection, "Mark Issue", "afMarkIssue");
+    appendButton(debugSection, "Debug", "afDebugToggle");
+    appendButton(debugSection, "Copy Debug", "afDebugCopy");
+    appendButton(debugSection, "Refresh Cache", "afRefreshCache");
 
     const list = appendElement(panel, "div", "af-ribbon-list");
     list.dataset.afRibbonList = "";
@@ -517,6 +531,12 @@
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
     panel.querySelector("[data-af-theme-toggle]").addEventListener("click", cycleThemePreference);
     panel.querySelector("[data-af-utility-toggle]").addEventListener("click", toggleUtilityMenu);
+    panel.querySelector("[data-af-learner-text-smaller]").addEventListener("click", () => adjustLearnerTextScale(-0.1));
+    panel.querySelector("[data-af-learner-text-reset]").addEventListener("click", resetLearnerTextScale);
+    panel.querySelector("[data-af-learner-text-larger]").addEventListener("click", () => adjustLearnerTextScale(0.1));
+    panel.querySelector("[data-af-transparency-lower]").addEventListener("click", () => adjustPanelBackgroundAlpha(-0.1));
+    panel.querySelector("[data-af-transparency-reset]").addEventListener("click", resetPanelBackgroundAlpha);
+    panel.querySelector("[data-af-transparency-higher]").addEventListener("click", () => adjustPanelBackgroundAlpha(0.1));
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
     panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
@@ -716,6 +736,12 @@
     const themeToggle = panel.querySelector("[data-af-theme-toggle]");
     const utilityToggle = panel.querySelector("[data-af-utility-toggle]");
     const utilityMenu = panel.querySelector("[data-af-utility-menu]");
+    const learnerTextSmaller = panel.querySelector("[data-af-learner-text-smaller]");
+    const learnerTextReset = panel.querySelector("[data-af-learner-text-reset]");
+    const learnerTextLarger = panel.querySelector("[data-af-learner-text-larger]");
+    const transparencyLower = panel.querySelector("[data-af-transparency-lower]");
+    const transparencyReset = panel.querySelector("[data-af-transparency-reset]");
+    const transparencyHigher = panel.querySelector("[data-af-transparency-higher]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
     const debugCopy = panel.querySelector("[data-af-debug-copy]");
     const refreshCache = panel.querySelector("[data-af-refresh-cache]");
@@ -765,6 +791,14 @@
     utilityToggle.setAttribute("aria-expanded", state.utilityMenuOpen ? "true" : "false");
     utilityToggle.classList.toggle("is-active", state.utilityMenuOpen);
     utilityMenu.classList.toggle("is-open", state.utilityMenuOpen);
+    renderDisplayPreferenceControls({
+      learnerTextSmaller,
+      learnerTextReset,
+      learnerTextLarger,
+      transparencyLower,
+      transparencyReset,
+      transparencyHigher,
+    });
     debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
     refreshCache.textContent = state.cacheRefreshRequested ? "Refreshing" : "Refresh Cache";
@@ -834,6 +868,27 @@
     return "Show phrase translation";
   }
 
+  function renderDisplayPreferenceControls(controls) {
+    const learnerTextScale = state.displayPreferences.appearance.learnerTextScale;
+    const panelAlpha = state.displayPreferences.appearance.panelBackgroundAlpha;
+    const learnerPercent = Math.round(learnerTextScale * 100);
+    const alphaPercent = Math.round(panelAlpha * 100);
+
+    controls.learnerTextSmaller.disabled = learnerTextScale <= 0.85;
+    controls.learnerTextLarger.disabled = learnerTextScale >= 1.35;
+    controls.learnerTextReset.disabled = learnerTextScale === 1;
+    controls.learnerTextSmaller.title = `Subtitle text size: ${learnerPercent}%`;
+    controls.learnerTextLarger.title = `Subtitle text size: ${learnerPercent}%`;
+    controls.learnerTextReset.title = `Reset subtitle text size (${learnerPercent}%)`;
+
+    controls.transparencyLower.disabled = panelAlpha <= 0.65;
+    controls.transparencyHigher.disabled = panelAlpha >= 1;
+    controls.transparencyReset.disabled = panelAlpha === 0.92;
+    controls.transparencyLower.title = `Panel background opacity: ${alphaPercent}%`;
+    controls.transparencyHigher.title = `Panel background opacity: ${alphaPercent}%`;
+    controls.transparencyReset.title = `Reset panel background opacity (${alphaPercent}%)`;
+  }
+
   function toggleUtilityMenu(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -873,12 +928,64 @@
     render();
   }
 
+  function adjustLearnerTextScale(delta) {
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      appearance: {
+        ...preferences.appearance,
+        learnerTextScale: clampNumber(preferences.appearance.learnerTextScale + delta, 0.85, 1.35, 1),
+      },
+    }));
+    render();
+  }
+
+  function resetLearnerTextScale() {
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      appearance: {
+        ...preferences.appearance,
+        learnerTextScale: 1,
+      },
+    }));
+    render();
+  }
+
+  function adjustPanelBackgroundAlpha(delta) {
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      appearance: {
+        ...preferences.appearance,
+        panelBackgroundAlpha: clampNumber(preferences.appearance.panelBackgroundAlpha + delta, 0.65, 1, 0.92),
+      },
+    }));
+    render();
+  }
+
+  function resetPanelBackgroundAlpha() {
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      appearance: {
+        ...preferences.appearance,
+        panelBackgroundAlpha: 0.92,
+      },
+    }));
+    render();
+  }
+
   function applyThemeAttributes() {
     const preference = state.themePreference || "system";
     document.documentElement.dataset.afTheme = preference;
     const root = document.getElementById(ROOT_ID);
     if (root) {
       root.dataset.afTheme = preference;
+      root.style.setProperty(
+        "--af-learner-text-scale",
+        String(state.displayPreferences.appearance.learnerTextScale),
+      );
+      root.style.setProperty(
+        "--af-panel-background-alpha",
+        String(state.displayPreferences.appearance.panelBackgroundAlpha),
+      );
     }
   }
 
