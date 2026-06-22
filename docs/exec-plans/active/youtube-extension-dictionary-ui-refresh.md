@@ -309,7 +309,7 @@ move through these states:
 | Slice | Status | Required evidence | Open defects / notes |
 | --- | --- | --- | --- |
 | 0. Baseline evidence | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-0-baseline/README.md`; `opbouwen-ready-dom-snapshot.json`; `youtube-dom-snapshot.json`; screenshots for both states | Raw service-worker JSON capture was unavailable through AppleScript options-page context; use contract tests or a temporary debug helper before Slice 3 if raw payload is needed. |
-| 1. Header and account IA | planned | DOM smoke and desktop screenshot |  |
+| 1. Header and account IA | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-1-header-account/README.md`; DOM smoke and desktop screenshot |  |
 | 2. Remove redundant intro blocks | planned | DOM smoke proving first ready body item is a card |  |
 | 3. Card title and metadata chips | planned | Fixture/contract test plus `zware` browser smoke |  |
 | 4. Examples expand/collapse | planned | Interaction smoke; persistence test when storage slice lands |  |
@@ -322,7 +322,7 @@ Scenario ledger:
 
 | Scenario | Expected proof | Status | Evidence |
 | --- | --- | --- | --- |
-| `opbouwen` lookup | Header shows `opbouwen` and card count; body starts with first card | baseline captured | `youtube-extension-dictionary-ui-refresh-evidence/slice-0-baseline/opbouwen-ready-dom-snapshot.json` |
+| `opbouwen` lookup | Header shows `opbouwen` and card count; body starts with first card | header verified; body pending Slice 2 | `youtube-extension-dictionary-ui-refresh-evidence/slice-1-header-account/opbouwen-header-account-dom.json` |
 | `zware` lookup | Panel title is clicked form; card title is match; article/source chips are correct | baseline captured | `youtube-extension-dictionary-ui-refresh-evidence/slice-0-baseline/youtube-dom-snapshot.json` |
 | New-card progress | `Learn`/`Known` click shows immediate feedback and refreshed state | planned |  |
 | Review-card progress | `Again`/`Hard`/`Good`/`Easy` render only when backend actions allow them | planned |  |

@@ -125,41 +125,49 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 14px 10px;
   background: #ffffff;
   border-bottom: 1px solid var(--af-border);
 }
 
+.af-dictionary-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .af-dictionary-title {
+  overflow: hidden;
   font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .af-dictionary-subtitle {
   margin-top: 2px;
   color: var(--af-muted);
   font-size: 12px;
+  font-weight: 650;
 }
 
 .af-dictionary-account-wrap {
   position: relative;
-  flex: 0 1 150px;
+  flex: 0 0 auto;
 }
 
 .af-dictionary-account {
-  max-width: 150px;
-  padding: 4px 8px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
   color: #175cd3;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 999px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  text-align: right;
   font-family: inherit;
 }
 
@@ -203,23 +211,18 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-dictionary-close {
+  display: grid;
   flex: 0 0 auto;
   width: 30px;
   height: 30px;
   overflow: hidden;
+  place-items: center;
   color: var(--af-muted);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
   font: inherit;
-  font-size: 0;
-}
-
-.af-dictionary-close::before {
-  content: "x";
-  font-size: 14px;
-  font-weight: 900;
 }
 
 .af-dictionary-close:hover {

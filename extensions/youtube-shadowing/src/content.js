@@ -220,6 +220,7 @@
     const header = appendElement(panel, "div", "af-dictionary-header");
     const heading = appendElement(header, "div", "af-dictionary-heading");
     const title = appendElement(heading, "div", "af-dictionary-title");
+    title.dataset.afDictionaryTitle = "";
     title.textContent = "Dictionary";
     const subtitle = appendElement(heading, "div", "af-dictionary-subtitle");
     subtitle.dataset.afDictionarySubtitle = "";
@@ -239,7 +240,7 @@
     accountAction.className = "af-account-popover-action";
     const close = appendElement(header, "button", "af-dictionary-close");
     close.type = "button";
-    close.textContent = "Close";
+    close.innerHTML = `${iconSvg("close")}<span class="af-sr-only">Close</span>`;
     close.setAttribute("aria-label", "Close dictionary panel");
     close.addEventListener("click", () => {
       state.selectedWord = null;
@@ -433,6 +434,19 @@
         '<path d="M3 12a9 9 0 1 0 3-6.7"/>',
         '<path d="M3 3v6h6"/>',
         '<path d="M12 8v4l3 2"/>',
+      ],
+      account: [
+        '<path d="M20 21a8 8 0 0 0-16 0"/>',
+        '<circle cx="12" cy="7" r="4"/>',
+      ],
+      "account-connected": [
+        '<path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/>',
+        '<circle cx="9.5" cy="7" r="4"/>',
+        '<path d="m16 11 2 2 4-4"/>',
+      ],
+      close: [
+        '<path d="M18 6 6 18"/>',
+        '<path d="m6 6 12 12"/>',
       ],
     }[kind] || [];
     return [
@@ -1356,6 +1370,7 @@
   }
 
   function renderDictionary(panel) {
+    const title = panel.querySelector("[data-af-dictionary-title]");
     const subtitle = panel.querySelector("[data-af-dictionary-subtitle]");
     const account = panel.querySelector("[data-af-account]");
     const accountMenu = panel.querySelector("[data-af-account-menu]");
@@ -1363,12 +1378,20 @@
     const accountAction = panel.querySelector("[data-af-account-action]");
     const body = panel.querySelector("[data-af-dictionary-body]");
 
-    subtitle.textContent = state.selectedTrack
-      ? captionTrackApi.describeTrack(state.selectedTrack)
-      : "Contextual Lookup";
-    account.textContent = accountStatusLabel();
+    const headerCopy = dictionaryHeaderCopy();
+    title.textContent = headerCopy.title;
+    subtitle.textContent = headerCopy.subtitle;
+    clearElement(account);
+    account.insertAdjacentHTML(
+      "beforeend",
+      iconSvg(state.accountStatus === "signed-in" ? "account-connected" : "account"),
+    );
+    const accountText = appendElement(account, "span", "af-sr-only");
+    accountText.textContent = accountStatusLabel();
     account.classList.toggle("is-connected", state.accountStatus === "signed-in");
+    account.setAttribute("aria-label", accountStatusAriaLabel());
     account.setAttribute("aria-expanded", state.accountMenuOpen ? "true" : "false");
+    account.title = accountStatusLabel();
     accountMenu.classList.toggle("is-open", state.accountMenuOpen);
     accountCopy.textContent = accountStatusCopy();
     accountAction.textContent = accountConnectLabel();
@@ -1380,6 +1403,30 @@
     } else {
       renderAccountCard(body);
     }
+  }
+
+  function dictionaryHeaderCopy() {
+    const selectedWord = state.selectedWord;
+    if (!selectedWord) {
+      return {
+        title: "Dictionary",
+        subtitle: state.selectedTrack ? captionTrackApi.describeTrack(state.selectedTrack) : "Click a word",
+      };
+    }
+    if (selectedWord.lookupStatus === "loading") {
+      return { title: selectedWord.word, subtitle: "Looking up..." };
+    }
+    if (selectedWord.lookupStatus === "error") {
+      return { title: selectedWord.word, subtitle: "Lookup failed" };
+    }
+    const cards = selectedWord.lookupResult?.cards || [];
+    if (cards.length) {
+      return {
+        title: selectedWord.word,
+        subtitle: `${cards.length} ${cards.length === 1 ? "card" : "cards"} found`,
+      };
+    }
+    return { title: selectedWord.word, subtitle: "No cards found" };
   }
 
   function renderAccountCard(parent) {
@@ -2344,6 +2391,14 @@
     if (state.accountStatus === "signed-in") return state.accountUser?.email || "2000NL connected";
     if (state.accountStatus === "expired") return "Reconnect 2000NL";
     return "Guest lookup";
+  }
+
+  function accountStatusAriaLabel() {
+    if (state.accountStatus === "signed-in") {
+      return `2000NL account connected${state.accountUser?.email ? ` as ${state.accountUser.email}` : ""}`;
+    }
+    if (state.accountStatus === "expired") return "Reconnect 2000NL account";
+    return "Connect 2000NL account";
   }
 
   function accountStatusCopy() {
