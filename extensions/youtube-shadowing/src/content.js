@@ -825,6 +825,7 @@
     utilityToggle.setAttribute("aria-expanded", state.utilityMenuOpen ? "true" : "false");
     utilityToggle.classList.toggle("is-active", state.utilityMenuOpen);
     utilityMenu.classList.toggle("is-open", state.utilityMenuOpen);
+    positionUtilityMenu(panel, utilityMenu);
     renderDisplayPreferenceControls({
       learnerTextSmaller,
       learnerTextReset,
@@ -932,6 +933,19 @@
     controls.layoutReset.title = "Reset panel positions and sizes";
   }
 
+  function positionUtilityMenu(panel, utilityMenu) {
+    if (!state.utilityMenuOpen) {
+      utilityMenu.classList.remove("is-below");
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const panelRect = panel.getBoundingClientRect();
+      const menuHeight = utilityMenu.getBoundingClientRect().height || utilityMenu.scrollHeight || 0;
+      utilityMenu.classList.toggle("is-below", panelRect.top < menuHeight + 12);
+    });
+  }
+
   function hasCustomPanelLayout() {
     const layout = state.displayPreferences.layout;
     return !layout.locked
@@ -1020,12 +1034,15 @@
     const startGeometry = {
       x: rect.left,
       y: rect.top,
-      width: rect.width,
+      width: panelKey === "dictionaryPanel" && !panelHasGeometry(state.displayPreferences.layout.dictionaryPanel)
+        ? Math.min(rect.width, 520)
+        : rect.width,
       height: panelKey === "phraseRibbon" ? null : rect.height,
     };
     let nextGeometry = startGeometry;
     bringPanelToFront(panelKey, false);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const handle = event.currentTarget;
+    handle.setPointerCapture?.(event.pointerId);
 
     const onMove = (moveEvent) => {
       const x = startGeometry.x + moveEvent.clientX - startX;
@@ -1038,13 +1055,15 @@
       applyPanelGeometry(panel, panelKey, nextGeometry);
     };
     const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
       savePanelGeometry(panelKey, nextGeometry);
     };
 
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp, { once: true });
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp, { once: true });
+    handle.addEventListener("pointercancel", onUp, { once: true });
   }
 
   function beginPanelResize(event) {
@@ -1066,7 +1085,8 @@
     };
     let nextGeometry = startGeometry;
     bringPanelToFront(panelKey, false);
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const handle = event.currentTarget;
+    handle.setPointerCapture?.(event.pointerId);
 
     const onMove = (moveEvent) => {
       nextGeometry = clampPanelGeometry(panelKey, {
@@ -1077,22 +1097,27 @@
       applyPanelGeometry(panel, panelKey, nextGeometry);
     };
     const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
       savePanelGeometry(panelKey, nextGeometry);
     };
 
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp, { once: true });
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp, { once: true });
+    handle.addEventListener("pointercancel", onUp, { once: true });
   }
 
   function clampPanelGeometry(panelKey, geometry) {
     const margin = 8;
     const minWidth = panelKey === "phraseRibbon" ? Math.min(360, window.innerWidth - margin * 2) : Math.min(320, window.innerWidth - margin * 2);
     const minHeight = panelKey === "dictionaryPanel" ? 220 : null;
+    const maxWidth = panelKey === "dictionaryPanel"
+      ? Math.min(640, Math.max(minWidth, window.innerWidth - margin * 2))
+      : Math.max(minWidth, window.innerWidth - margin * 2);
     const width = geometry?.width === null
       ? null
-      : clampNumber(geometry?.width, minWidth, Math.max(minWidth, window.innerWidth - margin * 2), minWidth);
+      : clampNumber(geometry?.width, minWidth, maxWidth, minWidth);
     const height = panelKey === "phraseRibbon" || geometry?.height === null
       ? null
       : clampNumber(geometry?.height, minHeight, Math.max(minHeight, window.innerHeight - margin * 2), minHeight);
@@ -1871,6 +1896,7 @@
       translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase, index));
       translation.textContent = phraseTranslationCopy(phrase, index);
     } else {
+      translation.textContent = phraseTranslationText(phrase, index) || "";
       translation.setAttribute("aria-hidden", "true");
     }
   }
