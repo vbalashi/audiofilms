@@ -582,7 +582,7 @@
     count.textContent = hasPhrases
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
       : state.loading ? "Loading" : "0 / 0";
-    mode.textContent = state.guidedMode ? "Phrase navigation" : "Watching";
+    mode.textContent = "";
     mode.hidden = true;
     mode.classList.toggle("is-guided", state.guidedMode);
     renderAccountControl(account, accountMenu, accountCopy, accountAction);

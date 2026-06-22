@@ -676,7 +676,7 @@ function assertReplayInteraction() {
     Math.abs(currentTime - rowSeconds) <= 3;
 
   return [
-    assertion("replay enters guided mode", after.mode === "Phrase navigation", after.mode),
+    assertion("replay enters guided mode", after.guidedMode === true, JSON.stringify({ mode: after.mode, guidedMode: after.guidedMode })),
     assertion("replay keeps visible phrase", Boolean(after.rowText), after.rowText),
     assertion("replay seeks near current phrase", closeToPhrase, `row=${before.rowTime}, video=${after.video?.currentTime}`),
   ];
@@ -713,7 +713,7 @@ function assertNextStaysOnTargetInteraction() {
   return [
     assertion("next advances from visible phrase", parseCountOrdinal(afterEarly.count) === expectedOrdinal, `${before.count} -> ${afterEarly.count}`),
     assertion("next does not roll back during guided playback", parseCountOrdinal(afterAutoPause.count) === expectedOrdinal, `${before.count} -> ${afterAutoPause.count}`),
-    assertion("next leaves guided mode active", afterAutoPause.mode === "Phrase navigation", afterAutoPause.mode),
+    assertion("next leaves guided mode active", afterAutoPause.guidedMode === true, JSON.stringify({ mode: afterAutoPause.mode, guidedMode: afterAutoPause.guidedMode })),
   ];
 }
 
@@ -736,8 +736,8 @@ function assertKeyboardNavigationInteraction() {
     Math.abs(currentTime - rowSeconds) <= 3;
 
   return [
-    assertion("space exits guided mode", afterSpace.mode === "Watching", afterSpace.mode),
-    assertion("arrow down replays current phrase", afterReplay.mode === "Phrase navigation", afterReplay.mode),
+    assertion("space exits guided mode", afterSpace.guidedMode === false, JSON.stringify({ mode: afterSpace.mode, guidedMode: afterSpace.guidedMode })),
+    assertion("arrow down replays current phrase", afterReplay.guidedMode === true, JSON.stringify({ mode: afterReplay.mode, guidedMode: afterReplay.guidedMode })),
     assertion("arrow down seeks near visible phrase", closeToPhrase, `row=${afterSpace.rowTime}, video=${afterReplay.video?.currentTime}`),
   ];
 }
@@ -975,6 +975,7 @@ function readSnapshot() {
     source: root.querySelector("[data-af-source-toggle]")?.textContent || "",
     count: root.querySelector("[data-af-count]")?.textContent || "",
     mode: root.querySelector("[data-af-mode]")?.textContent || "",
+    guidedMode: root.querySelector("[data-af-mode]")?.classList.contains("is-guided") || false,
     message: root.querySelector(".af-ribbon-message")?.textContent || "",
     error: root.querySelector("[data-af-error]")?.textContent || "",
     rowTime: root.querySelector(".af-ribbon-row.is-current .af-ribbon-time")?.textContent || "",

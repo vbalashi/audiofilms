@@ -107,9 +107,9 @@ Result:
   `Connect 2000NL to translate phrases.`;
 - debug tools opened from the compact icon button and closed with Escape;
 - readiness chip showed `Dutch captions · Ready` with a status dot;
-- after the June 19 follow-up patch, the guided/passive header label uses
-  `Phrase navigation` / `Watching` instead of `Shortcuts active` /
-  `Passive sync`;
+- after the June 22 follow-up patch, the noisy guided/passive header label is
+  hidden; guided state remains available to smoke tests through state, not a
+  visible chip;
 - the readiness/source popover opens upward from the bottom ribbon and stayed
   within the viewport in a focused Chrome check;
 - the readiness/source popover includes inline helper copy explaining that
@@ -134,8 +134,7 @@ Result:
 - progress clicks rendered card-level feedback such as `Started learning` and
   `Hard recorded` without jumping back to the loading/context layout;
 - light/dark/system theme override applied to the ribbon, dictionary, and
-  floating `AudioFilms On/Off` toggle; the old `Phrase navigation` chip was
-  hidden;
+  floating `AudioFilms On/Off` toggle; the old guided-mode chip stayed hidden;
 - wide and narrow panel geometry stayed within viewport.
 
 Category: passing for the final UI slice.

@@ -324,11 +324,11 @@ Scenario ledger:
 | --- | --- | --- | --- |
 | `opbouwen` lookup | Header shows `opbouwen` and card count; body starts with first card | verified through Slice 2 | `youtube-extension-dictionary-ui-refresh-evidence/slice-2-ready-body/opbouwen-ready-body-dom.json` |
 | `zware` lookup | Panel title is clicked form; card title is match; article/source chips are correct | verified through Slice 3; source/article backend shape verified by contract tests | `youtube-extension-dictionary-ui-refresh-evidence/slice-3-card-metadata/zware-card-metadata-dom.json` |
-| New-card progress | `Learn`/`Known` click shows immediate feedback and refreshed state | planned |  |
-| Review-card progress | `Again`/`Hard`/`Good`/`Easy` render only when backend actions allow them | planned |  |
-| Examples preference | Expand/collapse-all applies globally for extension user | planned |  |
-| Translation toggle | Compact icon shows and hides card translation | planned |  |
-| Light/dark theme | Ribbon, dictionary, and floating toggle share theme | planned |  |
+| New-card progress | `Learn`/`Known` click shows immediate feedback and refreshed state | verified through Slice 6 mock action smoke | `youtube-extension-dictionary-ui-refresh-evidence/slice-6-progress/mock-progress-dom.json` |
+| Review-card progress | `Again`/`Hard`/`Good`/`Easy` render only when backend actions allow them | verified through Slice 6 projection and browser smoke | `youtube-extension-dictionary-ui-refresh-evidence/slice-6-progress/README.md` |
+| Examples preference | Expand/collapse-all applies globally for extension user | verified through Slice 4 persistence smoke | `youtube-extension-dictionary-ui-refresh-evidence/slice-4-examples/opbouwen-examples-dom.json` |
+| Translation toggle | Compact icon shows and hides card translation | verified through Slice 5 interaction smoke | `youtube-extension-dictionary-ui-refresh-evidence/slice-5-translation/opbouwen-translation-dom.json` |
+| Light/dark theme | Ribbon, dictionary, and floating toggle share theme | verified through Slice 7 light/dark smoke | `youtube-extension-dictionary-ui-refresh-evidence/slice-7-theme/README.md` |
 
 When a slice is not complete, record the reason in `Open defects / notes`
 instead of marking it verified. If a defect is outside the extension UI, label
