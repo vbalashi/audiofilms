@@ -577,6 +577,165 @@ tracked separately from visual regrouping work.
 - Optional YouTube transcript shortcut: opening the native transcript panel is a
   utility action and should not become the product's transcript retrieval policy.
 
+## Dictionary Panel Refinement Intent
+
+Status: draft refinement from June 22 dogfood feedback. This section narrows the
+Dictionary V2 presentation target without changing the 2000NL platform boundary.
+
+### Header And Account
+
+The dictionary panel header should answer the current lookup first:
+
+- first line: the clicked form, for example `opbouwen`;
+- second line: match count, for example `3 cards found`;
+- account identity is a compact icon control in the main panel header, not a
+  prominent email pill or a separate mini-card;
+- the icon opens the existing connect/account popover and may show connected
+  state through color, tooltip, and accessible label.
+
+The account email is useful in the popover/details state, but it should not
+compete with the dictionary answer in the default panel header.
+
+### Remove Introductory Blocks
+
+Once lookup cards are available, the default body should start with the first
+Dictionary Meaning Card. Do not show these introductory blocks above the cards:
+
+- selected-word recap card;
+- `Personal progress on`;
+- default context block;
+- `3 DICTIONARY CARDS`;
+- `Dictionary match`.
+
+The clicked form and card count belong in the sticky header. The original phrase
+context is already visible in the phrase ribbon, so it should not be repeated as
+a default dictionary-card preface. A small context icon may exist only as a
+quiet "why this lookup?" affordance for narrow layouts, scrolled panels, or
+diagnostics where the lookup payload needs to be checked without relying on the
+currently visible phrase.
+
+### Card Anatomy
+
+Each Dictionary Meaning Card should render the dictionary match as the card
+title. If the clicked form and lemma differ, do not print `clicked -> lemma` in
+the card title; the clicked form is already the panel title. For example:
+
+- panel title: `zware`;
+- card title: `bevalling`;
+- no visible `zware -> bevalling` prefix.
+
+Render metadata chips only when they add learner value:
+
+- keep part-of-speech chips such as `zn`, `ww`, or `bn`;
+- render `de`/`het` before a noun title as a subdued article marker with smaller
+  type, following the 2000NL training-card convention;
+- hide a generic `nl` language chip for a single-language Dutch lookup panel;
+- avoid showing both `nl` and `de` as equal chips, because one is language
+  metadata and the other is a Dutch article.
+
+Article placement depends on explicit backend-projected article metadata. The UI
+may decide where that metadata renders, but it must not infer `de`/`het` from
+the headword or arbitrary chip labels. 2000NL already has this data; AudioFilms
+should preserve it in the overlay contract.
+
+Source metadata should stay as a quiet source chip if the panel later supports
+multiple dictionary sources. The normal label should come directly from
+`dictionary.name` and should already be concise, for example `VanDale` rather
+than `VanDale Dutch`, because the panel language is already known from the lookup
+context.
+
+The extension should not own source-label cleanup rules and the backend should
+not introduce a parallel chip-label source of truth just to repair source names.
+If the payload currently exposes `dictionary.name = "VanDale Dutch"` but the
+desired learner-facing source label is `VanDale`, fix `dictionary.name` in the
+AudioFilms backend projection or 2000NL platform payload. `entry.languageCode`
+is backend metadata and should not be rendered as a normal learner-facing chip in
+this single-language dictionary panel.
+
+### Examples And Expansion
+
+The current `Details` section should become learner-facing examples:
+
+- label the section `Examples` or `Show examples`;
+- use an explicit expand/collapse icon button rather than the browser default
+  disclosure arrow;
+- remove per-example headings such as `Example`; each example block is enough;
+- include a sticky panel-level expand/collapse-all button near the card header;
+- remember the expand/collapse-all preference globally for the extension user.
+
+Default recommendation: collapsed examples by default on narrow panels, with the
+global extension-user preference taking precedence after the user changes it.
+
+### Translation Behavior
+
+Dictionary-card translation is a per-card, explicit reveal:
+
+- replace long `Translate` text buttons with compact icon buttons;
+- translated text appears directly under the translated word, definition,
+  phrase, or example, matching the 2000NL training-card pattern;
+- pressing the translation button again hides that card's translations;
+- translation state is per card and should not be confused with phrase-level
+  `Show Translation`.
+
+The first implementation may use block-level card translation if line-level
+section ids are not yet stable. The target remains line-level placement under
+the translated text element.
+
+### Progress Actions And Feedback
+
+Do not render the word `Progress` above action buttons. The buttons themselves
+are the progress controls.
+
+New cards should show the backend-provided/current contract labels `Learn` and
+`Known`. Learning/review cards should show the backend-provided/current contract
+labels `Again`, `Hard`, `Good`, `Easy`. Do not localize these labels in the
+YouTube overlay in this slice. The UI may support interface-language-dependent
+labels later, but submitted platform action and result ids must remain the 2000NL
+contract values.
+
+Every action click must visibly register:
+
+- pressed/loading state immediately on click;
+- success feedback after the refreshed lookup returns, for example a subtle
+  background change and `Started learning`;
+- failure feedback without moving the card unexpectedly;
+- no card jump caused by layout collapse, focus movement, or body rerender.
+
+If an already-learning card still shows only `Learn`/`Known`, treat that as a
+contract/debugging issue before inventing local state. The investigation should
+verify whether 2000NL sent the wrong display actions, AudioFilms projected them
+incorrectly, or the extension rendered the wrong group.
+
+### Visual System
+
+The phrase ribbon, dictionary panel, and floating AudioFilms On/Off toggle should
+share one theme system. The target is automatic system light/dark mode with a
+manual override in the extension UI. The override applies only to AudioFilms
+extension surfaces, not to the underlying YouTube page.
+
+Use the 2000NL training-card design guide as the primary visual reference:
+
+- Lexend-like display treatment for learner-facing labels where feasible;
+- translated text directly below source text, with the existing 2000NL
+  translation tones;
+- subdued part-of-speech and article metadata;
+- restrained card surfaces and stable spacing.
+
+For the YouTube overlay, prefer stricter controls than the main 2000NL card:
+
+- square or rectangular controls with modest 6-8px corner radius;
+- compact lucide-style icons for close, account, translate, expand/collapse,
+  expand/collapse all, and theme;
+- small, quiet, rectangular chips with dense but readable spacing;
+- no oval/pill chips for system UI controls or metadata chips;
+- no large explanatory UI text for actions that are clear from icon, tooltip,
+  and accessible label.
+
+The `Phrase navigation` chip is not useful as a default label. Phrase position
+and playback controls already communicate the mode; keep any guided-navigation
+diagnostic label inside details/debug unless a later design review gives it a
+clear learner-facing role.
+
 ## Files For Design Review
 
 Start here:

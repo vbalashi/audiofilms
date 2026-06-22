@@ -1,0 +1,95 @@
+{
+  "capturedAt": "2026-06-22T10:24:27.895Z",
+  "url": "https://www.youtube.com/watch?v=SQ33BIl9D0c&list=WL&index=8",
+  "ribbon": {
+    "source": "ASR transcript · Precise",
+    "count": "51 / 157",
+    "mode": "Phrase navigation",
+    "currentPhrase": "In het gebruik van software en heroïsme kun je opbouwen en winnen tegen een Goliath.",
+    "currentTime": "4:35"
+  },
+  "dictionary": {
+    "title": "Dictionary",
+    "subtitle": "Dutch",
+    "accountLabel": "vbalashi@gmail.com",
+    "selectedWord": "opbouwen",
+    "wordStatus": "Personal progress on",
+    "contextText": "In het gebruik van software en heroïsme kun je opbouwen en winnen tegen een Goliath.",
+    "lookupTitle": "3 dictionary cards",
+    "lookupCopy": "Dictionary match",
+    "overlayCardCount": 3,
+    "cards": [
+      {
+        "title": "opbouwen",
+        "chips": [
+          "ww",
+          "nl",
+          "VanDale Dutch",
+          "Seen 1x",
+          "Last today"
+        ],
+        "definition": "bouwen; tot een geheel maken",
+        "example": "na de brand is het huis weer opnieuw opgebouwd",
+        "detailsSummary": "Details",
+        "sectionLabels": [
+          "Example",
+          "Example"
+        ],
+        "translateActions": [
+          "Translate"
+        ],
+        "progressLabel": "Progress",
+        "progressActions": [
+          "Learn",
+          "Known"
+        ]
+      },
+      {
+        "title": "opbouwen -> constructief",
+        "chips": [
+          "bn",
+          "nl",
+          "VanDale Dutch"
+        ],
+        "definition": "iets wat constructief is, is nuttig en positief = opbouwend",
+        "example": "hij werd bedankt voor zijn constructieve bijdrage aan de discussie",
+        "detailsSummary": "Details",
+        "sectionLabels": [
+          "Example"
+        ],
+        "translateActions": [
+          "Translate"
+        ],
+        "progressLabel": "Progress",
+        "progressActions": [
+          "Learn",
+          "Known"
+        ]
+      },
+      {
+        "title": "opbouwen -> positief",
+        "chips": [
+          "bn",
+          "nl",
+          "VanDale Dutch"
+        ],
+        "definition": "een positieve persoon ziet vaak de goede kanten van dingen = opbouwend ( tegenstelling: negatief )",
+        "example": "zijn positieve instelling hielp hem om snel nieuw werk te vinden",
+        "detailsSummary": "Details",
+        "sectionLabels": [
+          "Example"
+        ],
+        "translateActions": [
+          "Translate"
+        ],
+        "progressLabel": "Progress",
+        "progressActions": [
+          "Learn",
+          "Known"
+        ]
+      }
+    ],
+    "actionStatus": "",
+    "actionError": ""
+  }
+}
