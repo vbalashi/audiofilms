@@ -314,7 +314,7 @@ move through these states:
 | 3. Card title and metadata chips | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-3-card-metadata/README.md`; fixture/contract test plus `zware` browser smoke | Remote API still showed old `VanDale Dutch`/no-article payload during browser smoke; local projection tests verify the intended backend shape. |
 | 4. Examples expand/collapse | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-4-examples/README.md`; DOM interaction smoke; page-reload persistence smoke |  |
 | 5. Per-element translation reveal | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-5-translation/README.md`; show/hide/show-again smoke | Current translation response is card-level overlay text, so the UI renders a contained block under the card text; line-level placement needs stable section/source ids from the backend. |
-| 6. Progress actions and feedback | planned | Fixture/action-state test plus browser click evidence |  |
+| 6. Progress actions and feedback | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-6-progress/README.md`; mock browser action smoke; projection contract test | `zware` baseline shows mixed `displayActions` by card: cards with `Learn`/`Known` are projected as new/encountered, while the `dwingend` card had review actions. Direct guest API lookup cannot confirm personalized state without user bearer. |
 | 7. Shared theme and control shape | planned | Light/dark screenshots; persistence test when storage slice lands |  |
 | 8. Documentation sync | planned | README/runbook/validation-matrix diff review |  |
 

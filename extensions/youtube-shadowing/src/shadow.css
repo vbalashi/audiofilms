@@ -396,6 +396,21 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
 }
 
+.af-overlay-card.is-action-pending {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.af-overlay-card.is-action-saved {
+  background: #f6fef9;
+  border-color: #abefc6;
+}
+
+.af-overlay-card.is-action-error {
+  background: #fffbfa;
+  border-color: #fecdca;
+}
+
 .af-overlay-card-header {
   display: flex;
   align-items: flex-start;
@@ -562,12 +577,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-card-review {
   margin-top: 16px;
-  padding-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--af-border);
-}
-
-.af-card-review-label {
-  margin-bottom: 9px;
 }
 
 .af-account-inline-action {
@@ -593,24 +604,54 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-weight: 800;
 }
 
-.af-review-actions [data-af-again] {
+.af-review-actions button[aria-pressed="true"],
+.af-review-actions button.is-action-saved {
+  background: #ecfdf3;
+  border-color: #abefc6;
+  box-shadow: inset 0 0 0 1px rgba(18, 183, 106, 0.16);
+}
+
+.af-review-actions button.is-action-pending {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475467;
+  cursor: wait;
+}
+
+.af-review-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.af-review-actions [data-af-action-again] {
   border-color: #fecaca;
   color: #b42318;
 }
 
-.af-review-actions [data-af-hard] {
+.af-review-actions [data-af-action-hard] {
   border-color: #fedf89;
   color: #b54708;
 }
 
-.af-review-actions [data-af-good] {
+.af-review-actions [data-af-action-good] {
   border-color: #bfdbfe;
   color: #175cd3;
 }
 
-.af-review-actions [data-af-easy] {
+.af-review-actions [data-af-action-easy] {
   border-color: #abefc6;
   color: #067647;
+}
+
+.af-card-inline-feedback {
+  margin-top: 8px;
+  color: #067647;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.af-overlay-card.is-action-error .af-card-inline-feedback {
+  color: #b42318;
 }
 
 .af-connect-prompt {

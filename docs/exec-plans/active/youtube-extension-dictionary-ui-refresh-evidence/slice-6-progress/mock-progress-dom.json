@@ -1,0 +1,68 @@
+{
+  "checkedAt": "2026-06-22T10:57:40.591Z",
+  "mock": "cards",
+  "word": "opbouwen",
+  "firstBodyClass": "af-overlay-card is-action-saved",
+  "selectedPreludeCount": 0,
+  "cards": [
+    {
+      "title": "appel",
+      "className": "af-overlay-card is-action-saved",
+      "progressLabelCount": 0,
+      "feedback": "Started learning",
+      "actions": [
+        {
+          "text": "Learn",
+          "pressed": "true",
+          "className": "is-action-saved",
+          "disabled": false
+        },
+        {
+          "text": "Known",
+          "pressed": "false",
+          "className": "",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "title": "appel",
+      "className": "af-overlay-card is-action-saved",
+      "progressLabelCount": 0,
+      "feedback": "Hard recorded",
+      "actions": [
+        {
+          "text": "Again",
+          "pressed": "false",
+          "className": "",
+          "disabled": false
+        },
+        {
+          "text": "Hard",
+          "pressed": "true",
+          "className": "is-action-saved",
+          "disabled": false
+        },
+        {
+          "text": "Good",
+          "pressed": "false",
+          "className": "",
+          "disabled": false
+        },
+        {
+          "text": "Easy",
+          "pressed": "false",
+          "className": "",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "title": "appel",
+      "className": "af-overlay-card",
+      "progressLabelCount": 0,
+      "feedback": "",
+      "actions": []
+    }
+  ]
+}

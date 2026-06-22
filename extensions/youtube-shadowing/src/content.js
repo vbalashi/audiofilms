@@ -67,6 +67,7 @@
     examplesExpanded: readExamplesExpanded(),
     exampleExpansionOverrides: {},
     visibleTranslationsByCardId: {},
+    cardActionFeedbackByCardId: {},
     accountStatus: "guest",
     accountUser: null,
     accountPreferences: null,
@@ -1683,6 +1684,10 @@
 
   function renderOverlayCard(parent, card) {
     const entry = appendElement(parent, "div", "af-overlay-card");
+    const feedback = state.cardActionFeedbackByCardId[card.id];
+    if (feedback?.status) {
+      entry.classList.add(`is-action-${feedback.status}`);
+    }
     const header = appendElement(entry, "div", "af-overlay-card-header");
     const titleWrap = appendElement(header, "div", "af-overlay-title-wrap");
     const title = appendElement(titleWrap, "div", "af-overlay-card-title");
@@ -1724,6 +1729,11 @@
     }
 
     renderReviewActions(entry, card);
+
+    if (feedback?.message) {
+      const status = appendElement(entry, "p", "af-dictionary-copy af-card-inline-feedback");
+      status.textContent = feedback.message;
+    }
   }
 
   function overlayTitle(card) {
@@ -1842,13 +1852,16 @@
       return;
     }
     const section = appendElement(parent, "div", "af-card-review");
-    const label = appendElement(section, "div", "af-card-review-label");
-    label.textContent = "Progress";
     const actions = appendElement(section, "div", "af-review-actions");
+    const feedback = state.cardActionFeedbackByCardId[card?.id];
 
     for (const displayAction of displayActions) {
       const button = appendButton(actions, displayAction.label || displayAction.id, `afAction-${displayAction.id}`);
-      button.disabled = !card?.entryId;
+      const isActive = feedback?.actionId === displayAction.id && feedback.status !== "error";
+      button.disabled = !card?.entryId || feedback?.status === "pending";
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+      button.classList.toggle("is-action-pending", feedback?.actionId === displayAction.id && feedback.status === "pending");
+      button.classList.toggle("is-action-saved", feedback?.actionId === displayAction.id && feedback.status === "saved");
       button.addEventListener("click", () => performDisplayAction(card, displayAction));
     }
   }
@@ -1880,7 +1893,7 @@
       return;
     }
     if (command?.kind === "platform-action") {
-      performDictionaryCardAction(card, {
+      performDictionaryCardAction(card, displayAction, {
         action: command.action,
         ...(command.result ? { result: command.result } : {}),
       });
@@ -1892,6 +1905,7 @@
     state.dictionaryLookupSeq = lookupSeq;
     state.exampleExpansionOverrides = {};
     state.visibleTranslationsByCardId = {};
+    state.cardActionFeedbackByCardId = {};
     state.selectedWord = {
       word,
       phraseIndex,
@@ -1957,7 +1971,7 @@
     }
   }
 
-  async function performDictionaryCardAction(card, actionPayload) {
+  async function performDictionaryCardAction(card, displayAction, actionPayload) {
     if (!card?.entryId || !state.selectedWord) return;
 
     const selectedWord = state.selectedWord;
@@ -1969,26 +1983,48 @@
         : {}),
       entryId: card.entryId,
     };
+    const pendingMessage = `${displayAction?.label || "Action"}...`;
     state.selectedWord = {
       ...state.selectedWord,
-      cardActionStatus: "Saving action...",
       cardActionError: "",
+    };
+    state.cardActionFeedbackByCardId = {
+      ...state.cardActionFeedbackByCardId,
+      [card.id]: {
+        status: "pending",
+        actionId: displayAction?.id || action,
+        message: pendingMessage,
+      },
     };
     render();
 
     try {
       await postDictionaryCommand("dict-action", payload);
       if (!isCurrentLookup(selectedWord)) return;
+      state.cardActionFeedbackByCardId = {
+        ...state.cardActionFeedbackByCardId,
+        [card.id]: {
+          status: "saved",
+          actionId: displayAction?.id || action,
+          message: dictionaryActionSuccessMessage(displayAction, action),
+        },
+      };
       state.selectedWord = {
         ...state.selectedWord,
-        lookupStatus: "loading",
-        cardActionStatus: "Refreshing lookup...",
         cardActionError: "",
       };
       render();
       await lookupSelectedWord(state.selectedWord);
     } catch (error) {
       if (!isCurrentLookup(selectedWord)) return;
+      state.cardActionFeedbackByCardId = {
+        ...state.cardActionFeedbackByCardId,
+        [card.id]: {
+          status: "error",
+          actionId: displayAction?.id || action,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
       state.selectedWord = {
         ...state.selectedWord,
         cardActionStatus: "",
@@ -1996,6 +2032,13 @@
       };
       render();
     }
+  }
+
+  function dictionaryActionSuccessMessage(displayAction, action) {
+    if (action === "start-learning") return "Started learning";
+    if (action === "mark-known") return "Marked known";
+    const label = displayAction?.label || "Progress";
+    return `${label} recorded`;
   }
 
   async function requestDictionaryCardTranslation(card) {
