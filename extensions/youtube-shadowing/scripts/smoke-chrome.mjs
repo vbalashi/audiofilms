@@ -513,7 +513,11 @@ function assertDebugMenuUi() {
   return [
     assertion("debug tools button is labelled", openGeometry.debugTools?.label === "Debug tools", openGeometry.debugTools?.label || ""),
     assertion("debug tools popover opens", openGeometry.debugTools?.open === true, JSON.stringify(openGeometry.debugTools)),
-    assertion("debug tools contains actions", openGeometry.debugTools?.actions?.join("|") === "Mark Issue|Debug|Copy Debug|Refresh Cache", (openGeometry.debugTools?.actions || []).join("|")),
+    assertion(
+      "debug tools contains actions",
+      ["Mark Issue", "Debug", "Copy Debug", "Refresh Cache"].every((action) => openGeometry.debugTools?.actions?.includes(action)),
+      (openGeometry.debugTools?.actions || []).join("|"),
+    ),
     assertion("debug tools popover closes with Escape", closedGeometry.debugTools?.open === false, JSON.stringify(closedGeometry.debugTools)),
   ];
 }

@@ -402,6 +402,11 @@
     panel.setAttribute("aria-label", "AudioFilms dictionary lookup");
 
     const header = appendElement(panel, "div", "af-dictionary-header");
+    const dragHandle = appendElement(header, "button", "af-panel-drag-handle");
+    dragHandle.type = "button";
+    dragHandle.dataset.afDragHandle = "dictionaryPanel";
+    dragHandle.textContent = "Move";
+    dragHandle.setAttribute("aria-label", "Move dictionary panel");
     const heading = appendElement(header, "div", "af-dictionary-heading");
     const title = appendElement(heading, "div", "af-dictionary-title");
     title.dataset.afDictionaryTitle = "";
@@ -424,6 +429,10 @@
     });
     const body = appendElement(panel, "div", "af-dictionary-body");
     body.dataset.afDictionaryBody = "";
+    const resizeHandle = appendElement(panel, "button", "af-panel-resize-handle");
+    resizeHandle.type = "button";
+    resizeHandle.dataset.afResizeHandle = "dictionaryPanel";
+    resizeHandle.setAttribute("aria-label", "Resize dictionary panel");
 
     return panel;
   }
@@ -434,6 +443,11 @@
     panel.setAttribute("aria-label", "AudioFilms phrase ribbon");
 
     const meta = appendElement(panel, "div", "af-ribbon-meta");
+    const dragHandle = appendElement(meta, "button", "af-panel-drag-handle");
+    dragHandle.type = "button";
+    dragHandle.dataset.afDragHandle = "phraseRibbon";
+    dragHandle.textContent = "Move";
+    dragHandle.setAttribute("aria-label", "Move phrase ribbon");
     const track = appendElement(meta, "div", "af-source-selector");
     track.dataset.afTrack = "";
     const trackButton = appendButton(track, "Captions: -", "afSourceToggle");
@@ -475,6 +489,11 @@
     appendButton(transparencyControls, "-", "afTransparencyLower");
     appendButton(transparencyControls, "Reset", "afTransparencyReset");
     appendButton(transparencyControls, "+", "afTransparencyHigher");
+    const layoutLabel = appendElement(displaySection, "div", "af-settings-label");
+    layoutLabel.textContent = "Panel layout";
+    const layoutControls = appendElement(displaySection, "div", "af-settings-button-row");
+    appendButton(layoutControls, "Unlock", "afLayoutLockToggle");
+    appendButton(layoutControls, "Reset", "afLayoutReset");
     const debugSection = appendElement(utilityMenu, "div", "af-settings-section af-debug-actions");
     appendButton(debugSection, "Mark Issue", "afMarkIssue");
     appendButton(debugSection, "Debug", "afDebugToggle");
@@ -520,6 +539,10 @@
     translationButton.title = "Show phrase translation (T)";
     const hints = appendElement(panel, "div", "af-shortcut-hints");
     hints.textContent = "Shortcuts: Arrow keys phrase navigation · S original · T translation · 1/2 modes";
+    const resizeHandle = appendElement(panel, "button", "af-panel-resize-handle");
+    resizeHandle.type = "button";
+    resizeHandle.dataset.afResizeHandle = "phraseRibbon";
+    resizeHandle.setAttribute("aria-label", "Resize phrase ribbon width");
 
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
     panel.querySelector("[data-af-replay]").addEventListener("click", replayCurrentPhrase);
@@ -537,6 +560,14 @@
     panel.querySelector("[data-af-transparency-lower]").addEventListener("click", () => adjustPanelBackgroundAlpha(-0.1));
     panel.querySelector("[data-af-transparency-reset]").addEventListener("click", resetPanelBackgroundAlpha);
     panel.querySelector("[data-af-transparency-higher]").addEventListener("click", () => adjustPanelBackgroundAlpha(0.1));
+    panel.querySelector("[data-af-layout-lock-toggle]").addEventListener("click", toggleLayoutLock);
+    panel.querySelector("[data-af-layout-reset]").addEventListener("click", resetPanelLayout);
+    panel.querySelectorAll("[data-af-drag-handle]").forEach((handle) => {
+      handle.addEventListener("pointerdown", beginPanelDrag);
+    });
+    panel.querySelectorAll("[data-af-resize-handle]").forEach((handle) => {
+      handle.addEventListener("pointerdown", beginPanelResize);
+    });
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
     panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
@@ -707,6 +738,7 @@
     }
 
     const { dictionaryPanel, ribbonPanel } = ensureWorkspace();
+    applyPanelLayout(ribbonPanel, dictionaryPanel);
     renderRibbon(ribbonPanel);
     if (dictionaryPanel) {
       renderDictionary(dictionaryPanel);
@@ -742,6 +774,8 @@
     const transparencyLower = panel.querySelector("[data-af-transparency-lower]");
     const transparencyReset = panel.querySelector("[data-af-transparency-reset]");
     const transparencyHigher = panel.querySelector("[data-af-transparency-higher]");
+    const layoutLockToggle = panel.querySelector("[data-af-layout-lock-toggle]");
+    const layoutReset = panel.querySelector("[data-af-layout-reset]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
     const debugCopy = panel.querySelector("[data-af-debug-copy]");
     const refreshCache = panel.querySelector("[data-af-refresh-cache]");
@@ -798,6 +832,8 @@
       transparencyLower,
       transparencyReset,
       transparencyHigher,
+      layoutLockToggle,
+      layoutReset,
     });
     debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
@@ -887,6 +923,219 @@
     controls.transparencyLower.title = `Panel background opacity: ${alphaPercent}%`;
     controls.transparencyHigher.title = `Panel background opacity: ${alphaPercent}%`;
     controls.transparencyReset.title = `Reset panel background opacity (${alphaPercent}%)`;
+
+    controls.layoutLockToggle.textContent = state.displayPreferences.layout.locked ? "Unlock" : "Lock";
+    controls.layoutLockToggle.title = state.displayPreferences.layout.locked
+      ? "Unlock panel layout editing"
+      : "Lock panel layout editing";
+    controls.layoutReset.disabled = !hasCustomPanelLayout();
+    controls.layoutReset.title = "Reset panel positions and sizes";
+  }
+
+  function hasCustomPanelLayout() {
+    const layout = state.displayPreferences.layout;
+    return !layout.locked
+      || panelHasGeometry(layout.phraseRibbon)
+      || panelHasGeometry(layout.dictionaryPanel)
+      || layout.zOrder !== "phraseRibbon";
+  }
+
+  function panelHasGeometry(geometry) {
+    return ["x", "y", "width", "height"].some((key) => geometry?.[key] !== null);
+  }
+
+  function toggleLayoutLock(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      layout: {
+        ...preferences.layout,
+        locked: !preferences.layout.locked,
+      },
+    }));
+    render();
+  }
+
+  function resetPanelLayout(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      layout: defaultPanelLayout(),
+    }));
+    render();
+  }
+
+  function defaultPanelLayout() {
+    return {
+      locked: true,
+      phraseRibbon: { x: null, y: null, width: null, height: null },
+      dictionaryPanel: { x: null, y: null, width: null, height: null },
+      zOrder: "phraseRibbon",
+    };
+  }
+
+  function applyPanelLayout(ribbonPanel, dictionaryPanel) {
+    applyPanelGeometry(ribbonPanel, "phraseRibbon");
+    if (dictionaryPanel) {
+      applyPanelGeometry(dictionaryPanel, "dictionaryPanel");
+    }
+  }
+
+  function applyPanelGeometry(panel, panelKey, overrideGeometry = null) {
+    if (!(panel instanceof HTMLElement)) return;
+    const layout = state.displayPreferences.layout;
+    const geometry = clampPanelGeometry(panelKey, overrideGeometry || layout[panelKey]);
+    const hasGeometry = panelHasGeometry(geometry);
+    panel.classList.toggle("is-layout-unlocked", !layout.locked);
+    panel.classList.toggle("is-floating", hasGeometry);
+    panel.style.zIndex = layout.zOrder === panelKey ? "1002" : "1001";
+
+    if (!hasGeometry) {
+      panel.style.left = "";
+      panel.style.top = "";
+      panel.style.width = "";
+      panel.style.height = "";
+      return;
+    }
+
+    panel.style.left = geometry.x === null ? "" : `${geometry.x}px`;
+    panel.style.top = geometry.y === null ? "" : `${geometry.y}px`;
+    panel.style.width = geometry.width === null ? "" : `${geometry.width}px`;
+    panel.style.height = panelKey === "phraseRibbon" || geometry.height === null ? "" : `${geometry.height}px`;
+  }
+
+  function beginPanelDrag(event) {
+    const panelKey = event.currentTarget?.dataset?.afDragHandle;
+    if (!panelKey || state.displayPreferences.layout.locked) return;
+    const panel = panelElement(panelKey);
+    if (!(panel instanceof HTMLElement)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = panel.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startGeometry = {
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: panelKey === "phraseRibbon" ? null : rect.height,
+    };
+    let nextGeometry = startGeometry;
+    bringPanelToFront(panelKey, false);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+
+    const onMove = (moveEvent) => {
+      const x = startGeometry.x + moveEvent.clientX - startX;
+      const y = startGeometry.y + moveEvent.clientY - startY;
+      nextGeometry = clampPanelGeometry(panelKey, {
+        ...startGeometry,
+        x,
+        y,
+      });
+      applyPanelGeometry(panel, panelKey, nextGeometry);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      savePanelGeometry(panelKey, nextGeometry);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  }
+
+  function beginPanelResize(event) {
+    const panelKey = event.currentTarget?.dataset?.afResizeHandle;
+    if (!panelKey || state.displayPreferences.layout.locked) return;
+    const panel = panelElement(panelKey);
+    if (!(panel instanceof HTMLElement)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = panel.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startGeometry = {
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: panelKey === "phraseRibbon" ? null : rect.height,
+    };
+    let nextGeometry = startGeometry;
+    bringPanelToFront(panelKey, false);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+
+    const onMove = (moveEvent) => {
+      nextGeometry = clampPanelGeometry(panelKey, {
+        ...startGeometry,
+        width: startGeometry.width + moveEvent.clientX - startX,
+        height: panelKey === "phraseRibbon" ? null : startGeometry.height + moveEvent.clientY - startY,
+      });
+      applyPanelGeometry(panel, panelKey, nextGeometry);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      savePanelGeometry(panelKey, nextGeometry);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  }
+
+  function clampPanelGeometry(panelKey, geometry) {
+    const margin = 8;
+    const minWidth = panelKey === "phraseRibbon" ? Math.min(360, window.innerWidth - margin * 2) : Math.min(320, window.innerWidth - margin * 2);
+    const minHeight = panelKey === "dictionaryPanel" ? 220 : null;
+    const width = geometry?.width === null
+      ? null
+      : clampNumber(geometry?.width, minWidth, Math.max(minWidth, window.innerWidth - margin * 2), minWidth);
+    const height = panelKey === "phraseRibbon" || geometry?.height === null
+      ? null
+      : clampNumber(geometry?.height, minHeight, Math.max(minHeight, window.innerHeight - margin * 2), minHeight);
+    const maxX = window.innerWidth - (width || minWidth) - margin;
+    const maxY = window.innerHeight - (height || minHeight || 80) - margin;
+
+    return {
+      x: geometry?.x === null ? null : clampNumber(geometry?.x, margin, Math.max(margin, maxX), margin),
+      y: geometry?.y === null ? null : clampNumber(geometry?.y, margin, Math.max(margin, maxY), margin),
+      width,
+      height,
+    };
+  }
+
+  function savePanelGeometry(panelKey, geometry) {
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      layout: {
+        ...preferences.layout,
+        [panelKey]: clampPanelGeometry(panelKey, geometry),
+        zOrder: panelKey,
+      },
+    }));
+    render();
+  }
+
+  function bringPanelToFront(panelKey, persist = true) {
+    state.displayPreferences.layout.zOrder = panelKey;
+    if (persist) {
+      updateDisplayPreferences((preferences) => ({
+        ...preferences,
+        layout: {
+          ...preferences.layout,
+          zOrder: panelKey,
+        },
+      }));
+    }
+  }
+
+  function panelElement(panelKey) {
+    const root = document.getElementById(ROOT_ID)?.shadowRoot;
+    const id = panelKey === "dictionaryPanel" ? DICTIONARY_PANEL_ID : RIBBON_PANEL_ID;
+    return root?.getElementById(id) || null;
   }
 
   function toggleUtilityMenu(event) {

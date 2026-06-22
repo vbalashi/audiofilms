@@ -248,6 +248,23 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   pointer-events: auto;
 }
 
+#af-shadowing-dictionary-panel,
+#af-shadowing-ribbon-panel {
+  position: relative;
+}
+
+#af-shadowing-dictionary-panel.is-floating,
+#af-shadowing-ribbon-panel.is-floating {
+  position: fixed;
+  right: auto;
+  bottom: auto;
+  margin: 0;
+}
+
+#af-shadowing-ribbon-panel.is-floating {
+  height: auto;
+}
+
 #af-shadowing-ribbon-panel.is-empty {
   max-width: min(520px, calc(100vw - 32px));
 }
@@ -298,6 +315,55 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   padding: 12px 14px 10px;
   background: var(--af-panel-alpha-bg);
   border-bottom: 1px solid var(--af-border);
+}
+
+.af-panel-drag-handle {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 24px;
+  padding: 0 7px;
+  color: var(--af-muted);
+  background: var(--af-control);
+  border: 1px solid var(--af-border);
+  border-radius: 5px;
+  cursor: grab;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.is-layout-unlocked .af-panel-drag-handle {
+  display: inline-flex;
+}
+
+.af-panel-drag-handle:active {
+  cursor: grabbing;
+}
+
+.af-panel-resize-handle {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 3;
+  display: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: linear-gradient(135deg, transparent 48%, var(--af-border-strong) 50%, var(--af-border-strong) 58%, transparent 60%);
+  border: 0;
+  border-radius: 3px;
+  cursor: nwse-resize;
+}
+
+#af-shadowing-ribbon-panel .af-panel-resize-handle {
+  cursor: ew-resize;
+}
+
+.is-layout-unlocked .af-panel-resize-handle {
+  display: block;
 }
 
 .af-dictionary-heading {
