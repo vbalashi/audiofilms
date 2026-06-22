@@ -1621,25 +1621,7 @@
       renderReadyDictionaryCards(parent, state.selectedWord);
       return;
     }
-
-    const phrase = state.phrases[state.selectedWord.phraseIndex] || state.phrases[state.currentIndex];
-    const card = appendElement(parent, "div", "af-dictionary-card af-dictionary-card-selected");
-    const header = appendElement(card, "div", "af-word-card-header");
-    const title = appendElement(header, "div", "af-word-title");
-    title.textContent = state.selectedWord.word;
-
-    const status = appendElement(card, "div", "af-word-status");
-    status.textContent = state.accountStatus === "signed-in" ? "Personal progress on" : "Guest lookup";
-
-    if (phrase) {
-      const context = appendElement(card, "div", "af-context-block");
-      const label = appendElement(context, "div", "af-context-label");
-      label.textContent = "Context";
-      const text = appendElement(context, "div", "af-context-text");
-      renderClickablePhraseText(text, phrase.text, state.selectedWord.phraseIndex);
-    }
-
-    renderDictionaryLookup(card);
+    renderDictionaryLookup(parent);
   }
 
   function renderReadyDictionaryCards(parent, selectedWord) {
