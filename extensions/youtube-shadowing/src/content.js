@@ -20,6 +20,7 @@
   const SHADOW_CONTAINER_ID = "audiofilms-shadow-container";
   const TOGGLE_ID = "af-shadowing-toggle";
   const LEARNING_ENABLED_STORAGE_KEY = "afShadowingLearningEnabled";
+  const EXAMPLES_EXPANDED_STORAGE_KEY = "afDictionaryExamplesExpanded";
   const MAX_PHRASE_DURATION_MS = 12000;
   const LONG_PAUSE_MS = 1000;
   const PRE_ROLL_MS = 150;
@@ -63,6 +64,8 @@
     guidedMode: false,
     selectedWord: null,
     dictionaryLookupSeq: 0,
+    examplesExpanded: readExamplesExpanded(),
+    exampleExpansionOverrides: {},
     accountStatus: "guest",
     accountUser: null,
     accountPreferences: null,
@@ -100,6 +103,14 @@
 
   function writeLearningEnabled(value) {
     window.localStorage.setItem(LEARNING_ENABLED_STORAGE_KEY, value ? "true" : "false");
+  }
+
+  function readExamplesExpanded() {
+    return window.localStorage.getItem(EXAMPLES_EXPANDED_STORAGE_KEY) === "true";
+  }
+
+  function writeExamplesExpanded(value) {
+    window.localStorage.setItem(EXAMPLES_EXPANDED_STORAGE_KEY, value ? "true" : "false");
   }
 
   function ensureToggle() {
@@ -238,6 +249,11 @@
     accountCopy.dataset.afAccountCopy = "";
     const accountAction = appendButton(accountMenu, "Connect 2000NL", "afAccountAction");
     accountAction.className = "af-account-popover-action";
+    const examplesToggle = appendElement(header, "button", "af-dictionary-examples-toggle");
+    examplesToggle.type = "button";
+    examplesToggle.dataset.afExamplesToggle = "";
+    examplesToggle.hidden = true;
+    examplesToggle.addEventListener("click", toggleAllExamples);
     const close = appendElement(header, "button", "af-dictionary-close");
     close.type = "button";
     close.innerHTML = `${iconSvg("close")}<span class="af-sr-only">Close</span>`;
@@ -448,6 +464,12 @@
         '<path d="M18 6 6 18"/>',
         '<path d="m6 6 12 12"/>',
       ],
+      expand: [
+        '<path d="m6 9 6 6 6-6"/>',
+      ],
+      collapse: [
+        '<path d="m18 15-6-6-6 6"/>',
+      ],
     }[kind] || [];
     return [
       '<svg class="af-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
@@ -623,6 +645,34 @@
       state.sourceMenuOpen = false;
     }
     render();
+  }
+
+  function toggleAllExamples(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.examplesExpanded = !state.examplesExpanded;
+    state.exampleExpansionOverrides = {};
+    writeExamplesExpanded(state.examplesExpanded);
+    render();
+  }
+
+  function toggleCardExamples(cardId) {
+    if (!cardId) return;
+    state.exampleExpansionOverrides = {
+      ...state.exampleExpansionOverrides,
+      [cardId]: !exampleSectionExpanded(cardId),
+    };
+    render();
+  }
+
+  function exampleSectionExpanded(cardId) {
+    if (
+      cardId
+      && Object.prototype.hasOwnProperty.call(state.exampleExpansionOverrides, cardId)
+    ) {
+      return state.exampleExpansionOverrides[cardId] === true;
+    }
+    return state.examplesExpanded;
   }
 
   function closeOpenMenus() {
@@ -1376,6 +1426,7 @@
     const accountMenu = panel.querySelector("[data-af-account-menu]");
     const accountCopy = panel.querySelector("[data-af-account-copy]");
     const accountAction = panel.querySelector("[data-af-account-action]");
+    const examplesToggle = panel.querySelector("[data-af-examples-toggle]");
     const body = panel.querySelector("[data-af-dictionary-body]");
 
     const headerCopy = dictionaryHeaderCopy();
@@ -1396,6 +1447,15 @@
     accountCopy.textContent = accountStatusCopy();
     accountAction.textContent = accountConnectLabel();
     accountAction.disabled = state.accountLoading;
+    const canToggleExamples = Boolean(state.selectedWord?.lookupResult?.cards?.length);
+    examplesToggle.hidden = !canToggleExamples;
+    if (canToggleExamples) {
+      const toggleLabel = state.examplesExpanded ? "Collapse all examples" : "Expand all examples";
+      examplesToggle.innerHTML = `${iconSvg(state.examplesExpanded ? "collapse" : "expand")}<span class="af-sr-only">${toggleLabel}</span>`;
+      examplesToggle.setAttribute("aria-label", toggleLabel);
+      examplesToggle.setAttribute("aria-pressed", state.examplesExpanded ? "true" : "false");
+      examplesToggle.title = toggleLabel;
+    }
 
     clearElement(body);
     if (state.selectedWord) {
@@ -1616,7 +1676,7 @@
       example.textContent = summary.example;
     }
 
-    renderOverlaySections(entry, card.sections || []);
+    renderOverlaySections(entry, card.sections || [], card);
 
     const personal = progressSignal(card.progress);
     if (personal.length) {
@@ -1665,20 +1725,26 @@
     }
   }
 
-  function renderOverlaySections(parent, sections) {
+  function renderOverlaySections(parent, sections, card) {
     const visibleSections = sections
       .filter((section) => section?.text)
       .filter((section, index) => index > 0 || section.kind !== "meaning")
       .slice(0, 4);
     if (!visibleSections.length) return;
 
-    const details = appendElement(parent, "details", "af-overlay-details");
-    const summary = appendElement(details, "summary", "af-overlay-details-summary");
-    summary.textContent = "Details";
+    const cardId = card?.id || "";
+    const expanded = exampleSectionExpanded(cardId);
+    const details = appendElement(parent, "div", "af-overlay-details");
+    details.classList.toggle("is-open", expanded);
+    const summary = appendElement(details, "button", "af-overlay-details-summary");
+    summary.type = "button";
+    summary.innerHTML = `${iconSvg(expanded ? "collapse" : "expand")}<span>Examples</span>`;
+    summary.setAttribute("aria-expanded", expanded ? "true" : "false");
+    summary.addEventListener("click", () => toggleCardExamples(cardId));
+    const content = appendElement(details, "div", "af-overlay-details-content");
+    content.hidden = !expanded;
     for (const section of visibleSections) {
-      const block = appendElement(details, "div", `af-overlay-section is-${section.kind || "meaning"}`);
-      const label = appendElement(block, "div", "af-overlay-section-label");
-      label.textContent = section.label || sectionLabel(section.kind);
+      const block = appendElement(content, "div", `af-overlay-section is-${section.kind || "meaning"}`);
       const text = appendElement(block, "p", "af-dictionary-copy");
       text.textContent = section.text;
       if (section.translation) {
@@ -1791,6 +1857,7 @@
   function selectLookupWord(word, phraseIndex) {
     const lookupSeq = state.dictionaryLookupSeq + 1;
     state.dictionaryLookupSeq = lookupSeq;
+    state.exampleExpansionOverrides = {};
     state.selectedWord = {
       word,
       phraseIndex,

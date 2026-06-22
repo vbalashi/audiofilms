@@ -312,7 +312,7 @@ move through these states:
 | 1. Header and account IA | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-1-header-account/README.md`; DOM smoke and desktop screenshot |  |
 | 2. Remove redundant intro blocks | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-2-ready-body/README.md`; DOM smoke proving first ready body item is a card |  |
 | 3. Card title and metadata chips | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-3-card-metadata/README.md`; fixture/contract test plus `zware` browser smoke | Remote API still showed old `VanDale Dutch`/no-article payload during browser smoke; local projection tests verify the intended backend shape. |
-| 4. Examples expand/collapse | planned | Interaction smoke; persistence test when storage slice lands |  |
+| 4. Examples expand/collapse | verified | `youtube-extension-dictionary-ui-refresh-evidence/slice-4-examples/README.md`; DOM interaction smoke; page-reload persistence smoke |  |
 | 5. Per-element translation reveal | planned | Show/hide interaction smoke; payload source-path check |  |
 | 6. Progress actions and feedback | planned | Fixture/action-state test plus browser click evidence |  |
 | 7. Shared theme and control shape | planned | Light/dark screenshots; persistence test when storage slice lands |  |

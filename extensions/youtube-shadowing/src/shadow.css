@@ -210,6 +210,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-weight: 850;
 }
 
+.af-dictionary-examples-toggle,
 .af-dictionary-close {
   display: grid;
   flex: 0 0 auto;
@@ -225,6 +226,17 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font: inherit;
 }
 
+.af-dictionary-examples-toggle {
+  color: #344054;
+  background: #f8fafc;
+  border-color: var(--af-border);
+}
+
+.af-dictionary-examples-toggle[hidden] {
+  display: none;
+}
+
+.af-dictionary-examples-toggle:hover,
 .af-dictionary-close:hover {
   color: var(--af-text);
   background: rgba(148, 163, 184, 0.12);
@@ -483,28 +495,41 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-overlay-details-summary {
-  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 10px 0 0;
   color: var(--af-muted);
+  background: transparent;
+  border: 0;
   cursor: pointer;
+  font: inherit;
   font-size: 12px;
   font-weight: 850;
+  text-align: left;
+}
+
+.af-overlay-details-summary .af-button-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.af-overlay-details-content {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.af-overlay-details-content[hidden] {
+  display: none;
 }
 
 .af-overlay-section {
-  margin-top: 9px;
   padding: 8px;
   background: #f9fafb;
   border: 1px solid #eaecf0;
   border-radius: 6px;
-}
-
-.af-overlay-section-label {
-  color: var(--af-muted);
-  font-family: var(--af-mono);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .af-section-translation {
