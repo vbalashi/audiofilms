@@ -2472,6 +2472,7 @@
     return [
       card.partOfSpeech ? { kind: "part-of-speech", label: card.partOfSpeech } : null,
       ...projected.filter((chip) => chip.kind === "part-of-speech" && chip.label !== card.partOfSpeech),
+      ...projected.filter((chip) => chip.kind === "list"),
       card.dictionary?.name || card.dictionary?.slug
         ? { kind: "dictionary", label: card.dictionary.name || card.dictionary.slug }
         : null,

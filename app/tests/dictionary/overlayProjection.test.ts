@@ -83,6 +83,7 @@ describe('dictionary overlay V2 projection', () => {
           ...baseItem().entry,
           partOfSpeech: 'zn',
           gender: 'de',
+          isNt22000: true,
         },
         dictionary: {
           id: 'dict:vandale',
@@ -101,7 +102,10 @@ describe('dictionary overlay V2 projection', () => {
     expect(card.article).toBe('de');
     expect(card.language).toBe('nl');
     expect(card.dictionary?.name).toBe('VanDale');
-    expect(card.chips).toEqual([{ kind: 'part-of-speech', label: 'zn' }]);
+    expect(card.chips).toEqual([
+      { kind: 'part-of-speech', label: 'zn' },
+      { kind: 'list', label: '2k', value: 'nt2-2000' },
+    ]);
   });
 
   it('projects noun articles from platform raw gender into the overlay contract', () => {

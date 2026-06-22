@@ -35,6 +35,7 @@ export type PlatformLookupItem = {
       gender?: string | null;
       part_of_speech?: string | null;
     } | null;
+    isNt22000?: boolean | null;
     content?: Record<string, unknown> | null;
     contentFingerprint?: string | null;
   } | null;
@@ -255,11 +256,12 @@ function normalizedMeaning(meaning: unknown, index: number): DictionaryOverlayCa
 function chipsFromContent(item: PlatformLookupItem, content: Record<string, unknown>): OverlayChip[] {
   return [
     chip('part-of-speech', stringValue(content.partOfSpeech) || stringValue(item.entry?.partOfSpeech)),
+    item.entry?.isNt22000 ? chip('list', '2k', 'nt2-2000') : null,
   ].filter((item): item is OverlayChip => Boolean(item));
 }
 
-function chip(kind: OverlayChip['kind'], label?: string | null): OverlayChip | null {
-  return label ? { kind, label } : null;
+function chip(kind: OverlayChip['kind'], label?: string | null, value?: string | null): OverlayChip | null {
+  return label ? { kind, label, ...(value ? { value } : {}) } : null;
 }
 
 function normalizedArticle(value?: string | null) {
