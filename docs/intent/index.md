@@ -47,6 +47,7 @@ Other feature work should stay secondary until those areas are in place.
 - Use `docs/dictionary/index.md` for current dictionary-specific guidance.
 - Use `docs/intent/subtitle-retrieval-strategy.md` for current subtitle access, manual-vs-auto, and ASR fallback notes.
 - Use `docs/intent/youtube-extension-designer-brief.md` when handing the current YouTube extension UI to a designer for regrouping, hierarchy, and state-model review.
+- Use `docs/intent/youtube-extension-floating-panels-settings-intent.md` for the current product decisions around movable/resizable extension panels, font scale, panel transparency, persisted enabled state, and browser-action control.
 - Use `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md` when handing backend/API gaps from the YouTube extension redesign to an architect or backend agent.
 
 For the YouTube extension redesign, the designer brief and backend/UI contracts

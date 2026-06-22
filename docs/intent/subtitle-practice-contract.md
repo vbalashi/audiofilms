@@ -31,6 +31,9 @@ These terms are defined in `CONTEXT.md` and expanded in `docs/exec-plans/active/
 ## Phrase Rules
 
 The app's canonical practice phrase normalizer lives in `app/src/lib/practice/phrases.ts`. API responses should run provider/source `phrases` through this normalizer and return the result as `practicePhrases`.
+Practice snapshots also re-run this normalizer over cached/backend-owned
+`practicePhrases` before exposing a `phraseSet`, so old ASR timing artifacts do
+not bypass current phrase length and ellipsis-continuation rules.
 
 Current default limits:
 

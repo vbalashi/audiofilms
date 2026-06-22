@@ -57,6 +57,8 @@
 
   function cleanPhraseText(text) {
     return text
+      .replace(/\s*(?:\.{3}|…)\s*(?=\p{Ll})/gu, " ")
+      .replace(/^(?:\.{3}|…)\s*/, "")
       .replace(/\s+([,.;:!?])/g, "$1")
       .replace(/\s+/g, " ")
       .trim();

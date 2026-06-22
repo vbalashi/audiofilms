@@ -16,7 +16,7 @@ export function wordCount(text: string) {
 }
 
 function splitLongText(text: string, options: Required<PracticePhraseOptions>) {
-  const words = text.trim().split(/\s+/).filter(Boolean);
+  const words = normalizeEllipsisContinuations(text).trim().split(/\s+/).filter(Boolean);
   const chunks: string[] = [];
   let buffer = '';
 
@@ -41,7 +41,7 @@ function splitPhraseIntoTimedParts(
   phrase: Phrase,
   options: Required<PracticePhraseOptions>,
 ): Phrase[] {
-  const text = phrase.text.trim().replace(/\s+/g, ' ');
+  const text = normalizeEllipsisContinuations(phrase.text).trim().replace(/\s+/g, ' ');
   const duration = Math.max(0, phrase.endSec - phrase.startSec);
   const sentenceParts = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
   const parts = sentenceParts.flatMap((part) => {
@@ -94,6 +94,14 @@ function stripLeadingEllipsis(text: string) {
   return text.trim().replace(/^(?:\.\.\.|…)\s*/, '');
 }
 
+function normalizeEllipsisContinuations(text: string) {
+  return text
+    .replace(/\s*(?:\.\.\.|…)\s*(?=\p{Ll})/gu, ' ')
+    .replace(/^(?:\.\.\.|…)\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function startsWithContinuationCue(text: string) {
   const cleanText = text.trim();
   if (/^(?:\.\.\.|…)/.test(cleanText)) return true;
@@ -134,7 +142,10 @@ function mergeContinuationPhrases(
       previous.endSec = Math.max(previous.endSec, phrase.endSec);
       previous.text = combinedText;
     } else {
-      merged.push({ ...phrase });
+      merged.push({
+        ...phrase,
+        text: hasTrailingEllipsis(previous.text) ? stripLeadingEllipsis(phrase.text) : phrase.text,
+      });
     }
   }
 

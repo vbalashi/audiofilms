@@ -12,6 +12,7 @@ import type {
   PracticeTextSourceKind,
   PracticeTimingQuality,
 } from '@/types/practice';
+import { normalizePracticePhrases } from '@/lib/practice/phrases';
 
 export type {
   PracticeAction,
@@ -92,7 +93,7 @@ function usablePracticePhrases(response: SubtitleResponse): Phrase[] {
     ? response.practicePhrases
     : response.phrases;
 
-  return phrases.filter(
+  return normalizePracticePhrases(phrases).filter(
     (phrase) =>
       phrase.text.trim().length > 0 &&
       Number.isFinite(phrase.startSec) &&

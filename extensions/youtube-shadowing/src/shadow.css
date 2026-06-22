@@ -205,7 +205,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 #audiofilms-shadow-container {
   display: grid;
-  grid-template-columns: minmax(320px, min(760px, calc(100vw - 32px))) minmax(260px, 340px);
+  grid-template-columns: minmax(360px, min(960px, calc(100vw - 32px))) minmax(260px, 340px);
   gap: 12px;
   align-items: end;
   justify-content: center;
@@ -1390,10 +1390,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   color: var(--af-muted);
   font-size: 12px;
   font-weight: 550;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .af-ribbon-row.is-recall-mode .af-phrase-translation {
