@@ -1461,6 +1461,11 @@
   }
 
   function renderSelectedWordCard(parent) {
+    if (state.selectedWord?.lookupStatus === "ready" && state.selectedWord.lookupResult?.cards?.length) {
+      renderReadyDictionaryCards(parent, state.selectedWord);
+      return;
+    }
+
     const phrase = state.phrases[state.selectedWord.phraseIndex] || state.phrases[state.currentIndex];
     const card = appendElement(parent, "div", "af-dictionary-card af-dictionary-card-selected");
     const header = appendElement(card, "div", "af-word-card-header");
@@ -1479,6 +1484,25 @@
     }
 
     renderDictionaryLookup(card);
+  }
+
+  function renderReadyDictionaryCards(parent, selectedWord) {
+    for (const card of selectedWord.lookupResult.cards) {
+      renderOverlayCard(parent, card);
+    }
+
+    if (selectedWord.cardActionStatus) {
+      const status = appendElement(parent, "p", "af-dictionary-copy af-card-action-status");
+      status.textContent = selectedWord.cardActionStatus;
+    }
+    if (selectedWord.cardActionError) {
+      const error = appendElement(parent, "p", "af-source-option-error");
+      error.textContent = selectedWord.cardActionError;
+    }
+    if (selectedWord.lookupResult?.meta?.warning) {
+      const warning = appendElement(parent, "p", "af-source-option-error");
+      warning.textContent = selectedWord.lookupResult.meta.warning;
+    }
   }
 
   function renderDictionaryLookup(parent) {
