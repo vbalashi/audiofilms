@@ -31,6 +31,8 @@
   const initialDisplayPreferences = readInitialDisplayPreferences();
 
   let panelGestureFallbackInstalled = false;
+  let displayPreferencesDirty = false;
+  let displayPreferencesMutationSeq = 0;
 
   const state = {
     videoId: null,
@@ -56,7 +58,7 @@
     learningEnabled: initialDisplayPreferences.enabled,
     textVisible: true,
     shadowTextVisible: true,
-    autoPause: true,
+    autoPause: initialDisplayPreferences.autoPause,
     practiceMode: "shadow",
     phraseTranslationVisible: false,
     phraseTranslations: {},
@@ -126,6 +128,7 @@
     return {
       version: 1,
       enabled: preferences.enabled !== false,
+      autoPause: preferences.autoPause !== false,
       examplesExpanded: preferences.examplesExpanded === true,
       theme: normalizeTheme(preferences.theme),
       appearance: {
@@ -172,7 +175,19 @@
   }
 
   async function initializeDisplayPreferences() {
+    const initMutationSeq = displayPreferencesMutationSeq;
     const stored = await readStoredDisplayPreferences();
+    if (displayPreferencesDirty || initMutationSeq !== displayPreferencesMutationSeq) {
+      try {
+        await writeDisplayPreferences(state.displayPreferences);
+      } catch (error) {
+        recordDebugEvent("display-preferences-write-failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      render();
+      return;
+    }
     const preferences = stored || state.displayPreferences;
     applyDisplayPreferences(preferences);
     if (!stored) {
@@ -219,9 +234,11 @@
 
   async function readStoredDisplayPreferences() {
     try {
-      const values = await chromeStorageGet(DISPLAY_PREFERENCES_STORAGE_KEY);
-      const stored = values?.[DISPLAY_PREFERENCES_STORAGE_KEY];
-      return stored ? normalizeDisplayPreferences(stored) : null;
+      const response = await sendExtensionMessage({ type: "af-get-display-preferences" });
+      if (!response?.ok) {
+        throw new Error(response?.error || "Display preferences read failed.");
+      }
+      return response.preferences ? normalizeDisplayPreferences(response.preferences) : null;
     } catch (error) {
       recordDebugEvent("display-preferences-read-failed", {
         error: error instanceof Error ? error.message : String(error),
@@ -233,22 +250,35 @@
   function applyDisplayPreferences(preferences) {
     state.displayPreferences = normalizeDisplayPreferences(preferences);
     state.learningEnabled = state.displayPreferences.enabled;
+    state.autoPause = state.displayPreferences.autoPause;
     state.examplesExpanded = state.displayPreferences.examplesExpanded;
     state.themePreference = state.displayPreferences.theme;
   }
 
   function updateDisplayPreferences(updater) {
     const next = normalizeDisplayPreferences(updater({ ...state.displayPreferences }));
+    displayPreferencesDirty = true;
+    displayPreferencesMutationSeq += 1;
     applyDisplayPreferences(next);
-    writeDisplayPreferences(next).catch((error) => {
+    return writeDisplayPreferences(next).catch((error) => {
       recordDebugEvent("display-preferences-write-failed", {
         error: error instanceof Error ? error.message : String(error),
       });
+    }).finally(() => {
+      displayPreferencesDirty = false;
     });
   }
 
   function writeDisplayPreferences(preferences) {
-    return chromeStorageSet({ [DISPLAY_PREFERENCES_STORAGE_KEY]: normalizeDisplayPreferences(preferences) });
+    return sendExtensionMessage({
+      type: "af-set-display-preferences",
+      preferences: normalizeDisplayPreferences(preferences),
+    }).then((response) => {
+      if (!response?.ok) {
+        throw new Error(response?.error || "Display preferences write failed.");
+      }
+      return normalizeDisplayPreferences(response.preferences);
+    });
   }
 
   function clearMigratedDisplayLocalStorage() {
@@ -259,26 +289,14 @@
     });
   }
 
-  function chromeStorageGet(key) {
+  function sendExtensionMessage(message) {
     return new Promise((resolve, reject) => {
-      chrome.storage.local.get(key, (values) => {
+      chrome.runtime.sendMessage(message, (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
           return;
         }
-        resolve(values);
-      });
-    });
-  }
-
-  function chromeStorageSet(values) {
-    return new Promise((resolve, reject) => {
-      chrome.storage.local.set(values, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve();
+        resolve(response);
       });
     });
   }
@@ -494,6 +512,10 @@
     appendButton(transparencyControls, "-", "afTransparencyLower");
     appendButton(transparencyControls, "Reset", "afTransparencyReset");
     appendButton(transparencyControls, "+", "afTransparencyHigher");
+    const playbackLabel = appendElement(displaySection, "div", "af-settings-label");
+    playbackLabel.textContent = "Playback";
+    const playbackControls = appendElement(displaySection, "div", "af-settings-button-row");
+    appendButton(playbackControls, "Auto-pause On", "afAutoPauseToggle");
     const layoutLabel = appendElement(displaySection, "div", "af-settings-label");
     layoutLabel.textContent = "Panel layout";
     const layoutControls = appendElement(displaySection, "div", "af-settings-button-row");
@@ -565,6 +587,7 @@
     panel.querySelector("[data-af-transparency-lower]").addEventListener("click", () => adjustPanelBackgroundAlpha(-0.1));
     panel.querySelector("[data-af-transparency-reset]").addEventListener("click", resetPanelBackgroundAlpha);
     panel.querySelector("[data-af-transparency-higher]").addEventListener("click", () => adjustPanelBackgroundAlpha(0.1));
+    panel.querySelector("[data-af-auto-pause-toggle]").addEventListener("click", toggleAutoPause);
     panel.querySelector("[data-af-layout-lock-toggle]").addEventListener("click", toggleLayoutLock);
     panel.querySelector("[data-af-layout-reset]").addEventListener("click", resetPanelLayout);
     panel.querySelectorAll("[data-af-drag-handle]").forEach((handle) => {
@@ -785,6 +808,7 @@
     const transparencyLower = panel.querySelector("[data-af-transparency-lower]");
     const transparencyReset = panel.querySelector("[data-af-transparency-reset]");
     const transparencyHigher = panel.querySelector("[data-af-transparency-higher]");
+    const autoPauseToggle = panel.querySelector("[data-af-auto-pause-toggle]");
     const layoutLockToggle = panel.querySelector("[data-af-layout-lock-toggle]");
     const layoutReset = panel.querySelector("[data-af-layout-reset]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
@@ -844,6 +868,7 @@
       transparencyLower,
       transparencyReset,
       transparencyHigher,
+      autoPauseToggle,
       layoutLockToggle,
       layoutReset,
     });
@@ -935,6 +960,13 @@
     controls.transparencyLower.title = `Panel background opacity: ${alphaPercent}%`;
     controls.transparencyHigher.title = `Panel background opacity: ${alphaPercent}%`;
     controls.transparencyReset.title = `Reset panel background opacity (${alphaPercent}%)`;
+
+    controls.autoPauseToggle.textContent = state.autoPause ? "Auto-pause On" : "Auto-pause Off";
+    controls.autoPauseToggle.classList.toggle("is-active", state.autoPause);
+    controls.autoPauseToggle.setAttribute("aria-pressed", state.autoPause ? "true" : "false");
+    controls.autoPauseToggle.title = state.autoPause
+      ? "Pause automatically at phrase boundaries"
+      : "Let YouTube continue playing after captions load";
 
     controls.layoutLockToggle.textContent = state.displayPreferences.layout.locked ? "Unlock" : "Lock";
     controls.layoutLockToggle.title = state.displayPreferences.layout.locked
@@ -3649,12 +3681,18 @@
       source.loadedCueSource = transcriptResult.retrievalPath;
       source.loadedTranscriptResult = summarizeTranscriptResult(transcriptResult);
       source.lastRetrievalAttempts = transcriptResult.retrievalAttempts || [];
+      state.guidedMode = state.autoPause;
+      state.passivePausedKey = "";
       state.error = "";
       updateBootDiagnostics({
         selectedRetrievalPath: transcriptResult.retrievalPath,
         lastError: "",
       });
       ensurePassivePlaybackWatcher();
+      const video = getVideoElement();
+      if (video && state.autoPause) {
+        syncPassivePlayback(video);
+      }
       recordDebugEvent("source-loaded", {
         source: captionTrackApi.sourceDisplayName(source),
         sourceKind: transcriptResult.sourceKind,
@@ -4021,14 +4059,24 @@
   }
 
   function toggleAutoPause() {
-    state.autoPause = !state.autoPause;
-    state.guidedMode = state.autoPause ? true : false;
+    const nextAutoPause = !state.autoPause;
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      autoPause: nextAutoPause,
+    }));
+    state.guidedMode = nextAutoPause;
+    state.passivePausedKey = "";
     recordNavigationEvent("auto-pause-toggle", {
-      autoPause: state.autoPause,
+      autoPause: nextAutoPause,
       guidedMode: state.guidedMode,
       playback: getPlaybackSnapshot(),
       currentPhrase: describePhraseAtIndex(state.currentIndex),
     });
+    const video = getVideoElement();
+    if (video && nextAutoPause) {
+      ensurePassivePlaybackWatcher();
+      syncPassivePlayback(video);
+    }
     render();
   }
 
@@ -4232,7 +4280,6 @@
       const phrase = state.phrases[state.activePlayback.index];
       if (phrase && state.currentIndex !== state.activePlayback.index) {
         state.currentIndex = state.activePlayback.index;
-        state.selectedWord = null;
         markCurrentTranscriptSegment(phrase);
         render();
       }
@@ -4250,7 +4297,6 @@
 
     if (index !== state.currentIndex) {
       state.currentIndex = index;
-      state.selectedWord = null;
       markCurrentTranscriptSegment(phrase);
       render();
     }
@@ -4307,7 +4353,6 @@
     }
     if (state.currentIndex !== state.guidedHold.index) {
       state.currentIndex = state.guidedHold.index;
-      state.selectedWord = null;
       markCurrentTranscriptSegment(phrase);
       render();
     }

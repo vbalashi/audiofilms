@@ -92,6 +92,38 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "af-get-display-preferences") {
+    readDisplayPreferences()
+      .then((preferences) => {
+        sendResponse({ ok: true, preferences });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          preferences: null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+    return true;
+  }
+
+  if (message?.type === "af-set-display-preferences") {
+    storeDisplayPreferences(message.preferences)
+      .then((preferences) => {
+        sendResponse({ ok: true, preferences });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          preferences: null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+    return true;
+  }
+
   if (message?.type === "af-connect-2000nl") {
     connectTwoThousandNl()
       .then(sendResponse)
@@ -471,10 +503,20 @@ async function clearConnectSession() {
 }
 
 async function toggleDisplayEnabledPreference() {
-  const values = await chromeStorageGet(DISPLAY_PREFERENCES_STORAGE_KEY);
-  const preferences = normalizeDisplayPreferences(values?.[DISPLAY_PREFERENCES_STORAGE_KEY]);
+  const preferences = await readDisplayPreferences();
   preferences.enabled = !preferences.enabled;
-  await chromeStorageSet({ [DISPLAY_PREFERENCES_STORAGE_KEY]: preferences });
+  await storeDisplayPreferences(preferences);
+}
+
+async function readDisplayPreferences() {
+  const values = await chromeStorageGet(DISPLAY_PREFERENCES_STORAGE_KEY);
+  return normalizeDisplayPreferences(values?.[DISPLAY_PREFERENCES_STORAGE_KEY]);
+}
+
+async function storeDisplayPreferences(preferences) {
+  const normalized = normalizeDisplayPreferences(preferences);
+  await chromeStorageSet({ [DISPLAY_PREFERENCES_STORAGE_KEY]: normalized });
+  return normalized;
 }
 
 function normalizeDisplayPreferences(value) {
@@ -487,6 +529,7 @@ function normalizeDisplayPreferences(value) {
   return {
     version: 1,
     enabled: preferences.enabled !== false,
+    autoPause: preferences.autoPause !== false,
     examplesExpanded: preferences.examplesExpanded === true,
     theme: ["system", "light", "dark"].includes(preferences.theme) ? preferences.theme : "system",
     appearance: {
