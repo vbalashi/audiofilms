@@ -30,6 +30,8 @@
   const CONTIGUOUS_BOUNDARY_GUARD_MS = 120;
   const initialDisplayPreferences = readInitialDisplayPreferences();
 
+  let panelGestureFallbackInstalled = false;
+
   const state = {
     videoId: null,
     tracks: [],
@@ -326,6 +328,7 @@
     const root = ensureAudioFilmsRoot();
     applyThemeAttributes();
     const container = ensureShadowContainer(root);
+    installPanelGestureFallback();
 
     let ribbonPanel = root.querySelector(`#${RIBBON_PANEL_ID}`);
     if (!ribbonPanel) {
@@ -566,12 +569,15 @@
     panel.querySelector("[data-af-layout-reset]").addEventListener("click", resetPanelLayout);
     panel.querySelectorAll("[data-af-drag-handle]").forEach((handle) => {
       handle.addEventListener("pointerdown", beginPanelDrag);
+      handle.addEventListener("mousedown", beginPanelDrag);
     });
     panel.querySelectorAll("[data-af-drag-surface]").forEach((surface) => {
       surface.addEventListener("pointerdown", beginPanelDrag);
+      surface.addEventListener("mousedown", beginPanelDrag);
     });
     panel.querySelectorAll("[data-af-resize-handle]").forEach((handle) => {
       handle.addEventListener("pointerdown", beginPanelResize);
+      handle.addEventListener("mousedown", beginPanelResize);
     });
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
@@ -1025,10 +1031,67 @@
     panel.style.height = panelKey === "phraseRibbon" || geometry.height === null ? "" : `${geometry.height}px`;
   }
 
-  function beginPanelDrag(event) {
-    const panelKey = event.currentTarget?.dataset?.afDragHandle || event.currentTarget?.dataset?.afDragSurface;
+  function installPanelGestureFallback() {
+    if (panelGestureFallbackInstalled) return;
+    panelGestureFallbackInstalled = true;
+    document.addEventListener("pointerdown", beginPanelGestureFromHost, true);
+    document.addEventListener("mousedown", beginPanelGestureFromHost, true);
+  }
+
+  function beginPanelGestureFromHost(event) {
+    if (state.displayPreferences.layout.locked) return;
+    if (event.type === "mousedown" && event.button !== 0) return;
+    if (event.target !== document.getElementById(ROOT_ID)) return;
+
+    const gesture = resolvePanelGestureAt(event.clientX, event.clientY);
+    if (!gesture) return;
+    if (gesture.kind === "resize") {
+      beginPanelResize(event, gesture.panelKey);
+    } else {
+      beginPanelDrag(event, gesture.panelKey, { fromSurface: gesture.fromSurface });
+    }
+  }
+
+  function resolvePanelGestureAt(x, y) {
+    const layout = state.displayPreferences.layout;
+    const panelKeys = layout.zOrder === "dictionaryPanel"
+      ? ["dictionaryPanel", "phraseRibbon"]
+      : ["phraseRibbon", "dictionaryPanel"];
+
+    for (const panelKey of panelKeys) {
+      const panel = panelElement(panelKey);
+      if (!(panel instanceof HTMLElement) || !rectContainsPoint(panel.getBoundingClientRect(), x, y)) continue;
+
+      const resizeHandle = panel.querySelector("[data-af-resize-handle]");
+      if (resizeHandle instanceof HTMLElement && rectContainsPoint(resizeHandle.getBoundingClientRect(), x, y)) {
+        return { kind: "resize", panelKey };
+      }
+
+      const dragHandle = panel.querySelector("[data-af-drag-handle]");
+      if (dragHandle instanceof HTMLElement && rectContainsPoint(dragHandle.getBoundingClientRect(), x, y)) {
+        return { kind: "drag", panelKey, fromSurface: false };
+      }
+
+      const dragSurface = panel.querySelector("[data-af-drag-surface]");
+      if (dragSurface instanceof HTMLElement && rectContainsPoint(dragSurface.getBoundingClientRect(), x, y)) {
+        const interactive = Array.from(dragSurface.querySelectorAll("button:not(.af-panel-drag-handle), a, input, select, textarea"));
+        if (interactive.some((element) => rectContainsPoint(element.getBoundingClientRect(), x, y))) return null;
+        return { kind: "drag", panelKey, fromSurface: true };
+      }
+    }
+
+    return null;
+  }
+
+  function rectContainsPoint(rect, x, y) {
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }
+
+  function beginPanelDrag(event, forcedPanelKey = "", options = {}) {
+    const panelKey = forcedPanelKey || event.currentTarget?.dataset?.afDragHandle || event.currentTarget?.dataset?.afDragSurface;
     if (!panelKey || state.displayPreferences.layout.locked) return;
-    if (event.currentTarget?.dataset?.afDragSurface && isInteractiveDragTarget(event.target)) return;
+    if (event.type === "mousedown" && event.button !== 0) return;
+    if ((options.fromSurface || event.currentTarget?.dataset?.afDragSurface) && isInteractiveDragTarget(event.target)) return;
     const panel = panelElement(panelKey);
     if (!(panel instanceof HTMLElement)) return;
 
@@ -1047,8 +1110,10 @@
     };
     let nextGeometry = startGeometry;
     bringPanelToFront(panelKey, false);
-    const handle = event.currentTarget;
-    handle.setPointerCapture?.(event.pointerId);
+    const ownerDocument = panel.ownerDocument || document;
+    const moveEventName = event.type === "mousedown" ? "mousemove" : "pointermove";
+    const upEventName = event.type === "mousedown" ? "mouseup" : "pointerup";
+    const cancelEventName = event.type === "mousedown" ? "mouseup" : "pointercancel";
 
     const onMove = (moveEvent) => {
       const x = startGeometry.x + moveEvent.clientX - startX;
@@ -1061,15 +1126,15 @@
       applyPanelGeometry(panel, panelKey, nextGeometry);
     };
     const onUp = () => {
-      handle.removeEventListener("pointermove", onMove);
-      handle.removeEventListener("pointerup", onUp);
-      handle.removeEventListener("pointercancel", onUp);
+      ownerDocument.removeEventListener(moveEventName, onMove, true);
+      ownerDocument.removeEventListener(upEventName, onUp, true);
+      ownerDocument.removeEventListener(cancelEventName, onUp, true);
       savePanelGeometry(panelKey, nextGeometry);
     };
 
-    handle.addEventListener("pointermove", onMove);
-    handle.addEventListener("pointerup", onUp, { once: true });
-    handle.addEventListener("pointercancel", onUp, { once: true });
+    ownerDocument.addEventListener(moveEventName, onMove, true);
+    ownerDocument.addEventListener(upEventName, onUp, true);
+    ownerDocument.addEventListener(cancelEventName, onUp, true);
   }
 
   function isInteractiveDragTarget(target) {
@@ -1077,9 +1142,10 @@
     return Boolean(target.closest("button:not(.af-panel-drag-handle), a, input, select, textarea"));
   }
 
-  function beginPanelResize(event) {
-    const panelKey = event.currentTarget?.dataset?.afResizeHandle;
+  function beginPanelResize(event, forcedPanelKey = "") {
+    const panelKey = forcedPanelKey || event.currentTarget?.dataset?.afResizeHandle;
     if (!panelKey || state.displayPreferences.layout.locked) return;
+    if (event.type === "mousedown" && event.button !== 0) return;
     const panel = panelElement(panelKey);
     if (!(panel instanceof HTMLElement)) return;
 
@@ -1096,8 +1162,10 @@
     };
     let nextGeometry = startGeometry;
     bringPanelToFront(panelKey, false);
-    const handle = event.currentTarget;
-    handle.setPointerCapture?.(event.pointerId);
+    const ownerDocument = panel.ownerDocument || document;
+    const moveEventName = event.type === "mousedown" ? "mousemove" : "pointermove";
+    const upEventName = event.type === "mousedown" ? "mouseup" : "pointerup";
+    const cancelEventName = event.type === "mousedown" ? "mouseup" : "pointercancel";
 
     const onMove = (moveEvent) => {
       nextGeometry = clampPanelGeometry(panelKey, {
@@ -1108,15 +1176,15 @@
       applyPanelGeometry(panel, panelKey, nextGeometry);
     };
     const onUp = () => {
-      handle.removeEventListener("pointermove", onMove);
-      handle.removeEventListener("pointerup", onUp);
-      handle.removeEventListener("pointercancel", onUp);
+      ownerDocument.removeEventListener(moveEventName, onMove, true);
+      ownerDocument.removeEventListener(upEventName, onUp, true);
+      ownerDocument.removeEventListener(cancelEventName, onUp, true);
       savePanelGeometry(panelKey, nextGeometry);
     };
 
-    handle.addEventListener("pointermove", onMove);
-    handle.addEventListener("pointerup", onUp, { once: true });
-    handle.addEventListener("pointercancel", onUp, { once: true });
+    ownerDocument.addEventListener(moveEventName, onMove, true);
+    ownerDocument.addEventListener(upEventName, onUp, true);
+    ownerDocument.addEventListener(cancelEventName, onUp, true);
   }
 
   function clampPanelGeometry(panelKey, geometry) {

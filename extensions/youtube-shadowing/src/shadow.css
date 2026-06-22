@@ -322,6 +322,12 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-bottom: 1px solid var(--af-border);
 }
 
+.is-layout-unlocked .af-dictionary-header,
+.is-layout-unlocked .af-ribbon-meta {
+  cursor: grab;
+  user-select: none;
+}
+
 .af-panel-drag-handle {
   display: none;
   flex: 0 0 auto;
@@ -338,6 +344,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font: inherit;
   font-size: 11px;
   font-weight: 800;
+  touch-action: none;
+  user-select: none;
 }
 
 .is-layout-unlocked .af-panel-drag-handle {
@@ -354,13 +362,16 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   bottom: 4px;
   z-index: 3;
   display: none;
-  width: 18px;
-  height: 18px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  background: linear-gradient(135deg, transparent 48%, var(--af-border-strong) 50%, var(--af-border-strong) 58%, transparent 60%);
+  background:
+    linear-gradient(135deg, transparent 54%, var(--af-border-strong) 56%, var(--af-border-strong) 62%, transparent 64%),
+    linear-gradient(135deg, transparent 68%, var(--af-border-strong) 70%, var(--af-border-strong) 76%, transparent 78%);
   border: 0;
   border-radius: 3px;
   cursor: nwse-resize;
+  touch-action: none;
 }
 
 #af-shadowing-ribbon-panel .af-panel-resize-handle {
