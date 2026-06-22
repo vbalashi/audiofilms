@@ -172,6 +172,25 @@ API base. The local development command path is:
 http://localhost:3000/api/dict/lookup
 ```
 
+Dictionary UI smoke should verify the current learner-facing panel contract:
+
+- ready lookup body starts with `.af-overlay-card`, not the selected-word/context
+  intro card;
+- header shows the clicked form and card count;
+- account identity is behind the account icon popover;
+- examples use explicit `Examples` buttons plus the global examples toggle;
+- translation is an icon button and toggles show/hide after first load;
+- progress buttons render backend-provided labels only (`Learn`, `Known`,
+  `Again`, `Hard`, `Good`, `Easy`) and clicks show per-card feedback without
+  replacing cards with a loading/context layout.
+
+Useful local UI preference keys for manual smoke:
+
+```js
+localStorage.afDictionaryExamplesExpanded = "true"; // or "false"
+localStorage.afShadowingTheme = "system"; // or "light" / "dark"
+```
+
 The extension sends dictionary requests through its service worker. To use 2000NL-backed Dutch lookup, run the AudioFilms app with:
 
 ```text

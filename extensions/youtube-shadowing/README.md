@@ -334,7 +334,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - `src/captionTracks.js`: YouTube caption track extraction, source labels, source grouping, and source debug formatting.
 - `src/youtubeAdapter.js`: watch-page URL helpers, player metadata extraction, balanced JSON extraction, and video element lookup.
 - `src/transcriptRetrieval.js`: timedtext, transcript API, transcript panel fallback/state diagnostics, cue parsers, and transcript quality metadata.
-- `src/content.js`: YouTube page integration, retrieval orchestration, playback controls, and temporary UI rendering.
+- `src/content.js`: YouTube page integration, retrieval orchestration, playback controls, dictionary panel rendering, and temporary UI state.
 - `src/content.css`: minimal injected global helper styles for the toggle and transcript debug/highlight state.
 - `src/shadow.css`: shadow-loaded panel styles for the AudioFilms learning layer.
 
@@ -355,7 +355,9 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
   when the AudioFilms app explicitly enables it. Write routes such as
   `/api/dict/actions` require a forwarded Connect token and must not use the
   environment fallback.
-- Plain lookup is read-only. Explicit card actions go through `/api/dict/actions`, then refresh lookup state. Per-card translation goes through `/api/dict/translation`.
+- Plain lookup is read-only. Explicit card actions go through `/api/dict/actions`, show per-card pending/saved/error feedback, then refresh lookup state without replacing the ready cards with the loading/context layout. Per-card translation goes through `/api/dict/translation` and is toggled show/hide from a compact icon button after the first load.
+- The dictionary ready state starts directly at backend-projected cards. The header carries the clicked form plus card count, account identity is behind the account icon, examples use explicit `Examples` expand/collapse buttons, and the global examples preference is stored in `localStorage.afDictionaryExamplesExpanded`.
+- Extension theme can be cycled with the ribbon theme icon and is stored in `localStorage.afShadowingTheme` as `system`, `light`, or `dark`. The ribbon, dictionary, and floating `AudioFilms On/Off` toggle share this theme surface.
 - Stable unpacked dev extension ID: `hhdkchoccmikoefhenobdjipgdppdpoc`.
 - 2000NL Connect dev redirect URI: `https://hhdkchoccmikoefhenobdjipgdppdpoc.chromiumapp.org/`.
 - 2000NL Connect dev origin: `chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc`.

@@ -119,13 +119,21 @@ Result:
 - `Improve Timing` opened as an enabled readiness action and showed operation
   feedback. On the current deployed API it failed closed with
   `Timing endpoint is unavailable on this AudioFilms API.`;
-- dictionary panel preserved clicked-word context and did not expose raw HTML;
-- dictionary account chip opened a popover with `Connect 2000NL`;
+- dictionary panel ready state opened directly on cards, with clicked form and
+  card count in the header;
+- dictionary account icon opened a popover with `Connect 2000NL`;
 - controlled dictionary-card fixture rendered three V2 cards:
   not-started/encountered with `Learn` and `Known`, reviewing with
   `Again`/`Hard`/`Good`/`Easy`, and frozen with no progress row;
-- card-level `Translate` rendered a ready translation block and a separate
-  error state without breaking the panel;
+- examples used explicit `Examples` expand/collapse controls and remembered the
+  global expand/collapse state;
+- card-level translate used a compact icon, toggled show/hide, and rendered the
+  loaded translation block without breaking the panel;
+- progress clicks rendered card-level feedback such as `Started learning` and
+  `Hard recorded` without jumping back to the loading/context layout;
+- light/dark/system theme override applied to the ribbon, dictionary, and
+  floating `AudioFilms On/Off` toggle; the old `Phrase navigation` chip was
+  hidden;
 - wide and narrow panel geometry stayed within viewport.
 
 Category: passing for the final UI slice.
