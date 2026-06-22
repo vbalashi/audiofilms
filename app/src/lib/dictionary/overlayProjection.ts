@@ -12,6 +12,8 @@ type OverlayDisplayAction = DictionaryOverlayCardV2['displayActions'][number];
 type OverlayMatchRelation = NonNullable<DictionaryOverlayCardV2['match']>['relation'];
 type OverlayProgressPhase = NonNullable<DictionaryOverlayCardV2['progress']>['phase'];
 type OverlaySectionKind = DictionaryOverlayCardV2Section['kind'];
+type OverlayTranslation = NonNullable<DictionaryOverlayCardV2['translation']>;
+type OverlayTranslationStatus = OverlayTranslation['status'];
 
 export type PlatformCardCapabilities = {
   phase?: string;
@@ -124,6 +126,7 @@ export function projectOverlayCard(
   const sections = normalizedSections(content);
   const definition = sections.find((section) => section.kind === 'meaning')?.text || '';
   const example = sections.find((section) => section.kind === 'example')?.text;
+  const summary = recordValue(content.summary);
   const capabilities = item.cardCapabilitiesByType?.[DICTIONARY_OVERLAY_CARD_TYPE_ID];
   const phase = normalizedPhase(capabilities?.phase);
   const progress = options.allowProgressActions && phase
@@ -139,6 +142,7 @@ export function projectOverlayCard(
     cardTypeId: DICTIONARY_OVERLAY_CARD_TYPE_ID,
     clickedForm,
     headword,
+    headwordTranslation: stringValue(content.headwordTranslation) || undefined,
     language: item.entry?.languageCode || sourceLanguageCode,
     partOfSpeech: partOfSpeech || undefined,
     article: article || undefined,
@@ -148,8 +152,14 @@ export function projectOverlayCard(
     },
     contentFingerprint: item.entry?.contentFingerprint || undefined,
     chips: chipsFromContent(item, content),
-    summary: { definition, example },
+    summary: {
+      definition,
+      definitionTranslation: stringValue(summary.definitionTranslation) || undefined,
+      example,
+      exampleTranslation: stringValue(summary.exampleTranslation) || undefined,
+    },
     sections,
+    translation: normalizedTranslation(content.translation),
     progress,
     displayActions: displayActionsForCapabilities(capabilities, options.allowProgressActions),
     dictionary: item.dictionary
@@ -198,6 +208,27 @@ function normalizedSection(section: unknown, index: number): DictionaryOverlayCa
     label: stringValue(section.label) || undefined,
     text,
     translation: stringValue(section.translation) || undefined,
+  };
+}
+
+function normalizedTranslation(value: unknown): OverlayTranslation | undefined {
+  if (!isRecord(value)) return undefined;
+  const status = normalizedTranslationStatus(value.status);
+  if (!status) return undefined;
+  const error = recordValue(value.error);
+  return {
+    status,
+    targetLanguageCode: stringValue(value.targetLanguageCode) || undefined,
+    translationId: stringValue(value.translationId) || undefined,
+    translationPolicyVersion: stringValue(value.translationPolicyVersion) || undefined,
+    ...(Object.keys(error).length
+      ? {
+          error: {
+            code: stringValue(error.code) || 'translation_failed',
+            message: stringValue(error.message) || undefined,
+          },
+        }
+      : {}),
   };
 }
 
@@ -326,8 +357,22 @@ function normalizedMatchRelation(value: unknown): OverlayMatchRelation {
 
 function normalizedSectionKind(value: unknown): OverlaySectionKind {
   const kind = stringValue(value);
-  const validKinds: OverlaySectionKind[] = ['meaning', 'example', 'idiom', 'form', 'note'];
+  const validKinds: OverlaySectionKind[] = ['meaning', 'context', 'example', 'idiom', 'form', 'note'];
   return validKinds.includes(kind as OverlaySectionKind) ? kind as OverlaySectionKind : 'meaning';
+}
+
+function normalizedTranslationStatus(value: unknown): OverlayTranslationStatus | null {
+  const status = stringValue(value);
+  const validStatuses: OverlayTranslationStatus[] = [
+    'ready',
+    'pending',
+    'failed',
+    'not_requested',
+    'not_available',
+  ];
+  return validStatuses.includes(status as OverlayTranslationStatus)
+    ? status as OverlayTranslationStatus
+    : null;
 }
 
 function stringValue(value: unknown) {
@@ -336,6 +381,10 @@ function stringValue(value: unknown) {
 
 function arrayValue(value: unknown) {
   return Array.isArray(value) ? value : [];
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

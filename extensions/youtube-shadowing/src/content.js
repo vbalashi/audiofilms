@@ -762,6 +762,11 @@
       return;
     }
 
+    if (cardHasLookupTranslations(card)) {
+      render();
+      return;
+    }
+
     const cached = state.selectedWord.translationsByCardId?.[card.id];
     if (cached) {
       render();
@@ -1761,7 +1766,7 @@
         "p",
         "af-dictionary-copy af-overlay-definition",
         summary.definition,
-        translatedDefinition(cardTranslation, 0),
+        lookupOrOverlayDefinition(card, cardTranslation, 0),
       );
     }
     if (summary.example) {
@@ -1770,7 +1775,7 @@
         "p",
         "af-dictionary-copy af-overlay-example",
         summary.example,
-        translatedExample(cardTranslation, 0),
+        lookupOrOverlayExample(card, cardTranslation, 0),
       );
     }
 
@@ -1803,7 +1808,7 @@
     }
     const headword = appendElement(titleLine, "span", "af-overlay-card-headword");
     headword.textContent = overlayTitle(card);
-    renderInlineTranslation(titleText, translatedHeadword(translation));
+    renderInlineTranslation(titleText, lookupOrOverlayHeadword(card, translation));
   }
 
   function overlayChips(card) {
@@ -1851,7 +1856,7 @@
         "p",
         "af-dictionary-copy",
         section.text,
-        section.translation || translatedSection(section, sections, translation),
+        lookupOrOverlaySection(card, section, sections, translation),
       );
     }
   }
@@ -1903,6 +1908,45 @@
     const translation = state.selectedWord?.translationsByCardId?.[card.id];
     if (!translation || translation.error) return null;
     return translation;
+  }
+
+  function cardTranslationsVisible(card) {
+    return Boolean(card?.id && state.visibleTranslationsByCardId[card.id] === true);
+  }
+
+  function cardHasLookupTranslations(card) {
+    if (!card) return false;
+    const summary = card.summary || {};
+    return Boolean(
+      cleanTranslationText(card.headwordTranslation) ||
+      cleanTranslationText(summary.definitionTranslation) ||
+      cleanTranslationText(summary.exampleTranslation) ||
+      (Array.isArray(card.sections) && card.sections.some((section) => cleanTranslationText(section?.translation)))
+    );
+  }
+
+  function lookupOrOverlayHeadword(card, translation) {
+    if (!cardTranslationsVisible(card)) return "";
+    return cleanTranslationText(card?.headwordTranslation) || translatedHeadword(translation);
+  }
+
+  function lookupOrOverlayDefinition(card, translation, meaningIndex = 0) {
+    if (!cardTranslationsVisible(card)) return "";
+    return cleanTranslationText(card?.summary?.definitionTranslation) ||
+      translatedDefinition(translation, meaningIndex);
+  }
+
+  function lookupOrOverlayExample(card, translation, exampleIndex = 0) {
+    if (!cardTranslationsVisible(card)) return "";
+    return cleanTranslationText(card?.summary?.exampleTranslation) ||
+      translatedExample(translation, exampleIndex);
+  }
+
+  function lookupOrOverlaySection(card, section, allSections, translation) {
+    if (!section) return "";
+    if (!cardTranslationsVisible(card)) return "";
+    return cleanTranslationText(section.translation) ||
+      translatedSection(section, allSections, translation);
   }
 
   function translatedHeadword(translation) {
@@ -2553,6 +2597,7 @@
   }
 
   function mockDictionaryCard({ id, entryId, clickedForm, headword, phase, progressActions }) {
+    const includeLookupTranslations = entryId !== "entry-translate-error";
     return {
       id,
       entryId,
@@ -2563,16 +2608,34 @@
       match: { relation: "exact", confidence: 1 },
       summary: {
         definition: "A round fruit used in learner examples.",
+        ...(includeLookupTranslations ? { definitionTranslation: "круглый фрукт для учебных примеров" } : {}),
         example: `${clickedForm} valt niet ver van de boom.`,
+        ...(includeLookupTranslations ? { exampleTranslation: "яблоко от яблони недалеко падает" } : {}),
       },
+      ...(includeLookupTranslations ? { headwordTranslation: "apple" } : {}),
       chips: [
         { kind: "part-of-speech", label: "noun" },
         { kind: "language", label: "Dutch" },
       ],
       sections: [
         { kind: "meaning", label: "Definition", text: "A round fruit used in learner examples." },
-        { kind: "example", label: "Example", text: `${clickedForm} valt niet ver van de boom.`, translation: "The apple does not fall far from the tree." },
+        {
+          kind: "example",
+          label: "Example",
+          text: `${clickedForm} valt niet ver van de boom.`,
+          ...(includeLookupTranslations ? { translation: "The apple does not fall far from the tree." } : {}),
+        },
       ],
+      ...(includeLookupTranslations
+        ? {
+            translation: {
+              status: "ready",
+              targetLanguageCode: "ru",
+              translationId: `mock-translation-${id}`,
+              translationPolicyVersion: "mock-v1",
+            },
+          }
+        : {}),
       progress: {
         phase,
         seenCount: phase === "encountered" ? 1 : 4,

@@ -10,6 +10,7 @@ type LookupMode = {
   endpoint: 'lookup' | 'catalog/lookup';
   accessToken: string;
   includeUserState: boolean;
+  includeTranslations: boolean;
   allowProgressActions: boolean;
   cacheControl?: string;
 };
@@ -129,6 +130,7 @@ function resolveLookupMode(request: Request): LookupMode | null {
       endpoint: 'lookup',
       accessToken: forwardedBearer,
       includeUserState: true,
+      includeTranslations: true,
       allowProgressActions: true,
       cacheControl: 'private, no-store',
     };
@@ -140,6 +142,7 @@ function resolveLookupMode(request: Request): LookupMode | null {
       endpoint: 'catalog/lookup',
       accessToken: catalogToken,
       includeUserState: false,
+      includeTranslations: false,
       allowProgressActions: false,
     };
   }
@@ -150,6 +153,7 @@ function resolveLookupMode(request: Request): LookupMode | null {
       endpoint: 'lookup',
       accessToken: localDogfoodToken,
       includeUserState: false,
+      includeTranslations: false,
       allowProgressActions: false,
     };
   }
@@ -173,6 +177,7 @@ function platformLookupRequest(
     return {
       ...baseRequest,
       includeUserState: true,
+      includeTranslations: lookupMode.includeTranslations,
       intent: 'external-click',
     };
   }

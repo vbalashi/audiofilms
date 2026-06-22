@@ -201,6 +201,85 @@ describe('dictionary overlay V2 projection', () => {
     expect(response.cards[0]).not.toHaveProperty('meanings');
   });
 
+  it('projects translated lookup fields from 2000NL without line remapping', () => {
+    const response = projectDictionaryLookupV2Response(
+      {
+        query: 'loopt',
+        items: [
+          baseItem({
+            entry: {
+              ...baseItem().entry,
+              content: {
+                headwordTranslation: 'идти',
+                summary: {
+                  definitionTranslation: 'идти; бежать',
+                  exampleTranslation: 'Он идет домой.',
+                },
+                sections: [
+                  {
+                    id: 'meaning-main',
+                    kind: 'meaning',
+                    text: 'to walk; to run',
+                    translation: 'идти; бежать',
+                    sourcePath: 'content.sections.0',
+                  },
+                  {
+                    id: 'example-main',
+                    kind: 'example',
+                    text: 'Hij loopt naar huis.',
+                    translation: 'Он идет домой.',
+                    sourcePath: 'content.sections.1',
+                  },
+                  {
+                    id: 'example-second',
+                    kind: 'example',
+                    text: 'Zij loopt door het park.',
+                    sourcePath: 'content.sections.2',
+                  },
+                ],
+                translation: {
+                  status: 'ready',
+                  targetLanguageCode: 'ru',
+                  translationId: 'translation:lopen:ru',
+                  translationPolicyVersion: 'platform-card-translation-v1',
+                },
+              },
+            },
+          }),
+        ],
+      },
+      'loopt',
+      'nl',
+      'Hij loopt naar huis.',
+      { allowProgressActions: true },
+    );
+
+    expect('error' in response).toBe(false);
+    if ('error' in response) throw new Error('expected success response');
+    const card = response.cards[0];
+    expect(card.headwordTranslation).toBe('идти');
+    expect(card.summary).toEqual({
+      definition: 'to walk; to run',
+      definitionTranslation: 'идти; бежать',
+      example: 'Hij loopt naar huis.',
+      exampleTranslation: 'Он идет домой.',
+    });
+    expect(card.sections.map((section) => ({
+      sourcePath: section.sourcePath,
+      translation: section.translation,
+    }))).toEqual([
+      { sourcePath: 'content.sections.0', translation: 'идти; бежать' },
+      { sourcePath: 'content.sections.1', translation: 'Он идет домой.' },
+      { sourcePath: 'content.sections.2', translation: undefined },
+    ]);
+    expect(card.translation).toEqual({
+      status: 'ready',
+      targetLanguageCode: 'ru',
+      translationId: 'translation:lopen:ru',
+      translationPolicyVersion: 'platform-card-translation-v1',
+    });
+  });
+
   it('omits progress actions for hidden, frozen, and guest catalog cards', () => {
     const hidden = baseItem({
       cardCapabilitiesByType: {

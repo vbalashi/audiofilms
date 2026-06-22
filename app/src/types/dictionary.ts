@@ -36,10 +36,28 @@ export type DictionaryOverlayCardMeaning = {
 export type DictionaryOverlayCardV2Section = {
   id: string;
   sourcePath: string;
-  kind: 'meaning' | 'example' | 'idiom' | 'form' | 'note';
+  kind: 'meaning' | 'context' | 'example' | 'idiom' | 'form' | 'note';
   label?: string;
   text: string;
   translation?: string;
+};
+
+export type DictionaryOverlayCardV2TranslationStatus =
+  | 'ready'
+  | 'pending'
+  | 'failed'
+  | 'not_requested'
+  | 'not_available';
+
+export type DictionaryOverlayCardV2Translation = {
+  status: DictionaryOverlayCardV2TranslationStatus;
+  targetLanguageCode?: string;
+  translationId?: string;
+  translationPolicyVersion?: string;
+  error?: {
+    code: string;
+    message?: string;
+  };
 };
 
 export type DictionaryOverlayCardV2 = {
@@ -48,6 +66,7 @@ export type DictionaryOverlayCardV2 = {
   cardTypeId: 'word-to-definition';
   clickedForm: string;
   headword: string;
+  headwordTranslation?: string;
   language: string;
   partOfSpeech?: string;
   article?: string;
@@ -63,9 +82,12 @@ export type DictionaryOverlayCardV2 = {
   }>;
   summary: {
     definition: string;
+    definitionTranslation?: string;
     example?: string;
+    exampleTranslation?: string;
   };
   sections: DictionaryOverlayCardV2Section[];
+  translation?: DictionaryOverlayCardV2Translation;
   progress: {
     phase:
       | 'not-started'

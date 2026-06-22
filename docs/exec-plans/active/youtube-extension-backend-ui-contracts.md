@@ -109,7 +109,7 @@ them.
 | Phrase Translation | proposed | AudioFilms `POST /api/practice/phrase-translations` calls 2000NL generic text-translation authority and associates the result to a phrase artifact. | Recall uses it as prompt; Shadow `Show Translation` renders it inline for current phrase. | Confirm 2000NL `POST /api/platform/v1/text-translation`, cache key, prefetch policy, and missing-translation behavior. |
 | Translation target | proposed | 2000NL `GET /api/platform/v1/session` exposed through AudioFilms `GET /api/dict/session`. | Extension uses 2000NL target language; local override is dogfood-only fallback. | Confirm preference field name and unauthenticated fallback. |
 | Dictionary lookup V2 | contract-tested projection | `POST /api/dict/lookup` backed by 2000NL lookup V2 request/body. | UI sends clicked form, language, and phrase context without URL query leakage. | Exact/inflection/no-match projection is covered by pure tests; normalized 2000NL content, match relation, and content fingerprint still depend on platform contract stability. |
-| Dictionary card V2 | contract-tested projection | Explicit V2 card contract with `displayActions.command`; raw platform capabilities stay diagnostic. | UI renders clicked form, headword, chips, sections, state-aware actions, quiet encounter signals. | AudioFilms projection tests cover nullable fields, `sourcePath`, progress-action filtering, review grades, and no legacy/fallback card shape. |
+| Dictionary card V2 | contract-tested projection | Explicit V2 card contract with `displayActions.command`; raw platform capabilities stay diagnostic. Authenticated lookup requests translated cards with `includeTranslations:true`. | UI renders clicked form, headword, chips, sections, state-aware actions, quiet encounter signals, and show/hide translations already attached to the lookup card. | AudioFilms projection tests cover nullable fields, translated lookup fields, `sourcePath`, progress-action filtering, review grades, and no legacy/fallback card shape. |
 | Encounter logging | proposed | 2000NL/action-log boundary through AudioFilms. | Learn/Known/review are explicit mutations; passive card rendering should not silently become review. | Decide whether click/card-view creates a `seen` encounter and how it affects `Seen`/`Last`. |
 | Write identity | required | `/api/dict/actions` and authenticated `/api/dict/translation` require a forwarded 2000NL Connect Bearer token. | Guest lookup can be read-only; progress/translation writes are fail-closed. | Confirm service credential model for guest public catalog lookup, if needed. |
 | Guest lookup deploy readiness | implemented | `GET /api/health` exposes `providers.dictionary.guestLookup`. | Deployer verifies guest lookup separately from forwarded-Bearer user lookup. | Production-ready guest lookup requires `status: "available"`, `productionReady: true`, and `mode: "catalog-token"` from `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`; local dogfood fallback reports `status: "degraded"` and is never production-ready. |
@@ -822,9 +822,14 @@ Rules:
 - Personal encounter signals should stay quiet in the card footer. Do not make
   YouTube lookup become an analytics dashboard.
 - Return `lastSeenAt`; the UI should format the relative label.
-- Card translation overlays need stable section ids or `sourcePath` before
-  line-level definition/example/idiom placement is guaranteed. Block-level
-  translation can ship first.
+- Authenticated dictionary lookup requests `includeTranslations:true` and uses
+  the translated 2000NL card projection as the primary path. The UI should
+  render `headwordTranslation`, `summary.*Translation`, and
+  `sections[].translation` as local show/hide content without calling
+  `/api/dict/translation`.
+- `/api/dict/translation` remains a fallback/refresh/future-card path, not the
+  ordinary path for 2000NL dictionary entries that already return translated
+  lookup fields.
 - List membership and action-log review views belong primarily in the main
   2000NL/app surfaces, not in the YouTube dictionary panel, unless a compact chip
   is clearly useful.
