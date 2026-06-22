@@ -402,6 +402,7 @@
     panel.setAttribute("aria-label", "AudioFilms dictionary lookup");
 
     const header = appendElement(panel, "div", "af-dictionary-header");
+    header.dataset.afDragSurface = "dictionaryPanel";
     const dragHandle = appendElement(header, "button", "af-panel-drag-handle");
     dragHandle.type = "button";
     dragHandle.dataset.afDragHandle = "dictionaryPanel";
@@ -443,6 +444,7 @@
     panel.setAttribute("aria-label", "AudioFilms phrase ribbon");
 
     const meta = appendElement(panel, "div", "af-ribbon-meta");
+    meta.dataset.afDragSurface = "phraseRibbon";
     const dragHandle = appendElement(meta, "button", "af-panel-drag-handle");
     dragHandle.type = "button";
     dragHandle.dataset.afDragHandle = "phraseRibbon";
@@ -564,6 +566,9 @@
     panel.querySelector("[data-af-layout-reset]").addEventListener("click", resetPanelLayout);
     panel.querySelectorAll("[data-af-drag-handle]").forEach((handle) => {
       handle.addEventListener("pointerdown", beginPanelDrag);
+    });
+    panel.querySelectorAll("[data-af-drag-surface]").forEach((surface) => {
+      surface.addEventListener("pointerdown", beginPanelDrag);
     });
     panel.querySelectorAll("[data-af-resize-handle]").forEach((handle) => {
       handle.addEventListener("pointerdown", beginPanelResize);
@@ -1021,8 +1026,9 @@
   }
 
   function beginPanelDrag(event) {
-    const panelKey = event.currentTarget?.dataset?.afDragHandle;
+    const panelKey = event.currentTarget?.dataset?.afDragHandle || event.currentTarget?.dataset?.afDragSurface;
     if (!panelKey || state.displayPreferences.layout.locked) return;
+    if (event.currentTarget?.dataset?.afDragSurface && isInteractiveDragTarget(event.target)) return;
     const panel = panelElement(panelKey);
     if (!(panel instanceof HTMLElement)) return;
 
@@ -1064,6 +1070,11 @@
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onUp, { once: true });
     handle.addEventListener("pointercancel", onUp, { once: true });
+  }
+
+  function isInteractiveDragTarget(target) {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest("button:not(.af-panel-drag-handle), a, input, select, textarea"));
   }
 
   function beginPanelResize(event) {

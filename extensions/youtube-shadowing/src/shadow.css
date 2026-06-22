@@ -298,6 +298,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 #af-shadowing-dictionary-panel {
+  grid-column: 2;
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -1745,6 +1746,7 @@ transcript-segment-view-model[data-af-current="true"] .ytwTranscriptSegmentViewM
   }
 
   #af-shadowing-dictionary-panel {
+    grid-column: 1;
     display: flex;
   }
 }
