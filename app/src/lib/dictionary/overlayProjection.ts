@@ -115,6 +115,12 @@ export function projectOverlayCard(
     stringValue(item.entry?.headword) ||
     item.match?.matchedForm ||
     clickedForm;
+  const partOfSpeech = stringValue(content.partOfSpeech) || stringValue(item.entry?.partOfSpeech);
+  const article = normalizedArticle(
+    stringValue(content.article) ||
+    stringValue(content.gender) ||
+    stringValue(item.entry?.gender),
+  );
   const sections = normalizedSections(content);
   const definition = sections.find((section) => section.kind === 'meaning')?.text || '';
   const example = sections.find((section) => section.kind === 'example')?.text;
@@ -134,6 +140,8 @@ export function projectOverlayCard(
     clickedForm,
     headword,
     language: item.entry?.languageCode || sourceLanguageCode,
+    partOfSpeech: partOfSpeech || undefined,
+    article: article || undefined,
     match: {
       matchedForm: item.match?.matchedForm,
       relation: normalizedMatchRelation(item.match?.relation),
@@ -148,7 +156,7 @@ export function projectOverlayCard(
       ? {
           id: item.dictionary.id,
           slug: item.dictionary.slug,
-          name: item.dictionary.name,
+          name: displayDictionaryName(item.dictionary.name, item.dictionary.slug),
           kind: item.dictionary.kind,
         }
       : undefined,
@@ -209,14 +217,22 @@ function normalizedMeaning(meaning: unknown, index: number): DictionaryOverlayCa
 function chipsFromContent(item: PlatformLookupItem, content: Record<string, unknown>): OverlayChip[] {
   return [
     chip('part-of-speech', stringValue(content.partOfSpeech) || stringValue(item.entry?.partOfSpeech)),
-    chip('language', item.entry?.languageCode || stringValue(content.languageCode)),
-    chip('dictionary', item.dictionary?.name || item.dictionary?.slug),
-    chip('form', stringValue(content.gender) || stringValue(item.entry?.gender)),
   ].filter((item): item is OverlayChip => Boolean(item));
 }
 
 function chip(kind: OverlayChip['kind'], label?: string | null): OverlayChip | null {
   return label ? { kind, label } : null;
+}
+
+function normalizedArticle(value?: string | null) {
+  const article = stringValue(value).toLocaleLowerCase();
+  return article === 'de' || article === 'het' ? article : '';
+}
+
+function displayDictionaryName(name?: string | null, slug?: string | null) {
+  const label = stringValue(name) || stringValue(slug);
+  if (/^vandale\s+dutch$/i.test(label)) return 'VanDale';
+  return label || undefined;
 }
 
 function displayActionsForCapabilities(

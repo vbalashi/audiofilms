@@ -17,6 +17,7 @@ const baseCard = {
   clickedForm: 'loopt',
   headword: 'lopen',
   language: 'nl',
+  partOfSpeech: 'verb',
   match: {
     matchedForm: 'loopt',
     relation: 'inflection',
@@ -24,8 +25,6 @@ const baseCard = {
   contentFingerprint: 'content:lopen:v1',
   chips: [
     { kind: 'part-of-speech', label: 'verb' },
-    { kind: 'language', label: 'NL' },
-    { kind: 'dictionary', label: '2000NL' },
   ],
   summary: {
     definition: 'to walk; to run',

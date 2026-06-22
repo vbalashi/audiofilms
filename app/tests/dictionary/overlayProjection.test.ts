@@ -76,6 +76,34 @@ describe('dictionary overlay V2 projection', () => {
     expect(inflectionCard.headword).toBe('lopen');
   });
 
+  it('projects learner-facing metadata without language or article chips', () => {
+    const card = projectOverlayCard(
+      baseItem({
+        entry: {
+          ...baseItem().entry,
+          partOfSpeech: 'zn',
+          gender: 'de',
+        },
+        dictionary: {
+          id: 'dict:vandale',
+          slug: 'vandale-nl',
+          name: 'VanDale Dutch',
+          kind: 'platform',
+        },
+      }),
+      'zware',
+      'nl',
+      0,
+      { allowProgressActions: true },
+    );
+
+    expect(card.partOfSpeech).toBe('zn');
+    expect(card.article).toBe('de');
+    expect(card.language).toBe('nl');
+    expect(card.dictionary?.name).toBe('VanDale');
+    expect(card.chips).toEqual([{ kind: 'part-of-speech', label: 'zn' }]);
+  });
+
   it('projects no-match payloads without fallback or legacy provider cards', () => {
     const response = projectDictionaryLookupV2Response(
       { query: 'zzzz', items: [] },

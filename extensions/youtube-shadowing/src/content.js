@@ -1596,7 +1596,7 @@
     const header = appendElement(entry, "div", "af-overlay-card-header");
     const titleWrap = appendElement(header, "div", "af-overlay-title-wrap");
     const title = appendElement(titleWrap, "div", "af-overlay-card-title");
-    title.textContent = overlayTitle(card);
+    renderOverlayCardTitle(title, card);
     renderChipList(titleWrap, overlayChips(card));
     const translationActions = displayActionsByGroup(card, "translation");
     if (translationActions.length) {
@@ -1632,25 +1632,28 @@
   }
 
   function overlayTitle(card) {
-    const clicked = card.clickedForm || state.selectedWord?.word || "";
-    const headword = card.headword || clicked || "Dictionary card";
-    if (clicked && headword && clicked.toLocaleLowerCase() !== headword.toLocaleLowerCase()) {
-      return `${clicked} -> ${headword}`;
+    return card.headword || card.clickedForm || state.selectedWord?.word || "Dictionary card";
+  }
+
+  function renderOverlayCardTitle(parent, card) {
+    clearElement(parent);
+    if (card.article) {
+      const article = appendElement(parent, "span", "af-overlay-card-article");
+      article.textContent = card.article;
     }
-    return headword;
+    const headword = appendElement(parent, "span", "af-overlay-card-headword");
+    headword.textContent = overlayTitle(card);
   }
 
   function overlayChips(card) {
     const projected = Array.isArray(card.chips) ? card.chips : [];
-    const fallback = [
+    return [
       card.partOfSpeech ? { kind: "part-of-speech", label: card.partOfSpeech } : null,
-      card.language ? { kind: "language", label: card.language } : null,
+      ...projected.filter((chip) => chip.kind === "part-of-speech" && chip.label !== card.partOfSpeech),
       card.dictionary?.name || card.dictionary?.slug
         ? { kind: "dictionary", label: card.dictionary.name || card.dictionary.slug }
         : null,
-      card.gender ? { kind: "form", label: card.gender } : null,
     ].filter(Boolean);
-    return projected.length ? projected : fallback;
   }
 
   function renderChipList(parent, chips, className = "af-chip-list") {

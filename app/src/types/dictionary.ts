@@ -49,6 +49,8 @@ export type DictionaryOverlayCardV2 = {
   clickedForm: string;
   headword: string;
   language: string;
+  partOfSpeech?: string;
+  article?: string;
   match?: {
     matchedForm?: string;
     relation: 'exact' | 'inflection' | 'lemma' | 'fuzzy' | 'unknown';

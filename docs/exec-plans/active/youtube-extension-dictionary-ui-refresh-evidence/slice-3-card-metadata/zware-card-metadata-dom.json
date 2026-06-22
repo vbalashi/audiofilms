@@ -1,0 +1,82 @@
+{
+  "capturedAt": "2026-06-22T10:39:29.073Z",
+  "ribbon": {
+    "count": "53 / 157",
+    "phrase": "Met Palantir combineren ze grote hoeveelheden data om zware criminaliteit te bestrijden en aanslagen te voorkomen, zeggen ze."
+  },
+  "dictionary": {
+    "headerTitle": "zware",
+    "headerSubtitle": "10 cards found",
+    "overlayCardCount": 10,
+    "cards": [
+      {
+        "title": "zwaar",
+        "article": "",
+        "chips": [
+          "bn",
+          "VanDale Dutch",
+          "Seen 0x",
+          "Last today"
+        ],
+        "chipRadii": [
+          "4px"
+        ]
+      },
+      {
+        "title": "aanvaring",
+        "article": "",
+        "chips": [
+          "zn",
+          "VanDale Dutch"
+        ],
+        "chipRadii": [
+          "4px"
+        ]
+      },
+      {
+        "title": "arbeidsongeschikt",
+        "article": "",
+        "chips": [
+          "bn",
+          "VanDale Dutch"
+        ],
+        "chipRadii": [
+          "4px"
+        ]
+      },
+      {
+        "title": "beproeving",
+        "article": "",
+        "chips": [
+          "zn",
+          "VanDale Dutch"
+        ],
+        "chipRadii": [
+          "4px"
+        ]
+      },
+      {
+        "title": "bevalling",
+        "article": "",
+        "chips": [
+          "zn",
+          "VanDale Dutch"
+        ],
+        "chipRadii": [
+          "4px"
+        ]
+      },
+      {
+        "title": "bezwaar",
+        "article": "",
+        "chips": [
+          "zn",
+          "VanDale Dutch"
+        ],
+        "chipRadii": [
+          "4px"
+        ]
+      }
+    ]
+  }
+}

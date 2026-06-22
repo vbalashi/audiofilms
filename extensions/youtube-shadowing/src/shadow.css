@@ -396,9 +396,18 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-overlay-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
   color: var(--af-text);
   font-size: 18px;
   font-weight: 850;
+}
+
+.af-overlay-card-article {
+  color: var(--af-muted);
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .af-overlay-form {
@@ -421,11 +430,11 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 .af-chip {
   max-width: 100%;
   overflow: hidden;
-  padding: 2px 6px;
+  padding: 2px 5px;
   color: #475467;
   background: #f2f4f7;
   border: 1px solid #eaecf0;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 10px;
   font-weight: 800;
   line-height: 1.3;
