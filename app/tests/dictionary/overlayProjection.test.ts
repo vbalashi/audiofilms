@@ -104,6 +104,50 @@ describe('dictionary overlay V2 projection', () => {
     expect(card.chips).toEqual([{ kind: 'part-of-speech', label: 'zn' }]);
   });
 
+  it('projects noun articles from platform raw gender into the overlay contract', () => {
+    const card = projectOverlayCard(
+      baseItem({
+        entry: {
+          ...baseItem().entry,
+          id: 'entry:oog',
+          headword: 'oog',
+          partOfSpeech: 'zn',
+          gender: null,
+          raw: {
+            gender: 'het',
+            part_of_speech: 'zn',
+          },
+          content: {
+            sections: [
+              {
+                id: 'meaning-main',
+                kind: 'meaning',
+                text: 'elk van de twee ronde dingen in je gezicht waarmee je kijkt',
+                sourcePath: 'content.sections.0',
+              },
+            ],
+          },
+        },
+        dictionary: {
+          id: 'dict:vandale',
+          slug: 'vandale-nl',
+          name: 'VanDale Dutch',
+          kind: 'platform',
+        },
+        match: { queriedForm: 'oog', matchedForm: 'oog', relation: 'exact' },
+      }),
+      'oog',
+      'nl',
+      0,
+      { allowProgressActions: true },
+    );
+
+    expect(card.headword).toBe('oog');
+    expect(card.partOfSpeech).toBe('zn');
+    expect(card.article).toBe('het');
+    expect(card.chips).toEqual([{ kind: 'part-of-speech', label: 'zn' }]);
+  });
+
   it('projects no-match payloads without fallback or legacy provider cards', () => {
     const response = projectDictionaryLookupV2Response(
       { query: 'zzzz', items: [] },

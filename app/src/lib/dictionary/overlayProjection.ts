@@ -30,6 +30,11 @@ export type PlatformLookupItem = {
     headword?: string | null;
     partOfSpeech?: string | null;
     gender?: string | null;
+    raw?: {
+      article?: string | null;
+      gender?: string | null;
+      part_of_speech?: string | null;
+    } | null;
     content?: Record<string, unknown> | null;
     contentFingerprint?: string | null;
   } | null;
@@ -121,7 +126,9 @@ export function projectOverlayCard(
   const article = normalizedArticle(
     stringValue(content.article) ||
     stringValue(content.gender) ||
-    stringValue(item.entry?.gender),
+    stringValue(item.entry?.gender) ||
+    stringValue(item.entry?.raw?.article) ||
+    stringValue(item.entry?.raw?.gender),
   );
   const sections = normalizedSections(content);
   const definition = sections.find((section) => section.kind === 'meaning')?.text || '';
