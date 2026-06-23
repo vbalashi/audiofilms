@@ -726,6 +726,7 @@ function assertInteractions(fixture) {
     assertions.push(...assertNextStaysOnTargetInteraction());
     assertions.push(...assertMarkIssueInteraction());
     assertions.push(...assertKeyboardNavigationInteraction());
+    assertions.push(...assertWordReplayInteraction());
   }
   if (fixture.expect.checkOffOn) {
     assertions.push(...assertOffOnInteraction(fixture));
@@ -785,7 +786,12 @@ function assertNextStaysOnTargetInteraction() {
   clickShadowButton("[data-af-next]");
   sleep(450);
   const afterEarly = readSnapshot();
-  sleep(3800);
+  const earlyCurrentTime = Number(afterEarly.video?.currentTime);
+  const earlyPhraseEnd = Number(afterEarly.currentPhraseTiming?.playbackEndSeconds);
+  const waitForPhraseEndMs = Number.isFinite(earlyCurrentTime) && Number.isFinite(earlyPhraseEnd)
+    ? Math.min(15000, Math.max(3800, Math.ceil((earlyPhraseEnd - earlyCurrentTime) * 1000) + 650))
+    : 3800;
+  sleep(waitForPhraseEndMs);
   const afterAutoPause = readSnapshot();
   const expectedOrdinal = beforeOrdinal ? beforeOrdinal + 1 : null;
   const pausedAt = Number(afterAutoPause.video?.currentTime);
@@ -816,16 +822,19 @@ function assertKeyboardNavigationInteraction() {
   pressKey("ArrowDown", "ArrowDown");
   sleep(900);
   const afterReplay = readSnapshot();
-  const rowSeconds = parseTimestampSeconds(afterSpace.rowTime);
   const currentTime = Number(afterReplay.video?.currentTime);
-  const closeToPhrase = Number.isFinite(rowSeconds) &&
+  const phraseStart = Number(afterReplay.currentPhraseTiming?.startSeconds ?? parseTimestampSeconds(afterSpace.rowTime));
+  const phraseEnd = Number(afterReplay.currentPhraseTiming?.playbackEndSeconds);
+  const insidePhraseWindow = Number.isFinite(phraseStart) &&
+    Number.isFinite(phraseEnd) &&
     Number.isFinite(currentTime) &&
-    Math.abs(currentTime - rowSeconds) <= 3;
+    currentTime >= phraseStart - 0.25 &&
+    currentTime <= phraseEnd + 0.5;
 
   return [
     assertion("space exits guided mode", afterSpace.guidedMode === false, JSON.stringify({ mode: afterSpace.mode, guidedMode: afterSpace.guidedMode })),
     assertion("arrow down replays current phrase", afterReplay.guidedMode === true, JSON.stringify({ mode: afterReplay.mode, guidedMode: afterReplay.guidedMode })),
-    assertion("arrow down seeks near visible phrase", closeToPhrase, `row=${afterSpace.rowTime}, video=${afterReplay.video?.currentTime}`),
+    assertion("arrow down stays inside visible phrase", insidePhraseWindow, JSON.stringify({ phraseStart, phraseEnd, currentTime })),
   ];
 }
 
@@ -892,6 +901,37 @@ function assertLookupInteraction() {
     assertion("dictionary renders lookup surface", after.dictionary?.cardCount > 0 || Boolean(after.dictionary?.lookupTitle || after.dictionary?.lookupCopy), JSON.stringify(after.dictionary)),
     assertion("lookup leaves phrase row rendered", Boolean(after.rowText), after.rowText),
   ];
+}
+
+function assertWordReplayInteraction() {
+  const before = readSnapshot();
+  const shiftClick = clickFirstLookupWord({ shiftKey: true });
+  const afterShift = waitForReplaySnapshot("from-word", 2000);
+  const shiftReplay = afterShift.debug?.lastWordReplay || {};
+  const timing = afterShift.currentPhraseTiming || before.currentPhraseTiming || {};
+  const shiftSeek = Number(shiftReplay.seekToSec);
+  const shiftPause = Number(shiftReplay.expectedPauseAtSec);
+
+  const ctrlClick = clickFirstLookupWord({ ctrlKey: true });
+  const afterCtrl = waitForReplaySnapshot("word", 2000);
+  const ctrlReplay = afterCtrl.debug?.lastWordReplay || {};
+
+  return [
+    assertion("shift word replay clicked", shiftClick.clicked === true, shiftClick.detail),
+    assertion("shift word replay does not select dictionary word", !wordsMatch(afterShift.dictionary?.word, shiftClick.word), JSON.stringify(afterShift.dictionary)),
+    assertion("shift word replay uses estimated or exact timing", shiftReplay.ok === true && /estimate|word|asr|alignment/.test(shiftReplay.timingSource || ""), JSON.stringify(shiftReplay)),
+    assertion("shift word replay seek stays in current phrase", Number.isFinite(shiftSeek) && shiftSeek >= timing.startSeconds && shiftSeek <= timing.playbackEndSeconds, JSON.stringify({ timing, shiftReplay })),
+    assertion("shift word replay plays to phrase end", Number.isFinite(shiftPause) && shiftPause >= timing.endSeconds && shiftPause <= timing.playbackEndSeconds + 0.1, JSON.stringify({ timing, shiftReplay })),
+    assertion("ctrl word replay clicked", ctrlClick.clicked === true, ctrlClick.detail),
+    assertion("ctrl word replay does not select dictionary word", !wordsMatch(afterCtrl.dictionary?.word, ctrlClick.word), JSON.stringify(afterCtrl.dictionary)),
+    assertion("ctrl word replay handles missing exact timing honestly", ctrlReplay.ok === false && ctrlReplay.reason === "word-timing-unavailable", JSON.stringify(ctrlReplay)),
+    assertion("word replay keeps current phrase selected", afterCtrl.count === before.count, `${before.count} -> ${afterCtrl.count}`),
+  ];
+}
+
+function wordsMatch(left, right) {
+  const normalize = (value) => String(value || "").trim().toLocaleLowerCase();
+  return Boolean(normalize(left)) && normalize(left) === normalize(right);
 }
 
 function checkBackend() {
@@ -1056,6 +1096,19 @@ function waitForDictionarySelection(word, timeoutMs) {
       return last;
     }
     sleep(500);
+  }
+
+  return last || readSnapshot();
+}
+
+function waitForReplaySnapshot(mode, timeoutMs) {
+  const started = Date.now();
+  let last = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readSnapshot();
+    if (last.debug?.lastWordReplay?.mode === mode) return last;
+    sleep(250);
   }
 
   return last || readSnapshot();
@@ -1328,7 +1381,12 @@ function pauseVideo() {
   `);
 }
 
-function clickFirstLookupWord() {
+function clickFirstLookupWord(options = {}) {
+  const eventOptions = JSON.stringify({
+    shiftKey: Boolean(options.shiftKey),
+    ctrlKey: Boolean(options.ctrlKey),
+    metaKey: Boolean(options.metaKey),
+  });
   const raw = chromeEval(`
 (() => {
   const root = document.querySelector("#audiofilms-root")?.shadowRoot;
@@ -1338,13 +1396,23 @@ function clickFirstLookupWord() {
     return JSON.stringify({ clicked: false, word: "", detail: "no-word-button" });
   }
   const value = word.dataset.afLookupWord || word.textContent || "";
+  const options = ${eventOptions};
   for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
-    word.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+    word.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      shiftKey: options.shiftKey,
+      ctrlKey: options.ctrlKey,
+      metaKey: options.metaKey,
+    }));
   }
-  if (typeof word.click === "function") {
-    word.click();
-  }
-  return JSON.stringify({ clicked: true, word: value, detail: word.textContent || value });
+  return JSON.stringify({
+    clicked: true,
+    word: value,
+    detail: word.textContent || value,
+    modifiers: options,
+  });
 })()
   `);
   return JSON.parse(raw);

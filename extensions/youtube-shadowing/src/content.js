@@ -91,6 +91,7 @@
     accountMenuOpen: false,
     playbackFrame: null,
     activePlayback: null,
+    lastWordReplay: null,
     guidedHold: null,
     passiveVideo: null,
     passiveFrame: null,
@@ -2080,6 +2081,7 @@
       error: state.error,
       sources: state.practiceSources.map(captionTrackApi.formatSourceDebug),
       navigationEvents: state.navigationEvents.slice(-12),
+      lastWordReplay: state.lastWordReplay,
       lastIssueReport: state.lastIssueReport,
       events: state.debugEvents.slice(-8),
     }, null, 2);
@@ -2147,6 +2149,7 @@
       },
       playback: getPlaybackSnapshot(),
       currentPhrase: describePhraseAtIndex(state.currentIndex),
+      lastWordReplay: state.lastWordReplay,
       visibleState: {
         count: state.phrases.length ? `${state.currentIndex + 1} / ${state.phrases.length}` : "0 / 0",
         error: state.error,
@@ -2613,13 +2616,32 @@
       word.textContent = token;
       word.dataset.afLookupWord = lookupWord;
       const tokenIndex = lookupTokenIndex;
+      word.dataset.afPhraseIndex = String(phraseIndex);
+      word.dataset.afTokenIndex = String(tokenIndex);
+      word.dataset.afCharStart = String(charStart);
+      word.dataset.afCharEnd = String(charStart + token.length);
       word.classList.toggle(
         "is-selected",
         state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, lookupWord),
       );
+      word.classList.toggle(
+        "is-word-replay",
+        state.lastWordReplay?.phraseIndex === phraseIndex &&
+          state.lastWordReplay?.tokenIndex === tokenIndex &&
+          Date.now() - state.lastWordReplay.atMs < 1600,
+      );
       word.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+          handleWordReplayGesture(event, lookupWord, phraseIndex, {
+            tokenIndex,
+            charStart,
+            charEnd: charStart + token.length,
+            originalToken: token,
+          });
+          return;
+        }
         selectLookupWord(lookupWord, phraseIndex, {
           tokenIndex,
           charStart,
@@ -2629,6 +2651,25 @@
       });
       lookupTokenIndex += 1;
     }
+  }
+
+  function handleWordReplayGesture(event, word, phraseIndex, selection) {
+    const mode = event.ctrlKey || event.metaKey ? "word" : "from-word";
+    const result = playWordReplay(phraseIndex, selection, { mode, word });
+    state.lastWordReplay = {
+      atMs: Date.now(),
+      mode,
+      word,
+      phraseIndex,
+      tokenIndex: selection.tokenIndex,
+      ok: result.ok,
+      reason: result.reason || null,
+      timingSource: result.timingSource || null,
+      seekToSec: result.seekToSec ?? null,
+      expectedPauseAtSec: result.expectedPauseAtSec ?? null,
+    };
+    recordNavigationEvent("word-replay", state.lastWordReplay);
+    render();
   }
 
   function renderDictionary(panel) {
@@ -4871,6 +4912,120 @@
     return postRollEndMs;
   }
 
+  function playWordReplay(index, selection, options = {}) {
+    const phrase = state.phrases[index];
+    const video = getVideoElement();
+    if (!phrase || !video) {
+      return { ok: false, reason: !phrase ? "missing-phrase" : "missing-video" };
+    }
+    const wordTiming = resolveWordTiming(phrase, selection);
+    if (options.mode === "word" && !wordTiming) {
+      return {
+        ok: false,
+        reason: "word-timing-unavailable",
+        timingSource: "unavailable",
+      };
+    }
+
+    const phraseEndMs = playbackEndMsForPhrase(state.phrases, index);
+    const startMs = wordTiming
+      ? wordTiming.startMs
+      : estimateWordStartMs(phrase, selection);
+    const endMs = options.mode === "word"
+      ? wordTiming.endMs
+      : phraseEndMs;
+    const clampedStartMs = clampNumber(
+      startMs - (options.mode === "word" ? 40 : PRE_ROLL_MS),
+      phrase.startMs,
+      Math.max(phrase.startMs, phraseEndMs - 40),
+      phrase.startMs,
+    );
+    const clampedEndMs = clampNumber(
+      endMs,
+      Math.max(clampedStartMs + 80, phrase.startMs),
+      phraseEndMs,
+      phraseEndMs,
+    );
+    const startSeconds = Math.max(0, clampedStartMs) / 1000;
+    const endSeconds = Math.max(startSeconds + 0.08, clampedEndMs / 1000);
+
+    stopPlaybackTimer();
+    state.currentIndex = index;
+    state.guidedMode = true;
+    markCurrentTranscriptSegment(phrase);
+    video.currentTime = startSeconds;
+    video.play().catch(() => {});
+
+    const timingSource = wordTiming ? wordTiming.source : "estimate-char-position";
+    state.activePlayback = {
+      index,
+      endSeconds,
+      holdSeconds: endSeconds,
+      wordReplay: {
+        mode: options.mode,
+        tokenIndex: selection.tokenIndex,
+        timingSource,
+      },
+    };
+    state.playbackFrame = window.requestAnimationFrame(function frame() {
+      enforcePhraseEnd(video);
+      if (state.activePlayback) {
+        state.playbackFrame = window.requestAnimationFrame(frame);
+      }
+    });
+    return {
+      ok: true,
+      seekToSec: roundTime(startSeconds),
+      expectedPauseAtSec: roundTime(endSeconds),
+      timingSource,
+      autoPause: true,
+    };
+  }
+
+  function resolveWordTiming(phrase, selection = {}) {
+    const candidates = Array.isArray(phrase.wordTimings)
+      ? phrase.wordTimings
+      : Array.isArray(phrase.words)
+        ? phrase.words
+        : Array.isArray(phrase.tokens)
+          ? phrase.tokens
+          : [];
+    const tokenIndex = finiteInteger(selection.tokenIndex);
+    const item = candidates.find((candidate, index) => {
+      const candidateIndex = finiteInteger(candidate?.tokenIndex ?? candidate?.index);
+      return candidateIndex === tokenIndex || (candidateIndex === null && index === tokenIndex);
+    });
+    const startMs = finiteInteger(item?.startMs ?? item?.start);
+    const endMs = finiteInteger(item?.endMs ?? item?.end);
+    if (
+      startMs === null ||
+      endMs === null ||
+      endMs <= startMs ||
+      startMs < phrase.startMs - 250 ||
+      endMs > playbackEndMsForPhrase(state.phrases, state.phrases.indexOf(phrase)) + 250
+    ) {
+      return null;
+    }
+    const exactness = item?.timingExactness || phrase.timingExactness || state.transcriptResult?.timingExactness;
+    const source = exactness === "word-level" || item?.source === "asr" || item?.source === "alignment"
+      ? item?.source || "word-level"
+      : null;
+    return source ? { startMs, endMs, source } : null;
+  }
+
+  function estimateWordStartMs(phrase, selection = {}) {
+    const textLength = Math.max(String(phrase.text || "").length, 1);
+    const charStart = clampNumber(
+      finiteInteger(selection.charStart),
+      0,
+      textLength,
+      0,
+    );
+    const ratio = charStart / textLength;
+    const durationMs = Math.max(0, phrase.endMs - phrase.startMs);
+    return phrase.startMs + durationMs * ratio;
+  }
+
   function playPhrase(index, options = {}) {
     const phrase = state.phrases[index];
     const video = getVideoElement();
@@ -5077,6 +5232,7 @@
       recordNavigationEvent("auto-pause-held", {
         targetPhrase: describePhraseAtIndex(index),
         holdSeconds: roundTime(pausedAtSeconds),
+        wordReplay: state.activePlayback.wordReplay || null,
         playback: getPlaybackSnapshot(),
       });
       stopPlaybackTimer();

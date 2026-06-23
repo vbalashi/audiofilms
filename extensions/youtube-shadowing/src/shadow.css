@@ -1527,6 +1527,12 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: var(--af-accent-soft);
 }
 
+.af-ribbon-word.is-word-replay {
+  color: var(--af-accent);
+  background: color-mix(in srgb, var(--af-accent-soft) 70%, var(--af-panel-bg) 30%);
+  box-shadow: 0 0 0 1px var(--af-accent);
+}
+
 .af-ribbon-mask {
   display: block;
   width: min(480px, 82%);
