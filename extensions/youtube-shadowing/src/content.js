@@ -8,6 +8,7 @@
   const dictionaryActionApi = window.__afShadowingDictionaryActions;
   const phraseTokenApi = window.__afShadowingPhraseTokens;
   const diagnosticsReportApi = window.__afShadowingDiagnosticsReport;
+  const displayPreferencesApi = window.__afShadowingDisplayPreferences;
 
   try {
     bootAudioFilmsYouTubeShadowing();
@@ -129,57 +130,16 @@
     return normalizeDisplayPreferences({
       enabled: readLocalStorageValue(LEARNING_ENABLED_STORAGE_KEY) !== "false",
       examplesExpanded: readLocalStorageValue(EXAMPLES_EXPANDED_STORAGE_KEY) === "true",
-      theme: normalizeTheme(readLocalStorageValue(THEME_STORAGE_KEY)),
+      theme: readLocalStorageValue(THEME_STORAGE_KEY),
     });
   }
 
   function normalizeDisplayPreferences(value) {
-    const preferences = value && typeof value === "object" ? value : {};
-    const appearance = preferences.appearance && typeof preferences.appearance === "object"
-      ? preferences.appearance
-      : {};
-    const layout = preferences.layout && typeof preferences.layout === "object" ? preferences.layout : {};
-
-    return {
-      version: 1,
-      enabled: preferences.enabled !== false,
-      autoPause: preferences.autoPause !== false,
-      examplesExpanded: preferences.examplesExpanded === true,
-      theme: normalizeTheme(preferences.theme),
-      appearance: {
-        learnerTextScale: clampNumber(appearance.learnerTextScale, 0.85, 1.35, 1),
-        panelBackgroundAlpha: clampNumber(appearance.panelBackgroundAlpha, 0.65, 1, 0.92),
-      },
-      layout: {
-        locked: layout.locked !== false,
-        phraseRibbon: normalizePanelGeometry(layout.phraseRibbon),
-        dictionaryPanel: normalizePanelGeometry(layout.dictionaryPanel),
-        debugPanel: normalizePanelGeometry(layout.debugPanel),
-        zOrder: layout.zOrder === "dictionaryPanel" ? "dictionaryPanel" : "phraseRibbon",
-      },
-    };
-  }
-
-  function normalizePanelGeometry(value) {
-    const geometry = value && typeof value === "object" ? value : {};
-    return {
-      x: nullableFiniteNumber(geometry.x),
-      y: nullableFiniteNumber(geometry.y),
-      width: nullableFiniteNumber(geometry.width),
-      height: nullableFiniteNumber(geometry.height),
-    };
-  }
-
-  function nullableFiniteNumber(value) {
-    return Number.isFinite(value) ? value : null;
+    return displayPreferencesApi.normalizeDisplayPreferences(value);
   }
 
   function clampNumber(value, min, max, fallback) {
     return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
-  }
-
-  function normalizeTheme(value) {
-    return value === "light" || value === "dark" ? value : "system";
   }
 
   function readLocalStorageValue(key) {
@@ -1332,13 +1292,7 @@
   }
 
   function defaultPanelLayout() {
-    return {
-      locked: true,
-      phraseRibbon: { x: null, y: null, width: null, height: null },
-      dictionaryPanel: { x: null, y: null, width: null, height: null },
-      debugPanel: { x: null, y: null, width: null, height: null },
-      zOrder: "phraseRibbon",
-    };
+    return displayPreferencesApi.defaultPanelLayout();
   }
 
   function applyPanelLayout(ribbonPanel, dictionaryPanel) {

@@ -43,6 +43,7 @@
         "src/dictionaryActions.js",
         "src/phraseTokens.js",
         "src/diagnosticsReport.js",
+        "src/displayPreferences.js",
         "src/content.js"
       ],
       "css": [
