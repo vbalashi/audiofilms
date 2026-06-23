@@ -373,6 +373,26 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 
 If a focused run changes behavior, update `docs/intent/youtube-extension-validation-matrix.md` with the exact fixture, observed source badge, count, error state, and whether it is a regression or an intentional new baseline.
 
+Do not use the Codex in-app Browser for local AudioFilms QA in this
+environment. It can open ordinary external HTTPS pages, but local URLs such as
+`http://127.0.0.1:<port>/...` and `http://localhost:<port>/...` return
+`ERR_BLOCKED_BY_CLIENT` even when the local server receives the request. Treat
+that path as unavailable unless the Browser plugin behavior changes. Use
+repo-local scripts, the Chrome extension plugin, and the normal Chrome profile
+instead.
+
+For repeated diagnostics, prefer adding a small script under
+`extensions/youtube-shadowing/scripts/` over relying on manual browser steps.
+The current tool split is:
+
+- `smoke-chrome.mjs`: reloads the unpacked extension and runs full/focused
+  fixture checks through the normal Chrome profile.
+- Chrome extension plugin: interactive clicks, DOM snapshots, screenshots,
+  page logs, and page-level CDP network events on the real YouTube tab.
+- Extension UI diagnostics plus
+  `document.documentElement.dataset.afShadowingDiagnosticsState`: replacement
+  for unavailable `chrome://extensions` and service-worker inspector access.
+
 ## Syntax And App Validation
 
 For extension-only changes:

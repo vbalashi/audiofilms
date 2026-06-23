@@ -102,6 +102,77 @@ For local app API checks:
 
 ## Latest Run
 
+### 2026-06-23: Diagnostic Tools Baseline
+
+Status: closed for extension-owned UI diagnostics and Chrome-page diagnostics.
+In-app Browser local QA is declared unavailable in this environment; use custom
+debug scripts instead of trying to unblock it.
+
+Validated:
+
+- Chrome extension automation can reload the unpacked extension and run the
+  focused YouTube smoke against the real signed-in Chrome profile.
+- Chrome screenshots are available and were used for visual QA of floating
+  debug panel layering and utility-menu stacking.
+- The in-page diagnostics dataset
+  `document.documentElement.dataset.afShadowingDiagnosticsState` is readable
+  from the normal YouTube page context after clearing diagnostics.
+- The extension Debug panel is floating, scrollable, copyable, closable,
+  movable, resizable, and does not change phrase-ribbon height.
+- Debug panel z-order now behaves as intended: clicking the main overlay pushes
+  Debug behind it, clicking Debug brings it forward, and the utility menu opens
+  above the relevant overlay controls.
+- Current smoke assertions track the learner-facing contract instead of stale
+  internal provenance strings.
+- Chrome DevTools Protocol access is available on the YouTube tab for page
+  network and console diagnostics. A reload of `4EE7m94mJpk` produced
+  `Network.requestWillBeSent`, `Network.responseReceived`,
+  `Network.loadingFinished`, and `Network.loadingFailed` events with URL,
+  status, mime type, failure text, and request duration. Long YouTube reloads
+  can truncate the CDP event buffer, so diagnostic runs must read events in
+  batches from the returned cursor.
+- Chrome tab logs are readable through the Chrome extension plugin and include
+  YouTube page logs plus content-script logs such as `[AudioFilms] content
+  script loaded`.
+- In-app Browser can open ordinary external HTTPS pages and read DOM state, but
+  this is not enough to make it part of the local AudioFilms QA path.
+
+Blocked or limited:
+
+- Chrome Browser Use policy blocks `chrome://extensions/?id=...`, so the agent
+  cannot inspect extension error state or open the service-worker inspector
+  through the Chrome plugin. Do not treat user approval as sufficient to bypass
+  this tool policy.
+- Raw CDP on the YouTube tab does not support `Target.setDiscoverTargets`, so
+  service-worker target discovery is unavailable through this CDP surface.
+- In-app Browser is out of scope for local AudioFilms QA. It still fails local
+  URLs with `ERR_BLOCKED_BY_CLIENT` for both
+  `http://127.0.0.1:<port>/...` and `http://localhost:<port>/...`. The local
+  server received GET requests, so the failure appears to be client/policy
+  blocking after the request rather than total network reachability loss. Do not
+  spend future QA time trying to unblock this path unless the Browser plugin
+  itself changes.
+- Extension reload is still proven through the AppleScript-based smoke script.
+  Keep that script as the primary reload/full-fixture path for now; use the
+  Chrome extension plugin as the primary interactive diagnostics path for DOM,
+  screenshots, page logs, and page network events.
+
+QA rule change: every visual UI smoke that claims layout, z-order, overlap, or
+responsive behavior must include a Chrome screenshot as evidence. DOM geometry
+alone is not enough for visual-layer claims.
+
+Operational decision: for local and extension diagnostics, agents should use
+owned scripts and the real Chrome profile:
+
+- `smoke-chrome.mjs` remains the canonical reload/full-fixture runner.
+- Chrome extension plugin remains the interactive runner for clicks, DOM,
+  screenshots, page logs, and page-level CDP network events.
+- Add small repo-local debug scripts when a repeated diagnostic needs reliable
+  evidence collection. Prefer scripts over manual in-app Browser attempts.
+- Use extension UI diagnostics and
+  `document.documentElement.dataset.afShadowingDiagnosticsState` as the
+  replacement for inaccessible `chrome://extensions` and service-worker pages.
+
 ### 2026-06-23: Smoke Contract Refresh
 
 Default Chrome smoke no longer treats historical provenance strings as the
