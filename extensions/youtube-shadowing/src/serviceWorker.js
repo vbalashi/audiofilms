@@ -414,13 +414,18 @@ async function connectTwoThousandNl() {
 }
 
 async function getFreshConnectSession() {
-  const stored = await readConnectSession();
+  let stored = await readConnectSession();
   if (!stored?.refresh_token) {
     return { ok: true, session: null };
   }
-  if (!isPinnedConnectSession(stored)) {
+  const pinnedSession = pinnedOrMigratedConnectSession(stored);
+  if (!pinnedSession) {
     await clearConnectSession();
     return { ok: true, session: null };
+  }
+  if (pinnedSession !== stored) {
+    stored = pinnedSession;
+    await storeConnectSession(stored);
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -625,9 +630,22 @@ function normalizeClientId() {
 }
 
 function isPinnedConnectSession(session) {
+  return Boolean(pinnedOrMigratedConnectSession(session));
+}
+
+function pinnedOrMigratedConnectSession(session) {
   const sessionBaseUrl = String(session?.baseUrl || "").trim().replace(/\/+$/, "");
   const sessionClientId = String(session?.clientId || "").trim();
-  return sessionBaseUrl === normalizeConnectBaseUrl() && sessionClientId === normalizeClientId();
+  const expectedBaseUrl = normalizeConnectBaseUrl();
+  const expectedClientId = normalizeClientId();
+  if (sessionBaseUrl && sessionBaseUrl !== expectedBaseUrl) return null;
+  if (sessionClientId && sessionClientId !== expectedClientId) return null;
+  if (sessionBaseUrl === expectedBaseUrl && sessionClientId === expectedClientId) return session;
+  return {
+    ...session,
+    baseUrl: expectedBaseUrl,
+    clientId: expectedClientId,
+  };
 }
 
 function publicConnectSession(session) {
