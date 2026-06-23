@@ -199,6 +199,13 @@ environment from the runner process and the root `.env` file next to
 configuration includes the public base, ASR mode, tester tokens, and any 2000NL
 dictionary catalog token needed for guest lookup.
 
+For 2000NL-backed guest lookup, use the same secret value that 2000NL exposes as
+`PLATFORM_CATALOG_ACCESS_TOKEN`; in AudioFilms it must be named
+`DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`. The current canonical secret is stored
+in 1Password item `2000nl web` as concealed field
+`PLATFORM_CATALOG_ACCESS_TOKEN`, and is installed on Dell in `/srv/audiofilms/.env`.
+`compose.yaml` passes this value into the `audiofilms-api` container.
+
 GitHub repository secrets required:
 
 ```text
@@ -297,6 +304,9 @@ curl -i -X POST https://audiofilms-api.dilum.io/api/dict/lookup \
 
 Without `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`, `/api/dict/lookup` should
 return JSON `guest_lookup_unavailable` rather than a Next.js HTML 404 page.
+With the token configured, `/api/health` should report
+`providers.dictionary.guestLookup.productionReady=true` and
+`providers.dictionary.guestLookup.mode="catalog-token"`.
 
 ASR unavailable should be explicit when disabled:
 
