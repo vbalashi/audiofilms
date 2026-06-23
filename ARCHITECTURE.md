@@ -134,7 +134,7 @@ Environment selection currently happens through `app/env.example` keys:
 
 ### Status
 
-Accepted. Implementation is still in progress.
+Accepted. First backend response-boundary slice is implemented.
 
 ### Context
 
@@ -142,9 +142,9 @@ The app and no-build YouTube extension both need learner-facing phrase units for
 
 ### Decision
 
-AudioFilms will build learner-facing `practicePhrases[]` in the backend/app pipeline while retaining provider/source subtitle units separately as provider phrases. The extension should consume backend-produced practice phrases and metadata when available. Extension-only segmentation is allowed only as a temporary fallback for direct page `timedtext` captions that have not yet passed through the backend.
+AudioFilms builds learner-facing `practicePhrases[]` in the backend/app pipeline while retaining provider/source subtitle units separately as provider phrases. The extension should consume backend-produced practice phrases and metadata when available. Extension-only segmentation is allowed only as a temporary fallback for direct page `timedtext` captions that have not yet passed through the backend.
 
-Current implementation note: `app/src/lib/practice/phrases.ts` already contains the app normalizer, but `/api/get-subs` still returns only `phrases[]` and `WatchClient` currently runs normalization on the client. The next ADR-0001 implementation step is to move that practice phrase projection into the subtitle response boundary and separate source/provider units from learner-facing practice units.
+Current implementation note: `app/src/lib/practice/phrases.ts` contains the app normalizer, `subtitleService.ts` projects provider/source `phrases[]` into backend-owned `practicePhrases[]`, and `/api/get-subs` returns both shapes. `WatchClient` prefers `data.practicePhrases` and only normalizes on the client as a compatibility fallback for old or partial responses. The remaining ADR-0001 work is richer source/timing/artifact metadata, not moving basic practice phrase projection into `/api/get-subs`.
 
 ### Consequences
 

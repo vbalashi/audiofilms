@@ -21,17 +21,17 @@ interface SubtitleProvider {
 
 #### Available Providers
 
-1. **SupadataProvider** (`providers/SupadataProvider.ts`)
-   - Uses the Supadata API for subtitle retrieval
-   - Requires API key via `SUPADATA_API_KEY` environment variable
-   - Supports multiple languages
-   - Production-ready, high reliability
-
-2. **YtDlpProvider** (`providers/YtDlpProvider.ts`)
+1. **YtDlpProvider** (`providers/YtDlpProvider.ts`)
    - Uses yt-dlp binary for subtitle retrieval
    - No API key required
    - Runs locally
-   - Fallback option
+   - Current default retrieval path
+
+2. **SupadataProvider** (`providers/SupadataProvider.ts`)
+   - Uses the Supadata API for subtitle retrieval
+   - Requires API key via `SUPADATA_API_KEY` environment variable
+   - Supports multiple languages
+   - Paid/provider fallback when configured or used in shootouts
 
 #### Configuration
 
@@ -39,14 +39,15 @@ Set the provider via environment variables:
 
 ```bash
 # .env.local
-SUBTITLE_PROVIDER=supadata
-SUPADATA_API_KEY=your_api_key_here
+SUBTITLE_PROVIDER=yt-dlp
+YT_DLP_PATH=/usr/bin/yt-dlp
 ```
 
 To switch providers, simply change the `SUBTITLE_PROVIDER` variable:
 
 ```bash
-SUBTITLE_PROVIDER=yt-dlp
+SUBTITLE_PROVIDER=supadata
+SUPADATA_API_KEY=your_api_key_here
 ```
 
 ### Service Layer
@@ -149,7 +150,7 @@ SUBTITLE_PROVIDER=my-provider
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SUBTITLE_PROVIDER` | No | `supadata` | Provider to use: `supadata` or `yt-dlp` |
+| `SUBTITLE_PROVIDER` | No | `yt-dlp` | Provider to use: `yt-dlp` or `supadata` |
 | `SUPADATA_API_KEY` | Yes (for Supadata) | - | API key from Supadata |
 | `YT_DLP_PATH` | No | `/usr/bin/yt-dlp` | Path to yt-dlp binary |
 

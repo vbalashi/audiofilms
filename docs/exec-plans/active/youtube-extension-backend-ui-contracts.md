@@ -799,12 +799,10 @@ Rules:
   - `Hard` -> `review-card` + `hard`;
   - `Good` -> `review-card` + `success`;
   - `Easy` -> `review-card` + `easy`.
-- 2000NL currently has a status-name drift that the architect should resolve or
-  normalize: platform docs/runtime expose `hidden`, while one shared type has
-  referred to `known`. AudioFilms should not treat those names as final UI
-  states. The architect should decide whether the platform canonical state is
-  `hidden`, `known`, or both, and how AudioFilms projects it into overlay
-  `userState` and the `Known` display action.
+- The settled platform progress status is `hidden`; `Known`/`known` is an
+  AudioFilms display action that maps to the 2000NL `mark-known` platform
+  action. AudioFilms must not treat `known` as a persisted platform progress
+  state.
 - For the first redesign, use `Learn`/`Known` for `not-started` and
   `encountered`, the four review grades for `learning` and `reviewing`, and no
   progress row for `hidden` or `frozen`.

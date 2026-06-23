@@ -13,15 +13,18 @@ The user experience goal is not "show whatever transcript is easiest to fetch." 
 - avoid overlapping or rolling-caption artifacts;
 - make source quality and provider origin visible in debug, but invisible to normal learners unless there is a problem.
 
-## Why Supadata Is Primary Today
+## Why Supadata Is No Longer Primary
 
 The current code default is:
 
 ```text
-DEFAULT_SUBTITLE_PROVIDER = "supadata"
+DEFAULT_SUBTITLE_PROVIDER = "yt-dlp"
 ```
 
-This is a historical integration choice, not a proven product decision. Supadata was useful because it returns a simple structured API response and was faster to integrate than building robust YouTube caption extraction ourselves.
+The earlier `supadata` default has been superseded. Supadata was useful because
+it returns a simple structured API response and was faster to integrate than
+building robust YouTube caption extraction ourselves, but the current product
+default is the local/free `yt-dlp` path.
 
 It has real costs and risks:
 
@@ -352,4 +355,8 @@ Initial findings:
 
 Immediate conclusion:
 
-Do not change product defaults yet. The next implementation step should improve rolling-caption normalization by removing duplicate text artifacts and splitting remaining long ASR phrases, then compare against Supadata only with an explicit `npm run subtitle:shootout:supadata` run when quota use is acceptable.
+Product defaults have since changed to `yt-dlp`. The next implementation step
+should continue improving rolling-caption normalization by removing duplicate
+text artifacts and splitting remaining long ASR phrases, then compare against
+Supadata only with an explicit `npm run subtitle:shootout:supadata` run when
+quota use is acceptable.

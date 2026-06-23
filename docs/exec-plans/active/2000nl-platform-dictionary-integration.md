@@ -406,7 +406,7 @@ Mapping rule:
 
 ### Stage 4: Explicit Actions
 
-Status: partially implemented for the first dogfood slice.
+Status: implemented for the first dogfood slice.
 
 Wire explicit user actions only after read-only lookup is stable:
 
@@ -415,11 +415,16 @@ Wire explicit user actions only after read-only lookup is stable:
 - review card;
 - per-card translation.
 
-Not implemented in this slice:
+Still not implemented in this slice:
 
 - add to list;
 - copy to user dictionary;
-- complete review-grade surface for `hard` and `easy` in the extension UI.
+
+Implemented in the first dogfood slice:
+
+- `Learn` and `Known` display actions;
+- four-grade review display actions: `Again`, `Hard`, `Good`, and `Easy`;
+- per-card translation command.
 
 Exit criteria:
 
