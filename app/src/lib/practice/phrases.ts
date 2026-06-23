@@ -55,6 +55,17 @@ function splitPhraseIntoTimedParts(
       return [cleanPart];
     }
 
+    if (
+      (
+        isShortNumericSuffix(cleanPart.split(/\s+/).at(-1) || '') ||
+        hasShortHyphenatedNumericSuffix(cleanPart)
+      ) &&
+      wordCount(cleanPart) <= options.maxWords + 2 &&
+      cleanPart.length <= options.maxCharacters
+    ) {
+      return [cleanPart];
+    }
+
     return splitLongText(cleanPart, options);
   });
 
@@ -110,6 +121,70 @@ function startsWithContinuationCue(text: string) {
   return Boolean(firstLetter && firstLetter === firstLetter.toLocaleLowerCase());
 }
 
+function isShortNumericSuffix(text: string) {
+  return /^\d{1,3}[.!?]?$/.test(text.trim());
+}
+
+function hasShortHyphenatedNumericSuffix(text: string) {
+  return /[\p{L}]-\d{1,3}[.!?]?$/u.test(text.trim());
+}
+
+function shouldKeepShortSuffixWithBuffer(
+  buffer: string,
+  part: Phrase,
+  bufferEnd: number,
+  options: Required<PracticePhraseOptions>,
+) {
+  if (!buffer || !isShortNumericSuffix(part.text) || /[.!?]$/.test(buffer.trim())) {
+    return false;
+  }
+
+  const gapSec = part.startSec - bufferEnd;
+  const combinedText = joinPracticeText(buffer, part.text);
+  return (
+    Number.isFinite(gapSec) &&
+    gapSec >= 0 &&
+    gapSec <= options.maxContinuationGapSec &&
+    wordCount(combinedText) <= options.maxWords + 2 &&
+    combinedText.length <= options.maxCharacters
+  );
+}
+
+function shouldMergeShortNumericSuffix(
+  previous: Phrase,
+  next: Phrase,
+  options: Required<PracticePhraseOptions>,
+) {
+  const previousText = previous.text.trim();
+  const nextText = next.text.trim();
+  if (!previousText || !isShortNumericSuffix(nextText) || /[.!?]$/.test(previousText)) {
+    return false;
+  }
+
+  const gapSec = next.startSec - previous.endSec;
+  const combinedText = joinPracticeText(previousText, nextText);
+  return (
+    Number.isFinite(gapSec) &&
+    gapSec >= 0 &&
+    gapSec <= options.maxContinuationGapSec &&
+    wordCount(combinedText) <= options.maxWords + 2 &&
+    combinedText.length <= options.maxCharacters
+  );
+}
+
+function joinPracticeText(left: string, right: string) {
+  const cleanLeft = left.trim();
+  const cleanRight = right.trim();
+  if (!cleanLeft) return cleanRight;
+  if (!cleanRight) return cleanLeft;
+
+  if (isShortNumericSuffix(cleanRight) && /\p{L}$/u.test(cleanLeft)) {
+    return `${cleanLeft}-${cleanRight}`.replace(/\s+/g, ' ').trim();
+  }
+
+  return `${cleanLeft} ${cleanRight}`.replace(/\s+/g, ' ').trim();
+}
+
 function mergeContinuationPhrases(
   phrases: Phrase[],
   options: Required<PracticePhraseOptions>,
@@ -121,6 +196,12 @@ function mergeContinuationPhrases(
 
     if (!previous) {
       merged.push({ ...phrase });
+      continue;
+    }
+
+    if (shouldMergeShortNumericSuffix(previous, phrase, options)) {
+      previous.endSec = Math.max(previous.endSec, phrase.endSec);
+      previous.text = joinPracticeText(previous.text, phrase.text);
       continue;
     }
 
@@ -184,22 +265,24 @@ export function normalizePracticePhrases(
     const parts = splitPhraseIntoTimedParts(phrase, resolvedOptions);
 
     for (const part of parts) {
-      const nextText = `${buffer} ${part.text}`.trim();
+      let nextText = joinPracticeText(buffer, part.text);
       if (
         buffer &&
+        !shouldKeepShortSuffixWithBuffer(buffer, part, bufferEnd, resolvedOptions) &&
         (
           wordCount(nextText) > resolvedOptions.maxWords ||
           nextText.length > resolvedOptions.maxCharacters
         )
       ) {
         flush();
+        nextText = joinPracticeText(buffer, part.text);
       }
 
       if (bufferStart === null) {
         bufferStart = part.startSec;
       }
 
-      buffer = `${buffer} ${part.text}`.trim();
+      buffer = nextText;
       bufferEnd = Math.max(bufferEnd, part.endSec);
 
       if (

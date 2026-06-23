@@ -79,6 +79,32 @@ describe('normalizePracticePhrases', () => {
     expect(normalized.every((phrase) => phrase.text.length <= 140)).toBe(true);
   });
 
+  it('keeps short numeric title suffixes with the preceding phrase', () => {
+    const phrases: Phrase[] = [
+      {
+        id: 1,
+        startSec: 3.52,
+        endSec: 11.812,
+        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam Trappist',
+      },
+      {
+        id: 2,
+        startSec: 11.812,
+        endSec: 11.96,
+        text: '1.',
+      },
+    ];
+
+    expect(normalizePracticePhrases(phrases)).toEqual([
+      {
+        id: 0,
+        startSec: 3.52,
+        endSec: 11.96,
+        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam Trappist-1.',
+      },
+    ]);
+  });
+
   it('renormalizes cached backend practice phrases when building snapshots', () => {
     const response: SubtitleResponse = {
       phrases: [],

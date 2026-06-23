@@ -2425,15 +2425,6 @@
         lookupOrOverlayDefinition(card, cardTranslation, 0),
       );
     }
-    if (summary.example) {
-      renderTranslatedLine(
-        entry,
-        "p",
-        "af-dictionary-copy af-overlay-example",
-        summary.example,
-        lookupOrOverlayExample(card, cardTranslation, 0),
-      );
-    }
 
     renderOverlaySections(entry, card.sections || [], card, cardTranslation);
 
@@ -2591,12 +2582,6 @@
     if (!cardTranslationsVisible(card)) return "";
     return cleanTranslationText(card?.summary?.definitionTranslation) ||
       translatedDefinition(translation, meaningIndex);
-  }
-
-  function lookupOrOverlayExample(card, translation, exampleIndex = 0) {
-    if (!cardTranslationsVisible(card)) return "";
-    return cleanTranslationText(card?.summary?.exampleTranslation) ||
-      translatedExample(translation, exampleIndex);
   }
 
   function lookupOrOverlaySection(card, section, allSections, translation) {

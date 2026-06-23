@@ -781,11 +781,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   color: var(--af-text);
 }
 
-.af-overlay-example {
-  color: var(--af-muted);
-  font-style: italic;
-}
-
 .af-overlay-idiom {
   color: var(--af-warning-text);
 }
