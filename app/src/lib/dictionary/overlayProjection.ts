@@ -71,7 +71,10 @@ export function projectDictionaryLookupV2Response(
   clickedForm: string,
   sourceLanguageCode: string,
   contextText: string | undefined,
-  options: { allowProgressActions: boolean },
+  options: {
+    allowProgressActions: boolean;
+    translationFallbackReason?: string;
+  },
 ): DictionaryLookupV2SuccessResponse | DictionaryLookupV2NoMatchResponse {
   const cards: DictionaryOverlayCardV2[] = (platformBody?.items || []).map((item, index) =>
     projectOverlayCard(item, clickedForm, sourceLanguageCode, index, options),
@@ -106,6 +109,12 @@ export function projectDictionaryLookupV2Response(
       provider: '2000nl',
       fallbackUsed: false,
       responseVersion: 'overlay-v2',
+      ...(options.translationFallbackReason
+        ? {
+            translationFallbackUsed: true,
+            translationFallbackReason: options.translationFallbackReason,
+          }
+        : {}),
     },
   };
 }

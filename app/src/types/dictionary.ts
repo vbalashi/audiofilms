@@ -161,6 +161,8 @@ export type DictionaryLookupV2SuccessResponse = {
     provider: '2000nl';
     fallbackUsed: false;
     responseVersion: 'overlay-v2';
+    translationFallbackUsed?: boolean;
+    translationFallbackReason?: string;
   };
 };
 

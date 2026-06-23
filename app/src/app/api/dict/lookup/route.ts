@@ -15,6 +15,13 @@ type LookupMode = {
   cacheControl?: string;
 };
 
+type PlatformLookupAttempt = {
+  response: Response | null;
+  body: PlatformLookupResponse | null;
+  detail: string | null;
+  error: unknown;
+};
+
 export async function OPTIONS(request: Request) {
   return optionsResponse(request, { methods: ['POST', 'OPTIONS'] });
 }
@@ -47,18 +54,54 @@ export async function POST(request: Request) {
     );
   }
 
-  const platformResponse = await fetch(`${platformApiBase()}/${lookupMode.endpoint}`, {
-    method: 'POST',
-    headers: {
-      accept: 'application/json',
-      authorization: `Bearer ${lookupMode.accessToken}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(platformLookupRequest(clickedForm, sourceLanguageCode, contextText, lookupMode)),
-  });
-  const platformBody = (await platformResponse.json().catch(() => null)) as
-    | PlatformLookupResponse
-    | null;
+  const platformAttempt = await fetchPlatformLookup(
+    clickedForm,
+    sourceLanguageCode,
+    contextText,
+    lookupMode,
+  );
+  let platformResponse = platformAttempt.response;
+  let platformBody = platformAttempt.body;
+  let translationFallbackReason: string | undefined;
+
+  if (
+    platformResponse &&
+    platformResponse.status >= 500 &&
+    lookupMode.includeTranslations &&
+    lookupMode.endpoint === 'lookup'
+  ) {
+    const fallbackMode = {
+      ...lookupMode,
+      includeTranslations: false,
+    };
+    const fallbackAttempt = await fetchPlatformLookup(
+      clickedForm,
+      sourceLanguageCode,
+      contextText,
+      fallbackMode,
+    );
+    if (fallbackAttempt.response?.ok) {
+      translationFallbackReason =
+        platformAttempt.body?.error || platformAttempt.detail || `HTTP ${platformResponse.status}`;
+      platformResponse = fallbackAttempt.response;
+      platformBody = fallbackAttempt.body;
+    }
+  }
+
+  if (!platformResponse) {
+    return jsonResponse(
+      request,
+      {
+        error: 'platform_unavailable',
+        code: 'platform_unavailable',
+        detail: platformAttempt.detail,
+      },
+      {
+        status: 502,
+        headers: responseHeaders(lookupMode),
+      },
+    );
+  }
 
   if (!platformResponse.ok) {
     return jsonResponse(
@@ -66,7 +109,7 @@ export async function POST(request: Request) {
       {
         error: mapPlatformError(platformResponse.status),
         code: mapPlatformError(platformResponse.status),
-        detail: platformBody?.error || platformBody?.detail || null,
+        detail: platformBody?.error || platformBody?.detail || platformAttempt.detail,
       },
       {
         status: platformResponse.status === 429 ? 429 : 502,
@@ -80,7 +123,10 @@ export async function POST(request: Request) {
     clickedForm,
     sourceLanguageCode,
     contextText,
-    { allowProgressActions: lookupMode.allowProgressActions },
+    {
+      allowProgressActions: lookupMode.allowProgressActions,
+      translationFallbackReason,
+    },
   );
 
   if ('error' in responseBody) {
@@ -102,6 +148,60 @@ export async function POST(request: Request) {
       headers: responseHeaders(lookupMode),
     },
   );
+}
+
+async function fetchPlatformLookup(
+  clickedForm: string,
+  sourceLanguageCode: string,
+  contextText: string | undefined,
+  lookupMode: LookupMode,
+): Promise<PlatformLookupAttempt> {
+  try {
+    const response = await fetch(`${platformApiBase()}/${lookupMode.endpoint}`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${lookupMode.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(
+        platformLookupRequest(clickedForm, sourceLanguageCode, contextText, lookupMode),
+      ),
+    });
+    const text = await response.text();
+    const body = parsePlatformJson(text);
+
+    return {
+      response,
+      body,
+      detail: body?.error || body?.detail || safePlatformErrorDetail(text),
+      error: null,
+    };
+  } catch (error) {
+    return {
+      response: null,
+      body: null,
+      detail: error instanceof Error ? error.message : String(error),
+      error,
+    };
+  }
+}
+
+function parsePlatformJson(text: string) {
+  try {
+    return text ? (JSON.parse(text) as PlatformLookupResponse) : null;
+  } catch {
+    return null;
+  }
+}
+
+function safePlatformErrorDetail(text: string) {
+  const body = text.trim();
+  if (!body) return null;
+  if (/^<!doctype\s+html/i.test(body) || /<html[\s>]/i.test(body)) {
+    return '2000NL returned HTML instead of JSON.';
+  }
+  return body.slice(0, 240);
 }
 
 function platformApiBase() {
