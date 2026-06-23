@@ -16,6 +16,27 @@ This repo should be treated as a `light` Harness-mode application project.
 - `docs/exec-plans/completed/`: closed plans worth keeping.
 - `docs/tech-debt/`: known structural issues and cleanup targets.
 
+## Related Workspaces
+
+AudioFilms is tracked with 2000NL and Pontix in the shared GitHub Project
+`AudioFilms / 2000NL Roadmap`:
+https://github.com/users/vbalashi/projects/2.
+
+Before changing behavior that crosses dictionary lookup, platform translation,
+connected-client auth, source provenance, 2000NL user/card state, or Pontix
+selection flows, read the coordination map:
+`/Users/khrustal/dev/docs/project-map/2000nl-audiofilms-translate-extension.md`.
+
+Related local workspaces:
+
+- `/Users/khrustal/dev/2000nl` - platform API, dictionary data, user
+  dictionaries, card/progress state, and source/provenance storage.
+- `/Users/khrustal/dev/translate-extension` - Pontix Chrome extension.
+
+Keep AudioFilms as the owner of subtitles, practice-phrase construction,
+AudioFilms backend facades, and the YouTube shadowing extension. Do not move
+2000NL platform semantics or Pontix-specific selection behavior into this repo.
+
 For YouTube extension continuation, read `docs/intent/youtube-extension-agent-runbook.md` before changing or validating `extensions/youtube-shadowing/`. It records the local Chrome extension id, reload flow, smoke commands, diagnostics, and expert-review zip policy.
 
 For subtitle provider ordering, quota control, rolling captions, and clean-text/ASR timing experiments, read `docs/exec-plans/active/subtitle-source-quality-shootout.md`.
