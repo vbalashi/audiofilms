@@ -1858,6 +1858,7 @@
   function buildPracticeTimingPayload(source) {
     const result = source?.loadedTranscriptResult || state.transcriptResult || {};
     const sourceKind = timingPayloadSourceKind(source, result);
+    const artifact = result.practiceArtifact || practiceArtifactFromSnapshot(result.practiceSnapshot);
     const payload = {
       videoId: state.videoId,
       lang: result.languageCode || source?.languageCode || "auto",
@@ -1865,6 +1866,9 @@
       textSource: sourceKind === "manual" ? "manual" : "asr",
       fullAudio: true,
     };
+    if (artifact?.snapshotRevisionId) payload.snapshotRevisionId = artifact.snapshotRevisionId;
+    if (artifact?.textSourceRevisionId) payload.textSourceRevisionId = artifact.textSourceRevisionId;
+    if (artifact?.timingEvidenceRevisionId) payload.timingEvidenceRevisionId = artifact.timingEvidenceRevisionId;
     return payload;
   }
 
@@ -4363,6 +4367,19 @@
     const snapshot = operation?.result?.snapshot;
     const phrases = snapshot?.phraseSet?.phrases;
     if (operation?.kind !== "improve-timing" || operation.state !== "succeeded" || !Array.isArray(phrases) || !phrases.length) {
+      return null;
+    }
+
+    const applicability = operation.result?.applicability;
+    if (!applicability?.appliesToCurrentSnapshot) {
+      recordDebugEvent("timing-cache-skipped", {
+        operationId: operation.id || "",
+        staleReason: applicability?.staleReason || "missing-applicability",
+        requestedSnapshotRevisionId: applicability?.requestedSnapshotRevisionId || "",
+        resultSnapshotRevisionId: applicability?.resultSnapshotRevisionId || operation.result?.snapshotRevisionId || "",
+        requestedTextSourceRevisionId: applicability?.requestedTextSourceRevisionId || "",
+        resultTextSourceRevisionId: applicability?.resultTextSourceRevisionId || operation.result?.textSourceRevisionId || "",
+      });
       return null;
     }
 
