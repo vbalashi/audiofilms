@@ -213,6 +213,21 @@ TELEGRAM_BOT_TOKEN
 TELEGRAM_CHAT_ID
 ```
 
+Telegram notification source of truth:
+
+```text
+Bot username:  @status_2000nl_bot
+Bot token:     1Password item telegram, field @status_2000nl_bot
+Chat ID:       -1003979211146
+Chat title:    2000nl status
+Secret names:  TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+```
+
+The same bot/chat pair is used by 2000NL. Keep the token only in 1Password and
+GitHub Actions secrets; do not copy it into repo files or deployment `.env`.
+The 2000NL reference doc is
+`/Users/khrustal/dev/2000nl/reports/telegram-notifications-setup.md`.
+
 GitHub repository variables:
 
 ```text
