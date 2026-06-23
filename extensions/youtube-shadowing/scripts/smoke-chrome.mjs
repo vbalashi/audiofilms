@@ -788,11 +788,19 @@ function assertNextStaysOnTargetInteraction() {
   sleep(3800);
   const afterAutoPause = readSnapshot();
   const expectedOrdinal = beforeOrdinal ? beforeOrdinal + 1 : null;
+  const pausedAt = Number(afterAutoPause.video?.currentTime);
+  const phraseStart = Number(afterAutoPause.currentPhraseTiming?.startSeconds);
+  const phraseEnd = Number(afterAutoPause.currentPhraseTiming?.playbackEndSeconds);
+  const stayedNearEnd = Number.isFinite(pausedAt) &&
+    Number.isFinite(phraseStart) &&
+    Number.isFinite(phraseEnd) &&
+    Math.abs(pausedAt - phraseEnd) < Math.abs(pausedAt - phraseStart);
 
   return [
     assertion("next advances from visible phrase", parseCountOrdinal(afterEarly.count) === expectedOrdinal, `${before.count} -> ${afterEarly.count}`),
     assertion("next does not roll back during guided playback", parseCountOrdinal(afterAutoPause.count) === expectedOrdinal, `${before.count} -> ${afterAutoPause.count}`),
     assertion("next leaves guided mode active", afterAutoPause.guidedMode === true, JSON.stringify({ mode: afterAutoPause.mode, guidedMode: afterAutoPause.guidedMode })),
+    assertion("next auto-pause holds near phrase end", stayedNearEnd, JSON.stringify({ pausedAt, phraseStart, phraseEnd })),
   ];
 }
 
@@ -1078,6 +1086,12 @@ function readSnapshot() {
   }
 
   const debug = parseJson(debugPre && debugPre.textContent);
+  const currentRow = root.querySelector(".af-ribbon-row.is-current");
+  const currentPhraseTiming = currentRow ? {
+    startSeconds: Number((Number(currentRow.dataset.afPhraseStartMs) / 1000).toFixed(3)),
+    endSeconds: Number((Number(currentRow.dataset.afPhraseEndMs) / 1000).toFixed(3)),
+    playbackEndSeconds: Number((Number(currentRow.dataset.afPhrasePlaybackEndMs) / 1000).toFixed(3)),
+  } : null;
   return JSON.stringify({
     panel: true,
     boot: document.documentElement.dataset.afShadowingBoot || "",
@@ -1094,6 +1108,7 @@ function readSnapshot() {
     error: root.querySelector("[data-af-error]")?.textContent || "",
     rowTime: root.querySelector(".af-ribbon-row.is-current .af-ribbon-time")?.textContent || "",
     rowText: root.querySelector(".af-ribbon-row.is-current .af-ribbon-text")?.textContent || "",
+    currentPhraseTiming,
     dictionary: (() => {
       const dictionary = root.querySelector("#af-shadowing-dictionary-panel");
       if (!dictionary) return { present: false };

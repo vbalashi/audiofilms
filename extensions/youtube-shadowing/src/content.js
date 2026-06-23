@@ -2343,6 +2343,9 @@
 
   function appendPhraseRow(parent, phrase, index) {
     const row = appendElement(parent, "div", "af-ribbon-row");
+    row.dataset.afPhraseStartMs = String(Math.round(phrase.startMs));
+    row.dataset.afPhraseEndMs = String(Math.round(phrase.endMs));
+    row.dataset.afPhrasePlaybackEndMs = String(Math.round(playbackEndMsForPhrase(state.phrases, index)));
     row.classList.toggle("is-current", index === state.currentIndex);
     row.classList.toggle("is-past", index < state.currentIndex);
     row.classList.toggle("is-future", index > state.currentIndex);
@@ -4829,7 +4832,7 @@
     state.activePlayback = {
       index,
       endSeconds,
-      holdSeconds: Math.max(0, phrase.startMs / 1000),
+      holdSeconds: endSeconds,
     };
 
     state.playbackFrame = window.requestAnimationFrame(function frame() {
@@ -4978,7 +4981,6 @@
 
     state.passivePausedKey = pauseKey;
     video.pause();
-    video.currentTime = Math.max(0, phrase.startMs / 1000);
     markCurrentTranscriptSegment(phrase);
     render();
   }
@@ -4990,17 +4992,17 @@
       const index = state.activePlayback.index;
       const phrase = state.phrases[state.activePlayback.index];
       video.pause();
-      video.currentTime = state.activePlayback.holdSeconds;
+      const pausedAtSeconds = video.currentTime;
       state.currentIndex = index;
       state.guidedHold = {
         index,
-        holdSeconds: state.activePlayback.holdSeconds,
+        holdSeconds: pausedAtSeconds,
         createdAt: Date.now(),
       };
       markCurrentTranscriptSegment(phrase);
       recordNavigationEvent("auto-pause-held", {
         targetPhrase: describePhraseAtIndex(index),
-        holdSeconds: roundTime(state.activePlayback.holdSeconds),
+        holdSeconds: roundTime(pausedAtSeconds),
         playback: getPlaybackSnapshot(),
       });
       stopPlaybackTimer();
