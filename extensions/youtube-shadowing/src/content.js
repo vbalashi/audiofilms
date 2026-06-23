@@ -6,6 +6,7 @@
   const transcriptRetrievalApi = window.__afShadowingTranscriptRetrieval;
   const sourceBindingApi = window.__afShadowingSourceBinding;
   const dictionaryActionApi = window.__afShadowingDictionaryActions;
+  const phraseTokenApi = window.__afShadowingPhraseTokens;
 
   try {
     bootAudioFilmsYouTubeShadowing();
@@ -2813,62 +2814,50 @@
   }
 
   function renderClickablePhraseText(parent, text, phraseIndex) {
-    const tokens = Array.from(String(text || "").matchAll(/\s+|\S+/gu));
-    let lookupTokenIndex = 0;
-    for (const match of tokens) {
-      const token = match[0];
-      const charStart = match.index || 0;
-      if (!token) continue;
-      if (/^\s+$/.test(token)) {
-        parent.appendChild(document.createTextNode(token));
-        continue;
-      }
-
-      const lookupWord = normalizeLookupWord(token);
-      if (!lookupWord) {
-        parent.appendChild(document.createTextNode(token));
+    const segments = phraseTokenApi.tokenizeClickablePhraseText(text);
+    for (const segment of segments) {
+      if (segment.kind !== "word") {
+        parent.appendChild(document.createTextNode(segment.text));
         continue;
       }
 
       const word = appendElement(parent, "button", "af-ribbon-word");
       word.type = "button";
-      word.textContent = token;
-      word.dataset.afLookupWord = lookupWord;
-      const tokenIndex = lookupTokenIndex;
+      word.textContent = segment.text;
+      word.dataset.afLookupWord = segment.lookupWord;
       word.dataset.afPhraseIndex = String(phraseIndex);
-      word.dataset.afTokenIndex = String(tokenIndex);
-      word.dataset.afCharStart = String(charStart);
-      word.dataset.afCharEnd = String(charStart + token.length);
+      word.dataset.afTokenIndex = String(segment.tokenIndex);
+      word.dataset.afCharStart = String(segment.charStart);
+      word.dataset.afCharEnd = String(segment.charEnd);
       word.classList.toggle(
         "is-selected",
-        state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, lookupWord),
+        state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, segment.lookupWord),
       );
       word.classList.toggle(
         "is-word-replay",
         state.lastWordReplay?.phraseIndex === phraseIndex &&
-          state.lastWordReplay?.tokenIndex === tokenIndex &&
+          state.lastWordReplay?.tokenIndex === segment.tokenIndex &&
           Date.now() - state.lastWordReplay.atMs < 1600,
       );
       word.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
-          handleWordReplayGesture(event, lookupWord, phraseIndex, {
-            tokenIndex,
-            charStart,
-            charEnd: charStart + token.length,
-            originalToken: token,
+          handleWordReplayGesture(event, segment.lookupWord, phraseIndex, {
+            tokenIndex: segment.tokenIndex,
+            charStart: segment.charStart,
+            charEnd: segment.charEnd,
+            originalToken: segment.originalToken,
           });
           return;
         }
-        selectLookupWord(lookupWord, phraseIndex, {
-          tokenIndex,
-          charStart,
-          charEnd: charStart + token.length,
-          originalToken: token,
+        selectLookupWord(segment.lookupWord, phraseIndex, {
+          tokenIndex: segment.tokenIndex,
+          charStart: segment.charStart,
+          charEnd: segment.charEnd,
+          originalToken: segment.originalToken,
         });
       });
-      lookupTokenIndex += 1;
     }
   }
 
@@ -4231,12 +4220,6 @@
     while (element.firstChild) {
       element.removeChild(element.firstChild);
     }
-  }
-
-  function normalizeLookupWord(token) {
-    return token
-      .replace(/^[^\p{L}\p{N}]+/gu, "")
-      .replace(/[^\p{L}\p{N}]+$/gu, "");
   }
 
   function wordsEqual(left, right) {

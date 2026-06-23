@@ -41,6 +41,7 @@
         "src/transcriptRetrieval.js",
         "src/sourceBinding.js",
         "src/dictionaryActions.js",
+        "src/phraseTokens.js",
         "src/content.js"
       ],
       "css": [
