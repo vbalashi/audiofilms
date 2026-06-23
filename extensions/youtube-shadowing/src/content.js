@@ -34,6 +34,7 @@
 
   let panelGestureFallbackInstalled = false;
   let shadowLayerFocusInstalled = false;
+  let shadowScrollGuardInstalled = false;
   let displayPreferencesDirty = false;
   let displayPreferencesMutationSeq = 0;
 
@@ -386,6 +387,7 @@
     const root = host.shadowRoot || host.attachShadow({ mode: "open" });
     ensureShadowStyles(root);
     installShadowLayerFocus(root);
+    installShadowScrollGuard(root);
     return root;
   }
 
@@ -396,6 +398,78 @@
     root.addEventListener("mousedown", handleShadowLayerFocus, true);
     document.addEventListener("pointerdown", handleShadowLayerFocus, true);
     document.addEventListener("mousedown", handleShadowLayerFocus, true);
+  }
+
+  function installShadowScrollGuard(root) {
+    if (shadowScrollGuardInstalled) return;
+    shadowScrollGuardInstalled = true;
+    root.addEventListener("wheel", containAudioFilmsScroll, { capture: true, passive: false });
+    root.addEventListener("touchmove", containAudioFilmsTouchScroll, { capture: true, passive: false });
+  }
+
+  function containAudioFilmsScroll(event) {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    if (!pathContainsAudioFilmsSurface(path)) return;
+
+    event.stopPropagation();
+    const scrollable = firstScrollableElement(path, event.deltaX, event.deltaY);
+    if (!scrollable || !canScrollElement(scrollable, event.deltaX, event.deltaY)) {
+      event.preventDefault();
+    }
+  }
+
+  function containAudioFilmsTouchScroll(event) {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    if (!pathContainsAudioFilmsSurface(path)) return;
+    event.stopPropagation();
+  }
+
+  function pathContainsAudioFilmsSurface(path) {
+    return path.some((element) => (
+      element instanceof Element
+      && element.matches?.([
+        `#${RIBBON_PANEL_ID}`,
+        `#${RIBBON_PANEL_ID} *`,
+        `#${DICTIONARY_PANEL_ID}`,
+        `#${DICTIONARY_PANEL_ID} *`,
+        "[data-af-debug-panel]",
+        "[data-af-debug-panel] *",
+        "[data-af-source-menu]",
+        "[data-af-source-menu] *",
+        "[data-af-utility-menu]",
+        "[data-af-utility-menu] *",
+        "[data-af-account-menu]",
+        "[data-af-account-menu] *",
+      ].join(", "))
+    ));
+  }
+
+  function firstScrollableElement(path, deltaX, deltaY) {
+    return path.find((element) => (
+      element instanceof HTMLElement
+      && isScrollableInWheelDirection(element, deltaX, deltaY)
+    )) || null;
+  }
+
+  function isScrollableInWheelDirection(element, deltaX, deltaY) {
+    const style = window.getComputedStyle(element);
+    const horizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    if (horizontal) {
+      return /(auto|scroll)/.test(style.overflowX) && element.scrollWidth > element.clientWidth;
+    }
+    return /(auto|scroll)/.test(style.overflowY) && element.scrollHeight > element.clientHeight;
+  }
+
+  function canScrollElement(element, deltaX, deltaY) {
+    const horizontal = Math.abs(deltaX) > Math.abs(deltaY);
+    if (horizontal) {
+      if (deltaX < 0) return element.scrollLeft > 0;
+      if (deltaX > 0) return element.scrollLeft + element.clientWidth < element.scrollWidth;
+      return false;
+    }
+    if (deltaY < 0) return element.scrollTop > 0;
+    if (deltaY > 0) return element.scrollTop + element.clientHeight < element.scrollHeight;
+    return false;
   }
 
   function ensureShadowContainer(root) {

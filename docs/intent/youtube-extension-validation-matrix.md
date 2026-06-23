@@ -62,6 +62,10 @@ For extension smoke checks:
 - The main phrase ribbon header carries account placement; the dictionary header
   stays lookup-focused. The account icon opens a popover with a
   connect/reconnect/disconnect action.
+- Wheel/trackpad scrolling over AudioFilms panels, popovers, dictionary cards,
+  and debug output is contained inside the extension surface; scrolling at
+  panel edges must not move the underlying YouTube page. Scrolling outside the
+  extension should keep normal YouTube behavior.
 - Dictionary V2 card UI is covered with a controlled smoke fixture: card title,
   chips, sections, phase-dependent progress actions, card translation ready
   state, card translation error state, and hidden/frozen cards with no progress

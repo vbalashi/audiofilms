@@ -246,6 +246,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   line-height: 1.45;
   letter-spacing: 0;
   pointer-events: auto;
+  overscroll-behavior: contain;
 }
 
 #af-shadowing-dictionary-panel,
@@ -442,6 +443,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-radius: 6px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
   font-size: 12px;
+  overscroll-behavior: contain;
 }
 
 .af-account-popover.is-open {
@@ -498,6 +500,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   background: var(--af-panel-soft);
 }
@@ -1133,6 +1136,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border: 1px solid var(--af-border-strong);
   border-radius: 6px;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  overscroll-behavior: contain;
 }
 
 .af-utility-popover.is-below {
@@ -1242,6 +1246,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   width: min(380px, calc(100vw - 40px));
   max-height: 320px;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 8px;
   background: var(--af-panel);
   border: 1px solid var(--af-border-strong);
@@ -1411,6 +1416,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   display: grid;
   gap: 2px;
   min-height: 110px;
+  overscroll-behavior: contain;
   padding: 8px 12px;
 }
 
@@ -1634,6 +1640,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   line-height: 1.45;
   letter-spacing: 0;
   overflow: hidden;
+  overscroll-behavior: contain;
   resize: none;
 }
 
@@ -1697,6 +1704,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   min-height: 0;
   margin: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 10px;
   font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   white-space: pre-wrap;
