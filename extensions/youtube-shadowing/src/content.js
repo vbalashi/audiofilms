@@ -2799,11 +2799,17 @@
 
     const selectedWord = state.selectedWord;
     const action = actionPayload?.action || "";
+    const clientEventId = actionPayload?.clientEventId || createMutationTurnId();
+    const turnId = actionPayload?.turnId || (
+      (action === "review-card" || action === "mark-known" || action === "mark-unknown") && isUuid(clientEventId)
+        ? clientEventId
+        : undefined
+    );
     const payload = {
       ...actionPayload,
-      ...((action === "review-card" || action === "mark-known" || action === "mark-unknown") && !actionPayload.turnId
-        ? { turnId: createMutationTurnId() }
-        : {}),
+      clientEventId,
+      ...(turnId ? { turnId } : {}),
+      sourceContext: buildDictionaryActionSourceContext(selectedWord, card, action),
       entryId: card.entryId,
     };
     const pendingMessage = `${displayAction?.label || "Action"}...`;
@@ -2862,6 +2868,79 @@
     if (action === "mark-known") return "Marked known";
     const label = displayAction?.label || "Progress";
     return `${label} recorded`;
+  }
+
+  function buildDictionaryActionSourceContext(selectedWord, card, action) {
+    const phraseIndex = Number.isInteger(selectedWord?.phraseIndex)
+      ? selectedWord.phraseIndex
+      : state.currentIndex;
+    const phrase = state.phrases[phraseIndex] || state.phrases[state.currentIndex] || null;
+    const source = getSelectedPracticeSource();
+    const transcript = source?.loadedTranscriptResult || state.transcriptResult || {};
+    const languageCode =
+      transcript.languageCode ||
+      source?.languageCode ||
+      state.selectedTrack?.languageCode ||
+      "";
+    const video = getVideoElement();
+
+    return {
+      contractVersion: "source-context-v1",
+      client: {
+        id: "audiofilms-youtube-extension",
+        version: "no-build-spike",
+      },
+      source: {
+        kind: "youtube_video",
+        provider: "youtube",
+        externalId: state.videoId || "",
+        url: youtubeWatchUrl(state.videoId),
+        title: youtubeVideoTitle(),
+        languageCode,
+      },
+      location: {
+        kind: "caption_phrase",
+        phraseIndex,
+        startMs: finiteInteger(phrase?.startMs),
+        endMs: finiteInteger(phrase?.endMs),
+        currentTimeMs: video ? finiteInteger(video.currentTime * 1000) : null,
+      },
+      context: {
+        clickedForm: selectedWord?.word || card?.clickedForm || card?.headword || "",
+        text: phrase?.text || "",
+      },
+      diagnostics: {
+        action,
+        cardId: card?.id || "",
+        selectedSourceId: state.selectedSourceId || "",
+        sourceKind: transcript.sourceKind || "",
+        retrievalPath: transcript.retrievalPath || "",
+        timingExactness: transcript.timingExactness || "",
+        qualityFlags: Array.isArray(transcript.qualityFlags) ? transcript.qualityFlags : [],
+        fallbackUsed: Boolean(transcript.fallbackUsed),
+      },
+    };
+  }
+
+  function youtubeWatchUrl(videoId) {
+    if (!videoId) return window.location.href;
+    const url = new URL("https://www.youtube.com/watch");
+    url.searchParams.set("v", videoId);
+    return url.toString();
+  }
+
+  function youtubeVideoTitle() {
+    const title = document.title || "";
+    return title.replace(/\s*-\s*YouTube\s*$/i, "").trim();
+  }
+
+  function finiteInteger(value) {
+    return Number.isFinite(value) ? Math.round(value) : null;
+  }
+
+  function isUuid(value) {
+    return typeof value === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 
   async function requestDictionaryCardTranslation(card) {

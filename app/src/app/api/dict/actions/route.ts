@@ -23,6 +23,8 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const action = typeof body?.action === 'string' ? body.action : '';
   const entryId = typeof body?.entryId === 'string' ? body.entryId : '';
+  const clientEventId = normalizedMutationId(body?.clientEventId);
+  const sourceContext = normalizedSourceContext(body?.sourceContext);
 
   if (!SUPPORTED_ACTIONS.has(action)) {
     return jsonResponse(request, { error: 'unsupported_action' }, { status: 400 });
@@ -30,8 +32,17 @@ export async function POST(request: Request) {
   if (!entryId) {
     return jsonResponse(request, { error: 'missing_entry_id' }, { status: 400 });
   }
+  if (body?.clientEventId !== undefined && !clientEventId) {
+    return jsonResponse(request, { error: 'invalid_client_event_id' }, { status: 400 });
+  }
+  if (body?.sourceContext !== undefined && !sourceContext) {
+    return jsonResponse(request, { error: 'invalid_source_context' }, { status: 400 });
+  }
+  if (sourceContext && !clientEventId) {
+    return jsonResponse(request, { error: 'missing_client_event_id' }, { status: 400 });
+  }
   const turnId = normalizedTurnId(body?.turnId);
-  if (TURN_ID_REQUIRED_ACTIONS.has(action) && !turnId) {
+  if (TURN_ID_REQUIRED_ACTIONS.has(action) && !turnId && !clientEventId) {
     return jsonResponse(
       request,
       {
@@ -64,6 +75,12 @@ export async function POST(request: Request) {
   if (turnId) {
     platformBody.turnId = turnId;
   }
+  if (clientEventId) {
+    platformBody.clientEventId = clientEventId;
+  }
+  if (sourceContext) {
+    platformBody.sourceContext = sourceContext;
+  }
 
   const outcome = await postTwoThousandNlPlatformJson(
     'actions',
@@ -77,7 +94,17 @@ export async function POST(request: Request) {
 }
 
 function normalizedTurnId(value: unknown) {
+  return normalizedMutationId(value);
+}
+
+function normalizedMutationId(value: unknown) {
   if (typeof value !== 'string') return undefined;
-  const turnId = value.trim();
-  return TURN_ID_PATTERN.test(turnId) ? turnId : undefined;
+  const id = value.trim();
+  return TURN_ID_PATTERN.test(id) ? id : undefined;
+}
+
+function normalizedSourceContext(value: unknown) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return value as Record<string, unknown>;
 }
