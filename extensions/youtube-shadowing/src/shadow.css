@@ -1622,6 +1622,12 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: var(--af-accent-soft);
 }
 
+.af-ribbon-word.is-span-selected {
+  color: var(--af-accent-text);
+  background: var(--af-accent);
+  box-shadow: 0 0 0 1px var(--af-accent-strong);
+}
+
 .af-ribbon-word.is-word-replay {
   color: var(--af-accent);
   background: color-mix(in srgb, var(--af-accent-soft) 70%, var(--af-panel-bg) 30%);
@@ -1939,6 +1945,42 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-display-controls button.is-sticky {
   box-shadow: inset 0 -2px 0 var(--af-accent-strong);
+}
+
+.af-span-translation-card {
+  border-color: var(--af-accent);
+}
+
+.af-span-source {
+  color: var(--af-muted);
+}
+
+.af-span-translation-text {
+  margin: 8px 0 0;
+  color: var(--af-text);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.af-span-word-row,
+.af-span-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.af-span-word {
+  padding: 4px 7px;
+  color: var(--af-accent);
+  background: var(--af-accent-soft);
+  border: 1px solid var(--af-accent);
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .af-ribbon-controls button:hover:not(:disabled) {

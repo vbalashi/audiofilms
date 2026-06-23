@@ -468,6 +468,7 @@ function runGeometryScenario() {
     const wideWithDictionary = readGeometrySnapshot();
     const accountPlacementAssertions = assertDictionaryAccountPlacement();
     const dictionaryCardAssertions = assertDictionaryCardUi();
+    const spanSelectionAssertions = assertSpanSelectionUi();
 
     resizeChrome(430, 900);
     sleep(1200);
@@ -492,6 +493,7 @@ function runGeometryScenario() {
       assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
       ...accountPlacementAssertions,
       ...dictionaryCardAssertions,
+      ...spanSelectionAssertions,
       ...assertGeometry("wide phrase panel", wideBeforeLookup, { expectDictionary: false }),
       ...assertGeometry("wide with dictionary", wideWithDictionary, { expectDictionary: true }),
       ...assertGeometry("narrow with dictionary", narrowWithDictionary, { expectDictionary: true }),
@@ -705,6 +707,25 @@ function assertControlHierarchyUi() {
     assertion("phrase navigation is primary width", controls.practiceWidth > controls.modeWidth && controls.practiceWidth >= controls.displayWidth, JSON.stringify(controls)),
     assertion("display controls stay right of navigation", controls.displayLeft >= controls.practiceRight, JSON.stringify(controls)),
     assertion("display controls include shortcut labels", /\(S\)/.test(controls.displayText || "") && /\(T\)/.test(controls.displayText || ""), controls.displayText || ""),
+  ];
+}
+
+function assertSpanSelectionUi() {
+  const drag = dragFirstPhraseSpan();
+  sleep(900);
+  const spanGeometry = readGeometrySnapshot();
+  clickShadowButton("[data-af-span-clear]");
+  sleep(650);
+  const clearedGeometry = readGeometrySnapshot();
+  clickFirstLookupWord();
+  waitForDictionary(5000);
+
+  return [
+    assertion("span drag selected consecutive words", drag.selected === true, JSON.stringify(drag)),
+    assertion("span selection opens translation card", spanGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanGeometry.dictionaryUi)),
+    assertion("span translation keeps original words clickable", spanGeometry.dictionaryUi?.spanWordCount >= 2, JSON.stringify(spanGeometry.dictionaryUi)),
+    assertion("span selection highlights phrase words", spanGeometry.primaryUi?.spanSelectedWords >= 2, JSON.stringify(spanGeometry.primaryUi)),
+    assertion("clear span selection closes dictionary panel", !clearedGeometry.dictionary || clearedGeometry.dictionary.present === false, JSON.stringify(clearedGeometry.dictionary)),
   ];
 }
 
@@ -1398,6 +1419,7 @@ function readGeometrySnapshot() {
         text,
         hasTechnicalTerms: ["manual", "exact", "timedtext", "yt-dlp", "provider"].some((term) => lower.includes(term)),
         phraseIconButtons: root?.querySelectorAll(".af-practice-controls .af-phrase-icon-button .af-button-icon").length || 0,
+        spanSelectedWords: root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-selected").length || 0,
       };
     })(),
     controlHierarchy: (() => {
@@ -1466,6 +1488,10 @@ function readGeometrySnapshot() {
         inlineTranslations: dictionary.querySelectorAll(".af-inline-translation").length,
         actionStatus: dictionary.querySelector(".af-card-action-status")?.textContent || "",
         actionError: dictionary.querySelector(".af-source-option-error")?.textContent || "",
+        spanTranslationPresent: Boolean(dictionary.querySelector(".af-span-translation-card")),
+        spanWordCount: dictionary.querySelectorAll(".af-span-word").length,
+        spanTitle: dictionary.querySelector(".af-span-translation-card .af-dictionary-card-title")?.textContent || "",
+        spanText: dictionary.querySelector(".af-span-translation-text")?.textContent || "",
         hasRawHtml: /<!doctype|<html/i.test(text),
       };
     })(),
@@ -1623,6 +1649,50 @@ function clickFirstLookupWord(options = {}) {
     word: value,
     detail: word.textContent || value,
     modifiers: options,
+  });
+})()
+  `);
+  return JSON.parse(raw);
+}
+
+function dragFirstPhraseSpan() {
+  const raw = chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const words = Array.from(root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word") || [])
+    .filter((word) => (word.dataset.afLookupWord || "").length > 1);
+  const first = words[0];
+  const second = words[1];
+  if (!first || !second) {
+    return JSON.stringify({ selected: false, detail: "not-enough-words" });
+  }
+  first.dispatchEvent(new PointerEvent("pointerdown", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 1,
+  }));
+  second.dispatchEvent(new PointerEvent("pointerenter", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 1,
+  }));
+  second.dispatchEvent(new PointerEvent("pointerup", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 0,
+  }));
+  return JSON.stringify({
+    selected: true,
+    words: [
+      first.dataset.afLookupWord || first.textContent || "",
+      second.dataset.afLookupWord || second.textContent || "",
+    ],
   });
 })()
   `);

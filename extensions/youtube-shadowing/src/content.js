@@ -86,6 +86,9 @@
     lastMenuTrigger: null,
     guidedMode: false,
     selectedWord: null,
+    selectedSpan: null,
+    spanSelectionDraft: null,
+    suppressWordClickUntil: 0,
     dictionaryLookupSeq: 0,
     examplesExpanded: initialDisplayPreferences.examplesExpanded,
     exampleExpansionOverrides: {},
@@ -428,7 +431,7 @@
     }
 
     let dictionaryPanel = root.querySelector(`#${DICTIONARY_PANEL_ID}`);
-    if (state.selectedWord && !dictionaryPanel) {
+    if ((state.selectedWord || state.selectedSpan) && !dictionaryPanel) {
       dictionaryPanel = createDictionaryPanel();
     }
 
@@ -611,6 +614,7 @@
     close.setAttribute("aria-label", "Close dictionary panel");
     close.addEventListener("click", () => {
       state.selectedWord = null;
+      state.selectedSpan = null;
       render();
     });
     const body = appendElement(panel, "div", "af-dictionary-body");
@@ -874,7 +878,7 @@
       container.appendChild(ribbonPanel);
     }
 
-    if (!state.selectedWord) {
+    if (!state.selectedWord && !state.selectedSpan) {
       dictionaryPanel?.remove();
       return;
     }
@@ -2799,6 +2803,59 @@
     }
   }
 
+  async function requestSelectedSpanTranslation(span) {
+    const phrase = state.phrases[span.phraseIndex];
+    if (!phrase) return;
+    const source = getSelectedPracticeSource();
+    const sourceLanguageCode =
+      source?.loadedTranscriptResult?.languageCode ||
+      source?.languageCode ||
+      state.transcriptResult?.languageCode ||
+      "auto";
+    const targetLanguageCode = state.accountPreferences?.translationTargetLanguageCode || "";
+    const phraseId = `${phraseTranslationId(phrase, span.phraseIndex)}:span:${span.startTokenIndex}-${span.endTokenIndex}`;
+
+    if (state.accountStatus !== "signed-in") {
+      state.selectedSpan = {
+        ...span,
+        status: "failed",
+        error: "Connect 2000NL to translate selected phrases.",
+      };
+      render();
+      return;
+    }
+
+    try {
+      const translation = await postDictionaryCommand("phrase-translation", {
+        phraseId,
+        sourceText: span.text,
+        sourceLanguageCode,
+        contextText: span.contextText || phrase.text || "",
+        ...(targetLanguageCode ? { targetLanguageCode } : {}),
+        purpose: "youtube-span-translation",
+      });
+      const translatedText = translation?.translatedText || "";
+      if (state.selectedSpan !== span) return;
+      state.selectedSpan = translatedText
+        ? { ...span, ...translation, status: "ready", translatedText, error: "" }
+        : {
+            ...span,
+            ...translation,
+            status: "failed",
+            error: translation?.error?.message || translation?.error?.code || "Selected span translation returned no text.",
+          };
+      render();
+    } catch (error) {
+      if (state.selectedSpan !== span) return;
+      state.selectedSpan = {
+        ...span,
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      };
+      render();
+    }
+  }
+
   function shouldShowOriginalText(index) {
     if (index !== state.currentIndex) return true;
     return state.textVisible;
@@ -2824,6 +2881,7 @@
         "is-selected",
         state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, segment.lookupWord),
       );
+      word.classList.toggle("is-span-selected", isTokenInSelectedSpan(phraseIndex, segment.tokenIndex));
       word.classList.toggle(
         "is-word-replay",
         state.lastWordReplay?.phraseIndex === phraseIndex &&
@@ -2833,6 +2891,9 @@
       word.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (Date.now() < state.suppressWordClickUntil) {
+          return;
+        }
         if (event.shiftKey || event.ctrlKey || event.metaKey) {
           handleWordReplayGesture(event, segment.lookupWord, phraseIndex, {
             tokenIndex: segment.tokenIndex,
@@ -2849,7 +2910,79 @@
           originalToken: segment.originalToken,
         });
       });
+      word.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey) return;
+        state.spanSelectionDraft = {
+          phraseIndex,
+          startTokenIndex: segment.tokenIndex,
+          endTokenIndex: segment.tokenIndex,
+        };
+      });
+      word.addEventListener("pointerenter", (event) => {
+        const draft = state.spanSelectionDraft;
+        if (!draft || draft.phraseIndex !== phraseIndex || event.buttons !== 1) return;
+        draft.endTokenIndex = segment.tokenIndex;
+      });
+      word.addEventListener("pointerup", (event) => {
+        const draft = state.spanSelectionDraft;
+        if (!draft || draft.phraseIndex !== phraseIndex) return;
+        draft.endTokenIndex = segment.tokenIndex;
+        state.spanSelectionDraft = null;
+        const selected = selectPhraseSpan(draft);
+        if (selected) {
+          event.preventDefault();
+          event.stopPropagation();
+          state.suppressWordClickUntil = Date.now() + 500;
+        }
+      });
     }
+  }
+
+  function isTokenInSelectedSpan(phraseIndex, tokenIndex) {
+    const span = state.selectedSpan;
+    if (!span || span.phraseIndex !== phraseIndex) return false;
+    return tokenIndex >= span.startTokenIndex && tokenIndex <= span.endTokenIndex;
+  }
+
+  function clearSelectedSpan() {
+    state.selectedSpan = null;
+    render();
+  }
+
+  function selectPhraseSpan(draft) {
+    const phrase = state.phrases[draft.phraseIndex];
+    if (!phrase) return false;
+    const startTokenIndex = Math.min(draft.startTokenIndex, draft.endTokenIndex);
+    const endTokenIndex = Math.max(draft.startTokenIndex, draft.endTokenIndex);
+    if (endTokenIndex <= startTokenIndex) return false;
+
+    const tokens = phraseTokenApi.tokenizeClickablePhraseText(phrase.text)
+      .filter((segment) => segment.kind === "word" && segment.tokenIndex >= startTokenIndex && segment.tokenIndex <= endTokenIndex);
+    if (tokens.length < 2) return false;
+
+    const charStart = Math.min(...tokens.map((token) => token.charStart));
+    const charEnd = Math.max(...tokens.map((token) => token.charEnd));
+    const text = String(phrase.text || "").slice(charStart, charEnd).trim();
+    if (!text || !text.includes(" ")) return false;
+
+    const span = {
+      phraseIndex: draft.phraseIndex,
+      startTokenIndex,
+      endTokenIndex,
+      charStart,
+      charEnd,
+      text,
+      contextText: phrase.text || "",
+      tokens,
+      status: "loading",
+      translatedText: "",
+      error: "",
+    };
+    state.selectedWord = null;
+    state.selectedSpan = span;
+    render();
+    requestSelectedSpanTranslation(span);
+    return true;
   }
 
   function handleWordReplayGesture(event, word, phraseIndex, selection) {
@@ -2891,7 +3024,9 @@
     }
 
     clearElement(body);
-    if (state.selectedWord) {
+    if (state.selectedSpan) {
+      renderSelectedSpanCard(body);
+    } else if (state.selectedWord) {
       renderSelectedWordCard(body);
     } else {
       renderAccountCard(body);
@@ -2918,6 +3053,16 @@
   }
 
   function dictionaryHeaderCopy() {
+    const selectedSpan = state.selectedSpan;
+    if (selectedSpan) {
+      if (selectedSpan.status === "loading") {
+        return { title: "Selected phrase", subtitle: "Translating selected span..." };
+      }
+      if (selectedSpan.status === "failed") {
+        return { title: "Selected phrase", subtitle: "Translation failed" };
+      }
+      return { title: "Selected phrase", subtitle: "Span translation" };
+    }
     const selectedWord = state.selectedWord;
     if (!selectedWord) {
       return {
@@ -2978,6 +3123,53 @@
       return;
     }
     renderDictionaryLookup(parent);
+  }
+
+  function renderSelectedSpanCard(parent) {
+    const span = state.selectedSpan;
+    if (!span) return;
+
+    const card = appendElement(parent, "div", "af-dictionary-card af-span-translation-card");
+    const eyebrow = appendElement(card, "div", "af-dictionary-eyebrow");
+    eyebrow.textContent = "Selected span";
+    const title = appendElement(card, "div", "af-dictionary-card-title");
+    title.textContent = span.text;
+
+    const source = appendElement(card, "p", "af-dictionary-copy af-span-source");
+    source.textContent = span.contextText && span.contextText !== span.text
+      ? `Context: ${span.contextText}`
+      : "Current practice phrase";
+
+    if (span.status === "loading") {
+      const loading = appendElement(card, "p", "af-dictionary-copy");
+      loading.textContent = "Translating selected words...";
+      appendElement(card, "div", "af-lookup-skeleton");
+    } else if (span.status === "failed") {
+      const error = appendElement(card, "p", "af-source-option-error");
+      error.textContent = span.error || "Selected span translation failed.";
+    } else {
+      const translation = appendElement(card, "p", "af-span-translation-text");
+      translation.textContent = span.translatedText || "No translation returned.";
+    }
+
+    const words = appendElement(card, "div", "af-span-word-row");
+    for (const token of span.tokens || []) {
+      const word = appendButton(words, token.text, `afSpanWord-${token.tokenIndex}`);
+      word.className = "af-span-word";
+      word.addEventListener("click", () => {
+        selectLookupWord(token.lookupWord, span.phraseIndex, {
+          tokenIndex: token.tokenIndex,
+          charStart: token.charStart,
+          charEnd: token.charEnd,
+          originalToken: token.originalToken,
+        });
+      });
+    }
+
+    const actions = appendElement(card, "div", "af-span-actions");
+    const clear = appendButton(actions, "Clear selection", "afSpanClear");
+    clear.className = "af-secondary-button";
+    clear.addEventListener("click", clearSelectedSpan);
   }
 
   function renderReadyDictionaryCards(parent, selectedWord) {
@@ -3473,6 +3665,7 @@
     state.exampleExpansionOverrides = {};
     state.visibleTranslationsByCardId = {};
     state.cardActionFeedbackByCardId = {};
+    state.selectedSpan = null;
     state.selectedWord = {
       word,
       phraseIndex,
@@ -4476,6 +4669,7 @@
     state.timingOperationError = "";
     clearTimingOperationPoll();
     state.selectedWord = null;
+    state.selectedSpan = null;
     state.guidedMode = false;
     state.error = "";
     state.loading = true;
@@ -4665,6 +4859,7 @@
         video.currentTime = Math.max(0, phrases[nextIndex].startMs / 1000);
       }
       state.selectedWord = null;
+      state.selectedSpan = null;
       state.phraseTranslations = {};
       state.timingOperationError = "";
       source.loadedCueSource = transcriptResult.retrievalPath;
@@ -5062,6 +5257,7 @@
     state.currentIndex = targetIndex;
     schedulePhraseProgressSave(command);
     if (fromIndex !== targetIndex) {
+      state.selectedSpan = null;
       applyPhraseEntryDisplayState();
     }
     enterGuidedMode();
@@ -5149,6 +5345,7 @@
       const changed = activeIndex !== state.currentIndex;
       state.currentIndex = activeIndex;
       if (changed) {
+        state.selectedSpan = null;
         applyPhraseEntryDisplayState();
       }
       render();
