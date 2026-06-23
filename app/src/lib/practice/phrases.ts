@@ -2,7 +2,7 @@ import type { Phrase } from '@/types/subtitles';
 
 export const DEFAULT_MAX_WORDS_PER_PRACTICE_PHRASE = 18;
 export const DEFAULT_MAX_CHARACTERS_PER_PRACTICE_PHRASE = 140;
-export const DEFAULT_MAX_CONTINUATION_GAP_SEC = 0.5;
+export const DEFAULT_MAX_CONTINUATION_GAP_SEC = 0.85;
 
 export type PracticePhraseOptions = {
   maxWords?: number;
@@ -11,7 +11,7 @@ export type PracticePhraseOptions = {
 };
 
 export function wordCount(text: string) {
-  const matches = text.match(/[\p{L}\p{N}]+/gu);
+  const matches = text.match(/[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*/gu);
   return matches ? matches.length : 0;
 }
 
@@ -34,7 +34,27 @@ function splitLongText(text: string, options: Required<PracticePhraseOptions>) {
   }
 
   if (buffer) chunks.push(buffer);
+  mergeShortTrailingChunk(chunks, options);
   return chunks.length > 0 ? chunks : [text];
+}
+
+function mergeShortTrailingChunk(
+  chunks: string[],
+  options: Required<PracticePhraseOptions>,
+) {
+  if (chunks.length < 2) return;
+
+  const tail = chunks.at(-1) || '';
+  if (wordCount(tail) > 3) return;
+
+  const previous = chunks[chunks.length - 2];
+  const combined = `${previous} ${tail}`.trim().replace(/\s+/g, ' ');
+  if (
+    wordCount(combined) <= options.maxWords + 2 &&
+    combined.length <= options.maxCharacters
+  ) {
+    chunks.splice(chunks.length - 2, 2, combined);
+  }
 }
 
 function splitPhraseIntoTimedParts(

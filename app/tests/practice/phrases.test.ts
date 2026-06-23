@@ -125,6 +125,78 @@ describe('normalizePracticePhrases', () => {
     ]);
   });
 
+  it('keeps a short natural sentence tail instead of making a two-word phrase', () => {
+    const phrases: Phrase[] = [
+      {
+        id: 24,
+        startSec: 74.24,
+        endSec: 80.56,
+        text: "Dit is de planeet die ons idee over leven in het universum dit jaar op z'n kop gaat zetten.",
+      },
+    ];
+
+    expect(normalizePracticePhrases(phrases)).toEqual([
+      {
+        id: 0,
+        startSec: 74.24,
+        endSec: 80.56,
+        text: "Dit is de planeet die ons idee over leven in het universum dit jaar op z'n kop gaat zetten.",
+      },
+    ]);
+  });
+
+  it('counts apostrophes and hyphenated numeric names as one word for continuation limits', () => {
+    const phrases: Phrase[] = [
+      {
+        id: 3,
+        startSec: 3.64,
+        endSec: 7.12,
+        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman...',
+      },
+      {
+        id: 4,
+        startSec: 7.4,
+        endSec: 12.04,
+        text: '...brandt een kleine rode ster met de naam TRAPPIST-1.',
+      },
+    ];
+
+    expect(normalizePracticePhrases(phrases)).toEqual([
+      {
+        id: 0,
+        startSec: 3.64,
+        endSec: 12.04,
+        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam TRAPPIST-1.',
+      },
+    ]);
+  });
+
+  it('allows a slightly longer ellipsis continuation gap for short emphatic openings', () => {
+    const phrases: Phrase[] = [
+      {
+        id: 1,
+        startSec: 1.24,
+        endSec: 1.6,
+        text: 'Maar...',
+      },
+      {
+        id: 2,
+        startSec: 2.36,
+        endSec: 3,
+        text: '...écht goed.',
+      },
+    ];
+
+    expect(normalizePracticePhrases(phrases)).toEqual([
+      {
+        id: 0,
+        startSec: 1.24,
+        endSec: 3,
+        text: 'Maar écht goed.',
+      },
+    ]);
+  });
+
   it('renormalizes cached backend practice phrases when building snapshots', () => {
     const response: SubtitleResponse = {
       phrases: [],
