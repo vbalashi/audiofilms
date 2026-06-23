@@ -201,11 +201,13 @@ https://audiofilms-api.dilum.io/api/asr/jobs
 For private local compatibility with the old synchronous endpoint, set `localStorage.afShadowingLocalAsrUrl = "http://localhost:3000/api/local-asr-practice"` and enable `LOCAL_ASR_PRACTICE_ENABLED=true` in the app environment. External tester builds should use `/api/asr/jobs`.
 
 On normal caption loads, the extension first asks the practice timing endpoint
-for an existing ASR timing result with `reuseOnly=true`. If a matching completed
-job is already cached, the ASR snapshot is applied immediately and shown as
-`ASR transcript · Precise`; no new ASR job is created and no rate-limit slot is
-consumed. If there is no cached ASR timing result, the extension silently falls
-back to normal caption retrieval and keeps `Improve Timing` available.
+for an existing timing result with `reuseOnly=true` for the selected text source.
+Manual caption sources request manual-text alignment, while auto-generated
+tracks request ASR transcript timing. If a matching completed job is already
+cached, the timing snapshot is applied immediately; no new ASR job is created
+and no rate-limit slot is consumed. If there is no matching timing result, the
+extension silently falls back to normal caption retrieval and keeps `Improve
+Timing` available.
 
 Remote ASR job creation requires a tester token when the backend has
 `ASR_AUTH_REQUIRED=true`. This token must be owned by the extension trusted

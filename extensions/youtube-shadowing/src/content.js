@@ -1537,14 +1537,21 @@
 
   function buildPracticeTimingPayload(source) {
     const result = source?.loadedTranscriptResult || state.transcriptResult || {};
+    const sourceKind = timingPayloadSourceKind(source, result);
     const payload = {
       videoId: state.videoId,
       lang: result.languageCode || source?.languageCode || "auto",
-      sourceKind: result.sourceKind === "auto" || source?.track?.kind === "asr" ? "auto" : "manual",
-      textSource: "asr",
+      sourceKind,
+      textSource: sourceKind === "manual" ? "manual" : "asr",
       fullAudio: true,
     };
     return payload;
+  }
+
+  function timingPayloadSourceKind(source, result = {}) {
+    if (source?.track?.kind === "asr") return "auto";
+    if (result.sourceKind === "auto") return "auto";
+    return "manual";
   }
 
   function applyTimingOperation(operation) {
@@ -3838,9 +3845,12 @@
 
     if (!cues.length) return null;
 
+    const textSource = operation.input?.textSource || snapshot.textSource?.kind || "";
+    const isManualTextSource = textSource === "manual" || snapshot.textSource?.kind === "provided-captions";
+
     return {
       cues,
-      sourceKind: "asr",
+      sourceKind: isManualTextSource ? "manual" : "asr",
       retrievalPath: "practice-timing-cache",
       fetchOrigin: "backend",
       provider: "audiofilms-practice-timing",
@@ -3849,7 +3859,11 @@
       languageCode: snapshot.textSource?.languageCode || operation.input?.language || "",
       timingExactness: "word-level",
       qualityFlags: [],
-      warnings: [`ASR job completed: ${cues.length} ASR transcript phrases.`],
+      warnings: [
+        isManualTextSource
+          ? `ASR timing cache aligned ${cues.length} caption phrases.`
+          : `ASR job completed: ${cues.length} ASR transcript phrases.`,
+      ],
       retrievalAttempts: [{ path: "practice-timing-cache", status: "ok", cues: cues.length }],
       cacheStatus: "hit",
       fallbackUsed: false,
