@@ -82,6 +82,11 @@ For extension smoke checks:
   the action payload keeps the original video id, caption artifact/revision or
   extension fallback fingerprint, phrase locator, and clicked-token offsets
   instead of rebuilding provenance from current page state.
+- No-match dictionary lookup renders the generated-card fallback as a
+  connect-required state for guests and as draft -> save -> explicit
+  `start-learning` for signed-in learners. The service worker remains the only
+  component that attaches the 2000NL Connect token to generated draft/save
+  requests.
 
 For local app API checks:
 
@@ -110,6 +115,23 @@ For local app API checks:
 | Viewport variants | `4EE7m94mJpk` | Compact UI responsiveness | No overlap at narrow/wide widths; YouTube recommendations not replaced | Passing DOM-geometry smoke; screenshots captured |
 
 ## Latest Run
+
+### 2026-06-23: Generated Dictionary Fallback Route Checks
+
+Status: implemented for AudioFilms issue #10. Browser smoke still depends on a
+live signed-in 2000NL Connect session and a no-match lookup fixture.
+
+Validated:
+
+- AudioFilms proxy routes require a forwarded bearer token for
+  `/api/dict/generated-entry/draft` and `/api/dict/generated-entry`.
+- Generated draft/save requests are proxied to the matching 2000NL Platform
+  endpoints without exposing the token to the content script.
+- The extension no-match state renders a guest connect prompt or a signed-in
+  generated-card draft flow; saving a draft then submits the explicit
+  `start-learning` action and refreshes lookup state.
+- Static validation covered dictionary route tests, lint, build, and extension
+  syntax checks.
 
 ### 2026-06-23: Diagnostic Tools Baseline
 

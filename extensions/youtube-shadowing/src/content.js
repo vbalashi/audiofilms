@@ -3022,6 +3022,7 @@
       lookup.classList.add("is-empty");
       lookupTitle.textContent = "No match";
       lookupCopy.textContent = "No dictionary match was returned for this word.";
+      renderGeneratedFallback(lookup, selectedWord);
       return;
     }
 
@@ -3036,6 +3037,52 @@
     if (selectedWord.lookupResult?.meta?.warning) {
       const warning = appendElement(lookup, "p", "af-source-option-error");
       warning.textContent = selectedWord.lookupResult.meta.warning;
+    }
+  }
+
+  function renderGeneratedFallback(parent, selectedWord) {
+    const fallback = appendElement(parent, "div", "af-dictionary-card af-generated-fallback-card");
+    const title = appendElement(fallback, "div", "af-dictionary-card-title");
+    title.textContent = "Generated learner card";
+    const copy = appendElement(fallback, "p", "af-dictionary-copy");
+
+    if (state.accountStatus !== "signed-in") {
+      copy.textContent = "Connect 2000NL to generate and save a private learner card.";
+      renderConnectPrompt(fallback);
+      return;
+    }
+
+    if (selectedWord.generatedDraftStatus === "loading") {
+      copy.textContent = "Generating a same-language explanation...";
+      appendElement(fallback, "div", "af-lookup-skeleton");
+      return;
+    }
+
+    if (selectedWord.generatedDraft) {
+      const generated = selectedWord.generatedDraft.generated || {};
+      copy.textContent = generated.definition || "Generated draft is ready.";
+      if (generated.example?.source) {
+        const example = appendElement(fallback, "p", "af-dictionary-copy");
+        example.textContent = generated.example.source;
+      }
+      const save = appendButton(
+        fallback,
+        selectedWord.generatedDraftStatus === "saving" ? "Saving..." : "Save & learn",
+        "afGeneratedSave",
+      );
+      save.className = "af-lookup-retry";
+      save.disabled = selectedWord.generatedDraftStatus === "saving";
+      save.addEventListener("click", () => saveGeneratedDictionaryDraft(selectedWord));
+    } else {
+      copy.textContent = "Create a draft explanation in Dutch, then choose whether to save it.";
+      const generate = appendButton(fallback, "Generate learner card", "afGeneratedDraft");
+      generate.className = "af-lookup-retry";
+      generate.addEventListener("click", () => generateDictionaryDraft(selectedWord));
+    }
+
+    if (selectedWord.generatedDraftError) {
+      const error = appendElement(fallback, "p", "af-source-option-error");
+      error.textContent = selectedWord.generatedDraftError;
     }
   }
 
@@ -3392,6 +3439,9 @@
       translateUrl: "",
       cardActionStatus: "",
       cardActionError: "",
+      generatedDraftStatus: "",
+      generatedDraft: null,
+      generatedDraftError: "",
       translationsByCardId: {},
     };
     state.currentIndex = phraseIndex;
@@ -3502,6 +3552,133 @@
       };
       render();
     }
+  }
+
+  async function generateDictionaryDraft(selectedWord) {
+    if (!isCurrentLookup(selectedWord)) return;
+    const payload = generatedEntryBasePayload(selectedWord);
+    if (!payload.ok) {
+      state.selectedWord = {
+        ...state.selectedWord,
+        generatedDraftError: payload.error,
+      };
+      render();
+      return;
+    }
+
+    state.selectedWord = {
+      ...state.selectedWord,
+      generatedDraftStatus: "loading",
+      generatedDraftError: "",
+    };
+    render();
+
+    try {
+      const draft = await postDictionaryCommand("dict-generated-draft", payload.value);
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        generatedDraftStatus: "ready",
+        generatedDraft: draft?.draft || null,
+        generatedDraftError: "",
+      };
+      render();
+    } catch (error) {
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        generatedDraftStatus: "error",
+        generatedDraftError: error instanceof Error ? error.message : String(error),
+      };
+      render();
+    }
+  }
+
+  async function saveGeneratedDictionaryDraft(selectedWord) {
+    if (!isCurrentLookup(selectedWord)) return;
+    const draft = selectedWord.generatedDraft;
+    const payload = generatedEntryBasePayload(selectedWord, draft?.generated);
+    if (!payload.ok) {
+      state.selectedWord = {
+        ...state.selectedWord,
+        generatedDraftError: payload.error,
+      };
+      render();
+      return;
+    }
+
+    state.selectedWord = {
+      ...state.selectedWord,
+      generatedDraftStatus: "saving",
+      generatedDraftError: "",
+    };
+    render();
+
+    try {
+      const saved = await postDictionaryCommand("dict-generated-save", payload.value);
+      const entryId = saved?.entryId;
+      if (entryId) {
+        await postDictionaryCommand("dict-action", {
+          action: "start-learning",
+          entryId,
+          clientEventId: createMutationTurnId(),
+          sourceContext: generatedEntrySourceContext(selectedWord, entryId),
+        });
+      }
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        generatedDraftStatus: "saved",
+        generatedDraftError: "",
+        cardActionStatus: entryId ? "Saved and started learning." : "Saved.",
+      };
+      render();
+      await lookupSelectedWord(state.selectedWord);
+    } catch (error) {
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        generatedDraftStatus: "ready",
+        generatedDraftError: error instanceof Error ? error.message : String(error),
+      };
+      render();
+    }
+  }
+
+  function generatedEntryBasePayload(selectedWord, generated = null) {
+    const phrase = selectedWord.sourceBinding?.phrase ||
+      state.phrases[selectedWord.phraseIndex] ||
+      state.phrases[state.currentIndex];
+    const source = getSelectedPracticeSource();
+    const language = selectedWord.sourceBinding?.captionSource?.languageCode ||
+      source?.loadedTranscriptResult?.languageCode ||
+      source?.languageCode ||
+      "auto";
+    if (!selectedWord.word) return { ok: false, error: "Missing selected word." };
+    if (!language || language === "auto") return { ok: false, error: "Missing source language." };
+    return {
+      ok: true,
+      value: {
+        clickedForm: selectedWord.word,
+        sourceLanguageCode: language,
+        contextText: phrase?.text || "",
+        sourceContext: generatedEntrySourceContext(selectedWord),
+        ...(generated ? { generated } : {}),
+      },
+    };
+  }
+
+  function generatedEntrySourceContext(selectedWord, entryId = "") {
+    return buildDictionaryActionSourceContext(
+      selectedWord.sourceBinding,
+      {
+        id: entryId || "generated-draft",
+        entryId,
+        clickedForm: selectedWord.word,
+        headword: selectedWord.word,
+      },
+      entryId ? "start-learning" : "generated-entry-draft",
+    );
   }
 
   function createDictionarySourceBinding(word, phraseIndex, selection = {}) {
@@ -3843,6 +4020,10 @@
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/actions");
       } else if (operation === "dict-translation") {
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/translation");
+      } else if (operation === "dict-generated-draft") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/generated-entry/draft");
+      } else if (operation === "dict-generated-save") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/generated-entry");
       } else if (operation === "phrase-translation") {
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/practice/phrase-translations");
       } else if (operation === "dict-session") {
@@ -3900,6 +4081,36 @@
     }
     if (operation === "dict-action") {
       return jsonCommandResponse({ ok: true });
+    }
+    if (operation === "dict-generated-draft") {
+      return jsonCommandResponse({
+        ok: true,
+        draft: {
+          clickedForm: body?.clickedForm || "appel",
+          languageCode: body?.sourceLanguageCode || "nl",
+          contextText: body?.contextText || "",
+          sourceContext: body?.sourceContext,
+          generated: {
+            definition: "Een gegenereerde uitleg voor deze selectie.",
+            example: { source: body?.contextText || "Dit is een voorbeeld." },
+            provider: "mock",
+            model: "mock-generated-entry",
+            promptVersion: "generated-user-entry-v1",
+            generatedAt: new Date().toISOString(),
+            contentFingerprint: "mock-generated-entry",
+          },
+        },
+      });
+    }
+    if (operation === "dict-generated-save") {
+      return jsonCommandResponse({
+        ok: true,
+        entryId: "entry-generated-mock",
+        generation: {
+          status: "persisted",
+          requiresExplicitStartLearning: true,
+        },
+      });
     }
     return null;
   }

@@ -386,6 +386,8 @@ function dictionaryCommand(operation) {
     "dict-lookup": { method: "POST", path: "/api/dict/lookup" },
     "dict-action": { method: "POST", path: "/api/dict/actions" },
     "dict-translation": { method: "POST", path: "/api/dict/translation" },
+    "dict-generated-draft": { method: "POST", path: "/api/dict/generated-entry/draft" },
+    "dict-generated-save": { method: "POST", path: "/api/dict/generated-entry" },
     "dict-session": { method: "GET", path: "/api/dict/session" },
     "phrase-translation": { method: "POST", path: "/api/practice/phrase-translations" },
   };
