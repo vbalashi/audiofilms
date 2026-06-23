@@ -64,13 +64,12 @@ function getDemoSubtitleFallback(videoId: string): SubtitleResponse | null {
 }
 
 function withPracticePhrases(response: SubtitleResponse): SubtitleResponse {
-  if (Array.isArray(response.practicePhrases) && response.practicePhrases.length > 0) {
-    return response;
-  }
-
+  const phraseInput = Array.isArray(response.practicePhrases) && response.practicePhrases.length > 0
+    ? response.practicePhrases
+    : response.phrases;
   return {
     ...response,
-    practicePhrases: normalizePracticePhrases(response.phrases),
+    practicePhrases: normalizePracticePhrases(phraseInput),
   };
 }
 
