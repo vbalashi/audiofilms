@@ -44,7 +44,9 @@ For extension smoke checks:
 - phrase count opens a compact jump popover; Start and Go select the requested
   phrase, seek to its start, keep YouTube paused, and reject invalid input
   inline;
-- Mark Issue copies a navigation incident report after a manual miss;
+- Mark Issue opens the report dialog after a manual miss, accepts category/free
+  text/diagnostics consent, submits successfully, and keeps `Copy report` as the
+  network-failure fallback;
 - source mismatch or unknown source warning appears only when metadata is actually uncertain;
 - AudioFilms Off removes the learning layer and leaves YouTube visually normal.
 - Primary learner-facing UI does not show technical source terms such as

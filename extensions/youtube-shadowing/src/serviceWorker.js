@@ -263,6 +263,13 @@ function backendCommand(operation, body) {
       payload: body.payload || {},
     };
   }
+  if (operation === "issue-report-submit") {
+    return {
+      method: "POST",
+      url: new URL("/api/extension/issue-reports", `${apiBase}/`).toString(),
+      payload: body.payload || {},
+    };
+  }
   if (operation === "practice-operation") {
     const operationId = normalizePracticeOperationId(body.operationId);
     return {

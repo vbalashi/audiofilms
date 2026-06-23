@@ -459,7 +459,15 @@ For the redesigned UI, Debug, Copy Debug, Refresh Cache, and Mark Issue should
 move behind a quiet overflow/debug surface. Until that redesign lands, use the
 current visible controls for validation.
 
-Use `Mark Issue` while manually testing phrase navigation. Press it immediately after a wrong Replay/Previous/Next/Space behavior. It copies a navigation incident report to the clipboard with:
+Use `Mark Issue` while manually testing phrase navigation. Press it immediately
+after a wrong Replay/Previous/Next/Space behavior. It opens a compact report
+dialog with category, description, expected behavior, and explicit diagnostics
+consent. `Submit` sends the report to `POST /api/extension/issue-reports`.
+Reports are stored under `AUDIOFILMS_DATA_DIR/issue-reports` when
+`AUDIOFILMS_DATA_DIR` is configured, or `.issue-reports` in the app working
+directory for local runs.
+
+The diagnostic payload can include:
 
 - current video and URL;
 - selected practice source;
@@ -470,7 +478,11 @@ Use `Mark Issue` while manually testing phrase navigation. Press it immediately 
 - recent navigation commands and delayed playback observations;
 - recent debug events.
 
-Paste that report into the next agent message instead of describing the miss only in prose.
+If submission fails, use `Copy report` in the same dialog and paste that report
+into the next agent message instead of describing the miss only in prose.
+Owner/agent retrieval is available from `GET /api/extension/issue-reports` with
+the configured tester token. Direct GitHub issue creation remains a triage step,
+not an automatic tester submission side effect.
 
 For service worker or manifest/runtime errors:
 

@@ -1289,6 +1289,134 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   text-align: center;
 }
 
+.af-issue-dialog {
+  display: grid;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 12px;
+  color: var(--af-text);
+  background: var(--af-panel-alpha-bg);
+  border: 1px solid var(--af-border-strong);
+  border-radius: 8px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+
+.af-issue-dialog[hidden] {
+  display: none;
+}
+
+.af-issue-dialog-header,
+.af-issue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.af-issue-dialog-title {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.af-issue-close {
+  width: 28px;
+  height: 28px;
+}
+
+.af-issue-field {
+  display: grid;
+  gap: 4px;
+}
+
+.af-issue-label {
+  color: var(--af-muted);
+  font-family: var(--af-mono);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.af-issue-select,
+.af-issue-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--af-text);
+  background: var(--af-control);
+  border: 1px solid var(--af-border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.af-issue-select {
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
+.af-issue-textarea {
+  min-height: 58px;
+  max-height: 130px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.af-issue-consent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--af-muted);
+  font-size: 12px;
+}
+
+.af-issue-status {
+  padding: 7px 8px;
+  color: var(--af-success-text);
+  background: var(--af-success-soft);
+  border: 1px solid var(--af-success);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.af-issue-status[hidden] {
+  display: none;
+}
+
+.af-issue-status.is-error {
+  color: var(--af-danger-text);
+  background: var(--af-danger-soft);
+  border-color: var(--af-danger);
+}
+
+.af-primary-button,
+.af-secondary-inline-button {
+  min-height: 32px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.af-primary-button {
+  color: var(--af-accent-text);
+  background: var(--af-accent);
+  border: 1px solid var(--af-accent-strong);
+}
+
+.af-secondary-inline-button {
+  color: var(--af-accent);
+  background: var(--af-accent-soft);
+  border: 1px solid var(--af-accent);
+}
+
+.af-primary-button:disabled,
+.af-secondary-inline-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .af-utility-popover button::before {
   display: inline-block;
   width: 18px;

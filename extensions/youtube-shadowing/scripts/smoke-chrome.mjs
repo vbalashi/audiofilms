@@ -861,10 +861,36 @@ function assertReplayInteraction() {
 }
 
 function assertMarkIssueInteraction() {
+  setLocalStorageItem("afShadowingIssueReportMock", "success");
   clickShadowButton("[data-af-mark-issue]");
   sleep(400);
-  const snapshot = readSnapshot();
-  const report = snapshot.debug?.lastIssueReport || "";
+  const opened = readSnapshot();
+  fillIssueReportForm({
+    category: "timing",
+    description: "Smoke report: replay paused at the wrong place.",
+    expected: "Replay should stay near the current phrase.",
+    includeDiagnostics: true,
+  });
+  sleep(100);
+  const filled = readSnapshot();
+  clickShadowButton("[data-af-issue-submit]");
+  sleep(700);
+  const submitted = readSnapshot();
+  setLocalStorageItem("afShadowingIssueReportMock", "error");
+  fillIssueReportForm({
+    category: "ui-layout",
+    description: "Smoke report: fallback copy path.",
+    expected: "",
+    includeDiagnostics: false,
+  });
+  clickShadowButton("[data-af-issue-submit]");
+  sleep(700);
+  const failed = readSnapshot();
+  clickShadowButton("[data-af-issue-copy]");
+  sleep(300);
+  const copied = readSnapshot();
+  removeLocalStorageItem("afShadowingIssueReportMock");
+  const report = submitted.debug?.lastIssueReport || failed.debug?.lastIssueReport || "";
   let parsed = null;
   try {
     parsed = JSON.parse(report);
@@ -872,10 +898,46 @@ function assertMarkIssueInteraction() {
     parsed = null;
   }
   return [
+    assertion("mark issue opens report dialog", opened.issueDialog?.open === true, JSON.stringify(opened.issueDialog)),
+    assertion("report dialog accepts category", filled.issueDialog?.category === "timing", JSON.stringify(filled.issueDialog)),
+    assertion("report dialog accepts free text", /replay paused/i.test(filled.issueDialog?.description || ""), filled.issueDialog?.description || ""),
+    assertion("report dialog keeps diagnostics consent", filled.issueDialog?.diagnosticsChecked === true, JSON.stringify(filled.issueDialog)),
+    assertion("report dialog submits successfully", /af_report_smoke/.test(submitted.issueDialog?.status || ""), submitted.issueDialog?.status || ""),
+    assertion("report dialog shows failed submit fallback", failed.issueDialog?.statusIsError === true && /mock_failure|failed|copy/i.test(failed.issueDialog?.status || ""), failed.issueDialog?.status || ""),
+    assertion("report dialog copy fallback works", copied.issueDialog?.copyText === "Copied", copied.issueDialog?.copyText || ""),
     assertion("mark issue report captured", parsed?.kind === "audiofilms-youtube-navigation-issue", report.slice(0, 120)),
     assertion("mark issue includes current phrase", Boolean(parsed?.currentPhrase?.text), parsed?.currentPhrase?.text || ""),
     assertion("mark issue includes navigation events", Array.isArray(parsed?.navigationEvents) && parsed.navigationEvents.length > 0, String(parsed?.navigationEvents?.length || 0)),
   ];
+}
+
+function fillIssueReportForm({ category, description, expected, includeDiagnostics }) {
+  chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const category = root?.querySelector("[data-af-issue-category]");
+  const description = root?.querySelector("[data-af-issue-description]");
+  const expected = root?.querySelector("[data-af-issue-expected]");
+  const diagnostics = root?.querySelector("[data-af-issue-diagnostics]");
+  if (category) {
+    category.value = ${JSON.stringify(category)};
+    category.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+  if (description) {
+    description.value = ${JSON.stringify(description)};
+    description.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  }
+  if (expected) {
+    expected.value = ${JSON.stringify(expected)};
+    expected.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  }
+  if (diagnostics) {
+    diagnostics.checked = ${Boolean(includeDiagnostics)};
+    diagnostics.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
+  return "ok";
+})()
+  `);
 }
 
 function assertNextStaysOnTargetInteraction() {
@@ -1337,6 +1399,20 @@ function readSnapshot() {
       };
     })(),
     debug,
+    issueDialog: (() => {
+      const dialog = root.querySelector("[data-af-issue-dialog]");
+      return {
+        open: Boolean(dialog && !dialog.hidden),
+        category: root.querySelector("[data-af-issue-category]")?.value || "",
+        description: root.querySelector("[data-af-issue-description]")?.value || "",
+        expected: root.querySelector("[data-af-issue-expected]")?.value || "",
+        diagnosticsChecked: root.querySelector("[data-af-issue-diagnostics]")?.checked || false,
+        status: root.querySelector("[data-af-issue-status]")?.textContent || "",
+        statusIsError: root.querySelector("[data-af-issue-status]")?.classList.contains("is-error") || false,
+        submitDisabled: root.querySelector("[data-af-issue-submit]")?.disabled || false,
+        copyText: root.querySelector("[data-af-issue-copy]")?.textContent || "",
+      };
+    })(),
     controls: Array.from(root.querySelectorAll(".af-ribbon-controls button")).map((button) => ({
       text: button.textContent || "",
       display: getComputedStyle(button).display,

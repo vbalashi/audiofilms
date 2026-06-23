@@ -33,6 +33,16 @@
   const PRE_ROLL_MS = 150;
   const POST_ROLL_MS = 250;
   const CONTIGUOUS_BOUNDARY_GUARD_MS = 120;
+  const ISSUE_REPORT_CATEGORIES = [
+    { value: "phrase-boundary", label: "Incorrect phrase split / merged sentences" },
+    { value: "timing", label: "Wrong timing / pause point" },
+    { value: "navigation", label: "Replay / Previous / Next behaved wrong" },
+    { value: "translation", label: "Translation problem" },
+    { value: "dictionary", label: "Dictionary lookup problem" },
+    { value: "ui-layout", label: "UI/layout problem" },
+    { value: "captions-source", label: "Captions/source problem" },
+    { value: "other", label: "Other" },
+  ];
   const initialDisplayPreferences = readInitialDisplayPreferences();
 
   let panelGestureFallbackInstalled = false;
@@ -58,6 +68,15 @@
     diagnosticsClearedAt: "",
     cacheRefreshRequested: false,
     issueCopied: false,
+    issueDialogOpen: false,
+    issueCategory: "navigation",
+    issueDescription: "",
+    issueExpectedBehavior: "",
+    issueIncludeDiagnostics: true,
+    issueSubmitting: false,
+    issueSubmitStatus: "",
+    issueSubmitError: "",
+    issueSubmittedId: "",
     debugEvents: [],
     navigationEvents: [],
     lastIssueReport: null,
@@ -767,6 +786,7 @@
     originalButton.title = "Show or hide original text (S)";
     const translationButton = appendButton(displayControls, "Show Translation", "afPhraseTranslation");
     translationButton.title = "Show phrase translation (T)";
+    createIssueReportDialog(panel);
     const resizeHandle = appendElement(panel, "button", "af-panel-resize-handle");
     resizeHandle.type = "button";
     resizeHandle.dataset.afResizeHandle = "phraseRibbon";
@@ -807,8 +827,93 @@
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
     panel.querySelector("[data-af-diagnostics-clear]").addEventListener("click", clearDiagnostics);
     panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
-    panel.querySelector("[data-af-mark-issue]").addEventListener("click", markIssue);
+    panel.querySelector("[data-af-mark-issue]").addEventListener("click", openIssueReportDialog);
     return panel;
+  }
+
+  function createIssueReportDialog(panel) {
+    const dialog = appendElement(panel, "section", "af-issue-dialog");
+    dialog.dataset.afIssueDialog = "";
+    dialog.setAttribute("aria-label", "Report an issue");
+    dialog.hidden = true;
+
+    const header = appendElement(dialog, "div", "af-issue-dialog-header");
+    const title = appendElement(header, "div", "af-issue-dialog-title");
+    title.textContent = "Report issue";
+    const close = appendElement(header, "button", "af-icon-button af-issue-close");
+    close.type = "button";
+    close.dataset.afIssueClose = "";
+    close.innerHTML = `${iconSvg("close")}<span class="af-sr-only">Close</span>`;
+    close.setAttribute("aria-label", "Close report dialog");
+
+    const categoryLabel = appendElement(dialog, "label", "af-issue-field");
+    appendElement(categoryLabel, "span", "af-issue-label").textContent = "Category";
+    const category = appendElement(categoryLabel, "select", "af-issue-select");
+    category.dataset.afIssueCategory = "";
+    for (const item of ISSUE_REPORT_CATEGORIES) {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.label;
+      category.appendChild(option);
+    }
+
+    const descriptionLabel = appendElement(dialog, "label", "af-issue-field");
+    appendElement(descriptionLabel, "span", "af-issue-label").textContent = "What went wrong";
+    const description = appendElement(descriptionLabel, "textarea", "af-issue-textarea");
+    description.dataset.afIssueDescription = "";
+    description.rows = 3;
+    description.maxLength = 4000;
+
+    const expectedLabel = appendElement(dialog, "label", "af-issue-field");
+    appendElement(expectedLabel, "span", "af-issue-label").textContent = "Expected behavior";
+    const expected = appendElement(expectedLabel, "textarea", "af-issue-textarea");
+    expected.dataset.afIssueExpected = "";
+    expected.rows = 2;
+    expected.maxLength = 4000;
+
+    const consentLabel = appendElement(dialog, "label", "af-issue-consent");
+    const consent = document.createElement("input");
+    consent.type = "checkbox";
+    consent.dataset.afIssueDiagnostics = "";
+    consentLabel.appendChild(consent);
+    appendElement(consentLabel, "span", "").textContent = "Include current diagnostics";
+
+    const status = appendElement(dialog, "div", "af-issue-status");
+    status.dataset.afIssueStatus = "";
+
+    const actions = appendElement(dialog, "div", "af-issue-actions");
+    const submit = appendElement(actions, "button", "af-primary-button");
+    submit.type = "button";
+    submit.dataset.afIssueSubmit = "";
+    submit.textContent = "Submit";
+    const copy = appendElement(actions, "button", "af-secondary-inline-button");
+    copy.type = "button";
+    copy.dataset.afIssueCopy = "";
+    copy.textContent = "Copy report";
+
+    close.addEventListener("click", closeIssueReportDialog);
+    category.addEventListener("change", (event) => {
+      state.issueCategory = event.currentTarget.value;
+      render();
+    });
+    description.addEventListener("input", (event) => {
+      state.issueDescription = event.currentTarget.value;
+      state.issueSubmitError = "";
+      state.issueSubmitStatus = "";
+      render();
+    });
+    expected.addEventListener("input", (event) => {
+      state.issueExpectedBehavior = event.currentTarget.value;
+      render();
+    });
+    consent.addEventListener("change", (event) => {
+      state.issueIncludeDiagnostics = Boolean(event.currentTarget.checked);
+      render();
+    });
+    submit.addEventListener("click", submitIssueReport);
+    copy.addEventListener("click", copyCurrentIssueReport);
+
+    return dialog;
   }
 
   function createDebugPanel() {
@@ -1075,6 +1180,7 @@
     const diagnosticsClear = panel.querySelector("[data-af-diagnostics-clear]");
     const refreshCache = panel.querySelector("[data-af-refresh-cache]");
     const markIssue = panel.querySelector("[data-af-mark-issue]");
+    const issueDialog = panel.querySelector("[data-af-issue-dialog]");
     const playbackButtons = [
       panel.querySelector("[data-af-prev]"),
       panel.querySelector("[data-af-replay]"),
@@ -1150,7 +1256,9 @@
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
     diagnosticsClear.textContent = state.diagnosticsClearedAt ? "Diagnostics Cleared" : "Clear Diagnostics";
     refreshCache.textContent = state.cacheRefreshRequested ? "Refreshing" : "Refresh Cache";
-    markIssue.textContent = state.issueCopied ? "Issue Copied" : "Mark Issue";
+    markIssue.textContent = state.issueDialogOpen ? "Reporting..." : "Mark Issue";
+    markIssue.setAttribute("aria-expanded", state.issueDialogOpen ? "true" : "false");
+    renderIssueReportDialog(issueDialog);
     error.textContent = state.error;
 
     playbackButtons.forEach((button) => {
@@ -2253,18 +2361,41 @@
     return message || "Timing improvement failed.";
   }
 
-  function markIssue() {
+  function openIssueReportDialog() {
     const report = formatIssueReport();
     recordDebugEvent("issue-marked", {
       navigationEventId: state.navigationEvents.at(-1)?.id || null,
       currentIndex: state.currentIndex,
     });
     state.lastIssueReport = report;
+    state.issueDialogOpen = true;
+    state.issueSubmitStatus = "";
+    state.issueSubmitError = "";
+    state.issueSubmittedId = "";
+    render();
+  }
+
+  function closeIssueReportDialog() {
+    if (state.issueSubmitting) return;
+    state.issueDialogOpen = false;
+    state.issueSubmitStatus = "";
+    state.issueSubmitError = "";
+    render();
+  }
+
+  function copyCurrentIssueReport() {
+    const report = state.lastIssueReport || formatIssueReport();
+    state.lastIssueReport = report;
     state.issueCopied = true;
+    state.issueSubmitStatus = "Report copied.";
+    state.issueSubmitError = "";
     render();
     copyIssueReport(report);
     window.setTimeout(() => {
       state.issueCopied = false;
+      if (state.issueSubmitStatus === "Report copied.") {
+        state.issueSubmitStatus = "";
+      }
       render();
     }, 1500);
   }
@@ -2273,8 +2404,110 @@
     Promise.resolve()
       .then(() => navigator.clipboard.writeText(report))
       .catch(() => {
-        copyTextWithFallback(report);
+      copyTextWithFallback(report);
+    });
+  }
+
+  async function submitIssueReport() {
+    const description = state.issueDescription.trim();
+    if (!description) {
+      state.issueSubmitError = "Describe what went wrong before submitting.";
+      state.issueSubmitStatus = "";
+      render();
+      return;
+    }
+
+    const report = state.lastIssueReport || formatIssueReport();
+    state.lastIssueReport = report;
+    state.issueSubmitting = true;
+    state.issueSubmitError = "";
+    state.issueSubmitStatus = "Submitting...";
+    render();
+
+    try {
+      const diagnostics = state.issueIncludeDiagnostics ? JSON.parse(report) : undefined;
+      const result = await postBackendJson("issue-report-submit", {
+        payload: {
+          reportVersion: 1,
+          category: state.issueCategory,
+          description,
+          expectedBehavior: state.issueExpectedBehavior.trim(),
+          includeDiagnostics: state.issueIncludeDiagnostics,
+          diagnostics,
+          extensionVersion: extensionVersion(),
+          browserUserAgent: navigator.userAgent,
+        },
       });
+      state.issueSubmittedId = result?.id || "";
+      state.issueSubmitStatus = result?.id ? `Submitted: ${result.id}` : "Submitted.";
+      state.issueSubmitError = "";
+      state.issueDescription = "";
+      state.issueExpectedBehavior = "";
+      recordDebugEvent("issue-report-submitted", {
+        reportId: result?.id || null,
+        category: state.issueCategory,
+      });
+    } catch (error) {
+      state.issueSubmitStatus = "";
+      state.issueSubmitError = readableIssueSubmitError(error);
+      recordDebugEvent("issue-report-submit-failed", {
+        error: state.issueSubmitError,
+        category: state.issueCategory,
+      });
+    } finally {
+      state.issueSubmitting = false;
+      render();
+    }
+  }
+
+  function readableIssueSubmitError(error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    if (/rate/i.test(message)) return "Too many reports. Copy report and share it manually.";
+    if (/missing_description/i.test(message)) return "Describe what went wrong before submitting.";
+    return message || "Report submit failed. Copy report and share it manually.";
+  }
+
+  function extensionVersion() {
+    try {
+      return chrome.runtime.getManifest().version || "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function renderIssueReportDialog(dialog) {
+    if (!(dialog instanceof HTMLElement)) return;
+    const category = dialog.querySelector("[data-af-issue-category]");
+    const description = dialog.querySelector("[data-af-issue-description]");
+    const expected = dialog.querySelector("[data-af-issue-expected]");
+    const diagnostics = dialog.querySelector("[data-af-issue-diagnostics]");
+    const status = dialog.querySelector("[data-af-issue-status]");
+    const submit = dialog.querySelector("[data-af-issue-submit]");
+    const copy = dialog.querySelector("[data-af-issue-copy]");
+
+    dialog.hidden = !state.issueDialogOpen;
+    dialog.classList.toggle("is-submitting", state.issueSubmitting);
+    if (category) category.value = state.issueCategory;
+    if (description && description.value !== state.issueDescription) {
+      description.value = state.issueDescription;
+    }
+    if (expected && expected.value !== state.issueExpectedBehavior) {
+      expected.value = state.issueExpectedBehavior;
+    }
+    if (diagnostics) diagnostics.checked = state.issueIncludeDiagnostics;
+    if (status) {
+      status.textContent = state.issueSubmitError || state.issueSubmitStatus;
+      status.classList.toggle("is-error", Boolean(state.issueSubmitError));
+      status.hidden = !state.issueSubmitError && !state.issueSubmitStatus;
+    }
+    if (submit) {
+      submit.textContent = state.issueSubmitting ? "Submitting..." : "Submit";
+      submit.disabled = state.issueSubmitting || !state.issueDescription.trim();
+    }
+    if (copy) {
+      copy.textContent = state.issueCopied ? "Copied" : "Copy report";
+      copy.disabled = state.issueSubmitting;
+    }
   }
 
   function copyTextWithFallback(text) {
@@ -4526,6 +4759,10 @@
   }
 
   function requestBackendCommand(operation, body = {}) {
+    if (operation === "issue-report-submit") {
+      const mockResponse = issueReportMockResponse();
+      if (mockResponse) return Promise.resolve(mockResponse);
+    }
     if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
       return requestBackendCommandDirect(operation, body);
     }
@@ -4552,6 +4789,13 @@
       fetchOptions.method = "POST";
       fetchOptions.headers["content-type"] = "application/json";
       fetchOptions.body = JSON.stringify(body.payload || {});
+    } else if (operation === "issue-report-submit") {
+      const mockResponse = issueReportMockResponse();
+      if (mockResponse) return Promise.resolve(mockResponse);
+      url = new URL("/api/extension/issue-reports", `${apiBase}/`);
+      fetchOptions.method = "POST";
+      fetchOptions.headers["content-type"] = "application/json";
+      fetchOptions.body = JSON.stringify(body.payload || {});
     } else if (operation === "practice-operation") {
       url = new URL(`/api/practice/operations/${encodeURIComponent(body.operationId || "")}`, `${apiBase}/`);
     } else {
@@ -4566,6 +4810,22 @@
       status: response.status,
       text: await response.text(),
     }));
+  }
+
+  function issueReportMockResponse() {
+    const mode = window.localStorage.getItem("afShadowingIssueReportMock");
+    if (mode === "success") {
+      return jsonCommandResponse({
+        id: "af_report_smoke",
+        status: "new",
+        category: state.issueCategory,
+        createdAt: new Date().toISOString(),
+      }, true, 201);
+    }
+    if (mode === "error") {
+      return jsonCommandResponse({ error: "issue_report_mock_failure" }, false, 503);
+    }
+    return null;
   }
 
   function apiBaseForBackendCommands() {
