@@ -33,6 +33,7 @@
   const initialDisplayPreferences = readInitialDisplayPreferences();
 
   let panelGestureFallbackInstalled = false;
+  let shadowLayerFocusInstalled = false;
   let displayPreferencesDirty = false;
   let displayPreferencesMutationSeq = 0;
 
@@ -47,6 +48,8 @@
     transcriptResult: null,
     debugVisible: false,
     debugCopied: false,
+    debugPanelInFront: false,
+    diagnosticsClearedAt: "",
     cacheRefreshRequested: false,
     issueCopied: false,
     debugEvents: [],
@@ -110,6 +113,7 @@
     if (updates.lastError) {
       document.documentElement.dataset.afShadowingLastError = String(updates.lastError).slice(0, 180);
     }
+    publishDiagnosticsSnapshot();
   }
 
   function readInitialDisplayPreferences() {
@@ -141,6 +145,7 @@
         locked: layout.locked !== false,
         phraseRibbon: normalizePanelGeometry(layout.phraseRibbon),
         dictionaryPanel: normalizePanelGeometry(layout.dictionaryPanel),
+        debugPanel: normalizePanelGeometry(layout.debugPanel),
         zOrder: layout.zOrder === "dictionaryPanel" ? "dictionaryPanel" : "phraseRibbon",
       },
     };
@@ -360,8 +365,13 @@
       dictionaryPanel = createDictionaryPanel();
     }
 
-    mountWorkspace(container, dictionaryPanel, ribbonPanel);
-    return { dictionaryPanel, ribbonPanel };
+    let debugPanel = root.querySelector("[data-af-debug-panel]");
+    if (!debugPanel) {
+      debugPanel = createDebugPanel();
+    }
+
+    mountWorkspace(container, dictionaryPanel, ribbonPanel, debugPanel);
+    return { dictionaryPanel, ribbonPanel, debugPanel };
   }
 
   function ensureAudioFilmsRoot() {
@@ -375,7 +385,17 @@
 
     const root = host.shadowRoot || host.attachShadow({ mode: "open" });
     ensureShadowStyles(root);
+    installShadowLayerFocus(root);
     return root;
+  }
+
+  function installShadowLayerFocus(root) {
+    if (shadowLayerFocusInstalled) return;
+    shadowLayerFocusInstalled = true;
+    root.addEventListener("pointerdown", handleShadowLayerFocus, true);
+    root.addEventListener("mousedown", handleShadowLayerFocus, true);
+    document.addEventListener("pointerdown", handleShadowLayerFocus, true);
+    document.addEventListener("mousedown", handleShadowLayerFocus, true);
   }
 
   function ensureShadowContainer(root) {
@@ -423,6 +443,8 @@
     const panel = document.createElement("aside");
     panel.id = DICTIONARY_PANEL_ID;
     panel.setAttribute("aria-label", "AudioFilms dictionary lookup");
+    panel.addEventListener("pointerdown", bringDebugPanelBehindFromPanel, true);
+    panel.addEventListener("mousedown", bringDebugPanelBehindFromPanel, true);
 
     const header = appendElement(panel, "div", "af-dictionary-header");
     header.dataset.afDragSurface = "dictionaryPanel";
@@ -465,6 +487,8 @@
     const panel = document.createElement("section");
     panel.id = RIBBON_PANEL_ID;
     panel.setAttribute("aria-label", "AudioFilms phrase ribbon");
+    panel.addEventListener("pointerdown", bringDebugPanelBehindFromPanel, true);
+    panel.addEventListener("mousedown", bringDebugPanelBehindFromPanel, true);
 
     const meta = appendElement(panel, "div", "af-ribbon-meta");
     meta.dataset.afDragSurface = "phraseRibbon";
@@ -527,6 +551,7 @@
     appendButton(debugSection, "Mark Issue", "afMarkIssue");
     appendButton(debugSection, "Debug", "afDebugToggle");
     appendButton(debugSection, "Copy Debug", "afDebugCopy");
+    appendButton(debugSection, "Clear Diagnostics", "afDiagnosticsClear");
     appendButton(debugSection, "Refresh Cache", "afRefreshCache");
 
     const list = appendElement(panel, "div", "af-ribbon-list");
@@ -534,8 +559,6 @@
 
     const error = appendElement(panel, "div", "af-ribbon-error");
     error.dataset.afError = "";
-    const debug = appendElement(panel, "pre", "af-ribbon-debug");
-    debug.dataset.afDebug = "";
 
     const controls = appendElement(panel, "div", "af-ribbon-controls");
     const practiceControls = appendElement(controls, "div", "af-control-group af-practice-controls");
@@ -606,9 +629,42 @@
     });
     panel.querySelector("[data-af-debug-toggle]").addEventListener("click", toggleDebug);
     panel.querySelector("[data-af-debug-copy]").addEventListener("click", copyDebug);
+    panel.querySelector("[data-af-diagnostics-clear]").addEventListener("click", clearDiagnostics);
     panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
     panel.querySelector("[data-af-mark-issue]").addEventListener("click", markIssue);
     return panel;
+  }
+
+  function createDebugPanel() {
+    const debugPanel = document.createElement("section");
+    debugPanel.className = "af-ribbon-debug-panel";
+    debugPanel.dataset.afDebugPanel = "";
+    debugPanel.setAttribute("aria-label", "Debug output");
+    debugPanel.addEventListener("pointerdown", bringDebugPanelToFrontFromEvent, true);
+    debugPanel.addEventListener("mousedown", bringDebugPanelToFrontFromEvent, true);
+
+    const debugHeader = appendElement(debugPanel, "div", "af-ribbon-debug-header");
+    debugHeader.dataset.afDebugDragSurface = "";
+    const debugTitle = appendElement(debugHeader, "div", "af-ribbon-debug-title");
+    debugTitle.textContent = "Debug";
+    const debugActions = appendElement(debugHeader, "div", "af-ribbon-debug-actions");
+    appendButton(debugActions, "Copy", "afDebugPanelCopy");
+    appendButton(debugActions, "Close", "afDebugPanelClose");
+    const debug = appendElement(debugPanel, "pre", "af-ribbon-debug");
+    debug.dataset.afDebug = "";
+    const debugResizeHandle = appendElement(debugPanel, "button", "af-ribbon-debug-resize-handle");
+    debugResizeHandle.type = "button";
+    debugResizeHandle.dataset.afDebugResizeHandle = "";
+    debugResizeHandle.setAttribute("aria-label", "Resize debug panel");
+
+    debugPanel.querySelector("[data-af-debug-panel-copy]").addEventListener("click", copyDebug);
+    debugPanel.querySelector("[data-af-debug-panel-close]").addEventListener("click", closeDebug);
+    debugPanel.querySelector("[data-af-debug-drag-surface]").addEventListener("pointerdown", beginDebugPanelDrag);
+    debugPanel.querySelector("[data-af-debug-drag-surface]").addEventListener("mousedown", beginDebugPanelDrag);
+    debugPanel.querySelector("[data-af-debug-resize-handle]").addEventListener("pointerdown", beginDebugPanelResize);
+    debugPanel.querySelector("[data-af-debug-resize-handle]").addEventListener("mousedown", beginDebugPanelResize);
+
+    return debugPanel;
   }
 
   function createAccountControl(parent) {
@@ -637,7 +693,11 @@
     return accountWrap;
   }
 
-  function mountWorkspace(container, dictionaryPanel, ribbonPanel) {
+  function mountWorkspace(container, dictionaryPanel, ribbonPanel, debugPanel) {
+    if (debugPanel.parentElement !== container) {
+      container.appendChild(debugPanel);
+    }
+
     if (ribbonPanel.parentElement !== container) {
       container.appendChild(ribbonPanel);
     }
@@ -773,13 +833,32 @@
       return;
     }
 
-    const { dictionaryPanel, ribbonPanel } = ensureWorkspace();
+    const { dictionaryPanel, ribbonPanel, debugPanel } = ensureWorkspace();
     applyPanelLayout(ribbonPanel, dictionaryPanel);
     renderRibbon(ribbonPanel);
+    renderDebugPanel(debugPanel);
     if (dictionaryPanel) {
       renderDictionary(dictionaryPanel);
     }
     document.documentElement.classList.toggle("af-shadowing-hide-transcript", !state.textVisible);
+  }
+
+  function renderDebugPanel(debugPanel) {
+    if (!(debugPanel instanceof HTMLElement)) return;
+    const debug = debugPanel.querySelector("[data-af-debug]");
+    const debugPanelCopy = debugPanel.querySelector("[data-af-debug-panel-copy]");
+
+    debugPanel.classList.toggle("is-open", state.debugVisible);
+    debugPanel.classList.toggle("is-front", state.debugPanelInFront);
+    debugPanel.classList.toggle("is-behind", !state.debugPanelInFront);
+    if (debugPanelCopy) {
+      debugPanelCopy.textContent = state.debugCopied ? "Copied" : "Copy";
+    }
+    if (debug) {
+      debug.textContent = state.debugVisible ? formatDebugState() : "";
+    }
+    applyDebugPanelGeometry(debugPanel);
+    applyDebugPanelLayer(debugPanel);
   }
 
   function renderRibbon(panel) {
@@ -790,7 +869,6 @@
     const mode = panel.querySelector("[data-af-mode]");
     const list = panel.querySelector("[data-af-ribbon-list]");
     const error = panel.querySelector("[data-af-error]");
-    const debug = panel.querySelector("[data-af-debug]");
     const controls = panel.querySelector(".af-ribbon-controls");
     const hints = panel.querySelector(".af-shortcut-hints");
     const toggle = panel.querySelector("[data-af-toggle]");
@@ -815,6 +893,7 @@
     const layoutReset = panel.querySelector("[data-af-layout-reset]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
     const debugCopy = panel.querySelector("[data-af-debug-copy]");
+    const diagnosticsClear = panel.querySelector("[data-af-diagnostics-clear]");
     const refreshCache = panel.querySelector("[data-af-refresh-cache]");
     const markIssue = panel.querySelector("[data-af-mark-issue]");
     const playbackButtons = [
@@ -876,10 +955,10 @@
     });
     debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
+    diagnosticsClear.textContent = state.diagnosticsClearedAt ? "Diagnostics Cleared" : "Clear Diagnostics";
     refreshCache.textContent = state.cacheRefreshRequested ? "Refreshing" : "Refresh Cache";
     markIssue.textContent = state.issueCopied ? "Issue Copied" : "Mark Issue";
     error.textContent = state.error;
-    debug.textContent = state.debugVisible ? formatDebugState() : "";
 
     playbackButtons.forEach((button) => {
       button.hidden = isEmpty;
@@ -890,6 +969,7 @@
       button.disabled = state.loading || !hasPhrases;
     });
     refreshCache.disabled = state.loading || !getSelectedPracticeSource();
+    diagnosticsClear.disabled = state.loading;
     markIssue.disabled = state.loading;
     sourceToggle.dataset.afReadiness = readiness.state;
 
@@ -996,6 +1076,7 @@
     return !layout.locked
       || panelHasGeometry(layout.phraseRibbon)
       || panelHasGeometry(layout.dictionaryPanel)
+      || panelHasGeometry(layout.debugPanel)
       || layout.zOrder !== "phraseRibbon";
   }
 
@@ -1031,6 +1112,7 @@
       locked: true,
       phraseRibbon: { x: null, y: null, width: null, height: null },
       dictionaryPanel: { x: null, y: null, width: null, height: null },
+      debugPanel: { x: null, y: null, width: null, height: null },
       zOrder: "phraseRibbon",
     };
   }
@@ -1063,6 +1145,175 @@
     panel.style.top = geometry.y === null ? "" : `${geometry.y}px`;
     panel.style.width = geometry.width === null ? "" : `${geometry.width}px`;
     panel.style.height = panelKey === "phraseRibbon" || geometry.height === null ? "" : `${geometry.height}px`;
+  }
+
+  function applyDebugPanelGeometry(panel, overrideGeometry = null) {
+    if (!(panel instanceof HTMLElement)) return;
+    const geometry = clampDebugPanelGeometry(overrideGeometry || state.displayPreferences.layout.debugPanel);
+    if (!panelHasGeometry(geometry)) {
+      panel.style.left = "";
+      panel.style.top = "";
+      panel.style.right = "";
+      panel.style.bottom = "";
+      panel.style.width = "";
+      panel.style.height = "";
+      return;
+    }
+
+    panel.style.left = `${geometry.x}px`;
+    panel.style.top = `${geometry.y}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+    panel.style.width = `${geometry.width}px`;
+    panel.style.height = `${geometry.height}px`;
+  }
+
+  function applyDebugPanelLayer(panel = debugPanelElement()) {
+    if (!(panel instanceof HTMLElement)) return;
+    panel.style.zIndex = state.debugPanelInFront ? "1003" : "1000";
+  }
+
+  function bringDebugPanelToFrontFromEvent(event) {
+    if (event.type === "mousedown" && event.button !== 0) return;
+    bringDebugPanelToFront();
+  }
+
+  function handleShadowLayerFocus(event) {
+    if (event.type === "mousedown" && event.button !== 0) return;
+    if (!state.debugVisible) return;
+
+    const debugPanel = debugPanelElement();
+    if (!(debugPanel instanceof HTMLElement)) return;
+
+    const x = event.clientX;
+    const y = event.clientY;
+    if (rectContainsPoint(debugPanel.getBoundingClientRect(), x, y)) {
+      bringDebugPanelToFront();
+      return;
+    }
+
+    const ribbonPanel = panelElement("phraseRibbon");
+    const dictionaryPanel = panelElement("dictionaryPanel");
+    const clickedMainPanel = [ribbonPanel, dictionaryPanel].some((panel) => (
+      panel instanceof HTMLElement && rectContainsPoint(panel.getBoundingClientRect(), x, y)
+    ));
+    if (clickedMainPanel) {
+      bringDebugPanelBehind();
+    }
+  }
+
+  function bringDebugPanelBehindFromPanel(event) {
+    if (event.type === "mousedown" && event.button !== 0) return;
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    if (path.some((element) => element instanceof Element && element.matches?.("[data-af-debug-panel], [data-af-debug-panel] *"))) {
+      return;
+    }
+    bringDebugPanelBehind();
+  }
+
+  function bringDebugPanelToFront() {
+    if (state.debugPanelInFront) return;
+    state.debugPanelInFront = true;
+    const panel = debugPanelElement();
+    panel?.classList.add("is-front");
+    panel?.classList.remove("is-behind");
+    applyDebugPanelLayer(panel);
+  }
+
+  function bringDebugPanelBehind() {
+    if (!state.debugPanelInFront) return;
+    state.debugPanelInFront = false;
+    const panel = debugPanelElement();
+    panel?.classList.remove("is-front");
+    panel?.classList.add("is-behind");
+    applyDebugPanelLayer(panel);
+  }
+
+  function beginDebugPanelDrag(event) {
+    if (event.type === "mousedown" && event.button !== 0) return;
+    if (isInteractiveDragTarget(event.target)) return;
+    const panel = debugPanelElement();
+    if (!(panel instanceof HTMLElement)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    bringDebugPanelToFront();
+    const rect = panel.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startGeometry = clampDebugPanelGeometry({
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+    let nextGeometry = startGeometry;
+    const ownerDocument = panel.ownerDocument || document;
+    const moveEventName = event.type === "mousedown" ? "mousemove" : "pointermove";
+    const upEventName = event.type === "mousedown" ? "mouseup" : "pointerup";
+    const cancelEventName = event.type === "mousedown" ? "mouseup" : "pointercancel";
+
+    const onMove = (moveEvent) => {
+      nextGeometry = clampDebugPanelGeometry({
+        ...startGeometry,
+        x: startGeometry.x + moveEvent.clientX - startX,
+        y: startGeometry.y + moveEvent.clientY - startY,
+      });
+      applyDebugPanelGeometry(panel, nextGeometry);
+    };
+    const onUp = () => {
+      ownerDocument.removeEventListener(moveEventName, onMove, true);
+      ownerDocument.removeEventListener(upEventName, onUp, true);
+      ownerDocument.removeEventListener(cancelEventName, onUp, true);
+      saveDebugPanelGeometry(nextGeometry);
+    };
+
+    ownerDocument.addEventListener(moveEventName, onMove, true);
+    ownerDocument.addEventListener(upEventName, onUp, true);
+    ownerDocument.addEventListener(cancelEventName, onUp, true);
+  }
+
+  function beginDebugPanelResize(event) {
+    if (event.type === "mousedown" && event.button !== 0) return;
+    const panel = debugPanelElement();
+    if (!(panel instanceof HTMLElement)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    bringDebugPanelToFront();
+    const rect = panel.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startGeometry = clampDebugPanelGeometry({
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height,
+    });
+    let nextGeometry = startGeometry;
+    const ownerDocument = panel.ownerDocument || document;
+    const moveEventName = event.type === "mousedown" ? "mousemove" : "pointermove";
+    const upEventName = event.type === "mousedown" ? "mouseup" : "pointerup";
+    const cancelEventName = event.type === "mousedown" ? "mouseup" : "pointercancel";
+
+    const onMove = (moveEvent) => {
+      nextGeometry = clampDebugPanelGeometry({
+        ...startGeometry,
+        width: startGeometry.width + moveEvent.clientX - startX,
+        height: startGeometry.height + moveEvent.clientY - startY,
+      });
+      applyDebugPanelGeometry(panel, nextGeometry);
+    };
+    const onUp = () => {
+      ownerDocument.removeEventListener(moveEventName, onMove, true);
+      ownerDocument.removeEventListener(upEventName, onUp, true);
+      ownerDocument.removeEventListener(cancelEventName, onUp, true);
+      saveDebugPanelGeometry(nextGeometry);
+    };
+
+    ownerDocument.addEventListener(moveEventName, onMove, true);
+    ownerDocument.addEventListener(upEventName, onUp, true);
+    ownerDocument.addEventListener(cancelEventName, onUp, true);
   }
 
   function installPanelGestureFallback() {
@@ -1245,6 +1496,31 @@
     };
   }
 
+  function clampDebugPanelGeometry(geometry) {
+    const margin = 8;
+    const minWidth = Math.min(320, window.innerWidth - margin * 2);
+    const minHeight = Math.min(220, window.innerHeight - margin * 2);
+    const maxWidth = Math.max(minWidth, window.innerWidth - margin * 2);
+    const maxHeight = Math.max(minHeight, window.innerHeight - margin * 2);
+    const fallbackWidth = Math.min(560, maxWidth);
+    const fallbackHeight = Math.min(460, maxHeight);
+    const width = geometry?.width === null
+      ? null
+      : clampNumber(geometry?.width, minWidth, maxWidth, fallbackWidth);
+    const height = geometry?.height === null
+      ? null
+      : clampNumber(geometry?.height, minHeight, maxHeight, fallbackHeight);
+    const maxX = window.innerWidth - (width || fallbackWidth) - margin;
+    const maxY = window.innerHeight - (height || fallbackHeight) - margin;
+
+    return {
+      x: geometry?.x === null ? null : clampNumber(geometry?.x, margin, Math.max(margin, maxX), margin),
+      y: geometry?.y === null ? null : clampNumber(geometry?.y, margin, Math.max(margin, maxY), margin),
+      width,
+      height,
+    };
+  }
+
   function savePanelGeometry(panelKey, geometry) {
     updateDisplayPreferences((preferences) => ({
       ...preferences,
@@ -1252,6 +1528,17 @@
         ...preferences.layout,
         [panelKey]: clampPanelGeometry(panelKey, geometry),
         zOrder: panelKey,
+      },
+    }));
+    render();
+  }
+
+  function saveDebugPanelGeometry(geometry) {
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      layout: {
+        ...preferences.layout,
+        debugPanel: clampDebugPanelGeometry(geometry),
       },
     }));
     render();
@@ -1274,6 +1561,11 @@
     const root = document.getElementById(ROOT_ID)?.shadowRoot;
     const id = panelKey === "dictionaryPanel" ? DICTIONARY_PANEL_ID : RIBBON_PANEL_ID;
     return root?.getElementById(id) || null;
+  }
+
+  function debugPanelElement() {
+    const root = document.getElementById(ROOT_ID)?.shadowRoot;
+    return root?.querySelector("[data-af-debug-panel]") || null;
   }
 
   function toggleUtilityMenu(event) {
@@ -1466,7 +1758,16 @@
   }
 
   function toggleDebug() {
-    state.debugVisible = !state.debugVisible;
+    const nextVisible = !state.debugVisible;
+    state.debugVisible = nextVisible;
+    if (nextVisible) {
+      state.debugPanelInFront = true;
+    }
+    render();
+  }
+
+  function closeDebug() {
+    state.debugVisible = false;
     render();
   }
 
@@ -1483,6 +1784,23 @@
       state.debugCopied = false;
       render();
     }, 1200);
+  }
+
+  function clearDiagnostics() {
+    const clearedAt = new Date().toISOString();
+    state.debugEvents = [];
+    state.navigationEvents = [];
+    state.lastIssueReport = null;
+    state.navigationEventSeq = 0;
+    state.debugCopied = false;
+    state.issueCopied = false;
+    state.diagnosticsClearedAt = clearedAt;
+    state.bootDiagnostics.lastError = "";
+    state.bootDiagnostics.updatedAt = clearedAt;
+    delete document.documentElement.dataset.afShadowingLastError;
+    delete document.documentElement.dataset.afShadowingBootError;
+    publishDiagnosticsSnapshot();
+    render();
   }
 
   async function refreshSelectedSourceCache() {
@@ -1664,6 +1982,7 @@
       transcriptResult: state.transcriptResult ? summarizeTranscriptResult(state.transcriptResult) : null,
       phrases: state.phrases.length,
       currentPhrase: describePhraseAtIndex(state.currentIndex),
+      diagnosticsClearedAt: state.diagnosticsClearedAt,
       error: state.error,
       sources: state.practiceSources.map(captionTrackApi.formatSourceDebug),
       navigationEvents: state.navigationEvents.slice(-12),
@@ -1681,6 +2000,7 @@
     if (state.debugEvents.length > 30) {
       state.debugEvents.splice(0, state.debugEvents.length - 30);
     }
+    publishDiagnosticsSnapshot();
   }
 
   function recordNavigationEvent(type, detail = {}) {
@@ -1694,7 +2014,26 @@
     if (state.navigationEvents.length > 40) {
       state.navigationEvents.splice(0, state.navigationEvents.length - 40);
     }
+    publishDiagnosticsSnapshot();
     return event;
+  }
+
+  function publishDiagnosticsSnapshot() {
+    const snapshot = {
+      capturedAt: new Date().toISOString(),
+      diagnosticsClearedAt: state.diagnosticsClearedAt || "",
+      videoId: state.videoId || "",
+      selectedSourceId: state.selectedSourceId || "",
+      loading: Boolean(state.loading),
+      visibleError: state.error || "",
+      bootLastError: state.bootDiagnostics?.lastError || "",
+      debugEventCount: state.debugEvents.length,
+      navigationEventCount: state.navigationEvents.length,
+      recentDebugEvents: state.debugEvents.slice(-8),
+      recentNavigationEvents: state.navigationEvents.slice(-8),
+      lastIssueReportPresent: Boolean(state.lastIssueReport),
+    };
+    document.documentElement.dataset.afShadowingDiagnosticsState = JSON.stringify(snapshot);
   }
 
   function formatIssueReport() {

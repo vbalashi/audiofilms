@@ -352,11 +352,18 @@ The default smoke uses AppleScript to control the normal Google Chrome profile a
 - failed source switch preserving the previous working source;
 - wide/narrow viewport geometry.
 
+Default smoke should assert the current learner-facing contract, not historical
+provider internals. It accepts usable readiness labels (`Ready`, `Rough`, or
+`Precise`) and requires retrieval diagnostics to exist without pinning the exact
+retrieval path. Use `--strict-provenance` only when deliberately debugging the
+retrieval ladder or validating old expectations such as `backend-provider`.
+
 Useful focused runs:
 
 ```bash
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only=EColTNIbOko --reload-extension
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only=aircAruvnKk --reload-extension
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only=4EE7m94mJpk --reload-extension --strict-provenance
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-backend-off --reload-extension
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-backend-failed --reload-extension
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-source-switch-failed --reload-extension
@@ -401,6 +408,32 @@ Use the extension UI `Debug` button first. It includes:
 - visible error;
 - per-source errors and retrieval attempts;
 - recent extension events.
+
+For agent-driven smoke runs, clear extension-side diagnostics before the action
+sequence:
+
+1. Open the debug tools popover from the compact bug icon.
+2. Click `Clear Diagnostics`.
+3. Perform the UI actions under test.
+4. Read page diagnostics from the YouTube page context:
+
+```js
+JSON.parse(document.documentElement.dataset.afShadowingDiagnosticsState || "{}")
+```
+
+The diagnostics snapshot includes `diagnosticsClearedAt`, `visibleError`,
+`bootLastError`, recent debug events, recent navigation events, and whether an
+issue report exists. This is the preferred way to separate fresh run evidence
+from historical extension errors when `chrome://extensions` is unavailable to
+the automation surface.
+
+The expanded Debug output is a floating panel with its own scroll area. Opening
+it must not increase the phrase ribbon height or push the phrase controls below
+the viewport. The panel has its own `Copy` and `Close` controls so agents do not
+need to reopen or move the main debug tools popover after Debug is visible. Drag
+the Debug panel by its header and resize it from the lower-right corner; its
+geometry is saved in display preferences under `layout.debugPanel`. For geometry
+checks, compare the ribbon bounding box before and after toggling Debug.
 
 For the redesigned UI, Debug, Copy Debug, Refresh Cache, and Mark Issue should
 move behind a quiet overflow/debug surface. Until that redesign lands, use the

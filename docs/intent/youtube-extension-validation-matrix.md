@@ -102,6 +102,24 @@ For local app API checks:
 
 ## Latest Run
 
+### 2026-06-23: Smoke Contract Refresh
+
+Default Chrome smoke no longer treats historical provenance strings as the
+learner-facing contract. `Ready`, `Rough`, and `Precise` are accepted as usable
+readiness states, and the default fixture assertions require retrieval
+diagnostics to be recorded without pinning the exact retrieval path. Use
+`--strict-provenance` only for deliberate retrieval-ladder diagnostics.
+
+Focused run:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only=4EE7m94mJpk --reload-extension --skip-backend-check --skip-spa-check --skip-backend-off-check --skip-backend-failed-check --skip-source-switch-failed-check --skip-multilingual-switch-check --skip-geometry-check
+```
+
+Result: passed `manual-trappist` and `manual-after-empty` with
+`Dutch captions · Precise`, `practice-timing-cache`, and current dictionary UI
+selectors.
+
 ### Pending: Frozen Dictionary Provenance Smoke Matrix
 
 Use this focused matrix after source-aware dictionary action changes:

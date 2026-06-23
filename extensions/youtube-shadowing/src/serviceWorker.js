@@ -552,6 +552,7 @@ function normalizeDisplayPreferences(value) {
       locked: layout.locked !== false,
       phraseRibbon: normalizePanelGeometry(layout.phraseRibbon),
       dictionaryPanel: normalizePanelGeometry(layout.dictionaryPanel),
+      debugPanel: normalizePanelGeometry(layout.debugPanel),
       zOrder: layout.zOrder === "dictionaryPanel" ? "dictionaryPanel" : "phraseRibbon",
     },
   };

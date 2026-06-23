@@ -1215,6 +1215,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   content: "C";
 }
 
+.af-utility-popover [data-af-diagnostics-clear]::before {
+  content: "X";
+}
+
 .af-utility-popover [data-af-refresh-cache]::before {
   content: "R";
 }
@@ -1593,17 +1597,126 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   display: none;
 }
 
-.af-ribbon-debug {
-  max-height: 180px;
-  margin: 0 12px 8px;
-  overflow: auto;
-  padding: 10px;
+#af-shadowing-ribbon-panel > .af-ribbon-meta {
+  position: relative;
+  z-index: 110;
+}
+
+#af-shadowing-ribbon-panel > .af-ribbon-list,
+#af-shadowing-ribbon-panel > .af-ribbon-error,
+#af-shadowing-ribbon-panel > .af-ribbon-controls,
+#af-shadowing-ribbon-panel > .af-shortcut-hints {
+  position: relative;
+  z-index: 20;
+}
+
+#af-shadowing-ribbon-panel > .af-panel-resize-handle {
+  z-index: 30;
+}
+
+.af-ribbon-debug-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 112px;
+  z-index: 1000;
+  display: none;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(460px, calc(100vh - 160px));
+  margin: 0;
+  pointer-events: auto;
   color: var(--af-text);
   background: var(--af-panel-soft);
-  border: 1px solid var(--af-border);
+  border: 1px solid var(--af-border-strong);
   border-radius: 6px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  font-family: Roboto, Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  letter-spacing: 0;
+  overflow: hidden;
+  resize: none;
+}
+
+.af-ribbon-debug-panel.is-front {
+  z-index: 1003;
+}
+
+.af-ribbon-debug-panel.is-behind {
+  z-index: 1000;
+}
+
+.af-ribbon-debug-panel.is-open {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.af-ribbon-debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--af-panel-alpha-bg);
+  border-bottom: 1px solid var(--af-border);
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.af-ribbon-debug-title {
+  color: var(--af-text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.af-ribbon-debug-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.af-ribbon-debug-actions button {
+  min-width: 58px;
+  padding: 5px 8px;
+  color: var(--af-text);
+  background: var(--af-control);
+  border: 1px solid var(--af-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  touch-action: auto;
+  user-select: none;
+}
+
+.af-ribbon-debug-actions button:hover {
+  background: var(--af-control-hover);
+}
+
+.af-ribbon-debug {
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
   font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   white-space: pre-wrap;
+}
+
+.af-ribbon-debug-resize-handle {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background:
+    linear-gradient(135deg, transparent 54%, var(--af-border-strong) 56%, var(--af-border-strong) 62%, transparent 64%),
+    linear-gradient(135deg, transparent 68%, var(--af-border-strong) 70%, var(--af-border-strong) 76%, transparent 78%);
+  border: 0;
+  border-radius: 3px;
+  cursor: nwse-resize;
+  touch-action: none;
 }
 
 .af-ribbon-debug:empty {

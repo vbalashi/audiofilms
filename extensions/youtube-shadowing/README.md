@@ -153,6 +153,7 @@ Use this before deeper debugging or UI work:
 document.documentElement.dataset.afShadowingBoot
 document.documentElement.dataset.afShadowingBootVersion
 JSON.parse(document.documentElement.dataset.afShadowingBootState || "{}")
+JSON.parse(document.documentElement.dataset.afShadowingDiagnosticsState || "{}")
 window.__afShadowingBoot
 window.__afShadowingDebug
 ```
@@ -162,6 +163,13 @@ Expected signal:
 - `dataset.afShadowingBoot === "1"` means the content script ran.
 - `dataset.afShadowingBootVersion === "phase1-boot-diagnostics-2026-06-10"` means the current diagnostics build ran.
 - `dataset.afShadowingBootState` is the page-readable diagnostics snapshot. Prefer this for basic checks because Chrome content script globals live in an isolated world.
+- `dataset.afShadowingDiagnosticsState` is the page-readable run diagnostics
+  snapshot. Use the debug tools `Clear Diagnostics` action before a smoke run,
+  then read this dataset after button clicks to see fresh visible errors, boot
+  last error, recent debug events, and recent navigation events.
+- The expanded Debug output is a movable/resizable floating panel. Drag it by
+  the header, resize it from the lower-right corner, and use its local `Copy`
+  and `Close` buttons during agent-driven debugging.
 - `window.__afShadowingBoot.bootFailed === true` means it ran and crashed during boot.
 - `window.__afShadowingBoot` and `window.__afShadowingDebug` are only visible when DevTools is evaluating in the extension/content-script execution context, not the normal page context.
 - no dataset and no `window.__afShadowingBoot` means Chrome did not inject the current content script; check the loaded folder, `chrome://extensions` errors, the page URL, whether the extension itself was refreshed, and whether the tab was reloaded after loading the extension.
@@ -173,6 +181,23 @@ Use this after extension UI/retrieval changes to check the current local Chrome 
 ```bash
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --reload-extension
 ```
+
+The default smoke checks the current learner-facing extension contract: boot,
+caption availability, source/readiness labels, phrase rendering, UI controls,
+and core interactions. It accepts any usable readiness label (`Ready`, `Rough`,
+or `Precise`) and requires retrieval diagnostics to be present without pinning
+the exact historical retrieval path.
+
+Use strict provenance mode only when intentionally debugging the retrieval
+ladder:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --reload-extension --strict-provenance
+```
+
+Strict provenance keeps older exact expectations such as `backend-provider`.
+This can fail legitimately when timing-cache or text-source-specific paths are
+active.
 
 The smoke check expects:
 
