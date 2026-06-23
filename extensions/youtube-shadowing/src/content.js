@@ -1751,10 +1751,26 @@
 
   function onDocumentPointerDown(event) {
     if (!state.learningEnabled) return;
-    const host = document.getElementById(ROOT_ID);
-    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
-    if (host && path.includes(host)) return;
+    if (isMenuInteractionEvent(event)) return;
     closeOpenMenus();
+  }
+
+  function isMenuInteractionEvent(event) {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    return path.some((element) => (
+      element instanceof Element
+      && element.matches?.([
+        "[data-af-source-toggle]",
+        "[data-af-source-menu]",
+        "[data-af-source-menu] *",
+        "[data-af-utility-toggle]",
+        "[data-af-utility-menu]",
+        "[data-af-utility-menu] *",
+        "[data-af-account]",
+        "[data-af-account-menu]",
+        "[data-af-account-menu] *",
+      ].join(", "))
+    ));
   }
 
   function toggleDebug() {

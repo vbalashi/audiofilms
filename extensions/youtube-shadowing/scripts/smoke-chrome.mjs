@@ -458,6 +458,7 @@ function runGeometryScenario() {
     const phraseTranslationAssertions = assertPhraseTranslationUi();
     const improveTimingAssertions = assertImproveTimingUi();
     const debugMenuAssertions = assertDebugMenuUi();
+    const popoverDismissalAssertions = assertPopoverDismissalUi();
 
     const lookupClick = clickFirstLookupWord();
     const dictionaryOpened = waitForDictionary(waitMs);
@@ -479,6 +480,7 @@ function runGeometryScenario() {
       ...phraseTranslationAssertions,
       ...improveTimingAssertions,
       ...debugMenuAssertions,
+      ...popoverDismissalAssertions,
       assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
       assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
       assertion("phrase navigation uses icon controls", wideBeforeLookup.primaryUi?.phraseIconButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
@@ -531,6 +533,67 @@ function assertDebugMenuUi() {
     ),
     assertion("debug tools popover closes with Escape", closedGeometry.debugTools?.open === false, JSON.stringify(closedGeometry.debugTools)),
   ];
+}
+
+function assertPopoverDismissalUi() {
+  const assertions = [];
+
+  clickShadowButton("[data-af-utility-toggle]");
+  sleep(200);
+  const utilityOpen = readGeometrySnapshot();
+  clickOutsideShadowUi();
+  sleep(200);
+  const utilityOutsideClosed = readGeometrySnapshot();
+  assertions.push(
+    assertion("debug tools popover opens before outside click", utilityOpen.debugTools?.open === true, JSON.stringify(utilityOpen.debugTools)),
+    assertion("debug tools popover closes on outside click", utilityOutsideClosed.debugTools?.open === false, JSON.stringify(utilityOutsideClosed.debugTools)),
+  );
+
+  clickShadowButton("[data-af-source-toggle]");
+  sleep(200);
+  const sourceOpen = readGeometrySnapshot();
+  clickOutsideShadowUi();
+  sleep(200);
+  const sourceOutsideClosed = readGeometrySnapshot();
+  assertions.push(
+    assertion("source popover opens before outside click", sourceOpen.readinessMenu?.open === true, JSON.stringify(sourceOpen.readinessMenu)),
+    assertion("source popover closes on outside click", sourceOutsideClosed.readinessMenu?.open === false, JSON.stringify(sourceOutsideClosed.readinessMenu)),
+  );
+
+  clickShadowButton("[data-af-source-toggle]");
+  sleep(200);
+  const sourceReopen = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(200);
+  const sourceEscapeClosed = readGeometrySnapshot();
+  assertions.push(
+    assertion("source popover reopens before Escape", sourceReopen.readinessMenu?.open === true, JSON.stringify(sourceReopen.readinessMenu)),
+    assertion("source popover closes with Escape", sourceEscapeClosed.readinessMenu?.open === false, JSON.stringify(sourceEscapeClosed.readinessMenu)),
+  );
+
+  clickShadowButton("[data-af-account]");
+  sleep(200);
+  const accountOpen = readGeometrySnapshot();
+  clickOutsideShadowUi();
+  sleep(200);
+  const accountOutsideClosed = readGeometrySnapshot();
+  assertions.push(
+    assertion("account popover opens before outside click", accountOpen.ribbonUi?.accountMenuOpen === true, JSON.stringify(accountOpen.ribbonUi)),
+    assertion("account popover closes on outside click", accountOutsideClosed.ribbonUi?.accountMenuOpen === false, JSON.stringify(accountOutsideClosed.ribbonUi)),
+  );
+
+  clickShadowButton("[data-af-account]");
+  sleep(200);
+  const accountReopen = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(200);
+  const accountEscapeClosed = readGeometrySnapshot();
+  assertions.push(
+    assertion("account popover reopens before Escape", accountReopen.ribbonUi?.accountMenuOpen === true, JSON.stringify(accountReopen.ribbonUi)),
+    assertion("account popover closes with Escape", accountEscapeClosed.ribbonUi?.accountMenuOpen === false, JSON.stringify(accountEscapeClosed.ribbonUi)),
+  );
+
+  return assertions;
 }
 
 function assertPracticeModeLayoutStability(shadowGeometry) {
@@ -1215,6 +1278,25 @@ function pressKey(code, key) {
   document.dispatchEvent(new KeyboardEvent("keydown", eventInit));
   document.dispatchEvent(new KeyboardEvent("keyup", eventInit));
   return "pressed";
+})()
+  `);
+}
+
+function clickOutsideShadowUi() {
+  chromeEval(`
+(() => {
+  const target = document.elementFromPoint(20, 20) || document.body || document.documentElement;
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    target.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: 20,
+      clientY: 20,
+    }));
+  }
+  return "clicked";
 })()
   `);
 }
