@@ -197,6 +197,32 @@ describe('normalizePracticePhrases', () => {
     ]);
   });
 
+  it('merges a short sentence tail after a cached split without ellipsis', () => {
+    const phrases: Phrase[] = [
+      {
+        id: 22,
+        startSec: 74.24,
+        endSec: 79.717,
+        text: "Dit is de planeet die ons idee over leven in het universum dit jaar op z'n kop",
+      },
+      {
+        id: 23,
+        startSec: 79.717,
+        endSec: 80.56,
+        text: 'gaat zetten.',
+      },
+    ];
+
+    expect(normalizePracticePhrases(phrases)).toEqual([
+      {
+        id: 0,
+        startSec: 74.24,
+        endSec: 80.56,
+        text: "Dit is de planeet die ons idee over leven in het universum dit jaar op z'n kop gaat zetten.",
+      },
+    ]);
+  });
+
   it('renormalizes cached backend practice phrases when building snapshots', () => {
     const response: SubtitleResponse = {
       phrases: [],

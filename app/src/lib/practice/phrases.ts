@@ -198,6 +198,34 @@ function shouldMergeShortNumericSuffix(
   );
 }
 
+function shouldMergeShortSentenceTail(
+  previous: Phrase,
+  next: Phrase,
+  options: Required<PracticePhraseOptions>,
+) {
+  const previousText = previous.text.trim();
+  const nextText = next.text.trim();
+  if (
+    !previousText ||
+    !nextText ||
+    /[.!?]$/.test(previousText) ||
+    !/[.!?]$/.test(nextText) ||
+    wordCount(nextText) > 3
+  ) {
+    return false;
+  }
+
+  const gapSec = next.startSec - previous.endSec;
+  const combinedText = joinPracticeText(previousText, nextText);
+  return (
+    Number.isFinite(gapSec) &&
+    gapSec >= 0 &&
+    gapSec <= options.maxContinuationGapSec &&
+    wordCount(combinedText) <= options.maxWords + 2 &&
+    combinedText.length <= options.maxCharacters
+  );
+}
+
 function joinPracticeText(left: string, right: string) {
   const cleanLeft = left.trim();
   const cleanRight = right.trim();
@@ -226,6 +254,12 @@ function mergeContinuationPhrases(
     }
 
     if (shouldMergeShortNumericSuffix(previous, phrase, options)) {
+      previous.endSec = Math.max(previous.endSec, phrase.endSec);
+      previous.text = joinPracticeText(previous.text, phrase.text);
+      continue;
+    }
+
+    if (shouldMergeShortSentenceTail(previous, phrase, options)) {
       previous.endSec = Math.max(previous.endSec, phrase.endSec);
       previous.text = joinPracticeText(previous.text, phrase.text);
       continue;
