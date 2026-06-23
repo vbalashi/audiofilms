@@ -28,6 +28,8 @@
   const PRE_ROLL_MS = 150;
   const POST_ROLL_MS = 250;
   const CONTIGUOUS_BOUNDARY_GUARD_MS = 120;
+  const DICTIONARY_BINDING_VERSION = "youtube-dictionary-source-v2";
+  const EXTENSION_FALLBACK_BUILDER_VERSION = "audiofilms-extension-fallback-phrases-v1";
   const initialDisplayPreferences = readInitialDisplayPreferences();
 
   let panelGestureFallbackInstalled = false;
@@ -2153,8 +2155,11 @@
   }
 
   function renderClickablePhraseText(parent, text, phraseIndex) {
-    const tokens = text.split(/(\s+)/);
-    for (const token of tokens) {
+    const tokens = Array.from(String(text || "").matchAll(/\s+|\S+/gu));
+    let lookupTokenIndex = 0;
+    for (const match of tokens) {
+      const token = match[0];
+      const charStart = match.index || 0;
       if (!token) continue;
       if (/^\s+$/.test(token)) {
         parent.appendChild(document.createTextNode(token));
@@ -2171,6 +2176,7 @@
       word.type = "button";
       word.textContent = token;
       word.dataset.afLookupWord = lookupWord;
+      const tokenIndex = lookupTokenIndex;
       word.classList.toggle(
         "is-selected",
         state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, lookupWord),
@@ -2178,8 +2184,14 @@
       word.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        selectLookupWord(lookupWord, phraseIndex);
+        selectLookupWord(lookupWord, phraseIndex, {
+          tokenIndex,
+          charStart,
+          charEnd: charStart + token.length,
+          originalToken: token,
+        });
       });
+      lookupTokenIndex += 1;
     }
   }
 
@@ -2338,7 +2350,7 @@
       const retry = appendButton(lookup, "Retry lookup", "afLookupRetry");
       retry.className = "af-lookup-retry";
       retry.addEventListener("click", () => {
-        selectLookupWord(selectedWord.word, selectedWord.phraseIndex);
+        selectLookupWord(selectedWord.word, selectedWord.phraseIndex, selectedWord.selection);
       });
       if (selectedWord.translateUrl) {
         const link = appendElement(lookup, "a", "af-dictionary-link");
@@ -2730,8 +2742,9 @@
     }
   }
 
-  function selectLookupWord(word, phraseIndex) {
+  function selectLookupWord(word, phraseIndex, selection = {}) {
     const lookupSeq = state.dictionaryLookupSeq + 1;
+    const sourceBinding = createDictionarySourceBinding(word, phraseIndex, selection);
     state.dictionaryLookupSeq = lookupSeq;
     state.exampleExpansionOverrides = {};
     state.visibleTranslationsByCardId = {};
@@ -2739,6 +2752,8 @@
     state.selectedWord = {
       word,
       phraseIndex,
+      selection,
+      sourceBinding,
       lookupSeq,
       lookupStatus: "loading",
       lookupResult: null,
@@ -2754,9 +2769,9 @@
   }
 
   async function lookupSelectedWord(selectedWord) {
-    const phrase = state.phrases[selectedWord.phraseIndex] || state.phrases[state.currentIndex];
+    const phrase = selectedWord.sourceBinding?.phrase || state.phrases[selectedWord.phraseIndex] || state.phrases[state.currentIndex];
     const source = getSelectedPracticeSource();
-    const language = source?.loadedTranscriptResult?.languageCode || source?.languageCode || "auto";
+    const language = selectedWord.sourceBinding?.captionSource?.languageCode || source?.loadedTranscriptResult?.languageCode || source?.languageCode || "auto";
 
     try {
       const result = await fetchDictionaryResult({
@@ -2806,19 +2821,16 @@
 
     const selectedWord = state.selectedWord;
     const action = actionPayload?.action || "";
-    const clientEventId = actionPayload?.clientEventId || createMutationTurnId();
-    const turnId = actionPayload?.turnId || (
-      (action === "review-card" || action === "mark-known" || action === "mark-unknown") && isUuid(clientEventId)
-        ? clientEventId
-        : undefined
-    );
-    const payload = {
-      ...actionPayload,
-      clientEventId,
-      ...(turnId ? { turnId } : {}),
-      sourceContext: buildDictionaryActionSourceContext(selectedWord, card, action),
-      entryId: card.entryId,
-    };
+    const payload = frozenDictionaryActionPayload(selectedWord, card, actionPayload);
+    if (!payload.ok) {
+      state.selectedWord = {
+        ...state.selectedWord,
+        cardActionStatus: "",
+        cardActionError: payload.error,
+      };
+      render();
+      return;
+    }
     const pendingMessage = `${displayAction?.label || "Action"}...`;
     state.selectedWord = {
       ...state.selectedWord,
@@ -2835,7 +2847,7 @@
     render();
 
     try {
-      await postDictionaryCommand("dict-action", payload);
+      await postDictionaryCommand("dict-action", payload.value);
       if (!isCurrentLookup(selectedWord)) return;
       state.cardActionFeedbackByCardId = {
         ...state.cardActionFeedbackByCardId,
@@ -2877,63 +2889,196 @@
     return `${label} recorded`;
   }
 
-  function buildDictionaryActionSourceContext(selectedWord, card, action) {
-    const phraseIndex = Number.isInteger(selectedWord?.phraseIndex)
-      ? selectedWord.phraseIndex
-      : state.currentIndex;
+  function createDictionarySourceBinding(word, phraseIndex, selection = {}) {
     const phrase = state.phrases[phraseIndex] || state.phrases[state.currentIndex] || null;
     const source = getSelectedPracticeSource();
     const transcript = source?.loadedTranscriptResult || state.transcriptResult || {};
     const languageCode =
-      transcript.languageCode ||
-      source?.languageCode ||
-      state.selectedTrack?.languageCode ||
-      "";
+      normalizeLanguageCode(transcript.languageCode) ||
+      normalizeLanguageCode(source?.languageCode) ||
+      normalizeLanguageCode(state.selectedTrack?.languageCode);
+    const artifact = transcript.practiceArtifact
+      ? normalizeBackendPracticeArtifact(transcript.practiceArtifact, languageCode)
+      : buildExtensionFallbackArtifact(transcript, phrase, languageCode);
+
+    return {
+      bindingVersion: DICTIONARY_BINDING_VERSION,
+      videoId: state.videoId || "",
+      captionSource: {
+        languageCode,
+        trackExternalId: stableCaptionTrackId(source, transcript),
+        trackKind: captionTrackKind(source, transcript),
+      },
+      artifact,
+      phrase: {
+        id: phrase?.id ?? phrase?.index ?? phraseIndex,
+        index: Number.isInteger(phrase?.index) ? phrase.index : phraseIndex,
+        startMs: finiteInteger(phrase?.startMs),
+        endMs: finiteInteger(phrase?.endMs),
+        timingQuality: timingQualityFromTranscript(transcript),
+        locatorConfidence: locatorConfidenceFromTranscript(transcript),
+        text: boundedText(phrase?.text || "", 1000),
+        textHash: stableFingerprint(phrase?.text || ""),
+      },
+      selection: {
+        clickedForm: boundedText(word || selection.originalToken || "", 160),
+        tokenIndex: finiteInteger(selection.tokenIndex),
+        charStart: finiteInteger(selection.charStart),
+        charEnd: finiteInteger(selection.charEnd),
+      },
+      capturedAt: new Date().toISOString(),
+    };
+  }
+
+  function normalizeBackendPracticeArtifact(artifact, languageCode) {
+    return stripEmpty({
+      artifactKind: "caption_phrase_set",
+      producer: "audiofilms_backend",
+      snapshotRevisionId: artifact.snapshotRevisionId,
+      textSourceId: artifact.textSourceId,
+      textSourceRevisionId: artifact.textSourceRevisionId,
+      textContentFingerprint: artifact.textContentFingerprint,
+      timingEvidenceRevisionId: artifact.timingEvidenceRevisionId,
+      phraseSetRevisionId: artifact.phraseSetRevisionId,
+      builderVersion: artifact.builderVersion,
+      languageCode: normalizeLanguageCode(artifact.languageCode) || languageCode,
+      quality: artifact.quality,
+    });
+  }
+
+  function buildExtensionFallbackArtifact(transcript, phrase, languageCode) {
+    const phraseSetFingerprint = stableFingerprint({
+      builderVersion: EXTENSION_FALLBACK_BUILDER_VERSION,
+      videoId: state.videoId || "",
+      selectedSourceId: state.selectedSourceId || "",
+      languageCode,
+      sourceKind: transcript.sourceKind || "",
+      retrievalPath: transcript.retrievalPath || "",
+      timingExactness: transcript.timingExactness || "",
+      qualityFlags: transcript.qualityFlags || [],
+      cues: Array.isArray(phrase?.cues)
+        ? phrase.cues.map((cue) => ({
+          startMs: finiteInteger(cue.startMs),
+          endMs: finiteInteger(cue.endMs),
+          textHash: stableFingerprint(cue.text || ""),
+        }))
+        : [],
+      phrase: {
+        index: phrase?.index,
+        startMs: finiteInteger(phrase?.startMs),
+        endMs: finiteInteger(phrase?.endMs),
+        textHash: stableFingerprint(phrase?.text || ""),
+      },
+    });
+    return stripEmpty({
+      artifactKind: "caption_phrase_set",
+      producer: "audiofilms_extension_fallback",
+      textContentFingerprint: phraseSetFingerprint,
+      builderVersion: EXTENSION_FALLBACK_BUILDER_VERSION,
+      languageCode,
+      quality: transcript.fallbackReason || transcript.timingExactness || "extension-fallback",
+    });
+  }
+
+  function stableCaptionTrackId(source, transcript) {
+    return source?.track?.vssId ||
+      transcript.selectedTrackId ||
+      transcript.actualTrackId ||
+      stableFingerprint({
+        languageCode: source?.languageCode || transcript.languageCode || "",
+        name: source?.name || "",
+        kind: source?.track?.kind || transcript.sourceKind || "",
+      });
+  }
+
+  function captionTrackKind(source, transcript) {
+    const kind = source?.track?.kind === "asr" ? "auto" : transcript.sourceKind || sourceKindFromTrack(source?.track);
+    if (kind === "manual" || kind === "auto" || kind === "provider") return kind;
+    return "unknown";
+  }
+
+  function timingQualityFromTranscript(transcript) {
+    if (transcript.timingExactness === "word-level") return "word";
+    if (transcript.timingExactness === "exact") return "cue";
+    if (transcript.timingExactness === "inferred-end") return "approximate";
+    return transcript.timingExactness || "approximate";
+  }
+
+  function locatorConfidenceFromTranscript(transcript) {
+    if (transcript.practiceArtifact?.producer === "audiofilms_backend") return "canonical";
+    if (transcript.timingExactness === "exact" || transcript.timingExactness === "word-level") return "derived";
+    return "approximate";
+  }
+
+  function frozenDictionaryActionPayload(selectedWord, card, actionPayload = {}) {
+    const action = actionPayload?.action || "";
+    const binding = selectedWord.sourceBinding;
+    if (!binding?.videoId) {
+      return { ok: false, error: "Cannot save progress: the YouTube video identity is unavailable." };
+    }
+    if (state.videoId && binding.videoId !== state.videoId) {
+      return { ok: false, error: "This dictionary card belongs to a previous YouTube video. Click the word again on the current video." };
+    }
+    const clientEventId = actionPayload?.clientEventId || createMutationTurnId();
+    const turnId = actionPayload?.turnId || (
+      (action === "review-card" || action === "mark-known" || action === "mark-unknown") && isUuid(clientEventId)
+        ? clientEventId
+        : undefined
+    );
+    const payload = {
+      ...actionPayload,
+      clientEventId,
+      ...(turnId ? { turnId } : {}),
+      sourceContext: buildDictionaryActionSourceContext(binding, card, action),
+      entryId: card.entryId,
+    };
+    return { ok: true, value: payload };
+  }
+
+  function buildDictionaryActionSourceContext(binding, card, action) {
     const video = getVideoElement();
 
     return {
-      contractVersion: "source-context-v1",
-      client: {
-        id: "audiofilms-youtube-extension",
-        version: "no-build-spike",
-      },
+      contractVersion: "source-context-v2",
       source: {
         kind: "youtube_video",
         provider: "youtube",
-        externalId: state.videoId || "",
-        url: youtubeWatchUrl(state.videoId),
-        title: youtubeVideoTitle(),
-        languageCode,
+        externalId: binding.videoId,
+        languageCode: binding.captionSource?.languageCode || undefined,
       },
+      artifact: binding.artifact,
       location: {
         kind: "caption_phrase",
-        phraseIndex,
-        startMs: finiteInteger(phrase?.startMs),
-        endMs: finiteInteger(phrase?.endMs),
-        currentTimeMs: video ? finiteInteger(video.currentTime * 1000) : null,
+        phraseIndex: finiteInteger(binding.phrase?.index),
+        startMs: finiteInteger(binding.phrase?.startMs),
+        endMs: finiteInteger(binding.phrase?.endMs),
+        locatorConfidence: binding.phrase?.locatorConfidence,
+        phraseTextHash: binding.phrase?.textHash,
+        timingQuality: binding.phrase?.timingQuality,
       },
-      context: {
-        clickedForm: selectedWord?.word || card?.clickedForm || card?.headword || "",
-        text: phrase?.text || "",
+      selection: {
+        clickedForm: binding.selection?.clickedForm || card?.clickedForm || card?.headword || "",
+        tokenIndex: finiteInteger(binding.selection?.tokenIndex),
+        charStart: finiteInteger(binding.selection?.charStart),
+        charEnd: finiteInteger(binding.selection?.charEnd),
+        contextText: binding.phrase?.text || "",
+      },
+      observation: {
+        currentPlaybackTimeMs: video ? finiteInteger(video.currentTime * 1000) : null,
+        title: youtubeVideoTitle(),
+        capturedAt: new Date().toISOString(),
       },
       diagnostics: {
         action,
         cardId: card?.id || "",
-        selectedSourceId: state.selectedSourceId || "",
-        sourceKind: transcript.sourceKind || "",
-        retrievalPath: transcript.retrievalPath || "",
-        timingExactness: transcript.timingExactness || "",
-        qualityFlags: Array.isArray(transcript.qualityFlags) ? transcript.qualityFlags : [],
-        fallbackUsed: Boolean(transcript.fallbackUsed),
+        bindingVersion: binding.bindingVersion,
+        clientVersion: extensionVersion(),
+        captionSource: binding.captionSource,
+        fallbackReason: binding.artifact?.producer === "audiofilms_extension_fallback"
+          ? binding.artifact?.quality || ""
+          : "",
       },
     };
-  }
-
-  function youtubeWatchUrl(videoId) {
-    if (!videoId) return window.location.href;
-    const url = new URL("https://www.youtube.com/watch");
-    url.searchParams.set("v", videoId);
-    return url.toString();
   }
 
   function youtubeVideoTitle() {
@@ -2943,6 +3088,40 @@
 
   function finiteInteger(value) {
     return Number.isFinite(value) ? Math.round(value) : null;
+  }
+
+  function normalizeLanguageCode(languageCode) {
+    const normalized = String(languageCode || "").trim().toLowerCase().replace("_", "-");
+    return normalized === "auto" ? "" : normalized;
+  }
+
+  function boundedText(value, maxLength) {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    return text.length > maxLength ? text.slice(0, maxLength) : text;
+  }
+
+  function stripEmpty(value) {
+    return Object.fromEntries(
+      Object.entries(value).filter(([, entry]) => entry !== undefined && entry !== null && entry !== ""),
+    );
+  }
+
+  function stableFingerprint(value) {
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    let hash = 2166136261;
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `af-fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+  }
+
+  function extensionVersion() {
+    try {
+      return chrome?.runtime?.getManifest?.()?.version || "";
+    } catch (_error) {
+      return "";
+    }
   }
 
   function isUuid(value) {
@@ -3727,6 +3906,7 @@
       const cues = transcriptResult.cues;
       const phrases = transcriptResult.practicePhraseSource === "backend"
         ? cues.map((cue, index) => ({
+          id: cue.phraseId ?? index,
           startMs: cue.startMs,
           endMs: cue.endMs,
           text: phraseApi.cleanPhraseText(cue.text),
@@ -3871,6 +4051,24 @@
       failedProvider: "",
       fallbackReason: "",
       practicePhraseSource: "backend",
+      practiceSnapshot: snapshot,
+      practiceArtifact: practiceArtifactFromSnapshot(snapshot),
+    };
+  }
+
+  function practiceArtifactFromSnapshot(snapshot) {
+    if (!snapshot?.phraseSet?.revisionId) return null;
+    return {
+      artifactKind: "caption_phrase_set",
+      producer: "audiofilms_backend",
+      snapshotRevisionId: snapshot.snapshotRevisionId || "",
+      textSourceId: snapshot.textSource?.id || "",
+      textSourceRevisionId: snapshot.textSource?.revisionId || "",
+      textContentFingerprint: snapshot.textSource?.contentFingerprint || "",
+      timingEvidenceRevisionId: snapshot.timingEvidence?.revisionId || "",
+      phraseSetRevisionId: snapshot.phraseSet.revisionId || "",
+      languageCode: snapshot.textSource?.languageCode || "",
+      quality: snapshot.timingEvidence?.quality || "",
     };
   }
 
@@ -3952,6 +4150,8 @@
       failedProvider: result?.failedProvider || "",
       fallbackReason: result?.fallbackReason || "",
       practicePhraseSource: result?.practicePhraseSource || "",
+      practiceSnapshot: result?.practiceSnapshot || null,
+      practiceArtifact: result?.practiceArtifact || null,
     };
     state.cueSource = normalized.retrievalPath;
     return normalized;
@@ -3980,6 +4180,8 @@
       failedProvider: result.failedProvider || "",
       fallbackReason: result.fallbackReason || "",
       practicePhraseSource: result.practicePhraseSource || "",
+      practiceSnapshot: result.practiceSnapshot || null,
+      practiceArtifact: result.practiceArtifact || null,
     };
   }
 

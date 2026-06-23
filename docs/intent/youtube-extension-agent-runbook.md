@@ -140,14 +140,17 @@ normal Google Chrome and supports `--reload-extension`.
 ## Backend Requirement
 
 The extension runtime defaults to the remote tester API documented in
-`extensions/youtube-shadowing/README.md`:
+`extensions/youtube-shadowing/README.md`. Caption fallback requests now use the
+practice captions operation boundary so backend snapshot revisions are
+available for dictionary provenance:
 
 ```text
-https://audiofilms-api.dilum.io/api/get-subs
+https://audiofilms-api.dilum.io/api/practice/captions
 ```
 
 Local regression smoke fixtures can still be pointed at the local AudioFilms app
-API when that is the explicit test target:
+API when that is the explicit test target. The local preflight still checks
+`/api/get-subs` as a lightweight subtitle-read health check:
 
 ```text
 http://localhost:3000/api/get-subs
@@ -275,7 +278,7 @@ current 2000NL Bearer token to `https://2000.dilum.io/api/platform/v1/*`.
 Current subtitle backend expectation:
 
 - The app default subtitle extractor is `yt-dlp`, with Supadata as an explicit subtitle provider fallback when configured.
-- The extension still tries YouTube page timed text first. If YouTube returns `HTTP 429`, it falls back to the configured `/api/get-subs` endpoint, which defaults to `https://audiofilms-api.dilum.io/api/get-subs`.
+- The extension still tries YouTube page timed text first. If YouTube returns `HTTP 429`, it falls back to the configured `/api/practice/captions` endpoint, which defaults to `https://audiofilms-api.dilum.io/api/practice/captions`.
 - For private local ASR dogfood, set `localStorage.afShadowingLocalAsr = "on"` on the
   YouTube watch page. This deliberately tries
   `http://localhost:3000/api/local-asr-practice` before YouTube `timedtext`,
@@ -302,7 +305,7 @@ Current subtitle backend expectation:
 - Runtime `yt-dlp` auto captions include the Stage 1 rolling-caption cleanup used by the shootout lab.
 - Supadata fallback cache is intentional. Do not clear it just because it is Supadata; clear it only when testing provider selection from scratch.
 - During testing, the source badge should distinguish live/cached and primary/fallback paths, for example `via Supadata · cached · fallback`.
-- Subtitle cache is indefinite by default. Use the extension `Refresh Cache` debug button, or `/api/get-subs?...&refresh=1`, only when an intentional re-fetch is needed.
+- Subtitle cache is indefinite by default. Use the extension `Refresh Cache` debug button, or `/api/practice/captions` with `refresh: true`, only when an intentional re-fetch is needed.
 
 ## Boot Diagnostics
 

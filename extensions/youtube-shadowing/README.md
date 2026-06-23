@@ -48,7 +48,7 @@ This extension validates whether AudioFilms can run directly on YouTube pages, u
 - Falls back to another manual or auto-generated caption source when no preferred-language source is available.
 - Tries caption retrieval in this order:
   - YouTube `timedtext` caption URL from the player track;
-  - AudioFilms backend API via the shared extension config; default `https://audiofilms-api.dilum.io/api/get-subs`;
+  - AudioFilms backend practice captions API via the shared extension config; default `https://audiofilms-api.dilum.io/api/practice/captions`;
   - optional diagnostic YouTube transcript API metadata on the page;
   - optional diagnostic opened transcript panel DOM segments.
 - Tracks subtitle source and quality separately from the selected language:
@@ -100,7 +100,7 @@ The extension has a single shared resolver in `src/config.js`. Tester builds def
 
 ```text
 AF_API_BASE=https://audiofilms-api.dilum.io
-AF_BACKEND_SUBTITLES_URL=$AF_API_BASE/api/get-subs
+AF_BACKEND_SUBTITLES_URL=$AF_API_BASE/api/practice/captions
 AF_LOCAL_ASR_URL=$AF_API_BASE/api/asr/jobs
 AF_DICTIONARY_URL=$AF_API_BASE/api/dict
 AF_2000NL_CONNECT_BASE=https://2000.dilum.io
@@ -365,5 +365,5 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - 2000NL Connect dev origin: `chrome-extension://hhdkchoccmikoefhenobdjipgdppdpoc`.
 - No word-level alignment.
 - Uses YouTube web-player metadata, which can change.
-- Backend fallback expects `https://audiofilms-api.dilum.io/api/get-subs` by default. Set `localStorage.afShadowingApiBase = "http://localhost:3000"` for local development, or set `localStorage.afShadowingBackendSubtitlesUrl` to a specific endpoint or `off`.
+- Backend fallback expects `https://audiofilms-api.dilum.io/api/practice/captions` by default. Set `localStorage.afShadowingApiBase = "http://localhost:3000"` for local development, or set `localStorage.afShadowingBackendSubtitlesUrl` to a specific endpoint or `off`.
 - YouTube transcript API / DOM probing is disabled by default. Set `localStorage.afShadowingTranscriptFallback = "on"` only for diagnostics.

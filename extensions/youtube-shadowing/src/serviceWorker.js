@@ -192,6 +192,18 @@ function backendCommand(operation, body) {
     if (body.refresh === true) url.searchParams.set("refresh", "1");
     return { method: "GET", url: url.toString() };
   }
+  if (operation === "practice-captions") {
+    return {
+      method: "POST",
+      url: new URL("/api/practice/captions", `${apiBase}/`).toString(),
+      payload: {
+        videoId: body.videoId,
+        language: body.lang || "auto",
+        sourceKind: body.sourceKind || "manual",
+        refresh: body.refresh === true,
+      },
+    };
+  }
   if (operation === "local-asr-practice") {
     const url = new URL("/api/local-asr-practice", `${apiBase}/`);
     setSearchParam(url, "videoId", body.videoId);

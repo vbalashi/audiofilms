@@ -66,6 +66,13 @@ For extension smoke checks:
   chips, sections, phase-dependent progress actions, card translation ready
   state, card translation error state, and hidden/frozen cards with no progress
   row.
+- Source-aware dictionary actions use a frozen `DictionarySourceBinding`
+  captured at word click. Manual smoke should cover backend captions, direct
+  timed-text fallback, transcript-panel fallback, source switch after lookup,
+  YouTube SPA navigation after lookup, and retry/error behavior. Verify that
+  the action payload keeps the original video id, caption artifact/revision or
+  extension fallback fingerprint, phrase locator, and clicked-token offsets
+  instead of rebuilding provenance from current page state.
 
 For local app API checks:
 
@@ -94,6 +101,19 @@ For local app API checks:
 | Viewport variants | `4EE7m94mJpk` | Compact UI responsiveness | No overlap at narrow/wide widths; YouTube recommendations not replaced | Passing DOM-geometry smoke; screenshots captured |
 
 ## Latest Run
+
+### Pending: Frozen Dictionary Provenance Smoke Matrix
+
+Use this focused matrix after source-aware dictionary action changes:
+
+| Case | Setup | Expected provenance behavior |
+| --- | --- | --- |
+| Backend captions | Load a fixture through the AudioFilms backend practice captions path, click a word, then submit `Learn` or a review grade | `sourceContext.contractVersion` is `source-context-v2`; artifact producer is `audiofilms_backend`; snapshot, text source, timing evidence, and phrase-set revision ids are present when the backend supplied them |
+| Direct timed-text fallback | Disable backend fallback or use a fixture where direct YouTube timed text succeeds first | Artifact producer is `audiofilms_extension_fallback`; builder version and deterministic fingerprint are present; no backend revision ids are minted |
+| Transcript-panel fallback | Force/observe transcript fallback, click a word, and submit an action | Artifact remains extension fallback and degraded; phrase locator/timing is approximate where evidence is rough |
+| Source switch after lookup | Click a word, open dictionary cards, switch caption source before pressing an action | Action payload still references the frozen source, phrase, and token captured at click time |
+| YouTube SPA navigation after lookup | Click a word, navigate to another watch video, then press a stale card action | Action is blocked with a recoverable stale-card error; no action is submitted under the new video id |
+| Retry/error behavior | Trigger a transient action error and retry the same visible action; then intentionally press the same action again later | The request payload is frozen per send attempt; transport retry should reuse the same serialized payload when implemented, while a separate intentional press gets a new `clientEventId` |
 
 ### 2026-06-19: Final UI Slice Smoke, Normal Chrome
 

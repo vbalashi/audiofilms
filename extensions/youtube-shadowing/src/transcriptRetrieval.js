@@ -269,7 +269,7 @@
     }
 
     const response = await requestBackendCommand(
-      options.backendMode === "local-asr" ? "local-asr-practice" : "get-subs",
+      options.backendMode === "local-asr" ? "local-asr-practice" : "practice-captions",
       params,
       {
       timeoutMs: options.backendMode === "local-asr" ? localAsrTimeoutMs() : 15000,
@@ -296,17 +296,24 @@
   }
 
   function backendSubtitlePayloadToResult(payload, options = {}) {
-    const hasBackendPracticePhrases = Array.isArray(payload?.practicePhrases);
-    const phrases = hasBackendPracticePhrases
-      ? payload.practicePhrases
-      : Array.isArray(payload?.phrases)
+    const snapshot = normalizePracticeSnapshot(payload);
+    const snapshotPhrases = Array.isArray(snapshot?.phraseSet?.phrases)
+      ? snapshot.phraseSet.phrases
+      : [];
+    const hasBackendPracticePhrases = snapshotPhrases.length > 0 || Array.isArray(payload?.practicePhrases);
+    const phrases = snapshotPhrases.length
+      ? snapshotPhrases
+      : Array.isArray(payload?.practicePhrases)
+        ? payload.practicePhrases
+        : Array.isArray(payload?.phrases)
         ? payload.phrases
         : [];
     const cues = phrases
-      .map((phrase) => ({
+      .map((phrase, index) => ({
         startMs: Number(phrase.startSec) * 1000,
         endMs: Number(phrase.endSec) * 1000,
         text: cleanCaptionText(phrase.text || ""),
+        phraseId: phrase.id ?? index,
       }))
       .filter((cue) => Number.isFinite(cue.startMs) && Number.isFinite(cue.endMs) && cue.endMs > cue.startMs && cue.text)
       .sort((a, b) => a.startMs - b.startMs);
@@ -318,12 +325,12 @@
     const requestedLanguage = options.requestedLanguage || "auto";
     const requestedSourceKind = options.requestedSourceKind || "manual";
     const backendMode = options.backendMode || "";
-    const languageCode = payload?.language || "";
+    const languageCode = payload?.language || snapshot?.textSource?.languageCode || "";
     const meta = payload?.meta || {};
-    const provider = meta.provider || "audiofilms-backend";
+    const provider = meta.provider || (snapshot ? "audiofilms-practice-captions" : "audiofilms-backend");
     const returnedSourceKind = backendMode === "local-asr"
       ? localAsrSourceKind()
-      : meta.sourceKind || payload?.sourceKind || "";
+      : meta.sourceKind || payload?.sourceKind || sourceKindFromPracticeTextSource(snapshot?.textSource) || "";
     const warnings = [];
     const qualityFlags = [];
 
@@ -365,7 +372,38 @@
       qualityFlags: Array.from(new Set(qualityFlags)),
       warnings: Array.from(new Set(warnings)),
       practicePhraseSource: hasBackendPracticePhrases ? "backend" : "",
+      practiceSnapshot: snapshot,
+      practiceArtifact: practiceArtifactFromSnapshot(snapshot),
     };
+  }
+
+  function normalizePracticeSnapshot(payload) {
+    if (payload?.snapshot?.phraseSet) return payload.snapshot;
+    if (payload?.result?.snapshot?.phraseSet) return payload.result.snapshot;
+    if (payload?.operation?.result?.snapshot?.phraseSet) return payload.operation.result.snapshot;
+    return null;
+  }
+
+  function practiceArtifactFromSnapshot(snapshot) {
+    if (!snapshot?.phraseSet?.revisionId) return null;
+    return {
+      producer: "audiofilms_backend",
+      snapshotRevisionId: snapshot.snapshotRevisionId || "",
+      textSourceId: snapshot.textSource?.id || "",
+      textSourceRevisionId: snapshot.textSource?.revisionId || "",
+      textContentFingerprint: snapshot.textSource?.contentFingerprint || "",
+      timingEvidenceRevisionId: snapshot.timingEvidence?.revisionId || "",
+      phraseSetRevisionId: snapshot.phraseSet.revisionId || "",
+      languageCode: snapshot.textSource?.languageCode || "",
+      quality: snapshot.timingEvidence?.quality || "",
+    };
+  }
+
+  function sourceKindFromPracticeTextSource(textSource) {
+    if (textSource?.kind === "provided-captions") return "manual";
+    if (textSource?.kind === "auto-captions") return "auto";
+    if (textSource?.kind === "asr") return "asr";
+    return "";
   }
 
   async function fetchBackendAsrJobCues(endpoint, options = {}) {
@@ -537,7 +575,7 @@
   }
 
   function fetchBackendCommandDirect(operation, body = {}, options = {}) {
-    const apiBase = apiBaseForEndpoint(body.apiBase || backendProviderEndpoint(operation === "get-subs" ? "" : "local-asr"));
+    const apiBase = apiBaseForEndpoint(body.apiBase || backendProviderEndpoint(operation === "local-asr-practice" ? "local-asr" : ""));
     let url = "";
     const fetchOptions = { credentials: "omit", method: "GET", headers: { accept: "application/json" } };
 
@@ -547,6 +585,16 @@
       url.searchParams.set("lang", body.lang || "auto");
       url.searchParams.set("sourceKind", body.sourceKind || "manual");
       if (body.refresh === true) url.searchParams.set("refresh", "1");
+    } else if (operation === "practice-captions") {
+      url = new URL("/api/practice/captions", `${apiBase}/`);
+      fetchOptions.method = "POST";
+      fetchOptions.headers["content-type"] = "application/json";
+      fetchOptions.body = JSON.stringify({
+        videoId: body.videoId || "",
+        language: body.lang || "auto",
+        sourceKind: body.sourceKind || "manual",
+        refresh: body.refresh === true,
+      });
     } else if (operation === "local-asr-practice") {
       url = new URL("/api/local-asr-practice", `${apiBase}/`);
       for (const [key, value] of Object.entries(body)) {

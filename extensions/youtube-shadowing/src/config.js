@@ -2,7 +2,7 @@
   const DEFAULT_API_BASE = "https://audiofilms-api.dilum.io";
   const DEFAULT_2000NL_CONNECT_BASE = "https://2000.dilum.io";
   const ENDPOINT_PATHS = {
-    subtitles: "/api/get-subs",
+    subtitles: "/api/practice/captions",
     asrJobs: "/api/asr/jobs",
     dictionary: "/api/dict",
   };
