@@ -1711,8 +1711,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 #af-shadowing-ribbon-panel > .af-ribbon-list,
 #af-shadowing-ribbon-panel > .af-ribbon-error,
-#af-shadowing-ribbon-panel > .af-ribbon-controls,
-#af-shadowing-ribbon-panel > .af-shortcut-hints {
+#af-shadowing-ribbon-panel > .af-ribbon-controls {
   position: relative;
   z-index: 20;
 }
@@ -1833,10 +1832,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-ribbon-controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(220px, 1fr) minmax(180px, auto);
   align-items: center;
-  justify-content: space-between;
+  justify-content: stretch;
   gap: 8px;
   padding: 8px 12px 9px;
   border-top: 1px solid var(--af-border);
@@ -1844,17 +1843,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-ribbon-controls.is-hidden {
-  display: none;
-}
-
-.af-shortcut-hints {
-  padding: 0 12px 8px;
-  color: var(--af-dim);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.af-shortcut-hints.is-hidden {
   display: none;
 }
 
@@ -1878,25 +1866,42 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-weight: 800;
 }
 
+.af-button-shortcut {
+  margin-left: 4px;
+  color: var(--af-muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
 .af-ribbon-controls [data-af-replay] {
   color: var(--af-accent-text);
   background: var(--af-accent);
   border-color: var(--af-accent-strong);
 }
 
-.af-practice-controls button {
-  min-width: 54px;
+.af-ribbon-controls [data-af-replay] .af-button-shortcut {
+  color: currentColor;
 }
 
-.af-practice-controls .af-phrase-icon-button {
-  width: 54px;
-  min-width: 54px;
-  display: inline-flex;
-  align-items: center;
+.af-practice-controls {
   justify-content: center;
 }
 
+.af-practice-controls button {
+  min-width: 70px;
+}
+
+.af-practice-controls .af-phrase-icon-button {
+  min-width: 70px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
 .af-mode-controls {
+  justify-self: start;
   padding: 2px;
   background: var(--af-panel-soft);
   border: 1px solid var(--af-border);
@@ -1904,8 +1909,9 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-mode-controls button {
-  min-width: 54px;
+  min-width: 66px;
   padding: 4px 8px;
+  color: var(--af-muted);
   background: transparent;
   border-color: transparent;
   border-radius: 4px;
@@ -1918,9 +1924,11 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-display-controls button {
+  min-width: 0;
   color: var(--af-accent);
   background: var(--af-accent-soft);
   border-color: var(--af-accent);
+  font-size: 11px;
 }
 
 .af-display-controls button.is-active {
@@ -2016,11 +2024,12 @@ transcript-segment-view-model[data-af-current="true"] .ytwTranscriptSegmentViewM
   }
 
   .af-ribbon-controls {
+    grid-template-columns: 1fr;
     align-items: stretch;
   }
 
   .af-control-group {
-    flex: 1 1 100%;
+    justify-content: stretch;
   }
 
   .af-practice-controls button,

@@ -733,36 +733,36 @@
     error.dataset.afError = "";
 
     const controls = appendElement(panel, "div", "af-ribbon-controls");
+    const modeControls = appendElement(controls, "div", "af-control-group af-mode-controls");
+    const shadowButton = appendButton(modeControls, "Shadow", "afModeShadow");
+    shadowButton.innerHTML = 'Shadow <span class="af-button-shortcut">1</span>';
+    shadowButton.title = "Shadow mode (1)";
+    const recallButton = appendButton(modeControls, "Recall", "afModeRecall");
+    recallButton.innerHTML = 'Recall <span class="af-button-shortcut">2</span>';
+    recallButton.title = "Recall mode (2)";
+
     const practiceControls = appendElement(controls, "div", "af-control-group af-practice-controls");
     const prevButton = appendButton(practiceControls, "", "afPrev");
     prevButton.classList.add("af-phrase-icon-button");
-    prevButton.innerHTML = `${iconSvg("prev")}<span class="af-sr-only">Prev</span>`;
+    prevButton.innerHTML = `${iconSvg("prev")}<span class="af-button-shortcut">←</span><span class="af-sr-only">Prev</span>`;
     prevButton.setAttribute("aria-label", "Previous phrase");
     prevButton.title = "Previous phrase (ArrowLeft)";
     const replayButton = appendButton(practiceControls, "", "afReplay");
     replayButton.classList.add("af-phrase-icon-button");
-    replayButton.innerHTML = `${iconSvg("replay")}<span class="af-sr-only">Replay</span>`;
+    replayButton.innerHTML = `${iconSvg("replay")}<span class="af-button-shortcut">↓</span><span class="af-sr-only">Replay</span>`;
     replayButton.setAttribute("aria-label", "Replay current phrase");
     replayButton.title = "Replay current phrase (ArrowDown)";
     const nextButton = appendButton(practiceControls, "", "afNext");
     nextButton.classList.add("af-phrase-icon-button");
-    nextButton.innerHTML = `${iconSvg("next")}<span class="af-sr-only">Next</span>`;
+    nextButton.innerHTML = `${iconSvg("next")}<span class="af-button-shortcut">→</span><span class="af-sr-only">Next</span>`;
     nextButton.setAttribute("aria-label", "Next phrase");
     nextButton.title = "Next phrase (ArrowRight)";
-
-    const modeControls = appendElement(controls, "div", "af-control-group af-mode-controls");
-    const shadowButton = appendButton(modeControls, "Shadow", "afModeShadow");
-    shadowButton.title = "Shadow mode (1)";
-    const recallButton = appendButton(modeControls, "Recall", "afModeRecall");
-    recallButton.title = "Recall mode (2)";
 
     const displayControls = appendElement(controls, "div", "af-control-group af-display-controls");
     const originalButton = appendButton(displayControls, "Show Original", "afToggle");
     originalButton.title = "Show or hide original text (S)";
     const translationButton = appendButton(displayControls, "Show Translation", "afPhraseTranslation");
     translationButton.title = "Show phrase translation (T)";
-    const hints = appendElement(panel, "div", "af-shortcut-hints");
-    hints.textContent = "Shortcuts: Arrow keys phrase navigation · S original · Shift+S sticky · T translation · Shift+T sticky · 1/2 modes";
     const resizeHandle = appendElement(panel, "button", "af-panel-resize-handle");
     resizeHandle.type = "button";
     resizeHandle.dataset.afResizeHandle = "phraseRibbon";
@@ -1046,7 +1046,6 @@
     const list = panel.querySelector("[data-af-ribbon-list]");
     const error = panel.querySelector("[data-af-error]");
     const controls = panel.querySelector(".af-ribbon-controls");
-    const hints = panel.querySelector(".af-shortcut-hints");
     const toggle = panel.querySelector("[data-af-toggle]");
     const modeShadow = panel.querySelector("[data-af-mode-shadow]");
     const modeRecall = panel.querySelector("[data-af-mode-recall]");
@@ -1087,7 +1086,6 @@
     panel.classList.toggle("is-empty", isEmpty);
     panel.classList.toggle("is-recall", state.practiceMode === "recall");
     controls.classList.toggle("is-hidden", isEmpty);
-    hints.classList.toggle("is-hidden", isEmpty);
     count.textContent = hasPhrases
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
       : state.loading ? "Loading" : "0 / 0";
@@ -1215,12 +1213,12 @@
 
   function originalControlLabel() {
     if (state.practiceMode === "recall") {
-      return state.textVisible ? "Original: current" : "Reveal Original";
+      return state.textVisible ? "Original current (S)" : "Reveal (S)";
     }
     if (state.shadowTextVisible) {
-      return state.textVisible ? "Original: sticky" : "Original: current";
+      return state.textVisible ? "Original sticky (S)" : "Original current (S)";
     }
-    return state.textVisible ? "Original: current" : "Original: hidden";
+    return state.textVisible ? "Original current (S)" : "Original hidden (S)";
   }
 
   function originalControlTitle() {
@@ -1235,11 +1233,11 @@
   }
 
   function translationControlLabel() {
-    if (state.practiceMode === "recall") return "Translation: prompt";
+    if (state.practiceMode === "recall") return "Prompt (T)";
     if (state.phraseTranslationStickyVisible) {
-      return state.phraseTranslationVisible ? "Translation: sticky" : "Translation: current";
+      return state.phraseTranslationVisible ? "Translation sticky (T)" : "Translation current (T)";
     }
-    return state.phraseTranslationVisible ? "Translation: current" : "Show Translation";
+    return state.phraseTranslationVisible ? "Translation current (T)" : "Translate (T)";
   }
 
   function renderDisplayPreferenceControls(controls) {

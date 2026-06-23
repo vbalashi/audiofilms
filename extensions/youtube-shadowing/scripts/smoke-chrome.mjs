@@ -457,6 +457,7 @@ function runGeometryScenario() {
     const practiceModeLayoutAssertions = assertPracticeModeLayoutStability(wideBeforeLookup);
     const phraseTranslationAssertions = assertPhraseTranslationUi();
     const displayStickyAssertions = assertDisplayStickyUi();
+    const controlHierarchyAssertions = assertControlHierarchyUi();
     const improveTimingAssertions = assertImproveTimingUi();
     const debugMenuAssertions = assertDebugMenuUi();
     const popoverDismissalAssertions = assertPopoverDismissalUi();
@@ -480,6 +481,7 @@ function runGeometryScenario() {
       ...practiceModeLayoutAssertions,
       ...phraseTranslationAssertions,
       ...displayStickyAssertions,
+      ...controlHierarchyAssertions,
       ...improveTimingAssertions,
       ...debugMenuAssertions,
       ...popoverDismissalAssertions,
@@ -690,6 +692,19 @@ function assertDisplayStickyUi() {
     assertion("next keeps sticky translation visible", translationStickyNext.phraseTranslation?.visible === true && translationStickyNext.phraseTranslation?.sticky === true, JSON.stringify(translationStickyNext.phraseTranslation)),
     assertion("Shift+T turns sticky translation off", translationStickyClosed.phraseTranslation?.visible === false && translationStickyClosed.phraseTranslation?.sticky === false, JSON.stringify(translationStickyClosed.phraseTranslation)),
     assertion("display sticky scenario advanced phrases", Number((translationStickyNext.count || "").split("/")[0].trim()) > startIndex, `${start.count} -> ${translationStickyNext.count}`),
+  ];
+}
+
+function assertControlHierarchyUi() {
+  const geometry = readGeometrySnapshot();
+  const controls = geometry.controlHierarchy || {};
+  return [
+    assertion("shortcut hint row removed", controls.shortcutRowPresent === false, JSON.stringify(controls)),
+    assertion("mode controls show inline shortcuts", /Shadow\s*1/.test(controls.modeText || "") && /Recall\s*2/.test(controls.modeText || ""), controls.modeText || ""),
+    assertion("phrase navigation is centered", controls.practiceCenterOffset <= 32, JSON.stringify(controls)),
+    assertion("phrase navigation is primary width", controls.practiceWidth > controls.modeWidth && controls.practiceWidth >= controls.displayWidth, JSON.stringify(controls)),
+    assertion("display controls stay right of navigation", controls.displayLeft >= controls.practiceRight, JSON.stringify(controls)),
+    assertion("display controls include shortcut labels", /\(S\)/.test(controls.displayText || "") && /\(T\)/.test(controls.displayText || ""), controls.displayText || ""),
   ];
 }
 
@@ -1383,6 +1398,30 @@ function readGeometrySnapshot() {
         text,
         hasTechnicalTerms: ["manual", "exact", "timedtext", "yt-dlp", "provider"].some((term) => lower.includes(term)),
         phraseIconButtons: root?.querySelectorAll(".af-practice-controls .af-phrase-icon-button .af-button-icon").length || 0,
+      };
+    })(),
+    controlHierarchy: (() => {
+      const controls = root?.querySelector(".af-ribbon-controls");
+      const mode = root?.querySelector(".af-mode-controls");
+      const practice = root?.querySelector(".af-practice-controls");
+      const display = root?.querySelector(".af-display-controls");
+      const controlsRect = controls?.getBoundingClientRect();
+      const practiceRect = practice?.getBoundingClientRect();
+      const modeRect = mode?.getBoundingClientRect();
+      const displayRect = display?.getBoundingClientRect();
+      const controlsCenter = controlsRect ? controlsRect.left + controlsRect.width / 2 : 0;
+      const practiceCenter = practiceRect ? practiceRect.left + practiceRect.width / 2 : 0;
+      return {
+        shortcutRowPresent: Boolean(root?.querySelector(".af-shortcut-hints")),
+        modeText: mode?.textContent || "",
+        practiceText: practice?.textContent || "",
+        displayText: display?.textContent || "",
+        modeWidth: modeRect?.width || 0,
+        practiceWidth: practiceRect?.width || 0,
+        displayWidth: displayRect?.width || 0,
+        displayLeft: displayRect?.left || 0,
+        practiceRight: practiceRect?.right || 0,
+        practiceCenterOffset: Math.abs(practiceCenter - controlsCenter),
       };
     })(),
     readinessMenu: (() => {
