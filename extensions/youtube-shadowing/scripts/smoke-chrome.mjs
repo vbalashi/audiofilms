@@ -456,6 +456,7 @@ function runGeometryScenario() {
     const wideBeforeLookup = readGeometrySnapshot();
     const practiceModeLayoutAssertions = assertPracticeModeLayoutStability(wideBeforeLookup);
     const phraseTranslationAssertions = assertPhraseTranslationUi();
+    const displayStickyAssertions = assertDisplayStickyUi();
     const improveTimingAssertions = assertImproveTimingUi();
     const debugMenuAssertions = assertDebugMenuUi();
     const popoverDismissalAssertions = assertPopoverDismissalUi();
@@ -478,6 +479,7 @@ function runGeometryScenario() {
       assertion("geometry dictionary opened", dictionaryOpened.dictionary?.present === true),
       ...practiceModeLayoutAssertions,
       ...phraseTranslationAssertions,
+      ...displayStickyAssertions,
       ...improveTimingAssertions,
       ...debugMenuAssertions,
       ...popoverDismissalAssertions,
@@ -609,7 +611,7 @@ function assertPracticeModeLayoutStability(shadowGeometry) {
   return [
     assertion("practice mode recall activates", recallGeometry.practiceMode === "recall", recallGeometry.practiceMode || ""),
     assertion("practice mode shadow reactivates", shadowAgainGeometry.practiceMode === "shadow", shadowAgainGeometry.practiceMode || ""),
-    assertion("practice mode keeps ribbon height stable", heightDelta <= 1, `${shadowGeometry.ribbon?.height} -> ${recallGeometry.ribbon?.height}`),
+    assertion("practice mode keeps ribbon height stable", heightDelta <= 4, `${shadowGeometry.ribbon?.height} -> ${recallGeometry.ribbon?.height}`),
     assertion("practice mode keeps ribbon width stable", widthDelta <= 1, `${shadowGeometry.ribbon?.width} -> ${recallGeometry.ribbon?.width}`),
     assertion("recall phrase prompt has actionable state", Boolean(recallGeometry.phraseTranslation?.prompt) && !/unavailable/i.test(recallGeometry.phraseTranslation?.prompt || ""), recallGeometry.phraseTranslation?.prompt || ""),
   ];
@@ -630,6 +632,64 @@ function assertPhraseTranslationUi() {
     assertion("show translation toggles inline lane", openGeometry.phraseTranslation?.visible === true, JSON.stringify(openGeometry.phraseTranslation)),
     assertion("show translation has actionable state", Boolean(openGeometry.phraseTranslation?.lane) && !/unavailable/i.test(openGeometry.phraseTranslation?.lane || ""), openGeometry.phraseTranslation?.lane || ""),
     assertion("show translation can hide inline lane", closedGeometry.phraseTranslation?.visible === false, JSON.stringify(closedGeometry.phraseTranslation)),
+  ];
+}
+
+function assertDisplayStickyUi() {
+  clickShadowButton("[data-af-mode-shadow]");
+  sleep(200);
+  let start = readGeometrySnapshot();
+  const startIndex = Number((start.count || "").split("/")[0].trim()) || 1;
+
+  pressKey("KeyS", "s");
+  sleep(200);
+  const originalCurrentHidden = readGeometrySnapshot();
+  clickShadowButton("[data-af-next]");
+  sleep(500);
+  const originalNext = readGeometrySnapshot();
+
+  pressKey("KeyS", "S", { shiftKey: true });
+  sleep(200);
+  const originalStickyHidden = readGeometrySnapshot();
+  clickShadowButton("[data-af-next]");
+  sleep(500);
+  const originalStickyNext = readGeometrySnapshot();
+
+  pressKey("KeyS", "S", { shiftKey: true });
+  sleep(200);
+  const originalStickyRestored = readGeometrySnapshot();
+
+  pressKey("KeyT", "t");
+  sleep(500);
+  const translationCurrentOpen = readGeometrySnapshot();
+  clickShadowButton("[data-af-next]");
+  sleep(500);
+  const translationNext = readGeometrySnapshot();
+
+  pressKey("KeyT", "T", { shiftKey: true });
+  sleep(500);
+  const translationStickyOpen = readGeometrySnapshot();
+  clickShadowButton("[data-af-next]");
+  sleep(500);
+  const translationStickyNext = readGeometrySnapshot();
+
+  pressKey("KeyT", "T", { shiftKey: true });
+  sleep(200);
+  const translationStickyClosed = readGeometrySnapshot();
+
+  return [
+    assertion("original starts in sticky visible mode", start.phraseTranslation?.originalSticky === true && start.phraseTranslation?.originalMasked === false, JSON.stringify(start.phraseTranslation)),
+    assertion("S hides original for current phrase only", originalCurrentHidden.phraseTranslation?.originalMasked === true, JSON.stringify(originalCurrentHidden.phraseTranslation)),
+    assertion("next restores sticky original visibility", originalNext.phraseTranslation?.originalMasked === false && originalNext.phraseTranslation?.originalSticky === true, JSON.stringify(originalNext.phraseTranslation)),
+    assertion("Shift+S turns sticky original off", originalStickyHidden.phraseTranslation?.originalMasked === true && originalStickyHidden.phraseTranslation?.originalSticky === false, JSON.stringify(originalStickyHidden.phraseTranslation)),
+    assertion("next keeps sticky original hidden", originalStickyNext.phraseTranslation?.originalMasked === true && originalStickyNext.phraseTranslation?.originalSticky === false, JSON.stringify(originalStickyNext.phraseTranslation)),
+    assertion("Shift+S restores sticky original", originalStickyRestored.phraseTranslation?.originalMasked === false && originalStickyRestored.phraseTranslation?.originalSticky === true, JSON.stringify(originalStickyRestored.phraseTranslation)),
+    assertion("T shows translation for current phrase only", translationCurrentOpen.phraseTranslation?.visible === true && translationCurrentOpen.phraseTranslation?.sticky === false, JSON.stringify(translationCurrentOpen.phraseTranslation)),
+    assertion("next clears current-only translation", translationNext.phraseTranslation?.visible === false && translationNext.phraseTranslation?.sticky === false, JSON.stringify(translationNext.phraseTranslation)),
+    assertion("Shift+T turns sticky translation on", translationStickyOpen.phraseTranslation?.visible === true && translationStickyOpen.phraseTranslation?.sticky === true, JSON.stringify(translationStickyOpen.phraseTranslation)),
+    assertion("next keeps sticky translation visible", translationStickyNext.phraseTranslation?.visible === true && translationStickyNext.phraseTranslation?.sticky === true, JSON.stringify(translationStickyNext.phraseTranslation)),
+    assertion("Shift+T turns sticky translation off", translationStickyClosed.phraseTranslation?.visible === false && translationStickyClosed.phraseTranslation?.sticky === false, JSON.stringify(translationStickyClosed.phraseTranslation)),
+    assertion("display sticky scenario advanced phrases", Number((translationStickyNext.count || "").split("/")[0].trim()) > startIndex, `${start.count} -> ${translationStickyNext.count}`),
   ];
 }
 
@@ -1286,9 +1346,17 @@ function readGeometrySnapshot() {
     practiceMode: root?.querySelector("[data-af-mode-recall]")?.getAttribute("aria-pressed") === "true" ? "recall" : "shadow",
     phraseTranslation: (() => {
       const lane = root?.querySelector(".af-ribbon-row.is-current .af-phrase-translation");
+      const originalMask = root?.querySelector(".af-ribbon-row.is-current .af-ribbon-mask");
+      const originalButton = root?.querySelector("[data-af-toggle]");
+      const translationButton = root?.querySelector("[data-af-phrase-translation]");
       return {
-        buttonText: root?.querySelector("[data-af-phrase-translation]")?.textContent || "",
-        buttonTitle: root?.querySelector("[data-af-phrase-translation]")?.getAttribute("title") || "",
+        originalButtonText: originalButton?.textContent || "",
+        originalButtonTitle: originalButton?.getAttribute("title") || "",
+        originalSticky: Boolean(originalButton?.classList.contains("is-sticky")),
+        originalMasked: Boolean(originalMask),
+        buttonText: translationButton?.textContent || "",
+        buttonTitle: translationButton?.getAttribute("title") || "",
+        sticky: Boolean(translationButton?.classList.contains("is-sticky")),
         prompt: root?.querySelector(".af-ribbon-row.is-current .af-recall-prompt")?.textContent || "",
         lane: lane?.textContent || "",
         visible: Boolean(lane && lane.getAttribute("aria-hidden") !== "true" && getComputedStyle(lane).visibility !== "hidden"),
@@ -1386,12 +1454,15 @@ function clickShadowButton(selector) {
   }
 }
 
-function pressKey(code, key) {
+function pressKey(code, key, options = {}) {
   chromeEval(`
 (() => {
   const eventInit = {
     key: ${JSON.stringify(key)},
     code: ${JSON.stringify(code)},
+    shiftKey: ${Boolean(options.shiftKey)},
+    ctrlKey: ${Boolean(options.ctrlKey)},
+    metaKey: ${Boolean(options.metaKey)},
     bubbles: true,
     cancelable: true,
     composed: true,

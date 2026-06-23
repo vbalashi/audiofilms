@@ -41,6 +41,7 @@
   let displayPreferencesDirty = false;
   let displayPreferencesMutationSeq = 0;
   let phraseProgressSaveTimer = null;
+  let viewportLayoutFrame = 0;
 
   const state = {
     videoId: null,
@@ -71,6 +72,7 @@
     autoPause: initialDisplayPreferences.autoPause,
     practiceMode: "shadow",
     phraseTranslationVisible: false,
+    phraseTranslationStickyVisible: false,
     phraseTranslations: {},
     phraseTranslationSeq: 0,
     timingOperation: null,
@@ -760,7 +762,7 @@
     const translationButton = appendButton(displayControls, "Show Translation", "afPhraseTranslation");
     translationButton.title = "Show phrase translation (T)";
     const hints = appendElement(panel, "div", "af-shortcut-hints");
-    hints.textContent = "Shortcuts: Arrow keys phrase navigation · S original · T translation · 1/2 modes";
+    hints.textContent = "Shortcuts: Arrow keys phrase navigation · S original · Shift+S sticky · T translation · Shift+T sticky · 1/2 modes";
     const resizeHandle = appendElement(panel, "button", "af-panel-resize-handle");
     resizeHandle.type = "button";
     resizeHandle.dataset.afResizeHandle = "phraseRibbon";
@@ -768,11 +770,11 @@
 
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
     panel.querySelector("[data-af-replay]").addEventListener("click", replayCurrentPhrase);
-    panel.querySelector("[data-af-toggle]").addEventListener("click", toggleText);
+    panel.querySelector("[data-af-toggle]").addEventListener("click", (event) => toggleText(event));
     panel.querySelector("[data-af-next]").addEventListener("click", nextPhrase);
     panel.querySelector("[data-af-mode-shadow]").addEventListener("click", () => setPracticeMode("shadow"));
     panel.querySelector("[data-af-mode-recall]").addEventListener("click", () => setPracticeMode("recall"));
-    panel.querySelector("[data-af-phrase-translation]").addEventListener("click", togglePhraseTranslation);
+    panel.querySelector("[data-af-phrase-translation]").addEventListener("click", (event) => togglePhraseTranslation(event));
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
     panel.querySelector("[data-af-theme-toggle]").addEventListener("click", cycleThemePreference);
     panel.querySelector("[data-af-utility-toggle]").addEventListener("click", toggleUtilityMenu);
@@ -1107,20 +1109,25 @@
     themeToggle.innerHTML = `${iconSvg("theme")}<span class="af-sr-only">${themeLabel}</span>`;
     themeToggle.setAttribute("aria-label", themeLabel);
     themeToggle.title = themeLabel;
-    toggle.textContent = state.practiceMode === "recall"
-      ? state.textVisible ? "Hide Original" : "Reveal Original"
-      : state.textVisible ? "Hide Original" : "Show Original";
+    const originalSticky = state.practiceMode === "shadow" && state.shadowTextVisible;
+    const translationSticky = state.practiceMode === "shadow" && state.phraseTranslationStickyVisible;
+    toggle.textContent = originalControlLabel();
     toggle.classList.toggle("is-active", state.textVisible);
+    toggle.classList.toggle("is-sticky", originalSticky);
+    toggle.setAttribute("aria-pressed", state.textVisible ? "true" : "false");
+    toggle.title = originalControlTitle();
     modeShadow.classList.toggle("is-active", state.practiceMode === "shadow");
     modeRecall.classList.toggle("is-active", state.practiceMode === "recall");
     modeRecall.disabled = false;
-    modeRecall.title = phraseTranslationControlTitle(currentPhraseTranslation);
+    modeRecall.title = "Recall mode (2)";
     modeShadow.setAttribute("aria-pressed", state.practiceMode === "shadow" ? "true" : "false");
     modeRecall.setAttribute("aria-pressed", state.practiceMode === "recall" ? "true" : "false");
-    phraseTranslation.textContent = state.phraseTranslationVisible ? "Hide Translation" : "Show Translation";
+    phraseTranslation.textContent = translationControlLabel();
     phraseTranslation.classList.toggle("is-active", state.phraseTranslationVisible);
+    phraseTranslation.classList.toggle("is-sticky", translationSticky);
     phraseTranslation.hidden = isEmpty;
     phraseTranslation.disabled = state.loading || !hasPhrases;
+    phraseTranslation.setAttribute("aria-pressed", state.phraseTranslationVisible ? "true" : "false");
     phraseTranslation.title = phraseTranslationControlTitle(currentPhraseTranslation);
     utilityToggle.setAttribute("aria-expanded", state.utilityMenuOpen ? "true" : "false");
     utilityToggle.classList.toggle("is-active", state.utilityMenuOpen);
@@ -1177,22 +1184,18 @@
   }
 
   function setPracticeMode(mode) {
-    if (state.practiceMode === "shadow") {
-      state.shadowTextVisible = state.textVisible;
-    }
     state.practiceMode = mode === "recall" ? "recall" : "shadow";
-    if (state.practiceMode === "recall") {
-      state.textVisible = false;
-      state.phraseTranslationVisible = true;
-      ensureCurrentPhraseTranslation();
-    } else {
-      state.textVisible = state.shadowTextVisible;
-    }
+    applyPhraseEntryDisplayState();
     render();
   }
 
-  function togglePhraseTranslation() {
-    state.phraseTranslationVisible = !state.phraseTranslationVisible;
+  function togglePhraseTranslation(event) {
+    if (event?.shiftKey) {
+      state.phraseTranslationStickyVisible = !state.phraseTranslationStickyVisible;
+      state.phraseTranslationVisible = state.phraseTranslationStickyVisible;
+    } else {
+      state.phraseTranslationVisible = !state.phraseTranslationVisible;
+    }
     if (state.phraseTranslationVisible) {
       ensureCurrentPhraseTranslation();
     }
@@ -1200,11 +1203,43 @@
   }
 
   function phraseTranslationControlTitle(translation) {
-    if (translation?.status === "ready") return "Show phrase translation";
-    if (translation?.status === "loading") return "Phrase translation is loading";
-    if (state.accountStatus !== "signed-in") return "Connect 2000NL to translate phrases";
-    if (translation?.status === "failed") return translation.error || "Phrase translation failed";
-    return "Show phrase translation";
+    const mode = state.practiceMode === "shadow" && state.phraseTranslationStickyVisible
+      ? "Translation: sticky. Shift+T turns sticky mode off."
+      : "Translation: current phrase. Shift+T toggles sticky mode.";
+    if (translation?.status === "ready") return mode;
+    if (translation?.status === "loading") return `${mode} Phrase translation is loading.`;
+    if (state.accountStatus !== "signed-in") return `${mode} Connect 2000NL to translate phrases.`;
+    if (translation?.status === "failed") return `${mode} ${translation.error || "Phrase translation failed."}`;
+    return mode;
+  }
+
+  function originalControlLabel() {
+    if (state.practiceMode === "recall") {
+      return state.textVisible ? "Original: current" : "Reveal Original";
+    }
+    if (state.shadowTextVisible) {
+      return state.textVisible ? "Original: sticky" : "Original: current";
+    }
+    return state.textVisible ? "Original: current" : "Original: hidden";
+  }
+
+  function originalControlTitle() {
+    if (state.practiceMode === "recall") {
+      return state.textVisible
+        ? "Original revealed for the current Recall phrase. Shift+S toggles Shadow sticky original."
+        : "Reveal original for the current Recall phrase (S). Shift+S toggles Shadow sticky original.";
+    }
+    return state.shadowTextVisible
+      ? "Original: sticky. Press S to hide only this phrase, or Shift+S to keep originals hidden."
+      : "Original: hidden. Press S to reveal only this phrase, or Shift+S to keep originals visible.";
+  }
+
+  function translationControlLabel() {
+    if (state.practiceMode === "recall") return "Translation: prompt";
+    if (state.phraseTranslationStickyVisible) {
+      return state.phraseTranslationVisible ? "Translation: sticky" : "Translation: current";
+    }
+    return state.phraseTranslationVisible ? "Translation: current" : "Show Translation";
   }
 
   function renderDisplayPreferenceControls(controls) {
@@ -1300,6 +1335,18 @@
     if (dictionaryPanel) {
       applyPanelGeometry(dictionaryPanel, "dictionaryPanel");
     }
+  }
+
+  function scheduleViewportLayoutClamp() {
+    if (viewportLayoutFrame) return;
+    viewportLayoutFrame = window.requestAnimationFrame(() => {
+      viewportLayoutFrame = 0;
+      applyPanelLayout(panelElement("phraseRibbon"), panelElement("dictionaryPanel"));
+      const debugPanel = debugPanelElement();
+      if (debugPanel) {
+        applyDebugPanelGeometry(debugPanel);
+      }
+    });
   }
 
   function applyPanelGeometry(panel, panelKey, overrideGeometry = null) {
@@ -1499,6 +1546,7 @@
     panelGestureFallbackInstalled = true;
     document.addEventListener("pointerdown", beginPanelGestureFromHost, true);
     document.addEventListener("mousedown", beginPanelGestureFromHost, true);
+    window.addEventListener("resize", scheduleViewportLayoutClamp);
   }
 
   function beginPanelGestureFromHost(event) {
@@ -4423,6 +4471,7 @@
     state.textVisible = true;
     state.shadowTextVisible = true;
     state.phraseTranslationVisible = false;
+    state.phraseTranslationStickyVisible = false;
     state.phraseTranslations = {};
     state.lastPhraseProgressRestore = null;
     state.timingOperation = null;
@@ -5014,12 +5063,8 @@
     state.guidedHold = null;
     state.currentIndex = targetIndex;
     schedulePhraseProgressSave(command);
-    if (state.practiceMode === "recall") {
-      state.textVisible = false;
-      state.phraseTranslationVisible = true;
-    }
-    if (state.practiceMode === "recall" || state.phraseTranslationVisible) {
-      ensureCurrentPhraseTranslation();
+    if (fromIndex !== targetIndex) {
+      applyPhraseEntryDisplayState();
     }
     enterGuidedMode();
     render();
@@ -5036,10 +5081,14 @@
     scheduleNavigationObservation(navigationEvent.id, command, targetIndex, 750);
   }
 
-  function toggleText() {
-    state.textVisible = !state.textVisible;
-    if (state.practiceMode === "shadow") {
-      state.shadowTextVisible = state.textVisible;
+  function toggleText(event) {
+    if (event?.shiftKey) {
+      state.shadowTextVisible = !state.shadowTextVisible;
+      if (state.practiceMode === "shadow") {
+        state.textVisible = state.shadowTextVisible;
+      }
+    } else {
+      state.textVisible = !state.textVisible;
     }
     render();
   }
@@ -5072,10 +5121,20 @@
 
   function showText() {
     state.textVisible = true;
-    if (state.practiceMode === "shadow") {
-      state.shadowTextVisible = true;
-    }
     render();
+  }
+
+  function applyPhraseEntryDisplayState() {
+    if (state.practiceMode === "recall") {
+      state.textVisible = false;
+      state.phraseTranslationVisible = true;
+    } else {
+      state.textVisible = state.shadowTextVisible;
+      state.phraseTranslationVisible = state.phraseTranslationStickyVisible;
+    }
+    if (state.practiceMode === "recall" || state.phraseTranslationVisible) {
+      ensureCurrentPhraseTranslation();
+    }
   }
 
   function syncIndexToCurrentTime(options = {}) {
@@ -5089,7 +5148,11 @@
 
     const activeIndex = state.phrases.findIndex((phrase) => currentMs >= phrase.startMs && currentMs < phrase.endMs);
     if (activeIndex >= 0) {
+      const changed = activeIndex !== state.currentIndex;
       state.currentIndex = activeIndex;
+      if (changed) {
+        applyPhraseEntryDisplayState();
+      }
       render();
     }
   }
@@ -5518,17 +5581,13 @@
       replayCurrentPhrase();
     } else if (event.code === "ArrowUp") {
       blockYouTubeShortcutWithOptions(event);
-      toggleText();
+      toggleText(event);
     } else if (event.code === "KeyS") {
       blockYouTubeShortcutWithOptions(event);
-      if (state.practiceMode !== "shadow") {
-        setPracticeMode("shadow");
-      } else {
-        toggleText();
-      }
+      toggleText(event);
     } else if (event.code === "KeyT") {
       blockYouTubeShortcutWithOptions(event);
-      togglePhraseTranslation();
+      togglePhraseTranslation(event);
     } else if (event.code === "Digit1") {
       blockYouTubeShortcutWithOptions(event);
       setPracticeMode("shadow");
@@ -5587,7 +5646,8 @@
   }
 
   function shouldIgnoreKeyEvent(event) {
-    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return true;
+    if (event.metaKey || event.ctrlKey || event.altKey) return true;
+    if (event.shiftKey && event.code !== "KeyS" && event.code !== "KeyT") return true;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
     const tagName = target.tagName.toLowerCase();
