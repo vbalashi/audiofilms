@@ -5,6 +5,7 @@
   const youtubeAdapterApi = window.__afShadowingYouTubeAdapter || createYouTubeAdapterFallback();
   const transcriptRetrievalApi = window.__afShadowingTranscriptRetrieval;
   const sourceBindingApi = window.__afShadowingSourceBinding;
+  const dictionaryActionApi = window.__afShadowingDictionaryActions;
 
   try {
     bootAudioFilmsYouTubeShadowing();
@@ -3528,31 +3529,24 @@
       render();
       return;
     }
-    const pendingMessage = `${displayAction?.label || "Action"}...`;
+    const pendingFeedback = dictionaryActionApi.pendingFeedback(card, displayAction, action);
     state.selectedWord = {
       ...state.selectedWord,
       cardActionError: "",
     };
     state.cardActionFeedbackByCardId = {
       ...state.cardActionFeedbackByCardId,
-      [card.id]: {
-        status: "pending",
-        actionId: displayAction?.id || action,
-        message: pendingMessage,
-      },
+      [pendingFeedback.cardId]: pendingFeedback.feedback,
     };
     render();
 
     try {
       await postDictionaryCommand("dict-action", payload.value);
       if (!isCurrentLookup(selectedWord)) return;
+      const savedFeedback = dictionaryActionApi.savedFeedback(card, displayAction, action);
       state.cardActionFeedbackByCardId = {
         ...state.cardActionFeedbackByCardId,
-        [card.id]: {
-          status: "saved",
-          actionId: displayAction?.id || action,
-          message: dictionaryActionSuccessMessage(displayAction, action),
-        },
+        [savedFeedback.cardId]: savedFeedback.feedback,
       };
       state.selectedWord = {
         ...state.selectedWord,
@@ -3562,13 +3556,10 @@
       await lookupSelectedWord(state.selectedWord);
     } catch (error) {
       if (!isCurrentLookup(selectedWord)) return;
+      const failedFeedback = dictionaryActionApi.errorFeedback(card, displayAction, action, error);
       state.cardActionFeedbackByCardId = {
         ...state.cardActionFeedbackByCardId,
-        [card.id]: {
-          status: "error",
-          actionId: displayAction?.id || action,
-          message: error instanceof Error ? error.message : String(error),
-        },
+        [failedFeedback.cardId]: failedFeedback.feedback,
       };
       state.selectedWord = {
         ...state.selectedWord,
@@ -3577,13 +3568,6 @@
       };
       render();
     }
-  }
-
-  function dictionaryActionSuccessMessage(displayAction, action) {
-    if (action === "start-learning") return "Started learning";
-    if (action === "mark-known") return "Marked known";
-    const label = displayAction?.label || "Progress";
-    return `${label} recorded`;
   }
 
   function createDictionarySourceBinding(word, phraseIndex, selection = {}) {
@@ -3602,28 +3586,15 @@
   }
 
   function frozenDictionaryActionPayload(selectedWord, card, actionPayload = {}) {
-    const action = actionPayload?.action || "";
-    const binding = selectedWord.sourceBinding;
-    if (!binding?.videoId) {
-      return { ok: false, error: "Cannot save progress: the YouTube video identity is unavailable." };
-    }
-    if (state.videoId && binding.videoId !== state.videoId) {
-      return { ok: false, error: "This dictionary card belongs to a previous YouTube video. Click the word again on the current video." };
-    }
-    const clientEventId = actionPayload?.clientEventId || createMutationTurnId();
-    const turnId = actionPayload?.turnId || (
-      (action === "review-card" || action === "mark-known" || action === "mark-unknown") && isUuid(clientEventId)
-        ? clientEventId
-        : undefined
-    );
-    const payload = {
-      ...actionPayload,
-      clientEventId,
-      ...(turnId ? { turnId } : {}),
-      sourceContext: buildDictionaryActionSourceContext(binding, card, action),
-      entryId: card.entryId,
-    };
-    return { ok: true, value: payload };
+    return dictionaryActionApi.frozenDictionaryActionPayload({
+      selectedWord,
+      card,
+      actionPayload,
+      currentVideoId: state.videoId,
+      createMutationTurnId,
+      isUuid,
+      buildSourceContext: buildDictionaryActionSourceContext,
+    });
   }
 
   function buildDictionaryActionSourceContext(binding, card, action) {

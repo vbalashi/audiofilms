@@ -40,6 +40,7 @@
         "src/youtubeAdapter.js",
         "src/transcriptRetrieval.js",
         "src/sourceBinding.js",
+        "src/dictionaryActions.js",
         "src/content.js"
       ],
       "css": [
