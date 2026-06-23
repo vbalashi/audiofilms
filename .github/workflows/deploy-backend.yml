@@ -1,0 +1,138 @@
+name: Deploy AudioFilms backend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-audiofilms-backend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, audiofilms-backend]
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      DEPLOY_SERVER_NAME: ${{ vars.AUDIOFILMS_DEPLOY_SERVER_NAME || 'AudioFilms API' }}
+      DEPLOY_WORKDIR: ${{ vars.AUDIOFILMS_DEPLOY_WORKDIR || '/srv/audiofilms' }}
+      DEPLOY_PUBLIC_HEALTH_URL: ${{ vars.AUDIOFILMS_DEPLOY_PUBLIC_HEALTH_URL || 'https://audiofilms-api.dilum.io/api/health' }}
+      COMPOSE_PROFILES: ${{ vars.AUDIOFILMS_COMPOSE_PROFILES || '' }}
+    steps:
+      - name: Deploy backend with Telegram notifications
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          send_telegram() {
+            local message="$1"
+            if [[ -z "${TELEGRAM_BOT_TOKEN:-}" || -z "${TELEGRAM_CHAT_ID:-}" ]]; then
+              echo "Telegram env not set; skipping notification."
+              return 0
+            fi
+
+            curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=${message}" \
+              --data-urlencode "disable_web_page_preview=true" >/dev/null || true
+          }
+
+          docker_group() {
+            if command -v sg >/dev/null 2>&1 && getent group docker >/dev/null 2>&1; then
+              sg docker -c "$*"
+            else
+              "$@"
+            fi
+          }
+
+          docker_compose_cmd() {
+            if docker compose version >/dev/null 2>&1; then
+              printf '%q ' docker compose "$@"
+            else
+              printf '%q ' docker-compose "$@"
+            fi
+          }
+
+          run_docker_compose() {
+            if command -v sg >/dev/null 2>&1 && getent group docker >/dev/null 2>&1; then
+              sg docker -c "$(docker_compose_cmd "$@")"
+            elif docker compose version >/dev/null 2>&1; then
+              docker compose "$@"
+            else
+              docker-compose "$@"
+            fi
+          }
+
+          DEPLOY_START=$(date +%s)
+          START_TS_HUMAN=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          START_TS_ISO=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+          cd "${DEPLOY_WORKDIR}"
+          git fetch origin main --tags
+
+          COMMIT=$(git rev-parse --short origin/main)
+          COMMIT_FULL=$(git rev-parse origin/main)
+
+          LATEST_TAG=$(git describe --tags --abbrev=0 origin/main 2>/dev/null || echo "v0.0.0")
+          TAG_BASE="${LATEST_TAG#v}"
+          PATCH_COUNT=$(git rev-list "${LATEST_TAG}..origin/main" --count 2>/dev/null || echo "0")
+          TAG_MAJOR=$(echo "${TAG_BASE}" | cut -d. -f1)
+          TAG_MINOR=$(echo "${TAG_BASE}" | cut -d. -f2)
+          AUDIOFILMS_BUILD_VERSION="${TAG_MAJOR}.${TAG_MINOR}.${PATCH_COUNT}"
+
+          export AUDIOFILMS_BUILD_VERSION
+          export AUDIOFILMS_BUILD_AT="${START_TS_ISO}"
+          export AUDIOFILMS_COMMIT_SHA="${COMMIT_FULL}"
+
+          send_telegram "$(printf '%s\nTime: %s\nVersion: %s\nCommit: %s\nServer: %s' \
+            'Deployment started: AudioFilms backend' \
+            "${START_TS_HUMAN}" \
+            "${AUDIOFILMS_BUILD_VERSION}" \
+            "${COMMIT}" \
+            "${DEPLOY_SERVER_NAME}")"
+
+          on_err() {
+            local status=$?
+            local duration=$(( $(date +%s) - DEPLOY_START ))
+            local end_ts_human
+            end_ts_human=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+            send_telegram "$(printf '%s\nTime: %s\nVersion: %s\nCommit: %s\nServer: %s\nDuration: %ss\nError: exit %s while running: %s' \
+              'Deployment failed: AudioFilms backend' \
+              "${end_ts_human}" \
+              "${AUDIOFILMS_BUILD_VERSION}" \
+              "${COMMIT}" \
+              "${DEPLOY_SERVER_NAME}" \
+              "${duration}" \
+              "${status}" \
+              "${BASH_COMMAND}")"
+            exit "${status}"
+          }
+          trap on_err ERR
+
+          git reset --hard origin/main
+
+          if [[ -n "${COMPOSE_PROFILES:-}" ]]; then
+            run_docker_compose --profile "${COMPOSE_PROFILES}" up -d --build
+          else
+            run_docker_compose up -d --build
+          fi
+
+          docker_group docker image prune -f
+
+          if [[ -n "${DEPLOY_PUBLIC_HEALTH_URL:-}" ]]; then
+            curl -fsS "${DEPLOY_PUBLIC_HEALTH_URL}" >/dev/null
+          fi
+
+          trap - ERR
+          duration=$(( $(date +%s) - DEPLOY_START ))
+          END_TS_HUMAN=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          send_telegram "$(printf '%s\nTime: %s\nVersion: %s\nCommit: %s\nServer: %s\nDuration: %ss\nHealth: %s' \
+            'Deployment succeeded: AudioFilms backend' \
+            "${END_TS_HUMAN}" \
+            "${AUDIOFILMS_BUILD_VERSION}" \
+            "${COMMIT}" \
+            "${DEPLOY_SERVER_NAME}" \
+            "${duration}" \
+            "${DEPLOY_PUBLIC_HEALTH_URL:-not checked}")"

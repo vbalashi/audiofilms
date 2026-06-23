@@ -165,6 +165,71 @@ The worker uses the same image and runs:
 node scripts/asr-worker.mjs
 ```
 
+## Automatic Deployment
+
+The backend now mirrors the 2000NL deployment model: pushes to `main` trigger
+`.github/workflows/deploy-backend.yml` on a GitHub self-hosted runner. The
+workflow updates the deployed working tree, rebuilds/restarts Docker Compose,
+checks the public health URL, and sends Telegram start/success/failure messages.
+
+Recommended runner placement for the current Dell-first deployment:
+
+```text
+Runner host:  dell-k3s / current AudioFilms API host
+Runner name:  dell-audiofilms
+Runner label: audiofilms-backend
+Working tree: /srv/audiofilms
+Compose file: compose.yaml
+Public health: https://audiofilms-api.dilum.io/api/health
+```
+
+On the runner host, prepare the deployment working tree once:
+
+```bash
+sudo mkdir -p /srv/audiofilms
+sudo chown "$USER:$USER" /srv/audiofilms
+git clone git@github.com:vbalashi/audiofilms.git /srv/audiofilms
+cd /srv/audiofilms
+cp app/env.example .env
+```
+
+Keep real runtime values on the host, not in git. The Compose deployment reads
+environment from the runner process and the root `.env` file next to
+`compose.yaml`. For the current Dell ASR deployment, ensure the host
+configuration includes the public base, ASR mode, tester tokens, and any 2000NL
+dictionary catalog token needed for guest lookup.
+
+GitHub repository secrets required:
+
+```text
+TELEGRAM_BOT_TOKEN
+TELEGRAM_CHAT_ID
+```
+
+GitHub repository variables:
+
+```text
+AUDIOFILMS_DEPLOY_WORKDIR=/srv/audiofilms
+AUDIOFILMS_DEPLOY_SERVER_NAME=AudioFilms API (Dell)
+AUDIOFILMS_DEPLOY_PUBLIC_HEALTH_URL=https://audiofilms-api.dilum.io/api/health
+AUDIOFILMS_COMPOSE_PROFILES=asr
+```
+
+Leave `AUDIOFILMS_COMPOSE_PROFILES` empty if the deployment should restart only
+the API service. Set it to `asr` when the same host should keep
+`audiofilms-asr-worker` updated together with `audiofilms-api`.
+
+The workflow exports these build metadata variables before `docker compose up`
+so `/api/health` can identify what is deployed:
+
+```text
+AUDIOFILMS_BUILD_VERSION
+AUDIOFILMS_BUILD_AT
+AUDIOFILMS_COMMIT_SHA
+```
+
+Manual trigger is available from GitHub Actions via `workflow_dispatch`.
+
 ## Reverse Proxy / TLS
 
 Terminate TLS in Caddy, nginx, Traefik, or another reverse proxy and forward to the API container on port 3000.

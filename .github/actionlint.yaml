@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels:
+    - audiofilms-backend
+    - dell
+
+config-variables: null
