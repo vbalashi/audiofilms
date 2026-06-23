@@ -41,7 +41,9 @@ function splitPhraseIntoTimedParts(
   phrase: Phrase,
   options: Required<PracticePhraseOptions>,
 ): Phrase[] {
-  const text = normalizeEllipsisContinuations(phrase.text).trim().replace(/\s+/g, ' ');
+  const text = normalizeHyphenatedNumericNames(
+    normalizeEllipsisContinuations(phrase.text).trim().replace(/\s+/g, ' '),
+  );
   const duration = Math.max(0, phrase.endSec - phrase.startSec);
   const sentenceParts = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
   const parts = sentenceParts.flatMap((part) => {
@@ -111,6 +113,10 @@ function normalizeEllipsisContinuations(text: string) {
     .replace(/^(?:\.\.\.|…)\s*/, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeHyphenatedNumericNames(text: string) {
+  return text.replace(/\b(TRAPPIST|Trappist)\s+(\d{1,3})(?=[.!?]?(?:\s|$))/g, '$1-$2');
 }
 
 function startsWithContinuationCue(text: string) {

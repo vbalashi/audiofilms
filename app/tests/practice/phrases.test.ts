@@ -105,6 +105,26 @@ describe('normalizePracticePhrases', () => {
     ]);
   });
 
+  it('normalizes known hyphenated numeric names from ASR text', () => {
+    const phrases: Phrase[] = [
+      {
+        id: 1,
+        startSec: 3.52,
+        endSec: 11.96,
+        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam Trappist 1.',
+      },
+    ];
+
+    expect(normalizePracticePhrases(phrases)).toEqual([
+      {
+        id: 0,
+        startSec: 3.52,
+        endSec: 11.96,
+        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam Trappist-1.',
+      },
+    ]);
+  });
+
   it('renormalizes cached backend practice phrases when building snapshots', () => {
     const response: SubtitleResponse = {
       phrases: [],
