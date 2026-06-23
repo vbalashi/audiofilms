@@ -188,7 +188,7 @@ On the runner host, prepare the deployment working tree once:
 ```bash
 sudo mkdir -p /srv/audiofilms
 sudo chown "$USER:$USER" /srv/audiofilms
-git clone git@github.com:vbalashi/audiofilms.git /srv/audiofilms
+git clone https://github.com/vbalashi/audiofilms.git /srv/audiofilms
 cd /srv/audiofilms
 cp app/env.example .env
 ```
