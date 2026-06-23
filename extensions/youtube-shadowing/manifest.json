@@ -39,6 +39,7 @@
         "src/captionTracks.js",
         "src/youtubeAdapter.js",
         "src/transcriptRetrieval.js",
+        "src/sourceBinding.js",
         "src/content.js"
       ],
       "css": [
