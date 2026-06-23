@@ -28,6 +28,18 @@ const platformItem = {
     matchedForm: 'huis',
     relation: 'exact',
   },
+  cardCapabilitiesByType: {
+    'word-to-definition': {
+      phase: 'encountered',
+      actions: ['start-learning', 'mark-known'],
+      reviewResults: [],
+    },
+  },
+  userStateByCardType: {
+    'word-to-definition': {
+      seenCount: 1,
+    },
+  },
 };
 
 function lookupRequest() {
@@ -88,6 +100,17 @@ describe('/api/dict/lookup', () => {
       intent: 'external-click',
     });
     expect(payload.cards[0].headword).toBe('huis');
+    expect(payload.cards[0].progress).toMatchObject({
+      phase: 'encountered',
+      seenCount: 1,
+    });
+    expect(payload.cards[0].displayActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'learn', label: 'Learn', group: 'progress' }),
+        expect.objectContaining({ id: 'known', label: 'Known', group: 'progress' }),
+        expect.objectContaining({ id: 'translate', label: 'Translate', group: 'translation' }),
+      ]),
+    );
     expect(payload.meta).toMatchObject({
       provider: '2000nl',
       responseVersion: 'overlay-v2',

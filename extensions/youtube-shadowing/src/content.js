@@ -3028,8 +3028,9 @@
   function renderReviewActions(parent, card = null) {
     const displayActions = displayActionsByGroup(card, "progress");
     if (!displayActions.length) {
-      if (card?.entryId || state.accountStatus === "signed-in") return;
-      renderConnectPrompt(parent);
+      if (state.accountStatus !== "signed-in") {
+        renderConnectPrompt(parent);
+      }
       return;
     }
     const section = appendElement(parent, "div", "af-card-review");
