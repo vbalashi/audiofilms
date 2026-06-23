@@ -7,6 +7,7 @@
   const sourceBindingApi = window.__afShadowingSourceBinding;
   const dictionaryActionApi = window.__afShadowingDictionaryActions;
   const phraseTokenApi = window.__afShadowingPhraseTokens;
+  const diagnosticsReportApi = window.__afShadowingDiagnosticsReport;
 
   try {
     bootAudioFilmsYouTubeShadowing();
@@ -2333,8 +2334,7 @@
   }
 
   function publishDiagnosticsSnapshot() {
-    const snapshot = {
-      capturedAt: new Date().toISOString(),
+    const snapshot = diagnosticsReportApi.diagnosticsSnapshot({
       diagnosticsClearedAt: state.diagnosticsClearedAt || "",
       videoId: state.videoId || "",
       selectedSourceId: state.selectedSourceId || "",
@@ -2342,40 +2342,31 @@
       loading: Boolean(state.loading),
       visibleError: state.error || "",
       bootLastError: state.bootDiagnostics?.lastError || "",
-      debugEventCount: state.debugEvents.length,
-      navigationEventCount: state.navigationEvents.length,
-      recentDebugEvents: state.debugEvents.slice(-8),
-      recentNavigationEvents: state.navigationEvents.slice(-8),
-      lastIssueReportPresent: Boolean(state.lastIssueReport),
-    };
+      debugEvents: state.debugEvents,
+      navigationEvents: state.navigationEvents,
+      lastIssueReport: state.lastIssueReport,
+    });
     document.documentElement.dataset.afShadowingDiagnosticsState = JSON.stringify(snapshot);
   }
 
   function formatIssueReport() {
     const selectedSource = getSelectedPracticeSource();
-    return JSON.stringify({
-      kind: "audiofilms-youtube-navigation-issue",
-      capturedAt: new Date().toISOString(),
-      page: {
-        url: window.location.href,
-        videoId: state.videoId,
-      },
+    return JSON.stringify(diagnosticsReportApi.issueReport({
+      url: window.location.href,
+      videoId: state.videoId,
       selectedSource: selectedSource ? captionTrackApi.formatSourceDebug(selectedSource) : null,
-      mode: {
-        guidedMode: state.guidedMode,
-        autoPause: state.autoPause,
-        textVisible: state.textVisible,
-      },
+      guidedMode: state.guidedMode,
+      autoPause: state.autoPause,
+      textVisible: state.textVisible,
       playback: getPlaybackSnapshot(),
       currentPhrase: describePhraseAtIndex(state.currentIndex),
+      currentIndex: state.currentIndex,
+      phrases: state.phrases,
       lastWordReplay: state.lastWordReplay,
-      visibleState: {
-        count: state.phrases.length ? `${state.currentIndex + 1} / ${state.phrases.length}` : "0 / 0",
-        error: state.error,
-      },
-      navigationEvents: state.navigationEvents.slice(-20),
-      debugEvents: state.debugEvents.slice(-12),
-    }, null, 2);
+      visibleError: state.error,
+      navigationEvents: state.navigationEvents,
+      debugEvents: state.debugEvents,
+    }), null, 2);
   }
 
   function practiceReadiness() {

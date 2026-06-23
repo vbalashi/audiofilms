@@ -42,6 +42,7 @@
         "src/sourceBinding.js",
         "src/dictionaryActions.js",
         "src/phraseTokens.js",
+        "src/diagnosticsReport.js",
         "src/content.js"
       ],
       "css": [
