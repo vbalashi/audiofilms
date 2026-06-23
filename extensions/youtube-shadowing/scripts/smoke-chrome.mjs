@@ -727,6 +727,7 @@ function assertInteractions(fixture) {
     assertions.push(...assertMarkIssueInteraction());
     assertions.push(...assertKeyboardNavigationInteraction());
     assertions.push(...assertWordReplayInteraction());
+    assertions.push(...assertPhraseProgressRestoreInteraction(fixture));
   }
   if (fixture.expect.checkOffOn) {
     assertions.push(...assertOffOnInteraction(fixture));
@@ -926,6 +927,26 @@ function assertWordReplayInteraction() {
     assertion("ctrl word replay does not select dictionary word", !wordsMatch(afterCtrl.dictionary?.word, ctrlClick.word), JSON.stringify(afterCtrl.dictionary)),
     assertion("ctrl word replay handles missing exact timing honestly", ctrlReplay.ok === false && ctrlReplay.reason === "word-timing-unavailable", JSON.stringify(ctrlReplay)),
     assertion("word replay keeps current phrase selected", afterCtrl.count === before.count, `${before.count} -> ${afterCtrl.count}`),
+  ];
+}
+
+function assertPhraseProgressRestoreInteraction(fixture) {
+  const before = readSnapshot();
+  const beforeOrdinal = parseCountOrdinal(before.count);
+  clickShadowButton("[data-af-next]");
+  const saved = waitForSnapshot(fixture.videoId, waitMs);
+  const savedOrdinal = parseCountOrdinal(saved.count);
+  sleep(900);
+  setVideoCurrentTime(0);
+  reloadTab();
+  const restored = waitForSnapshot(fixture.videoId, waitMs);
+  const restoredOrdinal = parseCountOrdinal(restored.count);
+  const restore = restored.debug?.phraseProgressRestore || {};
+
+  return [
+    assertion("phrase progress moved to a later phrase", beforeOrdinal && savedOrdinal === beforeOrdinal + 1, `${before.count} -> ${saved.count}`),
+    assertion("phrase progress restores after reload", restoredOrdinal === savedOrdinal, `${saved.count} -> ${restored.count}`),
+    assertion("phrase progress restore recorded source-specific state", Boolean(restore.sourceId) && ["phrase-id", "clamped-index"].includes(restore.reason || ""), JSON.stringify(restore)),
   ];
 }
 
@@ -1377,6 +1398,18 @@ function pauseVideo() {
     video.pause();
   }
   return "ok";
+})()
+  `);
+}
+
+function setVideoCurrentTime(seconds) {
+  chromeEval(`
+(() => {
+  const video = document.querySelector("video");
+  if (!video) return "";
+  video.pause();
+  video.currentTime = ${Number(seconds) || 0};
+  return String(video.currentTime);
 })()
   `);
 }

@@ -39,6 +39,8 @@ For extension smoke checks:
 - Previous/Next advance from the visible selected phrase, not from the YouTube playhead;
 - Space toggles continuous YouTube play/pause and exits guided phrase playback;
 - ArrowDown replays the current visible phrase;
+- last selected phrase restores after reload for the same video and selected
+  caption source;
 - Mark Issue copies a navigation incident report after a manual miss;
 - source mismatch or unknown source warning appears only when metadata is actually uncertain;
 - AudioFilms Off removes the learning layer and leaves YouTube visually normal.
@@ -191,9 +193,9 @@ Focused run:
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only=4EE7m94mJpk --reload-extension --skip-backend-check --skip-spa-check --skip-backend-off-check --skip-backend-failed-check --skip-source-switch-failed-check --skip-multilingual-switch-check --skip-geometry-check
 ```
 
-Result: passed `manual-trappist` and `manual-after-empty` with
-`Dutch captions · Precise`, `practice-timing-cache`, and current dictionary UI
-selectors.
+Result: passed `manual-trappist` and `manual-after-empty` with current
+dictionary UI selectors. The focused interaction checks also cover Shift/Ctrl
+word replay and extension-storage phrase-position restore after page reload.
 
 ### Pending: Frozen Dictionary Provenance Smoke Matrix
 

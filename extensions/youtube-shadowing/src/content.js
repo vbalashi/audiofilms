@@ -37,6 +37,7 @@
   let shadowScrollGuardInstalled = false;
   let displayPreferencesDirty = false;
   let displayPreferencesMutationSeq = 0;
+  let phraseProgressSaveTimer = null;
 
   const state = {
     videoId: null,
@@ -96,6 +97,7 @@
     passiveVideo: null,
     passiveFrame: null,
     passivePausedKey: "",
+    lastPhraseProgressRestore: null,
     loading: false,
     loadToken: 0,
     error: "",
@@ -287,6 +289,102 @@
         throw new Error(response?.error || "Display preferences write failed.");
       }
       return normalizeDisplayPreferences(response.preferences);
+    });
+  }
+
+  function phraseProgressKey(sourceId = state.selectedSourceId) {
+    if (!state.videoId || !sourceId) return "";
+    return `${state.videoId}::${sourceId}`;
+  }
+
+  function phraseProgressId(phrase, index) {
+    if (!phrase) return "";
+    if (phrase.id !== undefined && phrase.id !== null) return String(phrase.id);
+    return stableFingerprint({
+      index: Number.isInteger(phrase.index) ? phrase.index : index,
+      startMs: finiteInteger(phrase.startMs),
+      endMs: finiteInteger(phrase.endMs),
+      text: String(phrase.text || "").slice(0, 240),
+    });
+  }
+
+  async function readStoredPhraseProgress(sourceId, phrases) {
+    const key = phraseProgressKey(sourceId);
+    if (!key) return null;
+    try {
+      const response = await sendExtensionMessage({ type: "af-get-phrase-progress", key });
+      if (!response?.ok || !response.progress) return null;
+      return restoreIndexFromPhraseProgress(response.progress, phrases);
+    } catch (error) {
+      recordDebugEvent("phrase-progress-read-failed", {
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  function restoreIndexFromPhraseProgress(progress, phrases) {
+    if (!progress || !phrases.length) return null;
+    const phraseId = String(progress.phraseId || "");
+    if (phraseId) {
+      const exactIndex = phrases.findIndex((phrase, index) => phraseProgressId(phrase, index) === phraseId);
+      if (exactIndex >= 0) {
+        return {
+          index: exactIndex,
+          reason: "phrase-id",
+          progress,
+        };
+      }
+    }
+    const fallbackIndex = clampNumber(progress.currentIndex, 0, phrases.length - 1, 0);
+    return {
+      index: Math.round(fallbackIndex),
+      reason: "clamped-index",
+      progress,
+    };
+  }
+
+  function schedulePhraseProgressSave(reason) {
+    if (phraseProgressSaveTimer) {
+      window.clearTimeout(phraseProgressSaveTimer);
+    }
+    phraseProgressSaveTimer = window.setTimeout(() => {
+      phraseProgressSaveTimer = null;
+      saveCurrentPhraseProgress(reason);
+    }, 250);
+  }
+
+  function saveCurrentPhraseProgress(reason) {
+    const key = phraseProgressKey();
+    const phrase = state.phrases[state.currentIndex];
+    if (!key || !phrase) return;
+    const progress = {
+      currentIndex: state.currentIndex,
+      phraseId: phraseProgressId(phrase, state.currentIndex),
+      phraseCount: state.phrases.length,
+      updatedAt: new Date().toISOString(),
+    };
+    sendExtensionMessage({
+      type: "af-set-phrase-progress",
+      key,
+      progress,
+    }).then((response) => {
+      if (!response?.ok) {
+        throw new Error(response?.error || "Phrase progress write failed.");
+      }
+      recordDebugEvent("phrase-progress-saved", {
+        reason,
+        key,
+        currentIndex: progress.currentIndex,
+        phraseCount: progress.phraseCount,
+      });
+    }).catch((error) => {
+      recordDebugEvent("phrase-progress-save-failed", {
+        reason,
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }
 
@@ -2077,6 +2175,7 @@
       transcriptResult: state.transcriptResult ? summarizeTranscriptResult(state.transcriptResult) : null,
       phrases: state.phrases.length,
       currentPhrase: describePhraseAtIndex(state.currentIndex),
+      phraseProgressRestore: state.lastPhraseProgressRestore,
       diagnosticsClearedAt: state.diagnosticsClearedAt,
       error: state.error,
       sources: state.practiceSources.map(captionTrackApi.formatSourceDebug),
@@ -2120,6 +2219,7 @@
       diagnosticsClearedAt: state.diagnosticsClearedAt || "",
       videoId: state.videoId || "",
       selectedSourceId: state.selectedSourceId || "",
+      phraseProgressRestore: state.lastPhraseProgressRestore,
       loading: Boolean(state.loading),
       visibleError: state.error || "",
       bootLastError: state.bootDiagnostics?.lastError || "",
@@ -3242,6 +3342,7 @@
       translationsByCardId: {},
     };
     state.currentIndex = phraseIndex;
+    schedulePhraseProgressSave("lookup-word");
     render();
     lookupSelectedWord(state.selectedWord);
   }
@@ -4228,6 +4329,10 @@
 
     const previousVideoId = state.videoId;
     const loadToken = state.loadToken + 1;
+    if (phraseProgressSaveTimer) {
+      window.clearTimeout(phraseProgressSaveTimer);
+      phraseProgressSaveTimer = null;
+    }
     state.videoId = videoId;
     state.loadToken = loadToken;
     state.tracks = [];
@@ -4244,6 +4349,7 @@
     state.shadowTextVisible = true;
     state.phraseTranslationVisible = false;
     state.phraseTranslations = {};
+    state.lastPhraseProgressRestore = null;
     state.timingOperation = null;
     state.timingOperationError = "";
     clearTimingOperationPoll();
@@ -4411,13 +4517,31 @@
       if (!phrases.length) {
         throw new Error("Caption track loaded, but no timed phrases were parsed.");
       }
+      const restoredProgress = await readStoredPhraseProgress(source.id, phrases);
+      if (loadToken !== state.loadToken) return;
+      const playbackIndex = findPhraseIndexForTime(phrases, currentMs);
+      const nextIndex = restoredProgress?.index ?? playbackIndex;
 
       state.selectedSourceId = source.id;
       state.selectedTrack = source.track;
       state.cues = cues;
       state.transcriptResult = transcriptResult;
       state.phrases = phrases;
-      state.currentIndex = findPhraseIndexForTime(phrases, currentMs);
+      state.currentIndex = nextIndex;
+      state.lastPhraseProgressRestore = restoredProgress
+        ? {
+            sourceId: source.id,
+            reason: restoredProgress.reason,
+            currentIndex: nextIndex,
+            savedIndex: restoredProgress.progress.currentIndex,
+            phraseCount: phrases.length,
+            savedPhraseCount: restoredProgress.progress.phraseCount,
+            updatedAt: restoredProgress.progress.updatedAt,
+          }
+        : null;
+      if (restoredProgress && video && phrases[nextIndex]) {
+        video.currentTime = Math.max(0, phrases[nextIndex].startMs / 1000);
+      }
       state.selectedWord = null;
       state.phraseTranslations = {};
       state.timingOperationError = "";
@@ -4432,9 +4556,9 @@
         lastError: "",
       });
       ensurePassivePlaybackWatcher();
-      const video = getVideoElement();
-      if (video && state.autoPause) {
-        syncPassivePlayback(video);
+      const playbackVideo = getVideoElement();
+      if (playbackVideo && state.autoPause) {
+        syncPassivePlayback(playbackVideo);
       }
       recordDebugEvent("source-loaded", {
         source: captionTrackApi.sourceDisplayName(source),
@@ -4445,6 +4569,7 @@
         warnings: transcriptResult.warnings,
         cues: cues.length,
         phrases: phrases.length,
+        phraseProgressRestore: state.lastPhraseProgressRestore,
       });
     } catch (error) {
       if (loadToken !== state.loadToken) return;
@@ -4813,6 +4938,7 @@
     });
     state.guidedHold = null;
     state.currentIndex = targetIndex;
+    schedulePhraseProgressSave(command);
     if (state.practiceMode === "recall") {
       state.textVisible = false;
       state.phraseTranslationVisible = true;
@@ -4952,6 +5078,7 @@
     stopPlaybackTimer();
     state.currentIndex = index;
     state.guidedMode = true;
+    schedulePhraseProgressSave(`word-replay-${options.mode || "unknown"}`);
     markCurrentTranscriptSegment(phrase);
     video.currentTime = startSeconds;
     video.play().catch(() => {});
@@ -5179,6 +5306,7 @@
       const phrase = state.phrases[state.activePlayback.index];
       if (phrase && state.currentIndex !== state.activePlayback.index) {
         state.currentIndex = state.activePlayback.index;
+        schedulePhraseProgressSave("active-playback");
         markCurrentTranscriptSegment(phrase);
         render();
       }
@@ -5196,6 +5324,7 @@
 
     if (index !== state.currentIndex) {
       state.currentIndex = index;
+      schedulePhraseProgressSave("passive-sync");
       markCurrentTranscriptSegment(phrase);
       render();
     }
@@ -5223,6 +5352,7 @@
       video.pause();
       const pausedAtSeconds = video.currentTime;
       state.currentIndex = index;
+      schedulePhraseProgressSave("auto-pause-held");
       state.guidedHold = {
         index,
         holdSeconds: pausedAtSeconds,
@@ -5252,6 +5382,7 @@
     }
     if (state.currentIndex !== state.guidedHold.index) {
       state.currentIndex = state.guidedHold.index;
+      schedulePhraseProgressSave("guided-hold");
       markCurrentTranscriptSegment(phrase);
       render();
     }

@@ -2,6 +2,7 @@ try { importScripts("config.js"); } catch (_error) {}
 const CONNECT_SESSION_STORAGE_KEY = "af2000nlConnectSession";
 const ASR_TESTER_TOKEN_STORAGE_KEY = "afAsrTesterToken";
 const DISPLAY_PREFERENCES_STORAGE_KEY = "afShadowingDisplayPreferences";
+const PHRASE_PROGRESS_STORAGE_KEY = "afShadowingPhraseProgress";
 const DEFAULT_API_BASE = globalThis.__afShadowingConfig?.defaults?.apiBase || "https://audiofilms-api.dilum.io";
 const DEFAULT_CONNECT_BASE_URL = globalThis.__afShadowingConfig?.defaults?.connectBase || "https://2000.dilum.io";
 const DEFAULT_CONNECT_CLIENT_ID = "audiofilms_chrome_dev";
@@ -117,6 +118,38 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({
           ok: false,
           preferences: null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+    return true;
+  }
+
+  if (message?.type === "af-get-phrase-progress") {
+    readPhraseProgress(message.key)
+      .then((progress) => {
+        sendResponse({ ok: true, progress });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          progress: null,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+    return true;
+  }
+
+  if (message?.type === "af-set-phrase-progress") {
+    storePhraseProgress(message.key, message.progress)
+      .then((progress) => {
+        sendResponse({ ok: true, progress });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          progress: null,
           error: error instanceof Error ? error.message : String(error),
         });
       });
@@ -536,6 +569,50 @@ async function storeDisplayPreferences(preferences) {
   const normalized = normalizeDisplayPreferences(preferences);
   await chromeStorageSet({ [DISPLAY_PREFERENCES_STORAGE_KEY]: normalized });
   return normalized;
+}
+
+async function readPhraseProgress(key) {
+  const storageKey = normalizePhraseProgressKey(key);
+  if (!storageKey) return null;
+  const values = await chromeStorageGet(PHRASE_PROGRESS_STORAGE_KEY);
+  const progressByKey = values?.[PHRASE_PROGRESS_STORAGE_KEY] || {};
+  return normalizePhraseProgress(progressByKey[storageKey]);
+}
+
+async function storePhraseProgress(key, progress) {
+  const storageKey = normalizePhraseProgressKey(key);
+  if (!storageKey) throw new Error("Invalid phrase progress key.");
+  const normalized = normalizePhraseProgress(progress);
+  if (!normalized) throw new Error("Invalid phrase progress payload.");
+  const values = await chromeStorageGet(PHRASE_PROGRESS_STORAGE_KEY);
+  const progressByKey = values?.[PHRASE_PROGRESS_STORAGE_KEY] || {};
+  const next = {
+    ...progressByKey,
+    [storageKey]: normalized,
+  };
+  await chromeStorageSet({ [PHRASE_PROGRESS_STORAGE_KEY]: next });
+  return normalized;
+}
+
+function normalizePhraseProgressKey(value) {
+  const key = String(value || "").trim();
+  return key && key.length <= 512 ? key : "";
+}
+
+function normalizePhraseProgress(value) {
+  if (!value || typeof value !== "object") return null;
+  const currentIndex = Number.isInteger(value.currentIndex) ? value.currentIndex : null;
+  const phraseCount = Number.isInteger(value.phraseCount) ? value.phraseCount : null;
+  if (currentIndex === null || currentIndex < 0 || phraseCount === null || phraseCount < 0) {
+    return null;
+  }
+  return {
+    version: 1,
+    currentIndex,
+    phraseId: String(value.phraseId || "").slice(0, 240),
+    phraseCount,
+    updatedAt: String(value.updatedAt || new Date().toISOString()).slice(0, 80),
+  };
 }
 
 function normalizeDisplayPreferences(value) {
