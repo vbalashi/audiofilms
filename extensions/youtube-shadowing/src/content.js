@@ -2482,8 +2482,7 @@
   function renderOverlaySections(parent, sections, card, translation = null) {
     const visibleSections = sections
       .filter((section) => section?.text)
-      .filter((section, index) => index > 0 || section.kind !== "meaning")
-      .slice(0, 4);
+      .filter((section, index) => index > 0 || section.kind !== "meaning");
     if (!visibleSections.length) return;
 
     const cardId = card?.id || "";
@@ -2506,6 +2505,10 @@
         section.text,
         lookupOrOverlaySection(card, section, sections, translation),
       );
+      if (section.label) {
+        const label = appendElement(block, "p", "af-dictionary-copy af-overlay-section-label");
+        label.textContent = section.label;
+      }
     }
   }
 

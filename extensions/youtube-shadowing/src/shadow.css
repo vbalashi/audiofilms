@@ -828,6 +828,11 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-radius: 6px;
 }
 
+.af-overlay-section-label {
+  margin-top: 4px;
+  color: var(--af-muted);
+}
+
 .af-lookup-placeholder-title,
 .af-account-mini-title,
 .af-card-review-label {
