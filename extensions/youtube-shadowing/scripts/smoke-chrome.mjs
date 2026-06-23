@@ -728,6 +728,7 @@ function assertInteractions(fixture) {
     assertions.push(...assertKeyboardNavigationInteraction());
     assertions.push(...assertWordReplayInteraction());
     assertions.push(...assertPhraseProgressRestoreInteraction(fixture));
+    assertions.push(...assertPhraseJumpInteraction());
   }
   if (fixture.expect.checkOffOn) {
     assertions.push(...assertOffOnInteraction(fixture));
@@ -922,7 +923,7 @@ function assertWordReplayInteraction() {
     assertion("shift word replay does not select dictionary word", !wordsMatch(afterShift.dictionary?.word, shiftClick.word), JSON.stringify(afterShift.dictionary)),
     assertion("shift word replay uses estimated or exact timing", shiftReplay.ok === true && /estimate|word|asr|alignment/.test(shiftReplay.timingSource || ""), JSON.stringify(shiftReplay)),
     assertion("shift word replay seek stays in current phrase", Number.isFinite(shiftSeek) && shiftSeek >= timing.startSeconds && shiftSeek <= timing.playbackEndSeconds, JSON.stringify({ timing, shiftReplay })),
-    assertion("shift word replay plays to phrase end", Number.isFinite(shiftPause) && shiftPause >= timing.endSeconds && shiftPause <= timing.playbackEndSeconds + 0.1, JSON.stringify({ timing, shiftReplay })),
+    assertion("shift word replay plays to phrase playback end", Number.isFinite(shiftPause) && Math.abs(shiftPause - timing.playbackEndSeconds) <= 0.15, JSON.stringify({ timing, shiftReplay })),
     assertion("ctrl word replay clicked", ctrlClick.clicked === true, ctrlClick.detail),
     assertion("ctrl word replay does not select dictionary word", !wordsMatch(afterCtrl.dictionary?.word, ctrlClick.word), JSON.stringify(afterCtrl.dictionary)),
     assertion("ctrl word replay handles missing exact timing honestly", ctrlReplay.ok === false && ctrlReplay.reason === "word-timing-unavailable", JSON.stringify(ctrlReplay)),
@@ -947,6 +948,37 @@ function assertPhraseProgressRestoreInteraction(fixture) {
     assertion("phrase progress moved to a later phrase", beforeOrdinal && savedOrdinal === beforeOrdinal + 1, `${before.count} -> ${saved.count}`),
     assertion("phrase progress restores after reload", restoredOrdinal === savedOrdinal, `${saved.count} -> ${restored.count}`),
     assertion("phrase progress restore recorded source-specific state", Boolean(restore.sourceId) && ["phrase-id", "clamped-index"].includes(restore.reason || ""), JSON.stringify(restore)),
+  ];
+}
+
+function assertPhraseJumpInteraction() {
+  const targetOrdinal = 3;
+  clickShadowButton("[data-af-count]");
+  const opened = readPhraseJumpState();
+  clickPhraseJumpStart();
+  sleep(500);
+  const afterStart = readSnapshot();
+
+  clickShadowButton("[data-af-count]");
+  setPhraseJumpInput("0");
+  clickPhraseJumpGo();
+  const invalid = readPhraseJumpState();
+
+  setPhraseJumpInput(String(targetOrdinal));
+  clickPhraseJumpGo();
+  sleep(500);
+  const afterGo = readSnapshot();
+  const goCurrentTime = Number(afterGo.video?.currentTime);
+  const goStart = Number(afterGo.currentPhraseTiming?.startSeconds);
+
+  return [
+    assertion("phrase jump popover opens", opened.open === true, JSON.stringify(opened)),
+    assertion("phrase jump start selects first phrase", parseCountOrdinal(afterStart.count) === 1, afterStart.count),
+    assertion("phrase jump start pauses video", afterStart.video?.paused === true, JSON.stringify(afterStart.video)),
+    assertion("phrase jump rejects invalid zero", invalid.open === true && /1-/.test(invalid.error || ""), JSON.stringify(invalid)),
+    assertion("phrase jump number selects requested phrase", parseCountOrdinal(afterGo.count) === targetOrdinal, afterGo.count),
+    assertion("phrase jump number pauses video", afterGo.video?.paused === true, JSON.stringify(afterGo.video)),
+    assertion("phrase jump number seeks to phrase start", Number.isFinite(goCurrentTime) && Number.isFinite(goStart) && Math.abs(goCurrentTime - goStart) <= 0.5, JSON.stringify({ goCurrentTime, goStart })),
   ];
 }
 
@@ -1412,6 +1444,42 @@ function setVideoCurrentTime(seconds) {
   return String(video.currentTime);
 })()
   `);
+}
+
+function readPhraseJumpState() {
+  const raw = chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const menu = root?.querySelector("[data-af-jump-menu]");
+  return JSON.stringify({
+    open: menu?.classList.contains("is-open") || false,
+    input: root?.querySelector("[data-af-jump-input]")?.value || "",
+    error: root?.querySelector("[data-af-jump-error]")?.textContent || "",
+  });
+})()
+  `);
+  return JSON.parse(raw);
+}
+
+function setPhraseJumpInput(value) {
+  const rawValue = JSON.stringify(String(value));
+  chromeEval(`
+(() => {
+  const input = document.querySelector("#audiofilms-root")?.shadowRoot?.querySelector("[data-af-jump-input]");
+  if (!input) return "";
+  input.value = ${rawValue};
+  input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  return input.value;
+})()
+  `);
+}
+
+function clickPhraseJumpStart() {
+  clickShadowButton("[data-af-jump-start]");
+}
+
+function clickPhraseJumpGo() {
+  clickShadowButton("[data-af-jump-go]");
 }
 
 function clickFirstLookupWord(options = {}) {

@@ -985,10 +985,101 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-ribbon-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
+  padding: 4px 7px;
   overflow: hidden;
+  color: var(--af-muted);
+  background: var(--af-control);
+  border: 1px solid var(--af-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.af-ribbon-count:hover,
+.af-ribbon-count[aria-expanded="true"] {
+  color: var(--af-accent);
+  background: var(--af-accent-soft);
+  border-color: var(--af-accent);
+}
+
+.af-ribbon-count:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.af-jump-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.af-jump-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 2147483647;
+  display: none;
+  width: min(220px, calc(100vw - 40px));
+  padding: 10px;
+  color: var(--af-muted);
+  background: var(--af-panel);
+  border: 1px solid var(--af-border-strong);
+  border-radius: 6px;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+  font-size: 12px;
+  overscroll-behavior: contain;
+}
+
+.af-jump-popover.is-open {
+  display: grid;
+  gap: 8px;
+}
+
+.af-jump-start,
+.af-jump-form button {
+  padding: 7px 9px;
+  color: var(--af-accent);
+  background: var(--af-accent-soft);
+  border: 1px solid var(--af-accent);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.af-jump-start:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.af-jump-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.af-jump-input {
+  min-width: 0;
+  padding: 7px 8px;
+  color: var(--af-text);
+  background: var(--af-control);
+  border: 1px solid var(--af-border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.af-jump-error {
+  color: var(--af-danger-text);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .af-ribbon-mode {

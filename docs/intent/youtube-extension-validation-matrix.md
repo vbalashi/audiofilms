@@ -41,6 +41,9 @@ For extension smoke checks:
 - ArrowDown replays the current visible phrase;
 - last selected phrase restores after reload for the same video and selected
   caption source;
+- phrase count opens a compact jump popover; Start and Go select the requested
+  phrase, seek to its start, keep YouTube paused, and reject invalid input
+  inline;
 - Mark Issue copies a navigation incident report after a manual miss;
 - source mismatch or unknown source warning appears only when metadata is actually uncertain;
 - AudioFilms Off removes the learning layer and leaves YouTube visually normal.
@@ -195,7 +198,8 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only=4EE7m94mJpk --
 
 Result: passed `manual-trappist` and `manual-after-empty` with current
 dictionary UI selectors. The focused interaction checks also cover Shift/Ctrl
-word replay and extension-storage phrase-position restore after page reload.
+word replay, extension-storage phrase-position restore after page reload, and
+the phrase-count jump popover without autoplay.
 
 ### Pending: Frozen Dictionary Provenance Smoke Matrix
 

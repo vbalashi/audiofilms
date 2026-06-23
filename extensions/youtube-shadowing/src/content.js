@@ -75,6 +75,9 @@
     timingOperationApiBase: "",
     timingOperationPollTimer: null,
     utilityMenuOpen: false,
+    phraseJumpMenuOpen: false,
+    phraseJumpInput: "",
+    phraseJumpError: "",
     lastMenuTrigger: null,
     guidedMode: false,
     selectedWord: null,
@@ -678,9 +681,41 @@
     const sourceMenu = appendElement(track, "div", "af-source-menu");
     sourceMenu.dataset.afSourceMenu = "";
     const metaRight = appendElement(meta, "div", "af-ribbon-meta-right");
-    const count = appendElement(metaRight, "span", "af-ribbon-count");
+    const jumpWrap = appendElement(metaRight, "div", "af-jump-wrap");
+    const count = appendElement(jumpWrap, "button", "af-ribbon-count");
+    count.type = "button";
     count.dataset.afCount = "";
+    count.setAttribute("aria-haspopup", "dialog");
+    count.setAttribute("aria-expanded", "false");
     count.textContent = "0 / 0";
+    count.addEventListener("click", togglePhraseJumpMenu);
+    const jumpMenu = appendElement(jumpWrap, "div", "af-jump-popover");
+    jumpMenu.dataset.afJumpMenu = "";
+    const jumpStart = appendButton(jumpMenu, "Start", "afJumpStart");
+    jumpStart.className = "af-jump-start";
+    const jumpForm = appendElement(jumpMenu, "div", "af-jump-form");
+    const jumpInput = appendElement(jumpForm, "input", "af-jump-input");
+    jumpInput.type = "number";
+    jumpInput.min = "1";
+    jumpInput.inputMode = "numeric";
+    jumpInput.dataset.afJumpInput = "";
+    jumpInput.setAttribute("aria-label", "Phrase number");
+    const jumpGo = appendButton(jumpForm, "Go", "afJumpGo");
+    const jumpError = appendElement(jumpMenu, "div", "af-jump-error");
+    jumpError.dataset.afJumpError = "";
+    jumpStart.addEventListener("click", () => jumpToPhrase(0, "jump-start"));
+    jumpGo.addEventListener("click", submitPhraseJump);
+    jumpInput.addEventListener("input", () => {
+      state.phraseJumpInput = jumpInput.value;
+      state.phraseJumpError = "";
+      render();
+    });
+    jumpInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submitPhraseJump();
+      }
+    });
     const mode = appendElement(metaRight, "span", "af-ribbon-mode");
     mode.dataset.afMode = "";
     mode.textContent = "Passive";
@@ -1039,6 +1074,10 @@
     const sourceToggle = panel.querySelector("[data-af-source-toggle]");
     const sourceMenu = panel.querySelector("[data-af-source-menu]");
     const count = panel.querySelector("[data-af-count]");
+    const jumpMenu = panel.querySelector("[data-af-jump-menu]");
+    const jumpInput = panel.querySelector("[data-af-jump-input]");
+    const jumpStart = panel.querySelector("[data-af-jump-start]");
+    const jumpError = panel.querySelector("[data-af-jump-error]");
     const mode = panel.querySelector("[data-af-mode]");
     const list = panel.querySelector("[data-af-ribbon-list]");
     const error = panel.querySelector("[data-af-error]");
@@ -1088,6 +1127,16 @@
     count.textContent = hasPhrases
       ? `${state.currentIndex + 1} / ${state.phrases.length}`
       : state.loading ? "Loading" : "0 / 0";
+    count.disabled = state.loading || !hasPhrases;
+    count.setAttribute("aria-expanded", state.phraseJumpMenuOpen ? "true" : "false");
+    count.title = hasPhrases ? "Jump to phrase" : "No phrases to jump to";
+    jumpMenu.classList.toggle("is-open", state.phraseJumpMenuOpen && hasPhrases);
+    jumpInput.value = state.phraseJumpInput || (hasPhrases ? String(state.currentIndex + 1) : "");
+    jumpInput.max = hasPhrases ? String(state.phrases.length) : "";
+    jumpInput.disabled = state.loading || !hasPhrases;
+    jumpStart.disabled = state.loading || !hasPhrases || state.currentIndex === 0;
+    jumpError.textContent = state.phraseJumpError;
+    jumpError.hidden = !state.phraseJumpError;
     mode.textContent = "";
     mode.hidden = true;
     mode.classList.toggle("is-guided", state.guidedMode);
@@ -1749,6 +1798,7 @@
     if (state.utilityMenuOpen) {
       state.accountMenuOpen = false;
       state.sourceMenuOpen = false;
+      state.phraseJumpMenuOpen = false;
     }
     render();
   }
@@ -1761,6 +1811,7 @@
     if (state.accountMenuOpen) {
       state.utilityMenuOpen = false;
       state.sourceMenuOpen = false;
+      state.phraseJumpMenuOpen = false;
     }
     render();
   }
@@ -1899,11 +1950,13 @@
   }
 
   function closeOpenMenus() {
-    if (!state.utilityMenuOpen && !state.accountMenuOpen && !state.sourceMenuOpen) return false;
-    const trigger = state.lastMenuTrigger || (state.sourceMenuOpen ? "source" : state.utilityMenuOpen ? "utility" : "account");
+    if (!state.utilityMenuOpen && !state.accountMenuOpen && !state.sourceMenuOpen && !state.phraseJumpMenuOpen) return false;
+    const trigger = state.lastMenuTrigger || (state.sourceMenuOpen ? "source" : state.utilityMenuOpen ? "utility" : state.accountMenuOpen ? "account" : "jump");
     state.utilityMenuOpen = false;
     state.accountMenuOpen = false;
     state.sourceMenuOpen = false;
+    state.phraseJumpMenuOpen = false;
+    state.phraseJumpError = "";
     state.lastMenuTrigger = null;
     render();
     requestAnimationFrame(() => focusMenuTrigger(trigger));
@@ -1917,6 +1970,7 @@
       source: "[data-af-source-toggle]",
       utility: "[data-af-utility-toggle]",
       account: "[data-af-account]",
+      jump: "[data-af-count]",
     }[trigger];
     if (!root || !selector) return;
     root.querySelector(selector)?.focus?.();
@@ -1942,6 +1996,9 @@
         "[data-af-account]",
         "[data-af-account-menu]",
         "[data-af-account-menu] *",
+        "[data-af-count]",
+        "[data-af-jump-menu]",
+        "[data-af-jump-menu] *",
       ].join(", "))
     ));
   }
@@ -1952,6 +2009,67 @@
     if (nextVisible) {
       state.debugPanelInFront = true;
     }
+    render();
+  }
+
+  function togglePhraseJumpMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.phraseJumpMenuOpen = !state.phraseJumpMenuOpen;
+    state.lastMenuTrigger = state.phraseJumpMenuOpen ? "jump" : null;
+    state.phraseJumpError = "";
+    state.phraseJumpInput = state.phrases.length ? String(state.currentIndex + 1) : "";
+    if (state.phraseJumpMenuOpen) {
+      state.sourceMenuOpen = false;
+      state.utilityMenuOpen = false;
+      state.accountMenuOpen = false;
+    }
+    render();
+    if (state.phraseJumpMenuOpen) {
+      requestAnimationFrame(() => {
+        document.getElementById(ROOT_ID)?.shadowRoot
+          ?.querySelector("[data-af-jump-input]")
+          ?.focus?.();
+      });
+    }
+  }
+
+  function submitPhraseJump() {
+    const targetNumber = Number(state.phraseJumpInput);
+    if (!Number.isInteger(targetNumber)) {
+      state.phraseJumpError = "Enter a whole number.";
+      render();
+      return;
+    }
+    if (targetNumber < 1 || targetNumber > state.phrases.length) {
+      state.phraseJumpError = `Choose 1-${state.phrases.length}.`;
+      render();
+      return;
+    }
+    jumpToPhrase(targetNumber - 1, "jump-number");
+  }
+
+  function jumpToPhrase(targetIndex, reason) {
+    const phrase = state.phrases[targetIndex];
+    const video = getVideoElement();
+    if (!phrase || !video) return;
+
+    stopPlaybackTimer();
+    video.pause();
+    video.currentTime = Math.max(0, phrase.startMs / 1000);
+    state.currentIndex = targetIndex;
+    state.guidedHold = null;
+    state.passivePausedKey = "";
+    state.phraseJumpMenuOpen = false;
+    state.phraseJumpError = "";
+    state.lastMenuTrigger = null;
+    markCurrentTranscriptSegment(phrase);
+    schedulePhraseProgressSave(reason);
+    recordNavigationEvent("phrase-jump", {
+      reason,
+      targetPhrase: describePhraseAtIndex(targetIndex),
+      playback: getPlaybackSnapshot(),
+    });
     render();
   }
 
@@ -2509,6 +2627,7 @@
     if (state.sourceMenuOpen) {
       state.utilityMenuOpen = false;
       state.accountMenuOpen = false;
+      state.phraseJumpMenuOpen = false;
     }
     render();
   }
