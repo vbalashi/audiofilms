@@ -19,8 +19,29 @@
 - dictionary behavior depends on provider selection and model defaults.
 - this is manageable, but it should stay centralized and not leak into ad hoc docs.
 
+### Practice Cache Lineage And Invalidation
+
+- The practice flow now has several related caches: provider subtitles, ASR
+  artifacts, manual-text alignment results, practice snapshots/phrase sets, and
+  phrase translation associations.
+- These caches are not all governed by one explicit lifecycle policy. When
+  segmentation, normalization, alignment, or translation policy changes, old
+  artifacts may remain useful as evidence but should not silently drive the
+  current learner experience.
+- Analyze cache keys and revision fields end to end, especially
+  `textSourceRevisionId`, `timingEvidenceRevisionId`, `phraseSetRevisionId`,
+  `snapshotRevisionId`, source text hashes, and translation IDs.
+- Decide how to mark stale artifacts, when to keep them for diagnostics, when to
+  regenerate them, and how to explain the current active artifact in issue
+  reports.
+- Pay special attention to mixed-source cases such as manual captions with ASR
+  timing, where a pure ASR transcript cache must not replace the selected
+  manual text source.
+
 ## Next Good Cleanup Steps
 
 - clean up remaining non-blocking validation warnings so `npm run lint` and `npm run build` stay high-signal,
 - tighten README content so repo overview, setup, and architecture stay concise and non-overlapping,
 - keep archived dictionary notes out of active guidance unless they are intentionally promoted back into maintained docs.
+- define a cache lineage and invalidation policy for practice phrases, ASR
+  timing, manual alignment, and phrase translations.
