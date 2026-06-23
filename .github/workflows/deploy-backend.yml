@@ -122,7 +122,15 @@ jobs:
           docker_group docker image prune -f
 
           if [[ -n "${DEPLOY_PUBLIC_HEALTH_URL:-}" ]]; then
-            curl -fsS "${DEPLOY_PUBLIC_HEALTH_URL}" >/dev/null
+            for attempt in {1..30}; do
+              if curl -fsS "${DEPLOY_PUBLIC_HEALTH_URL}" >/dev/null; then
+                break
+              fi
+              if [[ "${attempt}" -eq 30 ]]; then
+                curl -fsS "${DEPLOY_PUBLIC_HEALTH_URL}" >/dev/null
+              fi
+              sleep 2
+            done
           fi
 
           trap - ERR
