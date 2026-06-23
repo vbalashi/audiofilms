@@ -3584,7 +3584,9 @@
       const session = await getFreshTwoThousandNlSession();
       setTwoThousandNlSessionState(session, "");
     } catch (error) {
-      setTwoThousandNlSessionState(null, error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      recordDebugEvent("connect-session-sync-failed", { error: message });
+      setTwoThousandNlSessionState(null, message);
     }
     render();
   }
@@ -3607,7 +3609,9 @@
         return;
       }
     } catch (error) {
-      setTwoThousandNlSessionState(null, error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      recordDebugEvent("connect-session-connect-failed", { error: message });
+      setTwoThousandNlSessionState(null, message);
     } finally {
       state.accountLoading = false;
       render();
@@ -3644,7 +3648,9 @@
       type: "af-get-2000nl-session",
     });
     if (!response?.ok) {
-      setTwoThousandNlSessionState(null, response?.error || "2000NL session is unavailable.");
+      const message = response?.error || "2000NL session is unavailable.";
+      recordDebugEvent("connect-session-refresh-failed", { error: message });
+      setTwoThousandNlSessionState(null, message);
       return null;
     }
     const session = response.session || null;
@@ -4031,7 +4037,11 @@
         ? `Connected as ${state.accountUser.email}.`
         : "Connected to 2000NL.";
     }
-    if (state.accountStatus === "expired") return "Session expired. Reconnect to restore lookup and progress.";
+    if (state.accountStatus === "expired") {
+      return state.accountError
+        ? `Session expired: ${state.accountError}`
+        : "Session expired. Reconnect to restore lookup and progress.";
+    }
     return "Not connected. Personal progress is off.";
   }
 

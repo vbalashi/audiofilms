@@ -444,7 +444,9 @@ async function getFreshConnectSession() {
     await storeConnectSession({ ...refreshed, baseUrl, clientId });
     return { ok: true, session: publicConnectSession(refreshed), accessToken: refreshed.access_token };
   } catch (error) {
-    await clearConnectSession();
+    if (isTerminalConnectRefreshError(error)) {
+      await clearConnectSession();
+    }
     return {
       ok: false,
       session: null,
@@ -656,6 +658,11 @@ function publicConnectSession(session) {
     scope: session.scope || "",
     user: session.user || null,
   };
+}
+
+function isTerminalConnectRefreshError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /invalid_refresh_token|grant_revoked|invalid_client/i.test(message);
 }
 
 function shouldAttachDictionaryBearer(url) {
