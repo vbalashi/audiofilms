@@ -522,6 +522,13 @@ function runGeometryScenario() {
 }
 
 function assertDebugMenuUi() {
+  clickShadowButton("[data-af-settings-toggle]");
+  sleep(200);
+  const settingsGeometry = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(200);
+  const settingsClosedGeometry = readGeometrySnapshot();
+
   clickShadowButton("[data-af-utility-toggle]");
   sleep(200);
   const openGeometry = readGeometrySnapshot();
@@ -530,11 +537,24 @@ function assertDebugMenuUi() {
   const closedGeometry = readGeometrySnapshot();
 
   return [
+    assertion("settings button is labelled", settingsGeometry.settingsTools?.label === "Settings", settingsGeometry.settingsTools?.label || ""),
+    assertion("settings popover opens", settingsGeometry.settingsTools?.open === true, JSON.stringify(settingsGeometry.settingsTools)),
+    assertion(
+      "settings contains learner preferences",
+      ["A-", "A+", "Auto-pause", "Lock"].every((action) => settingsGeometry.settingsTools?.actions?.some((label) => label.includes(action))),
+      (settingsGeometry.settingsTools?.actions || []).join("|"),
+    ),
+    assertion("settings popover closes with Escape", settingsClosedGeometry.settingsTools?.open === false, JSON.stringify(settingsClosedGeometry.settingsTools)),
     assertion("debug tools button is labelled", openGeometry.debugTools?.label === "Debug tools", openGeometry.debugTools?.label || ""),
     assertion("debug tools popover opens", openGeometry.debugTools?.open === true, JSON.stringify(openGeometry.debugTools)),
     assertion(
       "debug tools contains actions",
       ["Mark Issue", "Debug", "Copy Debug", "Refresh Cache"].every((action) => openGeometry.debugTools?.actions?.includes(action)),
+      (openGeometry.debugTools?.actions || []).join("|"),
+    ),
+    assertion(
+      "debug tools exclude learner settings",
+      ["A-", "A+", "Auto-pause", "Lock", "Reset"].every((action) => !openGeometry.debugTools?.actions?.some((label) => label.includes(action))),
       (openGeometry.debugTools?.actions || []).join("|"),
     ),
     assertion("debug tools popover closes with Escape", closedGeometry.debugTools?.open === false, JSON.stringify(closedGeometry.debugTools)),
@@ -553,6 +573,17 @@ function assertPopoverDismissalUi() {
   assertions.push(
     assertion("debug tools popover opens before outside click", utilityOpen.debugTools?.open === true, JSON.stringify(utilityOpen.debugTools)),
     assertion("debug tools popover closes on outside click", utilityOutsideClosed.debugTools?.open === false, JSON.stringify(utilityOutsideClosed.debugTools)),
+  );
+
+  clickShadowButton("[data-af-settings-toggle]");
+  sleep(200);
+  const settingsOpen = readGeometrySnapshot();
+  clickOutsideShadowUi();
+  sleep(200);
+  const settingsOutsideClosed = readGeometrySnapshot();
+  assertions.push(
+    assertion("settings popover opens before outside click", settingsOpen.settingsTools?.open === true, JSON.stringify(settingsOpen.settingsTools)),
+    assertion("settings popover closes on outside click", settingsOutsideClosed.settingsTools?.open === false, JSON.stringify(settingsOutsideClosed.settingsTools)),
   );
 
   clickShadowButton("[data-af-source-toggle]");
@@ -772,6 +803,7 @@ function assertDictionaryAccountPlacement() {
   return [
     assertion("account icon is in ribbon header", Boolean(accountGeometry.ribbonUi?.accountLabel), JSON.stringify(accountGeometry.ribbonUi)),
     assertion("account icon is not in dictionary header", accountGeometry.dictionaryUi?.accountPresent === false, JSON.stringify(accountGeometry.dictionaryUi)),
+    assertion("account icon is rightmost header control", accountGeometry.ribbonUi?.accountRight >= accountGeometry.ribbonUi?.debugRight && accountGeometry.ribbonUi?.accountRight >= accountGeometry.ribbonUi?.settingsRight, JSON.stringify(accountGeometry.ribbonUi)),
     assertion("ribbon account menu opens", accountGeometry.ribbonUi?.accountMenuOpen === true, JSON.stringify(accountGeometry.ribbonUi)),
     assertion("ribbon account menu has connect action", /Connect|Disconnect|Reconnect/i.test(accountGeometry.ribbonUi?.accountAction || ""), accountGeometry.ribbonUi?.accountAction || ""),
   ];
@@ -1504,6 +1536,15 @@ function readGeometrySnapshot() {
         actions: Array.from(menu?.querySelectorAll("button") || []).map((button) => button.textContent.trim()),
       };
     })(),
+    settingsTools: (() => {
+      const trigger = root?.querySelector("[data-af-settings-toggle]");
+      const menu = root?.querySelector("[data-af-settings-menu]");
+      return {
+        label: trigger?.getAttribute("aria-label") || "",
+        open: menu?.classList.contains("is-open") || false,
+        actions: Array.from(menu?.querySelectorAll("button") || []).map((button) => button.textContent.trim()),
+      };
+    })(),
     primaryUi: (() => {
       const text = [
         root?.querySelector("[data-af-source-toggle]")?.textContent || "",
@@ -1564,6 +1605,10 @@ function readGeometrySnapshot() {
       accountMenuOpen: ribbon?.querySelector("[data-af-account-menu]")?.classList.contains("is-open") || false,
       accountAction: ribbon?.querySelector("[data-af-account-menu] [data-af-account-action]")?.textContent || "",
       modeText: ribbon?.querySelector("[data-af-mode]")?.textContent || "",
+      themeRight: ribbon?.querySelector("[data-af-theme-toggle]")?.getBoundingClientRect().right || 0,
+      settingsRight: ribbon?.querySelector("[data-af-settings-toggle]")?.getBoundingClientRect().right || 0,
+      debugRight: ribbon?.querySelector("[data-af-utility-toggle]")?.getBoundingClientRect().right || 0,
+      accountRight: ribbon?.querySelector("[data-af-account]")?.getBoundingClientRect().right || 0,
     }))(),
     dictionary: toRect(dictionary),
     dictionaryUi: (() => {

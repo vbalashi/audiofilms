@@ -99,6 +99,7 @@
     timingOperationApiBase: "",
     timingOperationPollTimer: null,
     utilityMenuOpen: false,
+    settingsMenuOpen: false,
     phraseJumpMenuOpen: false,
     phraseJumpInput: "",
     phraseJumpError: "",
@@ -706,10 +707,19 @@
     const mode = appendElement(metaRight, "span", "af-ribbon-mode");
     mode.dataset.afMode = "";
     mode.textContent = "Passive";
-    createAccountControl(metaRight);
     const themeButton = appendButton(metaRight, "", "afThemeToggle");
     themeButton.className = "af-icon-button af-theme-toggle";
     themeButton.setAttribute("aria-label", "Theme");
+    const settings = appendElement(metaRight, "div", "af-utility-menu af-settings-menu");
+    const settingsButton = appendButton(settings, "", "afSettingsToggle");
+    settingsButton.className = "af-icon-button af-utility-toggle af-settings-toggle";
+    settingsButton.innerHTML = `${iconSvg("settings")}<span class="af-sr-only">Settings</span>`;
+    settingsButton.setAttribute("aria-label", "Settings");
+    settingsButton.setAttribute("aria-haspopup", "menu");
+    settingsButton.setAttribute("aria-expanded", "false");
+    settingsButton.title = "Settings";
+    const settingsMenu = appendElement(settings, "div", "af-utility-popover af-settings-popover");
+    settingsMenu.dataset.afSettingsMenu = "";
     const utility = appendElement(metaRight, "div", "af-utility-menu");
     const utilityButton = appendButton(utility, "", "afUtilityToggle");
     utilityButton.className = "af-icon-button af-utility-toggle";
@@ -720,7 +730,7 @@
     utilityButton.title = "Debug tools";
     const utilityMenu = appendElement(utility, "div", "af-utility-popover");
     utilityMenu.dataset.afUtilityMenu = "";
-    const displaySection = appendElement(utilityMenu, "div", "af-settings-section");
+    const displaySection = appendElement(settingsMenu, "div", "af-settings-section");
     const textLabel = appendElement(displaySection, "div", "af-settings-label");
     textLabel.textContent = "Subtitle text";
     const textControls = appendElement(displaySection, "div", "af-settings-button-row");
@@ -748,6 +758,7 @@
     appendButton(debugSection, "Copy Debug", "afDebugCopy");
     appendButton(debugSection, "Clear Diagnostics", "afDiagnosticsClear");
     appendButton(debugSection, "Refresh Cache", "afRefreshCache");
+    createAccountControl(metaRight);
 
     const list = appendElement(panel, "div", "af-ribbon-list");
     list.dataset.afRibbonList = "";
@@ -801,6 +812,7 @@
     panel.querySelector("[data-af-phrase-translation]").addEventListener("click", (event) => togglePhraseTranslation(event));
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
     panel.querySelector("[data-af-theme-toggle]").addEventListener("click", cycleThemePreference);
+    panel.querySelector("[data-af-settings-toggle]").addEventListener("click", toggleSettingsMenu);
     panel.querySelector("[data-af-utility-toggle]").addEventListener("click", toggleUtilityMenu);
     panel.querySelector("[data-af-learner-text-smaller]").addEventListener("click", () => adjustLearnerTextScale(-0.1));
     panel.querySelector("[data-af-learner-text-reset]").addEventListener("click", resetLearnerTextScale);
@@ -1098,6 +1110,10 @@
         '<path d="m6.34 17.66-1.41 1.41"/>',
         '<path d="m19.07 4.93-1.41 1.41"/>',
       ],
+      settings: [
+        '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>',
+        '<circle cx="12" cy="12" r="3"/>',
+      ],
     }[kind] || [];
     return [
       '<svg class="af-button-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
@@ -1164,6 +1180,8 @@
     const accountCopy = panel.querySelector("[data-af-account-copy]");
     const accountAction = panel.querySelector("[data-af-account-action]");
     const themeToggle = panel.querySelector("[data-af-theme-toggle]");
+    const settingsToggle = panel.querySelector("[data-af-settings-toggle]");
+    const settingsMenu = panel.querySelector("[data-af-settings-menu]");
     const utilityToggle = panel.querySelector("[data-af-utility-toggle]");
     const utilityMenu = panel.querySelector("[data-af-utility-menu]");
     const learnerTextSmaller = panel.querySelector("[data-af-learner-text-smaller]");
@@ -1217,6 +1235,10 @@
     themeToggle.innerHTML = `${iconSvg("theme")}<span class="af-sr-only">${themeLabel}</span>`;
     themeToggle.setAttribute("aria-label", themeLabel);
     themeToggle.title = themeLabel;
+    settingsToggle.setAttribute("aria-expanded", state.settingsMenuOpen ? "true" : "false");
+    settingsToggle.classList.toggle("is-active", state.settingsMenuOpen);
+    settingsMenu.classList.toggle("is-open", state.settingsMenuOpen);
+    positionUtilityMenu(panel, settingsMenu, state.settingsMenuOpen);
     const originalSticky = state.practiceMode === "shadow" && state.shadowTextVisible;
     const translationSticky = state.practiceMode === "shadow" && state.phraseTranslationStickyVisible;
     toggle.textContent = originalControlLabel();
@@ -1240,7 +1262,7 @@
     utilityToggle.setAttribute("aria-expanded", state.utilityMenuOpen ? "true" : "false");
     utilityToggle.classList.toggle("is-active", state.utilityMenuOpen);
     utilityMenu.classList.toggle("is-open", state.utilityMenuOpen);
-    positionUtilityMenu(panel, utilityMenu);
+    positionUtilityMenu(panel, utilityMenu, state.utilityMenuOpen);
     renderDisplayPreferenceControls({
       learnerTextSmaller,
       learnerTextReset,
@@ -1387,8 +1409,8 @@
     controls.layoutReset.title = "Reset panel positions and sizes";
   }
 
-  function positionUtilityMenu(panel, utilityMenu) {
-    if (!state.utilityMenuOpen) {
+  function positionUtilityMenu(panel, utilityMenu, isOpen = state.utilityMenuOpen) {
+    if (!isOpen) {
       utilityMenu.classList.remove("is-below");
       return;
     }
@@ -1910,6 +1932,21 @@
     state.utilityMenuOpen = !state.utilityMenuOpen;
     state.lastMenuTrigger = state.utilityMenuOpen ? "utility" : null;
     if (state.utilityMenuOpen) {
+      state.settingsMenuOpen = false;
+      state.accountMenuOpen = false;
+      state.sourceMenuOpen = false;
+      state.phraseJumpMenuOpen = false;
+    }
+    render();
+  }
+
+  function toggleSettingsMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    state.settingsMenuOpen = !state.settingsMenuOpen;
+    state.lastMenuTrigger = state.settingsMenuOpen ? "settings" : null;
+    if (state.settingsMenuOpen) {
+      state.utilityMenuOpen = false;
       state.accountMenuOpen = false;
       state.sourceMenuOpen = false;
       state.phraseJumpMenuOpen = false;
@@ -1924,6 +1961,7 @@
     state.lastMenuTrigger = state.accountMenuOpen ? "account" : null;
     if (state.accountMenuOpen) {
       state.utilityMenuOpen = false;
+      state.settingsMenuOpen = false;
       state.sourceMenuOpen = false;
       state.phraseJumpMenuOpen = false;
     }
@@ -2064,9 +2102,10 @@
   }
 
   function closeOpenMenus() {
-    if (!state.utilityMenuOpen && !state.accountMenuOpen && !state.sourceMenuOpen && !state.phraseJumpMenuOpen) return false;
-    const trigger = state.lastMenuTrigger || (state.sourceMenuOpen ? "source" : state.utilityMenuOpen ? "utility" : state.accountMenuOpen ? "account" : "jump");
+    if (!state.utilityMenuOpen && !state.settingsMenuOpen && !state.accountMenuOpen && !state.sourceMenuOpen && !state.phraseJumpMenuOpen) return false;
+    const trigger = state.lastMenuTrigger || (state.sourceMenuOpen ? "source" : state.utilityMenuOpen ? "utility" : state.settingsMenuOpen ? "settings" : state.accountMenuOpen ? "account" : "jump");
     state.utilityMenuOpen = false;
+    state.settingsMenuOpen = false;
     state.accountMenuOpen = false;
     state.sourceMenuOpen = false;
     state.phraseJumpMenuOpen = false;
@@ -2083,6 +2122,7 @@
     const selector = {
       source: "[data-af-source-toggle]",
       utility: "[data-af-utility-toggle]",
+      settings: "[data-af-settings-toggle]",
       account: "[data-af-account]",
       jump: "[data-af-count]",
     }[trigger];
@@ -2107,6 +2147,9 @@
         "[data-af-utility-toggle]",
         "[data-af-utility-menu]",
         "[data-af-utility-menu] *",
+        "[data-af-settings-toggle]",
+        "[data-af-settings-menu]",
+        "[data-af-settings-menu] *",
         "[data-af-account]",
         "[data-af-account-menu]",
         "[data-af-account-menu] *",
@@ -2136,6 +2179,7 @@
     if (state.phraseJumpMenuOpen) {
       state.sourceMenuOpen = false;
       state.utilityMenuOpen = false;
+      state.settingsMenuOpen = false;
       state.accountMenuOpen = false;
     }
     render();
@@ -2855,6 +2899,7 @@
     state.lastMenuTrigger = state.sourceMenuOpen ? "source" : null;
     if (state.sourceMenuOpen) {
       state.utilityMenuOpen = false;
+      state.settingsMenuOpen = false;
       state.accountMenuOpen = false;
       state.phraseJumpMenuOpen = false;
     }
