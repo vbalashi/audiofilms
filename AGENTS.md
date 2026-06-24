@@ -43,11 +43,22 @@ For subtitle provider ordering, quota control, rolling captions, and clean-text/
 
 ## Working Rules
 
+- Before substantial code changes, new features, contract changes, or refactors,
+  check `ARCHITECTURE.md` for the owning layer and module ownership baseline.
+  Prefer the existing service/helper/provider/type boundary over growing a
+  route, UI component, content script, or provider file with unrelated
+  responsibilities.
 - Prefer changes inside `app/` unless the task is explicitly about repo-level docs.
 - Keep extension spike work inside `extensions/youtube-shadowing/` unless the task explicitly promotes behavior back into the main app.
 - For YouTube extension work, keep `extensions/youtube-shadowing/README.md`, `docs/intent/youtube-extension-validation-matrix.md`, and `docs/intent/youtube-extension-agent-runbook.md` aligned with any validation or workflow changes.
 - Keep API route changes aligned with provider interfaces in `app/src/lib/providers/` and `app/src/lib/providers/dictionary/`.
 - Treat `.subtitle-cache/` and `.video-info-cache/` as disposable local artifacts, not source of truth.
+- When decomposing broad but working extension or app code, first add
+  characterization tests or smoke evidence for current request/response shapes,
+  UI behavior, action side effects, and error handling. Then split by stable
+  domains such as source binding, dictionary command lifecycle, phrase
+  tokenization, diagnostics, layout/preferences, service orchestration, or
+  provider integration.
 - Do not spread environment assumptions across random markdown files. Add or update canonical setup notes in `ARCHITECTURE.md` or `docs/intent/`.
 - When a change alters runtime boundaries, provider selection, or validation steps, update the matching doc in this repo bootstrap.
 

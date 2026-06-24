@@ -124,6 +124,15 @@ Environment selection currently happens through `app/env.example` keys:
 
 ## Safe Change Patterns
 
+- Substantial code changes must start from the module ownership baseline below.
+  Routes stay thin, services own orchestration, providers own vendor-specific
+  behavior, types own stable app-facing contracts, and UI/components should not
+  parse provider-specific payloads or simulate 2000NL learning state.
+- Prefer domain extraction over broad-file growth. If a working module such as
+  an API route, service, provider, or `extensions/youtube-shadowing/src/content.js`
+  needs decomposition, first protect current behavior with tests or smoke
+  evidence, then split by stable responsibilities rather than rewriting the
+  workflow wholesale.
 - UI-only changes should avoid changing provider contracts.
 - Client hooks may orchestrate browser events and fetch normalized API payloads, but they should not embed provider-specific logic.
 - Provider changes should preserve the contracts in `app/src/types/`.
