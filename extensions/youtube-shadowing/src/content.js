@@ -4486,7 +4486,7 @@
     }
   }
 
-  async function saveGeneratedDictionaryDraft(selectedWord) {
+  async function saveGeneratedDictionaryDraft(selectedWord, card = null) {
     if (!isCurrentLookup(selectedWord)) return;
     const draft = selectedWord.generatedDraft;
     const draftPayload = generatedDraftPayload(draft);
@@ -4498,7 +4498,7 @@
       render();
       return;
     }
-    const payload = generatedEntryBasePayload(selectedWord, draft);
+    const payload = generatedEntryBasePayload(selectedWord, draft, card);
     if (!payload.ok) {
       state.selectedWord = {
         ...state.selectedWord,
@@ -4546,7 +4546,7 @@
     }
   }
 
-  function generatedEntryBasePayload(selectedWord, draft = null) {
+  function generatedEntryBasePayload(selectedWord, draft = null, card = null) {
     const phrase = selectedWord.sourceBinding?.phrase ||
       state.phrases[selectedWord.phraseIndex] ||
       state.phrases[state.currentIndex];
@@ -4565,6 +4565,24 @@
         contextText: phrase?.text || "",
         sourceContext: generatedEntrySourceContext(selectedWord),
         ...(generatedDraftPayload(draft) || {}),
+        ...(generatedDraftTranslationPayload(selectedWord, card) || {}),
+      },
+    };
+  }
+
+  function generatedDraftTranslationPayload(selectedWord, card = null) {
+    const cardId = card?.id || generatedDraftCard(selectedWord?.generatedDraft)?.id || "";
+    const translation = cardId ? selectedWord?.translationsByCardId?.[cardId] : null;
+    if (!translation || translation.status !== "ready" || !translation.overlay) return null;
+    return {
+      draftTranslation: {
+        targetLang: translation.targetLang || translation.targetLanguageCode || "",
+        status: "ready",
+        overlay: translation.overlay,
+        ...(translation.note ? { note: translation.note } : {}),
+        ...(translation.translationPolicyVersion
+          ? { translationPolicyVersion: translation.translationPolicyVersion }
+          : {}),
       },
     };
   }

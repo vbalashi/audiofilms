@@ -50,6 +50,9 @@ export async function POST(request: Request) {
       candidateId,
       revision,
       item,
+      ...(body?.draftTranslation && typeof body.draftTranslation === 'object'
+        ? { draftTranslation: body.draftTranslation }
+        : {}),
       ...(typeof body?.contextText === 'string' ? { contextText: body.contextText } : {}),
       ...(body?.sourceContext && typeof body.sourceContext === 'object'
         ? { sourceContext: body.sourceContext }

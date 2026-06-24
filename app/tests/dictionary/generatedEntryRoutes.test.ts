@@ -231,7 +231,7 @@ describe('/api/dict/generated-entry proxy routes', () => {
     });
   });
 
-  it('proxies generated entry save without inventing platform actions', async () => {
+  it('proxies generated entry save with a ready draft translation overlay', async () => {
     process.env.DICTIONARY_2000NL_API_BASE = 'https://2000nl.example/api/platform/v1';
     const fetchMock = vi.fn().mockResolvedValueOnce(
       new Response(JSON.stringify({ ok: true, entryId: 'entry-generated-1' }), {
@@ -249,6 +249,15 @@ describe('/api/dict/generated-entry proxy routes', () => {
         draftSetId: 'gds-1',
         candidateId: 'gdc-1',
         revision: 1,
+        draftTranslation: {
+          targetLang: 'ru',
+          status: 'ready',
+          overlay: {
+            headword: 'хлопоты',
+            meanings: [{ definition: 'ситуация с лишними усилиями' }],
+          },
+          translationPolicyVersion: 'platform-generated-draft-translation-v1',
+        },
         item: {
           entry: {
             contentFingerprint: 'fingerprint-1',
@@ -291,6 +300,15 @@ describe('/api/dict/generated-entry proxy routes', () => {
       draftSetId: 'gds-1',
       candidateId: 'gdc-1',
       revision: 1,
+      draftTranslation: {
+        targetLang: 'ru',
+        status: 'ready',
+        overlay: {
+          headword: 'хлопоты',
+          meanings: [{ definition: 'ситуация с лишними усилиями' }],
+        },
+        translationPolicyVersion: 'platform-generated-draft-translation-v1',
+      },
       item: {
         entry: {
           contentFingerprint: 'fingerprint-1',
