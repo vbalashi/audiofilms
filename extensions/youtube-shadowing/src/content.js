@@ -3707,6 +3707,20 @@
   }
 
   function renderGeneratedFallback(parent, selectedWord) {
+    const draftCard = generatedDraftCard(selectedWord.generatedDraft);
+    if (draftCard) {
+      renderOverlayCard(parent, draftCard);
+      if (selectedWord.generatedDraftStatus === "saving") {
+        const status = appendElement(parent, "p", "af-dictionary-copy af-card-action-status");
+        status.textContent = "Saving...";
+      }
+      if (selectedWord.generatedDraftError) {
+        const error = appendElement(parent, "p", "af-source-option-error");
+        error.textContent = selectedWord.generatedDraftError;
+      }
+      return;
+    }
+
     const fallback = appendElement(parent, "div", "af-dictionary-card af-generated-fallback-card");
     const title = appendElement(fallback, "div", "af-dictionary-card-title");
     title.textContent = "Generated learner card";
@@ -3750,6 +3764,12 @@
       const error = appendElement(fallback, "p", "af-source-option-error");
       error.textContent = selectedWord.generatedDraftError;
     }
+  }
+
+  function generatedDraftCard(draft) {
+    if (!draft || typeof draft !== "object") return null;
+    if (draft.card && typeof draft.card === "object") return draft.card;
+    return null;
   }
 
   function renderOverlayCard(parent, card) {
@@ -4044,7 +4064,8 @@
     for (const displayAction of displayActions) {
       const button = appendButton(actions, displayAction.label || displayAction.id, `afAction-${displayAction.id}`);
       const isActive = feedback?.actionId === displayAction.id && feedback.status !== "error";
-      button.disabled = !card?.entryId || feedback?.status === "pending";
+      const isGeneratedSave = displayAction?.command?.kind === "generated-save-and-start-learning";
+      button.disabled = (!card?.entryId && !isGeneratedSave) || feedback?.status === "pending";
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
       button.classList.toggle("is-action-pending", feedback?.actionId === displayAction.id && feedback.status === "pending");
       button.classList.toggle("is-action-saved", feedback?.actionId === displayAction.id && feedback.status === "saved");
@@ -4083,6 +4104,10 @@
         action: command.action,
         ...(command.result ? { result: command.result } : {}),
       });
+      return;
+    }
+    if (command?.kind === "generated-save-and-start-learning") {
+      saveGeneratedDictionaryDraft(state.selectedWord, card);
     }
   }
 
@@ -4737,8 +4762,20 @@
   }
 
   function dictionaryMockResponse(operation, body = null) {
-    if (window.localStorage.getItem("afShadowingDictionaryMock") !== "cards") return null;
+    const mockMode = window.localStorage.getItem("afShadowingDictionaryMock");
+    if (mockMode !== "cards" && mockMode !== "generated") return null;
     if (operation === "dict-lookup") {
+      if (mockMode === "generated") {
+        return jsonCommandResponse({
+          contractVersion: "dict-lookup-v2",
+          clickedForm: body?.clickedForm || "gedoe",
+          query: body?.clickedForm || "gedoe",
+          cards: [],
+          error: "no_match",
+          code: "no_match",
+          meta: { provider: "mock", responseVersion: "overlay-v2" },
+        }, false, 404);
+      }
       return jsonCommandResponse(mockDictionaryLookup(body));
     }
     if (operation === "dict-translation") {
@@ -4778,6 +4815,7 @@
             generatedAt: new Date().toISOString(),
             contentFingerprint: "mock-generated-entry",
           },
+          card: mockGeneratedDraftCard(body),
         },
       });
     }
@@ -4849,6 +4887,26 @@
         version: "dictionary-card-ui-smoke",
       },
     };
+  }
+
+  function mockGeneratedDraftCard(body = {}) {
+    const clickedForm = body?.clickedForm || "gedoe";
+    return mockDictionaryCard({
+      id: "mock-generated-draft",
+      entryId: "",
+      clickedForm,
+      headword: clickedForm,
+      phase: "not-started",
+      progressActions: [
+        {
+          id: "save-and-learn",
+          label: "Save & learn",
+          group: "progress",
+          enabled: true,
+          command: { kind: "generated-save-and-start-learning" },
+        },
+      ],
+    });
   }
 
   function mockDictionaryCard({ id, entryId, clickedForm, headword, phase, progressActions }) {

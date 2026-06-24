@@ -476,6 +476,7 @@ function runGeometryScenario() {
     const narrowWithDictionary = readGeometrySnapshot();
 
     resizeChrome(1344, 900);
+    const generatedDraftAssertions = assertGeneratedDraftCardUi();
 
     const assertions = [
       assertion("geometry lookup word clicked", lookupClick.clicked, lookupClick.detail),
@@ -496,6 +497,7 @@ function runGeometryScenario() {
       ...accountPlacementAssertions,
       ...dictionaryCardAssertions,
       ...spanSelectionAssertions,
+      ...generatedDraftAssertions,
       ...assertGeometry("wide phrase panel", wideBeforeLookup, { expectDictionary: false }),
       ...assertGeometry("wide with dictionary", wideWithDictionary, { expectDictionary: true }),
       ...assertGeometry("narrow with dictionary", narrowWithDictionary, { expectDictionary: true }),
@@ -897,6 +899,44 @@ function assertDictionaryCardUi() {
     assertion("dictionary translation error renders action error", /Card translation failed/i.test(afterErrorTranslation.dictionaryUi?.actionError || ""), afterErrorTranslation.dictionaryUi?.actionError || ""),
     assertion("dictionary review card present", Boolean(reviewCard), JSON.stringify(before.dictionaryUi?.cards || [])),
   ];
+}
+
+function assertGeneratedDraftCardUi() {
+  setLocalStorageItem("afShadowingDictionaryMock", "generated");
+  reloadTab();
+  waitForSnapshot("4EE7m94mJpk", waitMs);
+  pauseVideo();
+  const clicked = clickFirstLookupWord();
+  waitForDictionarySelection(clicked.word, waitMs);
+  const noMatch = readGeometrySnapshot();
+  clickShadowButton("[data-af-generated-draft]");
+  const generated = waitForGeneratedDraftCard(waitMs);
+
+  return [
+    assertion("generated lookup word clicked", clicked.clicked, clicked.detail),
+    assertion("generated no-match state exposes generate action", noMatch.dictionaryUi?.generatedFallbackCardCount === 1, JSON.stringify(noMatch.dictionaryUi)),
+    assertion("generated draft renders as overlay card", generated.dictionaryUi?.overlayCardCount === 1, JSON.stringify(generated.dictionaryUi)),
+    assertion("generated draft card has generated action", (generated.dictionaryUi?.cards?.[0]?.progressActions || []).includes("Save & learn"), JSON.stringify(generated.dictionaryUi?.cards || [])),
+    assertion("generated draft removes bespoke fallback block", generated.dictionaryUi?.generatedFallbackCardCount === 0, JSON.stringify(generated.dictionaryUi)),
+  ];
+}
+
+function waitForGeneratedDraftCard(timeoutMs) {
+  const started = Date.now();
+  let last = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readGeometrySnapshot();
+    if (
+      last.dictionaryUi?.overlayCardCount > 0 &&
+      last.dictionaryUi?.generatedFallbackCardCount === 0
+    ) {
+      return last;
+    }
+    sleep(500);
+  }
+
+  return last || readGeometrySnapshot();
 }
 
 function assertGeometry(label, geometry, options) {
@@ -1691,6 +1731,7 @@ function readGeometrySnapshot() {
         hasContext: Boolean(dictionary.querySelector(".af-context-text")?.textContent?.trim()),
         lookupState: dictionary.querySelector(".af-lookup-placeholder")?.className || "",
         overlayCardCount: dictionary.querySelectorAll(".af-overlay-card").length,
+        generatedFallbackCardCount: dictionary.querySelectorAll(".af-generated-fallback-card").length,
         cards: Array.from(dictionary.querySelectorAll(".af-overlay-card")).map((card) => ({
           title: card.querySelector(".af-overlay-card-title")?.textContent || "",
           chips: card.querySelectorAll(".af-chip").length,

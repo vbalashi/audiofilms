@@ -294,6 +294,14 @@ function displayActionsForCapabilities(
   const displayActions: OverlayDisplayAction[] = [];
 
   if (allowProgressActions) {
+    if (actions.has('save-and-start-learning')) {
+      displayActions.push({
+        id: 'save-and-learn',
+        label: 'Save & learn',
+        group: 'progress',
+        command: { kind: 'generated-save-and-start-learning' },
+      });
+    }
     if ((phase === 'not-started' || phase === 'encountered') && actions.has('start-learning')) {
       displayActions.push(progressAction('learn', 'Learn', 'start-learning'));
     }

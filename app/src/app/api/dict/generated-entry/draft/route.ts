@@ -1,5 +1,9 @@
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import {
+  projectOverlayCard,
+  type PlatformLookupItem,
+} from '@/lib/dictionary/overlayProjection';
+import {
   postTwoThousandNlPlatformJson,
   requireBearerToken,
 } from '@/lib/twoThousandNlPlatform';
@@ -47,8 +51,41 @@ export async function POST(request: Request) {
     bearerToken,
   );
 
-  return jsonResponse(request, outcome.body, {
+  const responseBody = projectDraftResponseCard(outcome.body, clickedForm, languageCode);
+
+  return jsonResponse(request, responseBody, {
     status: outcome.status,
     headers: { 'Cache-Control': 'private, no-store' },
   });
+}
+
+function projectDraftResponseCard(body: unknown, clickedForm: string, languageCode: string) {
+  if (!isRecord(body)) return body;
+  const draft = isRecord(body.draft) ? body.draft : null;
+  if (!draft || isRecord(draft.card)) return body;
+
+  const item = draftItem(draft);
+  if (!item) return body;
+
+  return {
+    ...body,
+    draft: {
+      ...draft,
+      card: projectOverlayCard(item, clickedForm, languageCode, 0, {
+        allowProgressActions: true,
+      }),
+    },
+  };
+}
+
+function draftItem(draft: Record<string, unknown>): PlatformLookupItem | null {
+  if (isRecord(draft.item)) return draft.item as PlatformLookupItem;
+  if (Array.isArray(draft.items) && isRecord(draft.items[0])) {
+    return draft.items[0] as PlatformLookupItem;
+  }
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }

@@ -85,6 +85,89 @@ describe('/api/dict/generated-entry proxy routes', () => {
     });
   });
 
+  it('projects lookup-like generated draft items into overlay cards', async () => {
+    process.env.DICTIONARY_2000NL_API_BASE = 'https://2000nl.example/api/platform/v1';
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          draft: {
+            clickedForm: 'gedoe',
+            languageCode: 'nl',
+            item: {
+              entry: {
+                id: null,
+                languageCode: 'nl',
+                headword: 'gedoe',
+                partOfSpeech: 'noun',
+                content: {
+                  sections: [
+                    {
+                      id: 'meaning-main',
+                      kind: 'meaning',
+                      text: 'Een situatie die veel moeite geeft.',
+                      sourcePath: 'content.sections.0',
+                    },
+                  ],
+                },
+              },
+              dictionary: {
+                id: 'generated',
+                slug: 'generated',
+                name: 'Generated',
+                kind: 'generated',
+              },
+              match: {
+                matchedForm: 'gedoe',
+                relation: 'exact',
+              },
+              cardCapabilitiesByType: {
+                'word-to-definition': {
+                  actions: ['save-and-start-learning'],
+                },
+              },
+            },
+            generated: { definition: 'Een situatie die veel moeite geeft.' },
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await draftPost(
+      request('/api/dict/generated-entry/draft', {
+        clickedForm: 'gedoe',
+        sourceLanguageCode: 'nl',
+        contextText: 'Wat een gedoe.',
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.draft.card).toMatchObject({
+      clickedForm: 'gedoe',
+      headword: 'gedoe',
+      language: 'nl',
+      summary: { definition: 'Een situatie die veel moeite geeft.' },
+      dictionary: { name: 'Generated' },
+      displayActions: [
+        {
+          id: 'save-and-learn',
+          label: 'Save & learn',
+          group: 'progress',
+          command: { kind: 'generated-save-and-start-learning' },
+        },
+        {
+          id: 'translate',
+          label: 'Translate',
+          group: 'translation',
+          command: { kind: 'card-translation' },
+        },
+      ],
+    });
+  });
+
   it('proxies generated entry save without inventing platform actions', async () => {
     process.env.DICTIONARY_2000NL_API_BASE = 'https://2000nl.example/api/platform/v1';
     const fetchMock = vi.fn().mockResolvedValueOnce(

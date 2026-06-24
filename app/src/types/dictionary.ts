@@ -101,8 +101,8 @@ export type DictionaryOverlayCardV2 = {
     frozenUntil?: string | null;
   } | null;
   displayActions: Array<{
-    id: 'learn' | 'known' | 'again' | 'hard' | 'good' | 'easy' | 'translate';
-    label: 'Learn' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy' | 'Translate';
+    id: 'learn' | 'known' | 'again' | 'hard' | 'good' | 'easy' | 'translate' | 'save-and-learn';
+    label: 'Learn' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy' | 'Translate' | 'Save & learn';
     group: 'progress' | 'translation';
     command:
       | {
@@ -111,6 +111,7 @@ export type DictionaryOverlayCardV2 = {
           result?: 'fail' | 'hard' | 'success' | 'easy';
           turnIdRequired?: boolean;
         }
+      | { kind: 'generated-save-and-start-learning' }
       | { kind: 'card-translation' };
   }>;
   dictionary?: {

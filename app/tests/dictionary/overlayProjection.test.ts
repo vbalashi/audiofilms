@@ -175,6 +175,20 @@ describe('dictionary overlay V2 projection', () => {
     expect('fallbackUsed' in response.meta).toBe(false);
   });
 
+  it('projects generated draft save capability as a card action', () => {
+    const actionIdsForGeneratedDraft = actionIds(
+      baseItem({
+        cardCapabilitiesByType: {
+          [DICTIONARY_OVERLAY_CARD_TYPE_ID]: {
+            actions: ['save-and-start-learning'],
+          },
+        },
+      }),
+    );
+
+    expect(actionIdsForGeneratedDraft).toEqual(['save-and-learn', 'translate']);
+  });
+
   it('tolerates nullable platform fields and preserves source paths', () => {
     const card = projectOverlayCard(
       baseItem({
