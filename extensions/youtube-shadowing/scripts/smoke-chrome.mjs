@@ -722,6 +722,7 @@ function assertSpanSelectionUi() {
 
   return [
     assertion("span drag selected consecutive words", drag.selected === true, JSON.stringify(drag)),
+    assertion("span drag previews draft range before release", drag.draftWords >= 2, JSON.stringify(drag)),
     assertion("span selection opens translation card", spanGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span translation keeps original words clickable", spanGeometry.dictionaryUi?.spanWordCount >= 2, JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span selection highlights phrase words", spanGeometry.primaryUi?.spanSelectedWords >= 2, JSON.stringify(spanGeometry.primaryUi)),
@@ -1496,6 +1497,7 @@ function readGeometrySnapshot() {
         hasTechnicalTerms: ["manual", "exact", "timedtext", "yt-dlp", "provider"].some((term) => lower.includes(term)),
         phraseIconButtons: root?.querySelectorAll(".af-practice-controls .af-phrase-icon-button .af-button-icon").length || 0,
         spanSelectedWords: root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-selected").length || 0,
+        spanDraftWords: root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-draft").length || 0,
       };
     })(),
     controlHierarchy: (() => {
@@ -1756,6 +1758,7 @@ function dragFirstPhraseSpan() {
     button: 0,
     buttons: 1,
   }));
+  const draftWords = root.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-draft").length;
   second.dispatchEvent(new PointerEvent("pointerup", {
     bubbles: true,
     cancelable: true,
@@ -1765,6 +1768,7 @@ function dragFirstPhraseSpan() {
   }));
   return JSON.stringify({
     selected: true,
+    draftWords,
     words: [
       first.dataset.afLookupWord || first.textContent || "",
       second.dataset.afLookupWord || second.textContent || "",

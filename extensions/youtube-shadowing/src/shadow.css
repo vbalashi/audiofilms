@@ -1756,6 +1756,12 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   box-shadow: 0 0 0 1px var(--af-accent-strong);
 }
 
+.af-ribbon-word.is-span-draft:not(.is-span-selected) {
+  color: var(--af-accent);
+  background: color-mix(in srgb, var(--af-accent-soft) 82%, var(--af-panel-bg) 18%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--af-accent) 55%, transparent);
+}
+
 .af-ribbon-word.is-word-replay {
   color: var(--af-accent);
   background: color-mix(in srgb, var(--af-accent-soft) 70%, var(--af-panel-bg) 30%);

@@ -3115,6 +3115,7 @@
         state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, segment.lookupWord),
       );
       word.classList.toggle("is-span-selected", isTokenInSelectedSpan(phraseIndex, segment.tokenIndex));
+      word.classList.toggle("is-span-draft", isTokenInSpanDraft(phraseIndex, segment.tokenIndex));
       word.classList.toggle(
         "is-word-replay",
         state.lastWordReplay?.phraseIndex === phraseIndex &&
@@ -3150,11 +3151,13 @@
           startTokenIndex: segment.tokenIndex,
           endTokenIndex: segment.tokenIndex,
         };
+        applySpanSelectionDraftPreview();
       });
       word.addEventListener("pointerenter", (event) => {
         const draft = state.spanSelectionDraft;
         if (!draft || draft.phraseIndex !== phraseIndex || event.buttons !== 1) return;
         draft.endTokenIndex = segment.tokenIndex;
+        applySpanSelectionDraftPreview();
       });
       word.addEventListener("pointerup", (event) => {
         const draft = state.spanSelectionDraft;
@@ -3168,6 +3171,7 @@
           state.suppressWordClickUntil = Date.now() + 500;
         }
       });
+      word.addEventListener("pointercancel", clearSpanSelectionDraft);
     }
   }
 
@@ -3175,6 +3179,30 @@
     const span = state.selectedSpan;
     if (!span || span.phraseIndex !== phraseIndex) return false;
     return tokenIndex >= span.startTokenIndex && tokenIndex <= span.endTokenIndex;
+  }
+
+  function isTokenInSpanDraft(phraseIndex, tokenIndex) {
+    const draft = state.spanSelectionDraft;
+    if (!draft || draft.phraseIndex !== phraseIndex) return false;
+    const startTokenIndex = Math.min(draft.startTokenIndex, draft.endTokenIndex);
+    const endTokenIndex = Math.max(draft.startTokenIndex, draft.endTokenIndex);
+    return tokenIndex >= startTokenIndex && tokenIndex <= endTokenIndex;
+  }
+
+  function applySpanSelectionDraftPreview() {
+    const root = document.getElementById(ROOT_ID)?.shadowRoot;
+    const words = root?.querySelectorAll(".af-ribbon-word[data-af-phrase-index][data-af-token-index]") || [];
+    for (const word of words) {
+      const phraseIndex = Number(word.dataset.afPhraseIndex);
+      const tokenIndex = Number(word.dataset.afTokenIndex);
+      word.classList.toggle("is-span-draft", isTokenInSpanDraft(phraseIndex, tokenIndex));
+    }
+  }
+
+  function clearSpanSelectionDraft() {
+    if (!state.spanSelectionDraft) return;
+    state.spanSelectionDraft = null;
+    applySpanSelectionDraftPreview();
   }
 
   function clearSelectedSpan() {
