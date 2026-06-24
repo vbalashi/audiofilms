@@ -451,6 +451,8 @@ function runGeometryScenario() {
   try {
     reloadTab();
     waitForSnapshot("4EE7m94mJpk", waitMs);
+    const initialAutoPauseAssertions = assertInitialAutoPauseOnLoad();
+    waitForSnapshot("4EE7m94mJpk", waitMs);
     pauseVideo();
     setDebugVisible(false);
     const wideBeforeLookup = readGeometrySnapshot();
@@ -489,6 +491,7 @@ function runGeometryScenario() {
       ...debugMenuAssertions,
       ...playbackSpeedAssertions,
       ...popoverDismissalAssertions,
+      ...initialAutoPauseAssertions,
       assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
       assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
       assertion("phrase navigation uses icon controls", wideBeforeLookup.primaryUi?.phraseIconButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
@@ -573,6 +576,22 @@ function assertPlaybackSpeedUi() {
     assertion("settings exposes slow replay speed", settings.playbackSpeed?.slowReplayLabel === "0.75x", JSON.stringify(settings.playbackSpeed)),
     assertion("Shift+ArrowDown applies slow replay speed", Math.abs(slowActive.playbackSpeed?.videoRate - 0.75) < 0.01, JSON.stringify(slowActive.playbackSpeed)),
     assertion("slow replay restores normal speed", Math.abs(slowRestored.playbackSpeed?.videoRate - 1) < 0.01 && slowRestored.playbackSpeed?.activeSlowReplay === false, JSON.stringify(slowRestored.playbackSpeed)),
+  ];
+}
+
+function assertInitialAutoPauseOnLoad() {
+  playVideo();
+  sleep(500);
+  const beforeReload = readSnapshot();
+  reloadTab();
+  waitForSnapshot("4EE7m94mJpk", waitMs);
+  sleep(1200);
+  const afterLoad = readSnapshot();
+
+  return [
+    assertion("auto-pause load setup started playback", beforeReload.video?.paused === false, JSON.stringify(beforeReload.video)),
+    assertion("auto-pause holds video after source load", afterLoad.video?.paused === true, JSON.stringify(afterLoad.video)),
+    assertion("auto-pause arms guided mode after source load", afterLoad.guidedMode === true, JSON.stringify({ guidedMode: afterLoad.guidedMode, mode: afterLoad.mode })),
   ];
 }
 
@@ -1843,6 +1862,19 @@ function pauseVideo() {
   const video = document.querySelector("video");
   if (video && typeof video.pause === "function") {
     video.pause();
+  }
+  return "ok";
+})()
+  `);
+}
+
+function playVideo() {
+  chromeEval(`
+(() => {
+  const video = document.querySelector("video");
+  if (video && typeof video.play === "function") {
+    video.muted = true;
+    video.play().catch(() => {});
   }
   return "ok";
 })()

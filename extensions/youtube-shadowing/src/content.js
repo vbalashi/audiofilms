@@ -5438,9 +5438,45 @@
     } finally {
       if (loadToken === state.loadToken) {
         state.loading = false;
+        holdInitialAutoPauseAfterSourceLoad();
         render();
       }
     }
+  }
+
+  function holdInitialAutoPauseAfterSourceLoad() {
+    if (!state.learningEnabled || !state.autoPause || !state.phrases.length) return;
+
+    const video = getVideoElement();
+    if (!video) return;
+
+    state.guidedMode = true;
+    syncPassivePlayback(video);
+
+    if (video.paused) return;
+
+    const currentMs = video.currentTime * 1000;
+    const index = findPlaybackPhraseIndex(state.phrases, currentMs);
+    const phrase = state.phrases[index] || state.phrases[state.currentIndex];
+    if (phrase && index !== state.currentIndex) {
+      state.currentIndex = index;
+      schedulePhraseProgressSave("auto-pause-load-sync");
+    }
+
+    video.pause();
+    state.guidedHold = {
+      index: state.currentIndex,
+      holdSeconds: video.currentTime,
+      createdAt: Date.now(),
+    };
+    state.passivePausedKey = `${state.videoId || ""}:${state.selectedSourceId}:load`;
+    if (phrase) {
+      markCurrentTranscriptSegment(phrase);
+    }
+    recordNavigationEvent("auto-pause-load", {
+      currentPhrase: describePhraseAtIndex(state.currentIndex),
+      playback: getPlaybackSnapshot(),
+    });
   }
 
   async function fetchReusableTimingTranscriptResult(source) {
