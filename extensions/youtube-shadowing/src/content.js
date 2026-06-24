@@ -33,6 +33,10 @@
   const PRE_ROLL_MS = 150;
   const POST_ROLL_MS = 250;
   const CONTIGUOUS_BOUNDARY_GUARD_MS = 120;
+  const PLAYBACK_RATE_MIN = 0.25;
+  const PLAYBACK_RATE_MAX = 2;
+  const PLAYBACK_RATE_STEP = 0.05;
+  const DEFAULT_SLOW_REPLAY_SPEED = 0.75;
   const ISSUE_REPORT_CATEGORIES = [
     { value: "phrase-boundary", label: "Incorrect phrase split / merged sentences" },
     { value: "timing", label: "Wrong timing / pause point" },
@@ -128,6 +132,8 @@
     passiveVideo: null,
     passiveFrame: null,
     passivePausedKey: "",
+    playbackRate: 1,
+    pendingPlaybackRateRestore: null,
     lastPhraseProgressRestore: null,
     loading: false,
     loadToken: 0,
@@ -747,6 +753,12 @@
     playbackLabel.textContent = "Playback";
     const playbackControls = appendElement(displaySection, "div", "af-settings-button-row");
     appendButton(playbackControls, "Auto-pause On", "afAutoPauseToggle");
+    const slowReplayLabel = appendElement(displaySection, "div", "af-settings-label");
+    slowReplayLabel.textContent = "Slow replay";
+    const slowReplayControls = appendElement(displaySection, "div", "af-settings-button-row");
+    appendButton(slowReplayControls, "-", "afSlowReplaySlower");
+    appendButton(slowReplayControls, "0.75x", "afSlowReplaySpeed");
+    appendButton(slowReplayControls, "+", "afSlowReplayFaster");
     const layoutLabel = appendElement(displaySection, "div", "af-settings-label");
     layoutLabel.textContent = "Panel layout";
     const layoutControls = appendElement(displaySection, "div", "af-settings-button-row");
@@ -791,6 +803,16 @@
     nextButton.innerHTML = `${iconSvg("next")}<span class="af-button-shortcut">→</span><span class="af-sr-only">Next</span>`;
     nextButton.setAttribute("aria-label", "Next phrase");
     nextButton.title = "Next phrase (ArrowRight)";
+    const speedControls = appendElement(practiceControls, "div", "af-speed-controls");
+    const speedLower = appendButton(speedControls, "-", "afSpeedLower");
+    speedLower.className = "af-speed-step";
+    speedLower.setAttribute("aria-label", "Decrease playback speed");
+    const speedLabel = appendElement(speedControls, "span", "af-speed-label");
+    speedLabel.dataset.afSpeedLabel = "";
+    speedLabel.textContent = "1.00x";
+    const speedHigher = appendButton(speedControls, "+", "afSpeedHigher");
+    speedHigher.className = "af-speed-step";
+    speedHigher.setAttribute("aria-label", "Increase playback speed");
 
     const displayControls = appendElement(controls, "div", "af-control-group af-display-controls");
     const originalButton = appendButton(displayControls, "Show Original", "afToggle");
@@ -804,7 +826,7 @@
     resizeHandle.setAttribute("aria-label", "Resize phrase ribbon width");
 
     panel.querySelector("[data-af-prev]").addEventListener("click", previousPhrase);
-    panel.querySelector("[data-af-replay]").addEventListener("click", replayCurrentPhrase);
+    panel.querySelector("[data-af-replay]").addEventListener("click", (event) => replayCurrentPhrase({ slowReplay: event.shiftKey }));
     panel.querySelector("[data-af-toggle]").addEventListener("click", (event) => toggleText(event));
     panel.querySelector("[data-af-next]").addEventListener("click", nextPhrase);
     panel.querySelector("[data-af-mode-shadow]").addEventListener("click", () => setPracticeMode("shadow"));
@@ -821,6 +843,10 @@
     panel.querySelector("[data-af-transparency-reset]").addEventListener("click", resetPanelBackgroundAlpha);
     panel.querySelector("[data-af-transparency-higher]").addEventListener("click", () => adjustPanelBackgroundAlpha(0.1));
     panel.querySelector("[data-af-auto-pause-toggle]").addEventListener("click", toggleAutoPause);
+    panel.querySelector("[data-af-slow-replay-slower]").addEventListener("click", () => adjustSlowReplaySpeed(-PLAYBACK_RATE_STEP));
+    panel.querySelector("[data-af-slow-replay-faster]").addEventListener("click", () => adjustSlowReplaySpeed(PLAYBACK_RATE_STEP));
+    panel.querySelector("[data-af-speed-lower]").addEventListener("click", () => adjustVideoPlaybackRate(-PLAYBACK_RATE_STEP));
+    panel.querySelector("[data-af-speed-higher]").addEventListener("click", () => adjustVideoPlaybackRate(PLAYBACK_RATE_STEP));
     panel.querySelector("[data-af-layout-lock-toggle]").addEventListener("click", toggleLayoutLock);
     panel.querySelector("[data-af-layout-reset]").addEventListener("click", resetPanelLayout);
     panel.querySelectorAll("[data-af-drag-handle]").forEach((handle) => {
@@ -1175,6 +1201,9 @@
     const modeShadow = panel.querySelector("[data-af-mode-shadow]");
     const modeRecall = panel.querySelector("[data-af-mode-recall]");
     const phraseTranslation = panel.querySelector("[data-af-phrase-translation]");
+    const speedLower = panel.querySelector("[data-af-speed-lower]");
+    const speedHigher = panel.querySelector("[data-af-speed-higher]");
+    const speedLabel = panel.querySelector("[data-af-speed-label]");
     const account = panel.querySelector("[data-af-account]");
     const accountMenu = panel.querySelector("[data-af-account-menu]");
     const accountCopy = panel.querySelector("[data-af-account-copy]");
@@ -1191,6 +1220,9 @@
     const transparencyReset = panel.querySelector("[data-af-transparency-reset]");
     const transparencyHigher = panel.querySelector("[data-af-transparency-higher]");
     const autoPauseToggle = panel.querySelector("[data-af-auto-pause-toggle]");
+    const slowReplaySlower = panel.querySelector("[data-af-slow-replay-slower]");
+    const slowReplaySpeed = panel.querySelector("[data-af-slow-replay-speed]");
+    const slowReplayFaster = panel.querySelector("[data-af-slow-replay-faster]");
     const layoutLockToggle = panel.querySelector("[data-af-layout-lock-toggle]");
     const layoutReset = panel.querySelector("[data-af-layout-reset]");
     const debugToggle = panel.querySelector("[data-af-debug-toggle]");
@@ -1271,9 +1303,13 @@
       transparencyReset,
       transparencyHigher,
       autoPauseToggle,
+      slowReplaySlower,
+      slowReplaySpeed,
+      slowReplayFaster,
       layoutLockToggle,
       layoutReset,
     });
+    renderPlaybackRateControls({ speedLower, speedHigher, speedLabel });
     debugToggle.textContent = state.debugVisible ? "Hide Debug" : "Debug";
     debugCopy.textContent = state.debugCopied ? "Copied" : "Copy Debug";
     diagnosticsClear.textContent = state.diagnosticsClearedAt ? "Diagnostics Cleared" : "Clear Diagnostics";
@@ -1401,12 +1437,30 @@
       ? "Pause automatically at phrase boundaries"
       : "Let YouTube continue playing after captions load";
 
+    const slowReplaySpeed = slowReplayPlaybackRate();
+    controls.slowReplaySpeed.textContent = formatPlaybackRate(slowReplaySpeed);
+    controls.slowReplaySpeed.title = "Slow replay speed for Shift+ArrowDown";
+    controls.slowReplaySlower.disabled = slowReplaySpeed <= PLAYBACK_RATE_MIN;
+    controls.slowReplayFaster.disabled = slowReplaySpeed >= PLAYBACK_RATE_MAX;
+    controls.slowReplaySlower.title = "Decrease slow replay speed";
+    controls.slowReplayFaster.title = "Increase slow replay speed";
+
     controls.layoutLockToggle.textContent = state.displayPreferences.layout.locked ? "Unlock" : "Lock";
     controls.layoutLockToggle.title = state.displayPreferences.layout.locked
       ? "Unlock panel layout editing"
       : "Lock panel layout editing";
     controls.layoutReset.disabled = !hasCustomPanelLayout();
     controls.layoutReset.title = "Reset panel positions and sizes";
+  }
+
+  function renderPlaybackRateControls(controls) {
+    const rate = syncPlaybackRateFromVideo();
+    controls.speedLabel.textContent = formatPlaybackRate(rate);
+    controls.speedLabel.title = `Playback speed ${formatPlaybackRate(rate)}`;
+    controls.speedLower.disabled = rate <= PLAYBACK_RATE_MIN;
+    controls.speedHigher.disabled = rate >= PLAYBACK_RATE_MAX;
+    controls.speedLower.title = "Decrease playback speed";
+    controls.speedHigher.title = "Increase playback speed";
   }
 
   function positionUtilityMenu(panel, utilityMenu, isOpen = state.utilityMenuOpen) {
@@ -2025,6 +2079,60 @@
       },
     }));
     render();
+  }
+
+  function adjustSlowReplaySpeed(delta) {
+    updateDisplayPreferences((preferences) => ({
+      ...preferences,
+      playback: {
+        ...(preferences.playback || {}),
+        slowReplaySpeed: clampPlaybackRate((preferences.playback?.slowReplaySpeed ?? DEFAULT_SLOW_REPLAY_SPEED) + delta),
+      },
+    }));
+    render();
+  }
+
+  function adjustVideoPlaybackRate(delta) {
+    const video = getVideoElement();
+    const currentRate = clampPlaybackRate(video?.playbackRate || state.playbackRate || 1);
+    setVideoPlaybackRate(clampPlaybackRate(currentRate + delta), "speed-control");
+  }
+
+  function setVideoPlaybackRate(rate, reason = "playback-rate") {
+    const video = getVideoElement();
+    const nextRate = clampPlaybackRate(rate);
+    state.playbackRate = nextRate;
+    if (video) {
+      video.playbackRate = nextRate;
+    }
+    recordDebugEvent("playback-rate-set", {
+      reason,
+      playbackRate: nextRate,
+    });
+    render();
+  }
+
+  function syncPlaybackRateFromVideo(video = getVideoElement()) {
+    const rate = clampPlaybackRate(video?.playbackRate || state.playbackRate || 1);
+    state.playbackRate = rate;
+    return rate;
+  }
+
+  function clampPlaybackRate(value) {
+    return clampNumber(Number(value), PLAYBACK_RATE_MIN, PLAYBACK_RATE_MAX, 1);
+  }
+
+  function slowReplayPlaybackRate() {
+    return clampNumber(
+      Number(state.displayPreferences.playback?.slowReplaySpeed),
+      PLAYBACK_RATE_MIN,
+      PLAYBACK_RATE_MAX,
+      DEFAULT_SLOW_REPLAY_SPEED,
+    );
+  }
+
+  function formatPlaybackRate(value) {
+    return `${clampPlaybackRate(value).toFixed(2)}x`;
   }
 
   function applyThemeAttributes() {
@@ -5568,9 +5676,9 @@
     }
   }
 
-  function replayCurrentPhrase() {
+  function replayCurrentPhrase(options = {}) {
     if (!state.phrases.length) return;
-    navigateToPhrase("replay", state.currentIndex);
+    navigateToPhrase(options.slowReplay ? "slow-replay" : "replay", state.currentIndex, options);
   }
 
   function pauseCurrentPlayback(command = "pause") {
@@ -5601,7 +5709,7 @@
     navigateToPhrase("previous", Math.max(state.currentIndex - 1, 0));
   }
 
-  function navigateToPhrase(command, targetIndex) {
+  function navigateToPhrase(command, targetIndex, options = {}) {
     const fromIndex = state.currentIndex;
     const before = getPlaybackSnapshot();
     const navigationEvent = recordNavigationEvent("command-start", {
@@ -5619,7 +5727,11 @@
     }
     enterGuidedMode();
     render();
-    const playResult = playPhrase(state.currentIndex, { command, navigationEventId: navigationEvent.id });
+    const playResult = playPhrase(state.currentIndex, {
+      command,
+      navigationEventId: navigationEvent.id,
+      slowReplay: Boolean(options.slowReplay),
+    });
     recordNavigationEvent("command-dispatched", {
       command,
       navigationEventId: navigationEvent.id,
@@ -5853,8 +5965,14 @@
     stopPlaybackTimer();
     const startSeconds = Math.max(0, phrase.startMs - PRE_ROLL_MS) / 1000;
     const endSeconds = playbackEndMsForPhrase(state.phrases, index) / 1000;
+    const normalPlaybackRate = syncPlaybackRateFromVideo(video);
+    const requestedPlaybackRate = options.slowReplay ? slowReplayPlaybackRate() : normalPlaybackRate;
     markCurrentTranscriptSegment(phrase);
     video.currentTime = startSeconds;
+    if (options.slowReplay) {
+      state.pendingPlaybackRateRestore = normalPlaybackRate;
+      video.playbackRate = requestedPlaybackRate;
+    }
     video.play().catch(() => {});
     recordNavigationEvent("seek-started", {
       command: options.command || "unknown",
@@ -5862,16 +5980,20 @@
       targetPhrase: describePhraseAtIndex(index),
       seekToSec: roundTime(startSeconds),
       expectedPauseAtSec: roundTime(endSeconds),
+      playbackRate: requestedPlaybackRate,
+      slowReplay: Boolean(options.slowReplay),
       playbackAfterSeek: getPlaybackSnapshot(),
     });
 
-    if (!state.autoPause) {
+    if (!state.autoPause && !options.slowReplay) {
       render();
       return {
         ok: true,
         seekToSec: roundTime(startSeconds),
         expectedPauseAtSec: null,
         autoPause: false,
+        playbackRate: requestedPlaybackRate,
+        slowReplay: false,
       };
     }
 
@@ -5879,6 +6001,9 @@
       index,
       endSeconds,
       holdSeconds: endSeconds,
+      playbackRate: requestedPlaybackRate,
+      restorePlaybackRate: options.slowReplay ? normalPlaybackRate : null,
+      slowReplay: Boolean(options.slowReplay),
     };
 
     state.playbackFrame = window.requestAnimationFrame(function frame() {
@@ -5892,6 +6017,8 @@
       seekToSec: roundTime(startSeconds),
       expectedPauseAtSec: roundTime(endSeconds),
       autoPause: true,
+      playbackRate: requestedPlaybackRate,
+      slowReplay: Boolean(options.slowReplay),
     };
   }
 
@@ -5912,11 +6039,20 @@
   }
 
   function stopPlaybackTimer() {
+    restorePlaybackRateAfterOverride();
     if (state.playbackFrame) {
       window.cancelAnimationFrame(state.playbackFrame);
       state.playbackFrame = null;
     }
     state.activePlayback = null;
+  }
+
+  function restorePlaybackRateAfterOverride(video = getVideoElement()) {
+    const restoreRate = state.activePlayback?.restorePlaybackRate || state.pendingPlaybackRateRestore;
+    if (!restoreRate || !video) return;
+    video.playbackRate = clampPlaybackRate(restoreRate);
+    state.playbackRate = clampPlaybackRate(restoreRate);
+    state.pendingPlaybackRateRestore = null;
   }
 
   function ensurePassivePlaybackWatcher() {
@@ -5929,6 +6065,8 @@
     video.addEventListener("timeupdate", onPassiveVideoTimeUpdate, true);
     video.addEventListener("play", onPassiveVideoPlay, true);
     video.addEventListener("pause", onPassiveVideoPause, true);
+    video.addEventListener("ratechange", onPassiveVideoRateChange, true);
+    syncPlaybackRateFromVideo(video);
     syncPassivePlayback(video);
     if (!video.paused) {
       startPassivePlaybackFrame(video);
@@ -5945,6 +6083,7 @@
       state.passiveVideo.removeEventListener("timeupdate", onPassiveVideoTimeUpdate, true);
       state.passiveVideo.removeEventListener("play", onPassiveVideoPlay, true);
       state.passiveVideo.removeEventListener("pause", onPassiveVideoPause, true);
+      state.passiveVideo.removeEventListener("ratechange", onPassiveVideoRateChange, true);
       state.passiveVideo = null;
     }
 
@@ -5966,6 +6105,16 @@
     if (state.passiveFrame) {
       window.cancelAnimationFrame(state.passiveFrame);
       state.passiveFrame = null;
+    }
+    restorePlaybackRateAfterOverride();
+  }
+
+  function onPassiveVideoRateChange(event) {
+    const video = event.currentTarget;
+    const activeRestore = state.activePlayback?.restorePlaybackRate;
+    if (!activeRestore || Math.abs(video.playbackRate - activeRestore) < 0.001) {
+      state.playbackRate = clampPlaybackRate(video.playbackRate || 1);
+      render();
     }
   }
 
@@ -6130,7 +6279,7 @@
       previousPhrase();
     } else if (event.code === "ArrowDown") {
       blockYouTubeShortcutWithOptions(event);
-      replayCurrentPhrase();
+      replayCurrentPhrase({ slowReplay: event.shiftKey });
     } else if (event.code === "ArrowUp") {
       blockYouTubeShortcutWithOptions(event);
       toggleText(event);
@@ -6199,7 +6348,7 @@
 
   function shouldIgnoreKeyEvent(event) {
     if (event.metaKey || event.ctrlKey || event.altKey) return true;
-    if (event.shiftKey && event.code !== "KeyS" && event.code !== "KeyT") return true;
+    if (event.shiftKey && event.code !== "KeyS" && event.code !== "KeyT" && event.code !== "ArrowDown") return true;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
     const tagName = target.tagName.toLowerCase();

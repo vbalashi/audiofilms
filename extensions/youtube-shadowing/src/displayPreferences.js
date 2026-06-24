@@ -4,6 +4,9 @@
     const appearance = preferences.appearance && typeof preferences.appearance === "object"
       ? preferences.appearance
       : {};
+    const playback = preferences.playback && typeof preferences.playback === "object"
+      ? preferences.playback
+      : {};
     const layout = preferences.layout && typeof preferences.layout === "object" ? preferences.layout : {};
 
     return {
@@ -15,6 +18,9 @@
       appearance: {
         learnerTextScale: clampNumber(appearance.learnerTextScale, 0.85, 1.35, 1),
         panelBackgroundAlpha: clampNumber(appearance.panelBackgroundAlpha, 0.65, 1, 0.92),
+      },
+      playback: {
+        slowReplaySpeed: clampNumber(playback.slowReplaySpeed, 0.25, 2, 0.75),
       },
       layout: {
         ...defaultPanelLayout(),

@@ -460,6 +460,7 @@ function runGeometryScenario() {
     const controlHierarchyAssertions = assertControlHierarchyUi();
     const improveTimingAssertions = assertImproveTimingUi();
     const debugMenuAssertions = assertDebugMenuUi();
+    const playbackSpeedAssertions = assertPlaybackSpeedUi();
     const popoverDismissalAssertions = assertPopoverDismissalUi();
 
     const lookupClick = clickFirstLookupWord();
@@ -485,6 +486,7 @@ function runGeometryScenario() {
       ...controlHierarchyAssertions,
       ...improveTimingAssertions,
       ...debugMenuAssertions,
+      ...playbackSpeedAssertions,
       ...popoverDismissalAssertions,
       assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
       assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
@@ -519,6 +521,41 @@ function runGeometryScenario() {
       removeLocalStorageItem("afShadowingDictionaryMock");
     }
   }
+}
+
+function assertPlaybackSpeedUi() {
+  setVideoPlaybackRate(1);
+  sleep(250);
+  const start = readGeometrySnapshot();
+  clickShadowButton("[data-af-speed-higher]");
+  sleep(300);
+  const faster = readGeometrySnapshot();
+  clickShadowButton("[data-af-speed-lower]");
+  sleep(300);
+  const restoredNormal = readGeometrySnapshot();
+
+  clickShadowButton("[data-af-settings-toggle]");
+  sleep(200);
+  const settings = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(150);
+
+  pressKey("ArrowDown", "ArrowDown", { shiftKey: true });
+  sleep(500);
+  const slowActive = readGeometrySnapshot();
+  forceActivePlaybackEnd();
+  sleep(700);
+  const slowRestored = readGeometrySnapshot();
+
+  return [
+    assertion("speed control starts at normal rate", Math.abs(start.playbackSpeed?.videoRate - 1) < 0.01, JSON.stringify(start.playbackSpeed)),
+    assertion("speed increase uses 0.05 step", Math.abs(faster.playbackSpeed?.videoRate - 1.05) < 0.01, JSON.stringify(faster.playbackSpeed)),
+    assertion("speed decrease restores normal rate", Math.abs(restoredNormal.playbackSpeed?.videoRate - 1) < 0.01, JSON.stringify(restoredNormal.playbackSpeed)),
+    assertion("speed label reflects video rate", /1\.00x/.test(restoredNormal.playbackSpeed?.label || ""), JSON.stringify(restoredNormal.playbackSpeed)),
+    assertion("settings exposes slow replay speed", settings.playbackSpeed?.slowReplayLabel === "0.75x", JSON.stringify(settings.playbackSpeed)),
+    assertion("Shift+ArrowDown applies slow replay speed", Math.abs(slowActive.playbackSpeed?.videoRate - 0.75) < 0.01, JSON.stringify(slowActive.playbackSpeed)),
+    assertion("slow replay restores normal speed", Math.abs(slowRestored.playbackSpeed?.videoRate - 1) < 0.01 && slowRestored.playbackSpeed?.activeSlowReplay === false, JSON.stringify(slowRestored.playbackSpeed)),
+  ];
 }
 
 function assertDebugMenuUi() {
@@ -1545,6 +1582,15 @@ function readGeometrySnapshot() {
         actions: Array.from(menu?.querySelectorAll("button") || []).map((button) => button.textContent.trim()),
       };
     })(),
+    playbackSpeed: (() => {
+      const video = document.querySelector("video");
+      return {
+        label: root?.querySelector("[data-af-speed-label]")?.textContent || "",
+        videoRate: Number(video?.playbackRate || 0),
+        slowReplayLabel: root?.querySelector("[data-af-slow-replay-speed]")?.textContent || "",
+        activeSlowReplay: Boolean(window.__afShadowingDebug?.activePlayback?.slowReplay),
+      };
+    })(),
     primaryUi: (() => {
       const text = [
         root?.querySelector("[data-af-source-toggle]")?.textContent || "",
@@ -1661,6 +1707,30 @@ function clickShadowButton(selector) {
   if (result !== "clicked") {
     fail(`Could not click shadow button ${selector}: ${result}`);
   }
+}
+
+function setVideoPlaybackRate(rate) {
+  chromeEval(`
+(() => {
+  const video = document.querySelector("video");
+  if (!video) return;
+  video.playbackRate = ${Number(rate)};
+  video.dispatchEvent(new Event("ratechange", { bubbles: true }));
+})()
+  `);
+}
+
+function forceActivePlaybackEnd() {
+  chromeEval(`
+(() => {
+  const video = document.querySelector("video");
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const row = root?.querySelector(".af-ribbon-row.is-current");
+  const endMs = Number(row?.dataset.afPhrasePlaybackEndMs || 0);
+  if (!video || !Number.isFinite(endMs) || endMs <= 0) return;
+  video.currentTime = Math.max(video.currentTime, endMs / 1000 + 0.08);
+})()
+  `);
 }
 
 function pressKey(code, key, options = {}) {
