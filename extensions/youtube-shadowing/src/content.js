@@ -2186,7 +2186,7 @@
   }
 
   function toggleCardTranslation(card) {
-    if (!card?.id || !state.selectedWord) return;
+    if (!card?.id || !state.selectedWord || !cardCanRequestTranslation(card)) return;
     const currentlyVisible = state.visibleTranslationsByCardId[card.id] === true;
     state.visibleTranslationsByCardId = {
       ...state.visibleTranslationsByCardId,
@@ -3791,7 +3791,7 @@
       const translationVisible = state.visibleTranslationsByCardId[card.id] === true;
       const translateButton = appendButton(header, "", `afAction-${translationActions[0].id}`);
       translateButton.className = "af-card-translate";
-      translateButton.disabled = !card?.entryId;
+      translateButton.disabled = !cardCanRequestTranslation(card);
       translateButton.innerHTML = `${iconSvg("translate")}<span class="af-sr-only">${translationVisible ? "Hide translation" : "Show translation"}</span>`;
       translateButton.title = translationVisible ? "Hide translation" : "Show translation";
       translateButton.setAttribute("aria-label", translationVisible ? "Hide translation" : "Show translation");
@@ -3958,6 +3958,10 @@
       cleanTranslationText(summary.exampleTranslation) ||
       (Array.isArray(card.sections) && card.sections.some((section) => cleanTranslationText(section?.translation)))
     );
+  }
+
+  function cardCanRequestTranslation(card) {
+    return Boolean(card?.entryId || card?.generatedDraftItem || generatedDraftItemFromOverlayCard(card));
   }
 
   function lookupOrOverlayHeadword(card, translation) {
@@ -4494,7 +4498,7 @@
 
     try {
       const translation = await postDictionaryCommand("dict-translation", {
-        ...(card.entryId ? { entryId: card.entryId } : {}),
+        ...(card.entryId && !generatedDraftItem ? { entryId: card.entryId } : {}),
         ...(generatedDraftItem ? { item: generatedDraftItem } : {}),
       });
       if (!isCurrentLookup(selectedWord)) return;

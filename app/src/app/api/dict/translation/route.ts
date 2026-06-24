@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const platformBody: Record<string, unknown> = {
     force: body?.force === true,
   };
-  if (entryId) {
+  if (entryId && !item) {
     platformBody.entryId = entryId;
   }
   if (item) {

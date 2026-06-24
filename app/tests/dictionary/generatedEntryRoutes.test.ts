@@ -210,6 +210,7 @@ describe('/api/dict/generated-entry proxy routes', () => {
 
     const response = await translationPost(
       request('/api/dict/translation', {
+        entryId: 'draft:gdc-1',
         item,
       }),
     );

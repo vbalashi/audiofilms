@@ -635,7 +635,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-generated-fallback-card {
   display: flex;
-  align-items: flex-start;
+  justify-content: center;
+  padding-top: 10px;
 }
 
 .af-generated-fallback-card .af-lookup-retry {
