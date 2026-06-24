@@ -132,6 +132,18 @@ _Avoid_: Target language, definition language
 A learner-facing dictionary candidate for one specific meaning/card identity returned by the dictionary authority. Learning and review actions such as Learn, Known, Again, Hard, Good, and Easy apply to this card, not to the clicked word globally.
 _Avoid_: Word card, lookup result, definition
 
+**Generated Draft Card**:
+A learner-facing Dictionary Meaning Card produced from the clicked form and phrase context before it has a durable dictionary entry identity. It may be rendered like a normal card with a temporary draft identity, but saving and learning are still explicit user actions.
+_Avoid_: No-match fallback, generated text, unsaved entry
+
+**Generated Draft Candidate**:
+One alternative generated version of a Generated Draft Card for the same clicked form and phrase context. A learner may compare candidates and choose which one to save.
+_Avoid_: Revision, regenerated field, final card
+
+**Draft Edit Revision**:
+A change to the content of one Generated Draft Candidate, such as regenerating a definition field, adding an example, or manually editing text. It is not a separate candidate unless the whole card is regenerated as an alternative.
+_Avoid_: New card, candidate, saved entry
+
 **Clicked Form**:
 The exact word form the learner clicked in the phrase text. It can differ from the dictionary lemma or headword, for example an inflected verb form.
 _Avoid_: Lemma, headword

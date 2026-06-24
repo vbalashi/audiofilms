@@ -1,0 +1,7 @@
+# Generated Draft Card Client Boundary
+
+AudioFilms treats generated draft cards as 2000NL-owned dictionary card candidates, not as a local UI fallback or an AudioFilms-authored LLM feature. AudioFilms may show `Generate Card` as a standing alternative to ready dictionary cards and may later auto-generate when no ready cards exist, but it sends clicked form, language, phrase context, and source context to 2000NL through its backend proxy and renders the platform-projected result.
+
+The source of truth for generated card identity, prompt/schema design, candidate lifecycle, translation overlay policy, and persistence is 2000NL ADR-0002. AudioFilms should project the 2000NL lookup-like draft item into `DictionaryOverlayCardV2`, display generated cards with normal card affordances and generated-source chips, and route `save-and-start-learning` through the service-worker Bearer-token path. It must not parse LLM output directly, invent durable card identities, or treat generated content as saved until 2000NL persists the selected candidate and a refreshed lookup returns the resulting entry.
+
+Consequences: no-match rendering should move away from a special "Generated learner card" block toward normal card rendering. Weak or unsuitable dictionary matches may expose a `Generate Card` action alongside ready cards; no-ready-card states can start with an explicit button and later become automatic generation without changing the platform boundary.
