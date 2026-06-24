@@ -633,6 +633,15 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   margin-top: 0;
 }
 
+.af-generated-fallback-card {
+  display: flex;
+  align-items: flex-start;
+}
+
+.af-generated-fallback-card .af-lookup-retry {
+  margin-top: 0;
+}
+
 .af-lookup-skeleton {
   height: 46px;
   margin-top: 12px;

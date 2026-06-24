@@ -941,6 +941,8 @@ function assertGeneratedDraftCardUi() {
   return [
     assertion("generated lookup word clicked", clicked.clicked, clicked.detail),
     assertion("generated no-match state exposes generate action", noMatch.dictionaryUi?.generatedFallbackCardCount === 1, JSON.stringify(noMatch.dictionaryUi)),
+    assertion("generated no-match state uses card-only wrapper", /is-card-only/.test(noMatch.dictionaryUi?.lookupState || ""), noMatch.dictionaryUi?.lookupState || ""),
+    assertion("generated no-match state omits redundant no-match copy", !/no match|no dictionary match/i.test(`${noMatch.dictionaryUi?.lookupTitle || ""} ${noMatch.dictionaryUi?.lookupCopy || ""}`), JSON.stringify(noMatch.dictionaryUi)),
     assertion("generated draft renders as overlay card", generated.dictionaryUi?.overlayCardCount === 1, JSON.stringify(generated.dictionaryUi)),
     assertion("generated draft uses card-only lookup wrapper", /is-card-only/.test(generated.dictionaryUi?.lookupState || ""), generated.dictionaryUi?.lookupState || ""),
     assertion("generated draft card has generated action", (generated.dictionaryUi?.cards?.[0]?.progressActions || []).includes("Start Learning"), JSON.stringify(generated.dictionaryUi?.cards || [])),

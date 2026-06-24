@@ -3699,16 +3699,10 @@
     const result = selectedWord.lookupResult?.result;
     const definitions = selectedWord.lookupResult?.definitions || [];
     if (!result) {
-      lookup.classList.add("is-empty");
+      lookup.classList.add("is-empty", "is-card-only");
+      lookupTitle.remove();
+      lookupCopy.remove();
       const draftCard = generatedDraftCard(selectedWord.generatedDraft);
-      if (draftCard) {
-        lookup.classList.add("is-card-only");
-        lookupTitle.remove();
-        lookupCopy.remove();
-      } else {
-        lookupTitle.textContent = "No match";
-        lookupCopy.textContent = "No dictionary match was returned for this word.";
-      }
       renderGeneratedFallback(lookup, selectedWord);
       return;
     }
@@ -3742,27 +3736,27 @@
       return;
     }
 
-    const fallback = appendElement(parent, "div", "af-dictionary-card af-generated-fallback-card");
-    const title = appendElement(fallback, "div", "af-dictionary-card-title");
-    title.textContent = "Create learner card";
-    const copy = appendElement(fallback, "p", "af-dictionary-copy");
+    const fallback = appendElement(parent, "div", "af-generated-fallback-card");
+    let copy = null;
 
     if (state.accountStatus !== "signed-in") {
+      copy = appendElement(fallback, "p", "af-dictionary-copy");
       copy.textContent = "Connect 2000NL to generate and save a private learner card.";
       renderConnectPrompt(fallback);
       return;
     }
 
     if (selectedWord.generatedDraftStatus === "loading") {
+      copy = appendElement(fallback, "p", "af-dictionary-copy");
       copy.textContent = "Generating a same-language explanation...";
       appendElement(fallback, "div", "af-lookup-skeleton");
       return;
     }
 
     if (selectedWord.generatedDraft) {
+      copy = appendElement(fallback, "p", "af-dictionary-copy");
       copy.textContent = "Generated draft did not include a renderable learner card.";
     } else {
-      copy.textContent = "Create a draft explanation in Dutch, then choose whether to save it.";
       const generate = appendButton(fallback, "Generate learner card", "afGeneratedDraft");
       generate.className = "af-lookup-retry";
       generate.addEventListener("click", () => generateDictionaryDraft(selectedWord));
