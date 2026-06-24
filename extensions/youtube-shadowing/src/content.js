@@ -713,6 +713,18 @@
     const mode = appendElement(metaRight, "span", "af-ribbon-mode");
     mode.dataset.afMode = "";
     mode.textContent = "Passive";
+    const speedControls = appendElement(metaRight, "div", "af-speed-controls");
+    const speedLower = appendButton(speedControls, "-", "afSpeedLower");
+    speedLower.className = "af-speed-step";
+    speedLower.setAttribute("aria-label", "Decrease playback speed");
+    speedLower.title = "Decrease playback speed (, or -)";
+    const speedLabel = appendElement(speedControls, "span", "af-speed-label");
+    speedLabel.dataset.afSpeedLabel = "";
+    speedLabel.textContent = "1.00x";
+    const speedHigher = appendButton(speedControls, "+", "afSpeedHigher");
+    speedHigher.className = "af-speed-step";
+    speedHigher.setAttribute("aria-label", "Increase playback speed");
+    speedHigher.title = "Increase playback speed (. or +)";
     const themeButton = appendButton(metaRight, "", "afThemeToggle");
     themeButton.className = "af-icon-button af-theme-toggle";
     themeButton.setAttribute("aria-label", "Theme");
@@ -803,22 +815,12 @@
     nextButton.innerHTML = `${iconSvg("next")}<span class="af-button-shortcut">→</span><span class="af-sr-only">Next</span>`;
     nextButton.setAttribute("aria-label", "Next phrase");
     nextButton.title = "Next phrase (ArrowRight)";
-    const speedControls = appendElement(practiceControls, "div", "af-speed-controls");
-    const speedLower = appendButton(speedControls, "-", "afSpeedLower");
-    speedLower.className = "af-speed-step";
-    speedLower.setAttribute("aria-label", "Decrease playback speed");
-    const speedLabel = appendElement(speedControls, "span", "af-speed-label");
-    speedLabel.dataset.afSpeedLabel = "";
-    speedLabel.textContent = "1.00x";
-    const speedHigher = appendButton(speedControls, "+", "afSpeedHigher");
-    speedHigher.className = "af-speed-step";
-    speedHigher.setAttribute("aria-label", "Increase playback speed");
 
     const displayControls = appendElement(controls, "div", "af-control-group af-display-controls");
     const originalButton = appendButton(displayControls, "Show Original", "afToggle");
     originalButton.title = "Show or hide original text (S)";
     const translationButton = appendButton(displayControls, "Show Translation", "afPhraseTranslation");
-    translationButton.title = "Show phrase translation (T)";
+    translationButton.title = "Show phrase translation (T or 0)";
     createIssueReportDialog(panel);
     const resizeHandle = appendElement(panel, "button", "af-panel-resize-handle");
     resizeHandle.type = "button";
@@ -1372,8 +1374,8 @@
 
   function phraseTranslationControlTitle(translation) {
     const mode = state.practiceMode === "shadow" && state.phraseTranslationStickyVisible
-      ? "Translation: sticky. Shift+T turns sticky mode off."
-      : "Translation: current phrase. Shift+T toggles sticky mode.";
+      ? "Translation: sticky. T or 0 toggles current phrase; Shift+T turns sticky mode off."
+      : "Translation: current phrase. Press T or 0. Shift+T toggles sticky mode.";
     if (translation?.status === "ready") return mode;
     if (translation?.status === "loading") return `${mode} Phrase translation is loading.`;
     if (state.accountStatus !== "signed-in") return `${mode} Connect 2000NL to translate phrases.`;
@@ -1403,11 +1405,11 @@
   }
 
   function translationControlLabel() {
-    if (state.practiceMode === "recall") return "Prompt (T)";
+    if (state.practiceMode === "recall") return "Prompt (T/0)";
     if (state.phraseTranslationStickyVisible) {
-      return state.phraseTranslationVisible ? "Translation sticky (T)" : "Translation current (T)";
+      return state.phraseTranslationVisible ? "Translation sticky (T/0)" : "Translation current (T/0)";
     }
-    return state.phraseTranslationVisible ? "Translation current (T)" : "Translate (T)";
+    return state.phraseTranslationVisible ? "Translation current (T/0)" : "Translate (T/0)";
   }
 
   function renderDisplayPreferenceControls(controls) {
@@ -6286,7 +6288,13 @@
     } else if (event.code === "KeyS") {
       blockYouTubeShortcutWithOptions(event);
       toggleText(event);
-    } else if (event.code === "KeyT") {
+    } else if (isSpeedDecreaseKey(event)) {
+      blockYouTubeShortcutWithOptions(event);
+      adjustVideoPlaybackRate(-PLAYBACK_RATE_STEP);
+    } else if (isSpeedIncreaseKey(event)) {
+      blockYouTubeShortcutWithOptions(event);
+      adjustVideoPlaybackRate(PLAYBACK_RATE_STEP);
+    } else if (isTranslationKey(event)) {
       blockYouTubeShortcutWithOptions(event);
       togglePhraseTranslation(event);
     } else if (event.code === "Digit1") {
@@ -6334,6 +6342,26 @@
     return event.code === "Space" || event.key === " " || event.key === "Spacebar";
   }
 
+  function isSpeedDecreaseKey(event) {
+    return event.code === "Comma" || event.code === "Minus" || event.code === "NumpadSubtract";
+  }
+
+  function isSpeedIncreaseKey(event) {
+    return event.code === "Period" || event.code === "Equal" || event.code === "NumpadAdd";
+  }
+
+  function isTranslationKey(event) {
+    return event.code === "KeyT" || event.code === "Digit0" || event.code === "Numpad0";
+  }
+
+  function allowsShiftShortcut(event) {
+    return event.code === "KeyS"
+      || event.code === "KeyT"
+      || event.code === "ArrowDown"
+      || isSpeedDecreaseKey(event)
+      || isSpeedIncreaseKey(event);
+  }
+
   function blockYouTubeShortcut(event) {
     blockYouTubeShortcutWithOptions(event, { immediate: true });
   }
@@ -6348,7 +6376,7 @@
 
   function shouldIgnoreKeyEvent(event) {
     if (event.metaKey || event.ctrlKey || event.altKey) return true;
-    if (event.shiftKey && event.code !== "KeyS" && event.code !== "KeyT" && event.code !== "ArrowDown") return true;
+    if (event.shiftKey && !allowsShiftShortcut(event)) return true;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
     const tagName = target.tagName.toLowerCase();

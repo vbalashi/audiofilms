@@ -1291,15 +1291,20 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-speed-controls {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 3px;
   min-width: 118px;
-  height: 32px;
+  height: 30px;
   padding: 0 4px;
   color: var(--af-muted);
   background: var(--af-control);
   border: 1px solid var(--af-border);
   border-radius: 6px;
+}
+
+.af-ribbon-meta-right .af-speed-controls {
+  min-width: 112px;
 }
 
 .af-speed-step {
@@ -2257,9 +2262,8 @@ transcript-segment-view-model[data-af-current="true"] .ytwTranscriptSegmentViewM
     flex: 1 1 0;
   }
 
-  .af-speed-controls {
-    flex: 1 1 100%;
+  .af-ribbon-meta-right .af-speed-controls {
     justify-content: center;
-    max-width: 100%;
+    min-width: 108px;
   }
 }

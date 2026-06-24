@@ -533,6 +533,18 @@ function assertPlaybackSpeedUi() {
   clickShadowButton("[data-af-speed-lower]");
   sleep(300);
   const restoredNormal = readGeometrySnapshot();
+  pressKey("Period", ".");
+  sleep(250);
+  const periodFaster = readGeometrySnapshot();
+  pressKey("Comma", ",");
+  sleep(250);
+  const commaRestored = readGeometrySnapshot();
+  pressKey("Equal", "+", { shiftKey: true });
+  sleep(250);
+  const plusFaster = readGeometrySnapshot();
+  pressKey("Minus", "-");
+  sleep(250);
+  const minusRestored = readGeometrySnapshot();
 
   clickShadowButton("[data-af-settings-toggle]");
   sleep(200);
@@ -551,6 +563,10 @@ function assertPlaybackSpeedUi() {
     assertion("speed control starts at normal rate", Math.abs(start.playbackSpeed?.videoRate - 1) < 0.01, JSON.stringify(start.playbackSpeed)),
     assertion("speed increase uses 0.05 step", Math.abs(faster.playbackSpeed?.videoRate - 1.05) < 0.01, JSON.stringify(faster.playbackSpeed)),
     assertion("speed decrease restores normal rate", Math.abs(restoredNormal.playbackSpeed?.videoRate - 1) < 0.01, JSON.stringify(restoredNormal.playbackSpeed)),
+    assertion("period shortcut increases speed", Math.abs(periodFaster.playbackSpeed?.videoRate - 1.05) < 0.01, JSON.stringify(periodFaster.playbackSpeed)),
+    assertion("comma shortcut decreases speed", Math.abs(commaRestored.playbackSpeed?.videoRate - 1) < 0.01, JSON.stringify(commaRestored.playbackSpeed)),
+    assertion("plus shortcut increases speed", Math.abs(plusFaster.playbackSpeed?.videoRate - 1.05) < 0.01, JSON.stringify(plusFaster.playbackSpeed)),
+    assertion("minus shortcut decreases speed", Math.abs(minusRestored.playbackSpeed?.videoRate - 1) < 0.01, JSON.stringify(minusRestored.playbackSpeed)),
     assertion("speed label reflects video rate", /1\.00x/.test(restoredNormal.playbackSpeed?.label || ""), JSON.stringify(restoredNormal.playbackSpeed)),
     assertion("settings exposes slow replay speed", settings.playbackSpeed?.slowReplayLabel === "0.75x", JSON.stringify(settings.playbackSpeed)),
     assertion("Shift+ArrowDown applies slow replay speed", Math.abs(slowActive.playbackSpeed?.videoRate - 0.75) < 0.01, JSON.stringify(slowActive.playbackSpeed)),
@@ -734,6 +750,12 @@ function assertDisplayStickyUi() {
   pressKey("KeyT", "t");
   sleep(500);
   const translationCurrentOpen = readGeometrySnapshot();
+  pressKey("Digit0", "0");
+  sleep(300);
+  const translationZeroClosed = readGeometrySnapshot();
+  pressKey("Digit0", "0");
+  sleep(500);
+  const translationZeroOpen = readGeometrySnapshot();
   clickShadowButton("[data-af-next]");
   sleep(500);
   const translationNext = readGeometrySnapshot();
@@ -757,6 +779,8 @@ function assertDisplayStickyUi() {
     assertion("next keeps sticky original hidden", originalStickyNext.phraseTranslation?.originalMasked === true && originalStickyNext.phraseTranslation?.originalSticky === false, JSON.stringify(originalStickyNext.phraseTranslation)),
     assertion("Shift+S restores sticky original", originalStickyRestored.phraseTranslation?.originalMasked === false && originalStickyRestored.phraseTranslation?.originalSticky === true, JSON.stringify(originalStickyRestored.phraseTranslation)),
     assertion("T shows translation for current phrase only", translationCurrentOpen.phraseTranslation?.visible === true && translationCurrentOpen.phraseTranslation?.sticky === false, JSON.stringify(translationCurrentOpen.phraseTranslation)),
+    assertion("0 hides current translation", translationZeroClosed.phraseTranslation?.visible === false && translationZeroClosed.phraseTranslation?.sticky === false, JSON.stringify(translationZeroClosed.phraseTranslation)),
+    assertion("0 shows current translation", translationZeroOpen.phraseTranslation?.visible === true && translationZeroOpen.phraseTranslation?.sticky === false, JSON.stringify(translationZeroOpen.phraseTranslation)),
     assertion("next clears current-only translation", translationNext.phraseTranslation?.visible === false && translationNext.phraseTranslation?.sticky === false, JSON.stringify(translationNext.phraseTranslation)),
     assertion("Shift+T turns sticky translation on", translationStickyOpen.phraseTranslation?.visible === true && translationStickyOpen.phraseTranslation?.sticky === true, JSON.stringify(translationStickyOpen.phraseTranslation)),
     assertion("next keeps sticky translation visible", translationStickyNext.phraseTranslation?.visible === true && translationStickyNext.phraseTranslation?.sticky === true, JSON.stringify(translationStickyNext.phraseTranslation)),
@@ -774,7 +798,7 @@ function assertControlHierarchyUi() {
     assertion("phrase navigation is centered", controls.practiceCenterOffset <= 32, JSON.stringify(controls)),
     assertion("phrase navigation is primary width", controls.practiceWidth > controls.modeWidth && controls.practiceWidth >= controls.displayWidth, JSON.stringify(controls)),
     assertion("display controls stay right of navigation", controls.displayLeft >= controls.practiceRight, JSON.stringify(controls)),
-    assertion("display controls include shortcut labels", /\(S\)/.test(controls.displayText || "") && /\(T\)/.test(controls.displayText || ""), controls.displayText || ""),
+    assertion("display controls include shortcut labels", /\(S\)/.test(controls.displayText || "") && /\(T\/0\)/.test(controls.displayText || ""), controls.displayText || ""),
   ];
 }
 
