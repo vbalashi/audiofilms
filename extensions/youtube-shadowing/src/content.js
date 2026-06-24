@@ -2246,6 +2246,20 @@
     closeOpenMenus();
   }
 
+  function onDocumentPointerUp(event) {
+    if (!state.spanSelectionDraft) return;
+    if (isSpanDraftWordEvent(event)) return;
+    clearSpanSelectionDraft();
+  }
+
+  function isSpanDraftWordEvent(event) {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    return path.some((element) => (
+      element instanceof Element
+      && element.matches?.(".af-ribbon-word[data-af-phrase-index][data-af-token-index]")
+    ));
+  }
+
   function isMenuInteractionEvent(event) {
     const path = typeof event.composedPath === "function" ? event.composedPath() : [];
     return path.some((element) => (
@@ -6395,6 +6409,11 @@
     if (event.type !== "keydown") return;
 
     if (event.code === "Escape") {
+      if (state.spanSelectionDraft) {
+        clearSpanSelectionDraft();
+        blockYouTubeShortcutWithOptions(event);
+        return;
+      }
       if (closeOpenMenus()) {
         blockYouTubeShortcutWithOptions(event);
       }
@@ -6571,6 +6590,7 @@
   document.addEventListener("keypress", onKeyboardEvent, true);
   document.addEventListener("keyup", onKeyboardEvent, true);
   document.addEventListener("pointerdown", onDocumentPointerDown, true);
+  document.addEventListener("pointerup", onDocumentPointerUp, true);
   window.addEventListener("keydown", onKeyboardEvent, true);
   window.addEventListener("keypress", onKeyboardEvent, true);
   window.addEventListener("keyup", onKeyboardEvent, true);

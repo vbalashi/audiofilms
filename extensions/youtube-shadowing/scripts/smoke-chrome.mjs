@@ -824,6 +824,8 @@ function assertControlHierarchyUi() {
 }
 
 function assertSpanSelectionUi() {
+  const escapeCancel = previewThenEscapeFirstPhraseSpan();
+  const outsideCancel = previewThenReleaseOutsideFirstPhraseSpan();
   const drag = dragFirstPhraseSpan();
   sleep(900);
   const spanGeometry = readGeometrySnapshot();
@@ -836,6 +838,8 @@ function assertSpanSelectionUi() {
   waitForDictionary(5000);
 
   return [
+    assertion("span draft clears on Escape", escapeCancel.draftWordsBefore >= 2 && escapeCancel.draftWordsAfter === 0, JSON.stringify(escapeCancel)),
+    assertion("span draft clears on outside pointerup", outsideCancel.draftWordsBefore >= 2 && outsideCancel.draftWordsAfter === 0, JSON.stringify(outsideCancel)),
     assertion("span drag selected consecutive words", drag.selected === true, JSON.stringify(drag)),
     assertion("span drag previews draft range before release", drag.draftWords >= 2, JSON.stringify(drag)),
     assertion("span selection opens translation card", spanGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanGeometry.dictionaryUi)),
@@ -2007,6 +2011,86 @@ function dragFirstPhraseSpan() {
       second.dataset.afLookupWord || second.textContent || "",
     ],
   });
+})()
+  `);
+  return JSON.parse(raw);
+}
+
+function previewThenEscapeFirstPhraseSpan() {
+  const raw = chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const words = Array.from(root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word") || [])
+    .filter((word) => (word.dataset.afLookupWord || "").length > 1);
+  const first = words[0];
+  const second = words[1];
+  if (!first || !second) {
+    return JSON.stringify({ draftWordsBefore: 0, draftWordsAfter: 0, detail: "not-enough-words" });
+  }
+  first.dispatchEvent(new PointerEvent("pointerdown", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 1,
+  }));
+  second.dispatchEvent(new PointerEvent("pointerenter", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 1,
+  }));
+  const draftWordsBefore = root.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-draft").length;
+  document.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Escape",
+    code: "Escape",
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }));
+  const draftWordsAfter = root.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-draft").length;
+  return JSON.stringify({ draftWordsBefore, draftWordsAfter });
+})()
+  `);
+  return JSON.parse(raw);
+}
+
+function previewThenReleaseOutsideFirstPhraseSpan() {
+  const raw = chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const words = Array.from(root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word") || [])
+    .filter((word) => (word.dataset.afLookupWord || "").length > 1);
+  const first = words[0];
+  const second = words[1];
+  if (!first || !second) {
+    return JSON.stringify({ draftWordsBefore: 0, draftWordsAfter: 0, detail: "not-enough-words" });
+  }
+  first.dispatchEvent(new PointerEvent("pointerdown", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 1,
+  }));
+  second.dispatchEvent(new PointerEvent("pointerenter", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 1,
+  }));
+  const draftWordsBefore = root.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-draft").length;
+  document.dispatchEvent(new PointerEvent("pointerup", {
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    button: 0,
+    buttons: 0,
+  }));
+  const draftWordsAfter = root.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-draft").length;
+  return JSON.stringify({ draftWordsBefore, draftWordsAfter });
 })()
   `);
   return JSON.parse(raw);
