@@ -43,6 +43,7 @@ export async function POST(request: Request) {
     {
       clickedForm,
       languageCode,
+      ...(typeof body?.draftSetId === 'string' ? { draftSetId: body.draftSetId } : {}),
       ...(typeof body?.contextText === 'string' ? { contextText: body.contextText } : {}),
       ...(body?.sourceContext && typeof body.sourceContext === 'object'
         ? { sourceContext: body.sourceContext }

@@ -26,9 +26,10 @@ export async function POST(request: Request) {
       : typeof body?.languageCode === 'string'
         ? body.languageCode.trim()
         : '';
-  const generated = body?.generated && typeof body.generated === 'object'
-    ? body.generated
-    : null;
+  const draftSetId = typeof body?.draftSetId === 'string' ? body.draftSetId.trim() : '';
+  const candidateId = typeof body?.candidateId === 'string' ? body.candidateId.trim() : '';
+  const revision = Number.isInteger(body?.revision) ? body.revision : null;
+  const item = body?.item && typeof body.item === 'object' ? body.item : null;
 
   if (!clickedForm) {
     return jsonResponse(request, { error: 'missing_clicked_form' }, { status: 400 });
@@ -36,8 +37,8 @@ export async function POST(request: Request) {
   if (!languageCode) {
     return jsonResponse(request, { error: 'missing_source_language_code' }, { status: 400 });
   }
-  if (!generated) {
-    return jsonResponse(request, { error: 'missing_generated_content' }, { status: 400 });
+  if (!draftSetId || !candidateId || !revision || !item) {
+    return jsonResponse(request, { error: 'missing_draft_candidate' }, { status: 400 });
   }
 
   const outcome = await postTwoThousandNlPlatformJson(
@@ -45,7 +46,10 @@ export async function POST(request: Request) {
     {
       clickedForm,
       languageCode,
-      generated,
+      draftSetId,
+      candidateId,
+      revision,
+      item,
       ...(typeof body?.contextText === 'string' ? { contextText: body.contextText } : {}),
       ...(body?.sourceContext && typeof body.sourceContext === 'object'
         ? { sourceContext: body.sourceContext }

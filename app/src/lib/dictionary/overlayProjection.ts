@@ -297,7 +297,7 @@ function displayActionsForCapabilities(
     if (actions.has('save-and-start-learning')) {
       displayActions.push({
         id: 'save-and-learn',
-        label: 'Save & learn',
+        label: 'Start Learning',
         group: 'progress',
         command: { kind: 'generated-save-and-start-learning' },
       });

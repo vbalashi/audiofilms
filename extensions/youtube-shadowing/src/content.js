@@ -3686,8 +3686,14 @@
     const definitions = selectedWord.lookupResult?.definitions || [];
     if (!result) {
       lookup.classList.add("is-empty");
-      lookupTitle.textContent = "No match";
-      lookupCopy.textContent = "No dictionary match was returned for this word.";
+      const draftCard = generatedDraftCard(selectedWord.generatedDraft);
+      if (draftCard) {
+        lookupTitle.textContent = draftCard.headword || selectedWord.word;
+        lookupCopy.textContent = draftCard.language || "Generated card";
+      } else {
+        lookupTitle.textContent = "No match";
+        lookupCopy.textContent = "No dictionary match was returned for this word.";
+      }
       renderGeneratedFallback(lookup, selectedWord);
       return;
     }
@@ -3723,7 +3729,7 @@
 
     const fallback = appendElement(parent, "div", "af-dictionary-card af-generated-fallback-card");
     const title = appendElement(fallback, "div", "af-dictionary-card-title");
-    title.textContent = "Generated learner card";
+    title.textContent = "Create learner card";
     const copy = appendElement(fallback, "p", "af-dictionary-copy");
 
     if (state.accountStatus !== "signed-in") {
@@ -3739,20 +3745,7 @@
     }
 
     if (selectedWord.generatedDraft) {
-      const generated = selectedWord.generatedDraft.generated || {};
-      copy.textContent = generated.definition || "Generated draft is ready.";
-      if (generated.example?.source) {
-        const example = appendElement(fallback, "p", "af-dictionary-copy");
-        example.textContent = generated.example.source;
-      }
-      const save = appendButton(
-        fallback,
-        selectedWord.generatedDraftStatus === "saving" ? "Saving..." : "Save & learn",
-        "afGeneratedSave",
-      );
-      save.className = "af-lookup-retry";
-      save.disabled = selectedWord.generatedDraftStatus === "saving";
-      save.addEventListener("click", () => saveGeneratedDictionaryDraft(selectedWord));
+      copy.textContent = "Generated draft did not include a renderable learner card.";
     } else {
       copy.textContent = "Create a draft explanation in Dutch, then choose whether to save it.";
       const generate = appendButton(fallback, "Generate learner card", "afGeneratedDraft");
@@ -4292,7 +4285,16 @@
   async function saveGeneratedDictionaryDraft(selectedWord) {
     if (!isCurrentLookup(selectedWord)) return;
     const draft = selectedWord.generatedDraft;
-    const payload = generatedEntryBasePayload(selectedWord, draft?.generated);
+    const draftPayload = generatedDraftPayload(draft);
+    if (!draftPayload) {
+      state.selectedWord = {
+        ...state.selectedWord,
+        generatedDraftError: "Generated draft is missing candidate identity.",
+      };
+      render();
+      return;
+    }
+    const payload = generatedEntryBasePayload(selectedWord, draft);
     if (!payload.ok) {
       state.selectedWord = {
         ...state.selectedWord,
@@ -4340,7 +4342,7 @@
     }
   }
 
-  function generatedEntryBasePayload(selectedWord, generated = null) {
+  function generatedEntryBasePayload(selectedWord, draft = null) {
     const phrase = selectedWord.sourceBinding?.phrase ||
       state.phrases[selectedWord.phraseIndex] ||
       state.phrases[state.currentIndex];
@@ -4358,9 +4360,19 @@
         sourceLanguageCode: language,
         contextText: phrase?.text || "",
         sourceContext: generatedEntrySourceContext(selectedWord),
-        ...(generated ? { generated } : {}),
+        ...(generatedDraftPayload(draft) || {}),
       },
     };
+  }
+
+  function generatedDraftPayload(draft) {
+    if (!draft || typeof draft !== "object") return null;
+    const item = draft.item && typeof draft.item === "object" ? draft.item : null;
+    const draftSetId = typeof draft.draftSetId === "string" ? draft.draftSetId : "";
+    const candidateId = typeof draft.candidateId === "string" ? draft.candidateId : "";
+    const revision = Number.isInteger(draft.revision) ? draft.revision : null;
+    if (!item || !draftSetId || !candidateId || !revision) return null;
+    return { draftSetId, candidateId, revision, item };
   }
 
   function generatedEntrySourceContext(selectedWord, entryId = "") {
@@ -4802,18 +4814,40 @@
       return jsonCommandResponse({
         ok: true,
         draft: {
+          draftSetId: "mock-draft-set",
+          candidateId: "mock-candidate",
+          revision: 1,
           clickedForm: body?.clickedForm || "appel",
           languageCode: body?.sourceLanguageCode || "nl",
           contextText: body?.contextText || "",
           sourceContext: body?.sourceContext,
-          generated: {
-            definition: "Een gegenereerde uitleg voor deze selectie.",
-            example: { source: body?.contextText || "Dit is een voorbeeld." },
-            provider: "mock",
-            model: "mock-generated-entry",
-            promptVersion: "generated-user-entry-v1",
-            generatedAt: new Date().toISOString(),
-            contentFingerprint: "mock-generated-entry",
+          item: {
+            draftSetId: "mock-draft-set",
+            candidateId: "mock-candidate",
+            revision: 1,
+            entry: {
+              content: {
+                headword: body?.clickedForm || "appel",
+                languageCode: body?.sourceLanguageCode || "nl",
+                sections: [
+                  {
+                    id: "meaning-1",
+                    kind: "meaning",
+                    text: "Een gegenereerde uitleg voor deze selectie.",
+                  },
+                  {
+                    id: "example-1",
+                    kind: "example",
+                    text: body?.contextText || "Dit is een voorbeeld.",
+                  },
+                ],
+                summary: {
+                  definition: "Een gegenereerde uitleg voor deze selectie.",
+                  example: body?.contextText || "Dit is een voorbeeld.",
+                },
+              },
+              contentFingerprint: "mock-generated-entry",
+            },
           },
           card: mockGeneratedDraftCard(body),
         },
@@ -4900,7 +4934,7 @@
       progressActions: [
         {
           id: "save-and-learn",
-          label: "Save & learn",
+          label: "Start Learning",
           group: "progress",
           enabled: true,
           command: { kind: "generated-save-and-start-learning" },

@@ -102,7 +102,7 @@ export type DictionaryOverlayCardV2 = {
   } | null;
   displayActions: Array<{
     id: 'learn' | 'known' | 'again' | 'hard' | 'good' | 'easy' | 'translate' | 'save-and-learn';
-    label: 'Learn' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy' | 'Translate' | 'Save & learn';
+    label: 'Learn' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy' | 'Translate' | 'Start Learning';
     group: 'progress' | 'translation';
     command:
       | {

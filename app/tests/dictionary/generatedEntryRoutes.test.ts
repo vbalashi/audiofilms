@@ -123,6 +123,7 @@ describe('/api/dict/generated-entry proxy routes', () => {
               },
               cardCapabilitiesByType: {
                 'word-to-definition': {
+                  phase: 'draft',
                   actions: ['save-and-start-learning'],
                 },
               },
@@ -154,7 +155,7 @@ describe('/api/dict/generated-entry proxy routes', () => {
       displayActions: [
         {
           id: 'save-and-learn',
-          label: 'Save & learn',
+          label: 'Start Learning',
           group: 'progress',
           command: { kind: 'generated-save-and-start-learning' },
         },
@@ -183,11 +184,30 @@ describe('/api/dict/generated-entry proxy routes', () => {
         clickedForm: 'gedoe',
         sourceLanguageCode: 'nl',
         contextText: 'Wat een gedoe.',
-        generated: {
-          definition: 'Een hoop gedoe.',
-          provider: 'openai',
-          model: 'gpt-test',
-          promptVersion: 'generated-user-entry-v1',
+        draftSetId: 'gds-1',
+        candidateId: 'gdc-1',
+        revision: 1,
+        item: {
+          entry: {
+            contentFingerprint: 'fingerprint-1',
+            content: {
+              headword: 'gedoe',
+              languageCode: 'nl',
+              sections: [
+                {
+                  id: 'meaning-1',
+                  kind: 'meaning',
+                  text: 'Een hoop gedoe.',
+                },
+              ],
+              summary: { definition: 'Een hoop gedoe.' },
+            },
+          },
+          generation: {
+            provider: 'openai',
+            model: 'gpt-test',
+            promptVersion: 'generated-user-entry-v1',
+          },
         },
       }),
     );
@@ -206,11 +226,30 @@ describe('/api/dict/generated-entry proxy routes', () => {
       clickedForm: 'gedoe',
       languageCode: 'nl',
       contextText: 'Wat een gedoe.',
-      generated: {
-        definition: 'Een hoop gedoe.',
-        provider: 'openai',
-        model: 'gpt-test',
-        promptVersion: 'generated-user-entry-v1',
+      draftSetId: 'gds-1',
+      candidateId: 'gdc-1',
+      revision: 1,
+      item: {
+        entry: {
+          contentFingerprint: 'fingerprint-1',
+          content: {
+            headword: 'gedoe',
+            languageCode: 'nl',
+            sections: [
+              {
+                id: 'meaning-1',
+                kind: 'meaning',
+                text: 'Een hoop gedoe.',
+              },
+            ],
+            summary: { definition: 'Een hoop gedoe.' },
+          },
+        },
+        generation: {
+          provider: 'openai',
+          model: 'gpt-test',
+          promptVersion: 'generated-user-entry-v1',
+        },
       },
     });
   });

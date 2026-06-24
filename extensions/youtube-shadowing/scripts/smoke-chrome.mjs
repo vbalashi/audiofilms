@@ -935,7 +935,7 @@ function assertGeneratedDraftCardUi() {
     assertion("generated lookup word clicked", clicked.clicked, clicked.detail),
     assertion("generated no-match state exposes generate action", noMatch.dictionaryUi?.generatedFallbackCardCount === 1, JSON.stringify(noMatch.dictionaryUi)),
     assertion("generated draft renders as overlay card", generated.dictionaryUi?.overlayCardCount === 1, JSON.stringify(generated.dictionaryUi)),
-    assertion("generated draft card has generated action", (generated.dictionaryUi?.cards?.[0]?.progressActions || []).includes("Save & learn"), JSON.stringify(generated.dictionaryUi?.cards || [])),
+    assertion("generated draft card has generated action", (generated.dictionaryUi?.cards?.[0]?.progressActions || []).includes("Start Learning"), JSON.stringify(generated.dictionaryUi?.cards || [])),
     assertion("generated draft removes bespoke fallback block", generated.dictionaryUi?.generatedFallbackCardCount === 0, JSON.stringify(generated.dictionaryUi)),
   ];
 }
