@@ -371,7 +371,12 @@ function timingHeaders(
   if (timing.platformServerTiming) {
     values.push(`af_platform_server;desc="${sanitizeServerTiming(timing.platformServerTiming)}"`);
   }
-  return { 'Server-Timing': values.join(', ') };
+  return {
+    'Server-Timing': values.join(', '),
+    ...(timing.platformServerTiming
+      ? { 'X-AF-Platform-Server-Timing': sanitizeHeaderValue(timing.platformServerTiming) }
+      : {}),
+  };
 }
 
 function timingMetric(name: string, value: number) {
@@ -379,7 +384,11 @@ function timingMetric(name: string, value: number) {
 }
 
 function sanitizeServerTiming(value: string) {
-  return value.replace(/["\\\r\n]/g, ' ').slice(0, 180);
+  return value.replace(/["\\\r\n]/g, ' ').slice(0, 600);
+}
+
+function sanitizeHeaderValue(value: string) {
+  return value.replace(/[\r\n]/g, ' ').slice(0, 2000);
 }
 
 function logLookupTiming(

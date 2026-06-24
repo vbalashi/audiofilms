@@ -338,6 +338,7 @@ async function fetchDictionaryCommand(operation, body = null) {
       fetchMs,
       authenticated: Boolean(session.ok && session.accessToken && headers.authorization),
       serverTiming: response.headers.get("server-timing") || "",
+      platformServerTiming: response.headers.get("x-af-platform-server-timing") || "",
     },
   };
 }
