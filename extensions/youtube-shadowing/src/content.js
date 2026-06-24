@@ -3287,6 +3287,11 @@
     clearElement(body);
     if (state.selectedSpan) {
       renderSelectedSpanCard(body);
+      if (state.selectedWord) {
+        renderSelectedWordCard(body);
+      } else {
+        renderSelectedSpanLookupPrompt(body);
+      }
     } else if (state.selectedWord) {
       renderSelectedWordCard(body);
     } else {
@@ -3396,11 +3401,6 @@
     const title = appendElement(card, "div", "af-dictionary-card-title");
     title.textContent = span.text;
 
-    const source = appendElement(card, "p", "af-dictionary-copy af-span-source");
-    source.textContent = span.contextText && span.contextText !== span.text
-      ? `Context: ${span.contextText}`
-      : "Current practice phrase";
-
     if (span.status === "loading") {
       const loading = appendElement(card, "p", "af-dictionary-copy");
       loading.textContent = "Translating selected words...";
@@ -3423,6 +3423,8 @@
           charStart: token.charStart,
           charEnd: token.charEnd,
           originalToken: token.originalToken,
+        }, {
+          preserveSelectedSpan: true,
         });
       });
     }
@@ -3431,6 +3433,14 @@
     const clear = appendButton(actions, "Clear selection", "afSpanClear");
     clear.className = "af-secondary-button";
     clear.addEventListener("click", clearSelectedSpan);
+  }
+
+  function renderSelectedSpanLookupPrompt(parent) {
+    const lookup = appendElement(parent, "div", "af-lookup-placeholder af-span-word-lookup-prompt");
+    const lookupTitle = appendElement(lookup, "div", "af-lookup-placeholder-title");
+    lookupTitle.textContent = "Dictionary result";
+    const lookupCopy = appendElement(lookup, "p", "af-dictionary-copy");
+    lookupCopy.textContent = "Click a word in the selected phrase.";
   }
 
   function renderReadyDictionaryCards(parent, selectedWord) {
@@ -3479,7 +3489,9 @@
       const retry = appendButton(lookup, "Retry lookup", "afLookupRetry");
       retry.className = "af-lookup-retry";
       retry.addEventListener("click", () => {
-        selectLookupWord(selectedWord.word, selectedWord.phraseIndex, selectedWord.selection);
+        selectLookupWord(selectedWord.word, selectedWord.phraseIndex, selectedWord.selection, {
+          preserveSelectedSpan: Boolean(selectedWord.preserveSelectedSpan && state.selectedSpan),
+        });
       });
       if (selectedWord.translateUrl) {
         const link = appendElement(lookup, "a", "af-dictionary-link");
@@ -3919,19 +3931,22 @@
     }
   }
 
-  function selectLookupWord(word, phraseIndex, selection = {}) {
+  function selectLookupWord(word, phraseIndex, selection = {}, options = {}) {
     const lookupSeq = state.dictionaryLookupSeq + 1;
     const sourceBinding = createDictionarySourceBinding(word, phraseIndex, selection);
     state.dictionaryLookupSeq = lookupSeq;
     state.exampleExpansionOverrides = {};
     state.visibleTranslationsByCardId = {};
     state.cardActionFeedbackByCardId = {};
-    state.selectedSpan = null;
+    if (!options.preserveSelectedSpan) {
+      state.selectedSpan = null;
+    }
     state.selectedWord = {
       word,
       phraseIndex,
       selection,
       sourceBinding,
+      preserveSelectedSpan: Boolean(options.preserveSelectedSpan),
       lookupSeq,
       lookupStatus: "loading",
       lookupResult: null,

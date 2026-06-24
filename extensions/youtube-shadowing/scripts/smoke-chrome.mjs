@@ -714,6 +714,8 @@ function assertSpanSelectionUi() {
   const drag = dragFirstPhraseSpan();
   sleep(900);
   const spanGeometry = readGeometrySnapshot();
+  clickShadowButton(".af-span-word");
+  const spanWordLookupGeometry = waitForGeometryDictionaryCards(5000);
   clickShadowButton("[data-af-span-clear]");
   sleep(650);
   const clearedGeometry = readGeometrySnapshot();
@@ -725,8 +727,11 @@ function assertSpanSelectionUi() {
     assertion("span drag previews draft range before release", drag.draftWords >= 2, JSON.stringify(drag)),
     assertion("span selection opens translation card", spanGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span translation keeps original words clickable", spanGeometry.dictionaryUi?.spanWordCount >= 2, JSON.stringify(spanGeometry.dictionaryUi)),
+    assertion("span card omits redundant context line", spanGeometry.dictionaryUi?.hasSpanContext === false, JSON.stringify(spanGeometry.dictionaryUi)),
+    assertion("span word lookup keeps selected phrase pinned", spanWordLookupGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanWordLookupGeometry.dictionaryUi)),
+    assertion("span word lookup renders dictionary cards below pinned phrase", spanWordLookupGeometry.dictionaryUi?.overlayCardCount > 0, JSON.stringify(spanWordLookupGeometry.dictionaryUi)),
     assertion("span selection highlights phrase words", spanGeometry.primaryUi?.spanSelectedWords >= 2, JSON.stringify(spanGeometry.primaryUi)),
-    assertion("clear span selection closes dictionary panel", !clearedGeometry.dictionary || clearedGeometry.dictionary.present === false, JSON.stringify(clearedGeometry.dictionary)),
+    assertion("clear span selection removes pinned phrase", clearedGeometry.dictionaryUi?.spanTranslationPresent === false, JSON.stringify(clearedGeometry.dictionaryUi)),
   ];
 }
 
@@ -1313,6 +1318,21 @@ function waitForDictionarySelection(word, timeoutMs) {
   return last || readSnapshot();
 }
 
+function waitForGeometryDictionaryCards(timeoutMs) {
+  const started = Date.now();
+  let last = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readGeometrySnapshot();
+    if (last.dictionaryUi?.spanTranslationPresent && last.dictionaryUi?.overlayCardCount > 0) {
+      return last;
+    }
+    sleep(500);
+  }
+
+  return last || readGeometrySnapshot();
+}
+
 function waitForReplaySnapshot(mode, timeoutMs) {
   const started = Date.now();
   let last = null;
@@ -1567,6 +1587,7 @@ function readGeometrySnapshot() {
         actionStatus: dictionary.querySelector(".af-card-action-status")?.textContent || "",
         actionError: dictionary.querySelector(".af-source-option-error")?.textContent || "",
         spanTranslationPresent: Boolean(dictionary.querySelector(".af-span-translation-card")),
+        hasSpanContext: Boolean(dictionary.querySelector(".af-span-source")?.textContent?.trim()),
         spanWordCount: dictionary.querySelectorAll(".af-span-word").length,
         spanTitle: dictionary.querySelector(".af-span-translation-card .af-dictionary-card-title")?.textContent || "",
         spanText: dictionary.querySelector(".af-span-translation-text")?.textContent || "",
