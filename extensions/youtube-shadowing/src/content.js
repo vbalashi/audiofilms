@@ -4288,6 +4288,10 @@
       payload = null;
     }
 
+    if (!response.ok && isNoMatchLookupPayload(response, payload)) {
+      return payload;
+    }
+
     if (!response.ok) {
       const message = safeLookupErrorMessage(response, payload, text);
       const error = new Error(`Dictionary lookup failed: HTTP ${response.status} ${message}`);
@@ -4296,6 +4300,11 @@
     }
 
     return payload;
+  }
+
+  function isNoMatchLookupPayload(response, payload) {
+    if (response.status !== 404 || !payload) return false;
+    return payload.code === "no_match" || payload.error === "no_match";
   }
 
   function safeLookupErrorMessage(response, payload, text) {
