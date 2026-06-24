@@ -3629,6 +3629,107 @@
       const warning = appendElement(parent, "p", "af-source-option-error");
       warning.textContent = selectedWord.lookupResult.meta.warning;
     }
+    renderGroupedSearchPreviews(parent, selectedWord);
+  }
+
+  function renderGroupedSearchPreviews(parent, selectedWord) {
+    const status = selectedWord.groupedSearchStatus || "idle";
+    if (status === "idle") return;
+
+    const container = appendElement(parent, "div", "af-dictionary-search-groups");
+    const heading = appendElement(container, "div", "af-dictionary-search-heading");
+    heading.textContent = "Search previews";
+
+    if (status === "loading") {
+      const loading = appendElement(container, "p", "af-dictionary-copy");
+      loading.textContent = "Loading examples and related dictionary text...";
+      return;
+    }
+
+    if (status === "unavailable") {
+      const unavailable = appendElement(container, "p", "af-dictionary-copy");
+      unavailable.textContent = selectedWord.groupedSearchError || "Search previews are not ready yet.";
+      return;
+    }
+
+    if (status === "error") {
+      const error = appendElement(container, "p", "af-source-option-error");
+      error.textContent = selectedWord.groupedSearchError || "Search previews failed.";
+      return;
+    }
+
+    const groups = (selectedWord.groupedSearchResult?.groups || [])
+      .filter((group) => group.id !== "headwords" && (group.total || group.items?.length));
+    if (!groups.length) {
+      const empty = appendElement(container, "p", "af-dictionary-copy");
+      empty.textContent = "No extra examples or browse results.";
+      return;
+    }
+
+    for (const group of groups) {
+      renderDictionarySearchGroup(container, selectedWord, group);
+    }
+  }
+
+  function renderDictionarySearchGroup(parent, selectedWord, group) {
+    const section = appendElement(parent, "section", "af-dictionary-search-group");
+    const header = appendElement(section, "div", "af-dictionary-search-group-header");
+    const title = appendElement(header, "div", "af-dictionary-search-group-title");
+    title.textContent = dictionarySearchGroupLabel(group.id);
+    const count = appendElement(header, "div", "af-dictionary-search-count");
+    count.textContent = String(group.total || group.items?.length || 0);
+
+    const list = appendElement(section, "div", "af-dictionary-search-items");
+    for (const item of group.items || []) {
+      const row = appendElement(list, "div", "af-dictionary-search-item");
+      const itemTitle = appendElement(row, "div", "af-dictionary-search-item-title");
+      itemTitle.textContent = dictionarySearchItemTitle(item);
+      const text = dictionarySearchItemText(item);
+      if (text) {
+        const copy = appendElement(row, "p", "af-dictionary-search-item-text");
+        copy.textContent = text;
+      }
+    }
+
+    if (group.page?.hasMore && group.page.nextCursor) {
+      const more = appendButton(section, "More results", `afSearchMore-${group.id}`);
+      more.className = "af-dictionary-search-more";
+      more.addEventListener("click", () => {
+        const phrase = selectedWord.sourceBinding?.phrase || state.phrases[selectedWord.phraseIndex] || {};
+        const source = getSelectedPracticeSource();
+        const language = selectedWord.sourceBinding?.captionSource?.languageCode ||
+          source?.loadedTranscriptResult?.languageCode ||
+          source?.languageCode ||
+          "auto";
+        state.selectedWord = {
+          ...state.selectedWord,
+          groupedSearchStatus: "loading",
+          groupedSearchError: "",
+        };
+        render();
+        loadGroupedDictionarySearch(selectedWord, language, phrase.text || "", {
+          group: group.id,
+          cursor: group.page.nextCursor,
+        });
+      });
+    }
+  }
+
+  function dictionarySearchGroupLabel(groupId) {
+    if (groupId === "examples") return "Example sentences";
+    if (groupId === "definitions") return "Within definitions";
+    if (groupId === "alphabetical") return "Alphabetical";
+    return "Headwords";
+  }
+
+  function dictionarySearchItemTitle(item) {
+    const headword = item?.entry?.headword || "";
+    const kind = item?.field?.kind || item?.match?.relation || item?.kind || "";
+    return [headword, kind].filter(Boolean).join(" · ");
+  }
+
+  function dictionarySearchItemText(item) {
+    return item?.field?.text || item?.entry?.summaryDefinition || item?.match?.matchedText || "";
   }
 
   function renderDictionaryLookup(parent) {
@@ -4152,6 +4253,9 @@
       generatedDraft: null,
       generatedDraftError: "",
       translationsByCardId: {},
+      groupedSearchStatus: "idle",
+      groupedSearchResult: null,
+      groupedSearchError: "",
     };
     state.currentIndex = phraseIndex;
     schedulePhraseProgressSave("lookup-word");
@@ -4179,12 +4283,16 @@
         translateUrl: "",
         cardActionStatus: "",
         cardActionError: "",
+        groupedSearchStatus: "loading",
+        groupedSearchResult: null,
+        groupedSearchError: "",
       };
       recordDebugEvent("dictionary-lookup-loaded", {
         word: selectedWord.word,
         language,
         provider: result?.meta?.provider || "",
       });
+      loadGroupedDictionarySearch(selectedWord, language, phrase?.text || "");
     } catch (error) {
       if (!isCurrentLookup(selectedWord)) return;
       const payload = error?.payload || {};
@@ -4205,6 +4313,71 @@
         render();
       }
     }
+  }
+
+  async function loadGroupedDictionarySearch(selectedWord, language, contextText, options = {}) {
+    const group = options.group || null;
+    const cursor = options.cursor || null;
+    try {
+      const result = await fetchDictionarySearchResult({
+        word: selectedWord.word,
+        language,
+        context: contextText || "",
+        group,
+        cursor,
+        limit: group ? 20 : 5,
+      });
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        groupedSearchStatus: "ready",
+        groupedSearchResult: mergeGroupedSearchResult(
+          state.selectedWord.groupedSearchResult,
+          result,
+          group,
+        ),
+        groupedSearchError: "",
+      };
+      recordDebugEvent("dictionary-search-loaded", {
+        word: selectedWord.word,
+        language,
+        group: group || "preview",
+      });
+      render();
+    } catch (error) {
+      if (!isCurrentLookup(selectedWord)) return;
+      const payload = error?.payload || {};
+      const unavailable = payload.error === "search_index_not_ready";
+      state.selectedWord = {
+        ...state.selectedWord,
+        groupedSearchStatus: unavailable ? "unavailable" : "error",
+        groupedSearchError: unavailable
+          ? "Search previews are still being prepared."
+          : payload.error || (error instanceof Error ? error.message : String(error)),
+      };
+      recordDebugEvent("dictionary-search-failed", {
+        word: selectedWord.word,
+        language,
+        error: state.selectedWord.groupedSearchError,
+      });
+      render();
+    }
+  }
+
+  function mergeGroupedSearchResult(current, next, groupId) {
+    if (!groupId || !current?.groups?.length) return next;
+    const incomingGroup = next?.groups?.[0];
+    if (!incomingGroup) return current;
+    return {
+      ...current,
+      groups: current.groups.map((group) => {
+        if (group.id !== groupId) return group;
+        return {
+          ...incomingGroup,
+          items: [...(group.items || []), ...(incomingGroup.items || [])],
+        };
+      }),
+    };
   }
 
   async function performDictionaryCardAction(card, displayAction, actionPayload) {
@@ -4587,6 +4760,38 @@
     return payload;
   }
 
+  async function fetchDictionarySearchResult({ word, language, context, group, cursor, limit }) {
+    const endpoint = dictionaryLookupEndpoint();
+    if (!endpoint) {
+      throw new Error("Dictionary search is disabled.");
+    }
+
+    const response = await requestDictionaryCommand("dict-search", {
+      clickedForm: word,
+      sourceLanguageCode: language || "auto",
+      ...(context ? { contextText: context } : {}),
+      ...(group ? { group } : {}),
+      ...(cursor ? { cursor } : {}),
+      limit: limit || 5,
+    });
+    const text = response.text || "";
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch (_error) {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const message = safeLookupErrorMessage(response, payload, text);
+      const error = new Error(`Dictionary search failed: HTTP ${response.status} ${message}`);
+      error.payload = payload || { error: message };
+      throw error;
+    }
+
+    return payload;
+  }
+
   function isNoMatchLookupPayload(response, payload) {
     if (response.status !== 404 || !payload) return false;
     return payload.code === "no_match" || payload.error === "no_match";
@@ -4782,6 +4987,8 @@
       const url = new URL(endpoint);
       if (operation === "dict-lookup") {
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/lookup");
+      } else if (operation === "dict-search") {
+        url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/search");
       } else if (operation === "dict-action") {
         url.pathname = url.pathname.replace(/\/dict\/?$/, "/dict/actions");
       } else if (operation === "dict-translation") {
@@ -4839,6 +5046,9 @@
         }, false, 404);
       }
       return jsonCommandResponse(mockDictionaryLookup(body));
+    }
+    if (operation === "dict-search") {
+      return jsonCommandResponse(mockDictionarySearch(body));
     }
     if (operation === "dict-translation") {
       if (body?.entryId === "entry-translate-error") {
@@ -4970,6 +5180,69 @@
         provider: "mock",
         version: "dictionary-card-ui-smoke",
       },
+    };
+  }
+
+  function mockDictionarySearch(body = {}) {
+    const query = body?.clickedForm || "appel";
+    const group = body?.group || null;
+    const groups = [
+      {
+        id: "headwords",
+        total: 1,
+        items: [],
+        page: { limit: body?.limit || 5, nextCursor: null, hasMore: false },
+      },
+      {
+        id: "examples",
+        total: 2,
+        items: [
+          {
+            kind: "field-match",
+            resultKey: "entry-learn:raw.meanings[0].examples[0]",
+            entry: { id: "entry-learn", headword: query },
+            field: { kind: "example", text: `Een voorbeeldzin met ${query}.` },
+            match: { matchedText: query },
+          },
+        ],
+        page: { limit: body?.limit || 5, nextCursor: "mock-examples-cursor", hasMore: !body?.cursor },
+      },
+      {
+        id: "definitions",
+        total: 1,
+        items: [
+          {
+            kind: "field-match",
+            resultKey: "entry-learn:raw.meanings[0].definition",
+            entry: { id: "entry-learn", headword: query },
+            field: { kind: "meaning-definition", text: `${query} in een woordenboekbetekenis.` },
+            match: { matchedText: query },
+          },
+        ],
+        page: { limit: body?.limit || 5, nextCursor: null, hasMore: false },
+      },
+      {
+        id: "alphabetical",
+        total: 3,
+        items: [
+          {
+            kind: "entry",
+            entry: { id: "entry-alpha-1", headword: query, summaryDefinition: "alfabetische buur" },
+            match: { relation: "alphabetical", matchedText: query },
+          },
+        ],
+        page: { limit: body?.limit || 5, nextCursor: null, hasMore: false },
+      },
+    ];
+    return {
+      contractVersion: "dictionary-search-v1",
+      query,
+      request: {
+        languageCode: body?.sourceLanguageCode || "nl",
+        scope: "mock",
+        ...(group ? { group } : {}),
+      },
+      groups: group ? groups.filter((candidate) => candidate.id === group) : groups,
     };
   }
 

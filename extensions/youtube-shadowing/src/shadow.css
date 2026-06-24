@@ -663,6 +663,101 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-weight: 850;
 }
 
+.af-dictionary-search-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--af-border);
+}
+
+.af-dictionary-search-heading {
+  color: var(--af-muted);
+  font-family: var(--af-mono);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.af-dictionary-search-group {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: var(--af-panel-soft);
+  border: 1px solid var(--af-border);
+  border-radius: 7px;
+}
+
+.af-dictionary-search-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.af-dictionary-search-group-title {
+  min-width: 0;
+  color: var(--af-text);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.af-dictionary-search-count {
+  flex: 0 0 auto;
+  min-width: 24px;
+  padding: 2px 6px;
+  color: var(--af-muted);
+  background: var(--af-panel);
+  border: 1px solid var(--af-border);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.af-dictionary-search-items {
+  display: grid;
+  gap: 7px;
+}
+
+.af-dictionary-search-item {
+  min-width: 0;
+  padding: 8px;
+  background: var(--af-panel);
+  border: 1px solid var(--af-border);
+  border-radius: 6px;
+}
+
+.af-dictionary-search-item-title {
+  overflow: hidden;
+  color: var(--af-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.af-dictionary-search-item-text {
+  margin: 4px 0 0;
+  color: var(--af-text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.af-dictionary-search-more {
+  justify-self: start;
+  padding: 6px 9px;
+  color: var(--af-accent);
+  background: var(--af-accent-soft);
+  border: 1px solid var(--af-accent);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+}
+
 .af-overlay-card {
   margin-top: 12px;
   padding: 13px;

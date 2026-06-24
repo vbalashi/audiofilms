@@ -391,6 +391,7 @@ function normalizePracticeOperationId(value) {
 function dictionaryCommand(operation) {
   const routes = {
     "dict-lookup": { method: "POST", path: "/api/dict/lookup" },
+    "dict-search": { method: "POST", path: "/api/dict/search" },
     "dict-action": { method: "POST", path: "/api/dict/actions" },
     "dict-translation": { method: "POST", path: "/api/dict/translation" },
     "dict-generated-draft": { method: "POST", path: "/api/dict/generated-entry/draft" },
