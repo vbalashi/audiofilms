@@ -7,6 +7,7 @@ This is the maintained entry point for dictionary-related guidance in this repo.
 ## Current Source Of Truth
 
 - Runtime provider defaults: [app/env.example](/Users/khrustal/dev/audiofilms/app/env.example)
+- Live 2000NL/AudioFilms smoke checks: [2000NL Dictionary Platform Smoke](/Users/khrustal/dev/2000nl/docs/runbooks/dictionary-platform-smoke.md)
 - Dictionary provider factory: [app/src/lib/providers/dictionary/index.ts](/Users/khrustal/dev/audiofilms/app/src/lib/providers/dictionary/index.ts)
 - Provider implementation notes: [app/src/lib/providers/dictionary/README.md](/Users/khrustal/dev/audiofilms/app/src/lib/providers/dictionary/README.md)
 - Architecture boundaries: [ARCHITECTURE.md](/Users/khrustal/dev/audiofilms/ARCHITECTURE.md)
@@ -20,6 +21,7 @@ This is the maintained entry point for dictionary-related guidance in this repo.
 - UI and extension consumers use normalized dictionary payloads from `/api/dict`
 - 2000NL rich consumers render AudioFilms `cards[]`; they do not parse 2000NL `entry.raw`.
 - Explicit 2000NL mutations go through `/api/dict/actions`; per-card translations go through `/api/dict/translation`.
+- AudioFilms proxy smoke requests use `clickedForm` and `sourceLanguageCode`; direct 2000NL Platform requests use `query` and `languageCode`.
 - Vendor-specific logic stays under `app/src/lib/providers/dictionary/`
 
 ## What To Update When Dictionary Behavior Changes

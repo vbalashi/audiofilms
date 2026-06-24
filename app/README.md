@@ -91,6 +91,12 @@ DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
 DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=... # guest read-only catalog lookup
 ```
 
+Use the 2000NL [Dictionary Platform Smoke](/Users/khrustal/dev/2000nl/docs/runbooks/dictionary-platform-smoke.md)
+runbook for direct 2000NL and AudioFilms proxy timing checks. AudioFilms
+`/api/dict/lookup` and `/api/dict/search` expect `clickedForm` and
+`sourceLanguageCode`; the direct 2000NL Platform API expects `query` and
+`languageCode`.
+
 The YouTube extension obtains a 2000NL Connect session and forwards its current
 Bearer token to the AudioFilms `/api/dict*` backend routes for user-state lookup,
 actions, and translation. Do not configure a shared end-user token as production
