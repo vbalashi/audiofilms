@@ -108,6 +108,12 @@ const FIXTURES = [
   },
 ];
 
+const DEFAULT_FIXTURE_NAMES = new Set([
+  "manual-trappist",
+  "english-manual",
+  "no-captions",
+]);
+
 const SPA_FIXTURES = [
   {
     name: "spa-manual-legacy",
@@ -190,8 +196,12 @@ const MULTILINGUAL_SOURCE_SWITCH_FIXTURE = {
 };
 
 const args = new Set(process.argv.slice(2));
+const profile = getArgValue("--profile") || (args.has("--full") ? "full" : "smoke");
+const shouldRunFullSuite = profile === "full";
+const shouldListFixtures = args.has("--list-fixtures");
 const shouldReloadExtension = args.has("--reload-extension");
 const shouldSkipBackendCheck = args.has("--skip-backend-check");
+const shouldRunLocalBackendCheck = args.has("--local-backend-check") && !shouldSkipBackendCheck;
 const shouldSkipSpaCheck = args.has("--skip-spa-check");
 const shouldSkipBackendOffCheck = args.has("--skip-backend-off-check");
 const shouldSkipBackendFailedCheck = args.has("--skip-backend-failed-check");
@@ -207,17 +217,33 @@ const shouldOnlyGeometry = args.has("--only-geometry");
 const fixtureFilter = getArgValue("--only");
 const waitMs = Number(getArgValue("--wait-ms") || 18000);
 
+if (!["smoke", "full"].includes(profile)) {
+  fail(`Unknown --profile=${profile}. Use --profile=smoke or --profile=full.`);
+}
+
+if (shouldListFixtures) {
+  printFixtureList();
+  process.exit(0);
+}
+
 const fixtures = fixtureFilter
   ? FIXTURES.filter((fixture) => fixture.name === fixtureFilter || fixture.videoId === fixtureFilter)
   : (shouldOnlyBackendOff || shouldOnlyBackendFailed || shouldOnlySourceSwitchFailed || shouldOnlyMultilingualSwitch || shouldOnlyGeometry)
     ? []
-  : FIXTURES;
+  : shouldRunFullSuite
+    ? FIXTURES
+    : FIXTURES.filter((fixture) => DEFAULT_FIXTURE_NAMES.has(fixture.name));
 
 if (!fixtures.length && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
   fail(`No fixtures matched --only=${fixtureFilter}`);
 }
 
-if (!shouldSkipBackendCheck) {
+console.log(`AudioFilms YouTube extension ${shouldRunFullSuite ? "full regression" : "smoke"} profile`);
+if (!shouldRunFullSuite && !fixtureFilter) {
+  console.log("Use --full for SPA, backend-degraded, source-switch, multilingual-switch, and geometry regression scenarios.");
+}
+
+if (shouldRunLocalBackendCheck) {
   checkBackend();
 }
 
@@ -232,40 +258,40 @@ for (const fixture of fixtures) {
   printFixtureResult(result);
 }
 
-if (!fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldSkipSpaCheck) {
+if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldSkipSpaCheck) {
   for (const fixture of runSpaNavigationScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((!fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
   for (const fixture of runBackendOffScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((!fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
   for (const fixture of runBackendFailedScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((!fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
   const sourceSwitchFailedResult = runSourceSwitchFailedScenario();
   results.push(sourceSwitchFailedResult);
   printFixtureResult(sourceSwitchFailedResult);
 }
 
-if (((!fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry) {
   const multilingualSwitchResult = runMultilingualSourceSwitchScenario();
   results.push(multilingualSwitchResult);
   printFixtureResult(multilingualSwitchResult);
 }
 
-if ((!fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
+if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
   const geometryResult = runGeometryScenario();
   results.push(geometryResult);
   printFixtureResult(geometryResult);
@@ -277,7 +303,7 @@ if (failed.length) {
   process.exit(1);
 }
 
-console.log(`\nAll ${results.length} YouTube extension smoke fixture(s) passed.`);
+console.log(`\nAll ${results.length} YouTube extension ${shouldRunFullSuite ? "regression" : "smoke"} fixture(s) passed.`);
 
 function runFixture(fixture) {
   const url = `https://www.youtube.com/watch?v=${fixture.videoId}`;
@@ -1334,7 +1360,7 @@ function checkBackend() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     fail(
-      `Backend preflight failed. Start the AudioFilms app on http://localhost:3000 or pass --skip-backend-check for browser-only diagnostics. ${message}`,
+      `Local backend preflight failed. Start the AudioFilms app on http://localhost:3000 or omit --local-backend-check for browser-only diagnostics. ${message}`,
     );
   }
 }
@@ -2348,6 +2374,24 @@ function printFixtureResult(result) {
     const mark = item.ok ? "ok" : "FAIL";
     console.log(`  - ${mark}: ${item.name}${item.detail ? ` (${item.detail})` : ""}`);
   }
+}
+
+function printFixtureList() {
+  console.log("Default smoke fixtures:");
+  for (const fixture of FIXTURES.filter((item) => DEFAULT_FIXTURE_NAMES.has(item.name))) {
+    console.log(`  - ${fixture.name} (${fixture.videoId})`);
+  }
+  console.log("\nFull regression fixtures:");
+  for (const fixture of FIXTURES) {
+    console.log(`  - ${fixture.name} (${fixture.videoId})`);
+  }
+  console.log("\nExtra full-regression scenarios:");
+  console.log("  - synthetic SPA navigation");
+  console.log("  - backend-off degraded state");
+  console.log("  - backend-failed degraded state");
+  console.log("  - failed source switch recovery");
+  console.log("  - multilingual source switch and lookup");
+  console.log("  - viewport geometry and mocked dictionary card states");
 }
 
 function parseTimestampSeconds(text) {

@@ -149,23 +149,24 @@ https://audiofilms-api.dilum.io/api/practice/captions
 ```
 
 Local regression smoke fixtures can still be pointed at the local AudioFilms app
-API when that is the explicit test target. The local preflight still checks
-`/api/get-subs` as a lightweight subtitle-read health check:
+API when that is the explicit test target. The local preflight is now opt-in
+with `--local-backend-check` and checks `/api/get-subs` as a lightweight
+subtitle-read health check:
 
 ```text
 http://localhost:3000/api/get-subs
 ```
 
-Before full local smoke, make sure the app server is running. The smoke script
-performs a local preflight request to:
+Before full local smoke against a local app server, make sure the app server is
+running. With `--local-backend-check`, the smoke script performs a local
+preflight request to:
 
 ```text
 http://localhost:3000/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
 ```
 
-If the local backend is intentionally unavailable for browser-only diagnostics,
-pass `--skip-backend-check`. Do not use that as evidence that backend
-integration works.
+If the local backend is intentionally unavailable, omit `--local-backend-check`.
+Do not use that as evidence that local backend integration works.
 
 Dictionary lookup defaults to the configured AudioFilms API base plus
 `/api/dict/lookup`, which is remote unless localStorage explicitly overrides the
@@ -329,28 +330,47 @@ Expected signals:
 
 ## Smoke Commands
 
-Run from the repository root:
+Run from the repository root for ordinary sanity checks:
 
 ```bash
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --reload-extension
 ```
 
-The default smoke uses AppleScript to control the normal Google Chrome profile and currently covers:
+The default smoke uses AppleScript to control the normal Google Chrome profile
+and currently covers a short real-page set:
 
 - Dutch manual captions;
+- English manual captions on a multilingual video;
+- no-captions empty state;
+- core playback/lookup/off-on interactions where enabled by those fixtures.
+
+Use the full regression profile when the change intentionally touches
+navigation, source switching, degraded backend states, multilingual switching,
+or layout geometry:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --reload-extension --full
+```
+
+The full profile additionally covers:
+
 - legacy manual captions;
 - browser-visible auto captions;
 - provider fallback warning;
-- English manual captions on a multilingual video;
 - multilingual source switching to Arabic and Arabic word lookup;
 - auto-only captions;
-- no-captions empty state;
 - recovery after no-captions;
 - synthetic YouTube SPA navigation;
 - backend disabled degraded state;
 - backend failed degraded state;
 - failed source switch preserving the previous working source;
 - wide/narrow viewport geometry.
+
+To inspect the fixture split without opening Chrome:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --list-fixtures
+```
 
 Default smoke should assert the current learner-facing contract, not historical
 provider internals. It accepts usable readiness labels (`Ready`, `Rough`, or

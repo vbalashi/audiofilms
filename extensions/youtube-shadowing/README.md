@@ -176,17 +176,37 @@ Expected signal:
 
 ## Multi-Video Smoke Check
 
-Use this after extension UI/retrieval changes to check the current local Chrome profile against the pinned fixture set:
+Use this after ordinary extension UI/retrieval changes to check the current
+local Chrome profile against a short real-page smoke set:
 
 ```bash
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --reload-extension
 ```
 
-The default smoke checks the current learner-facing extension contract: boot,
-caption availability, source/readiness labels, phrase rendering, UI controls,
-and core interactions. It accepts any usable readiness label (`Ready`, `Rough`,
-or `Precise`) and requires retrieval diagnostics to be present without pinning
-the exact historical retrieval path.
+The default smoke checks the current learner-facing extension contract on three
+real YouTube states: Dutch captions, English captions, and no captions. It
+checks boot, caption availability, source/readiness labels, phrase rendering,
+the no-caption empty state, and only the core interactions needed for confidence.
+It accepts any usable readiness label (`Ready`, `Rough`, or `Precise`) and
+requires retrieval diagnostics to be present without pinning the exact
+historical retrieval path.
+
+Use the full regression profile when deliberately validating broader behavior:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --reload-extension --full
+```
+
+The full profile keeps the older multi-fixture suite, including SPA navigation,
+backend-degraded states, failed source-switch recovery, multilingual switching,
+and viewport/dictionary geometry checks. It is intentionally heavier and should
+not be the default sanity check.
+
+To inspect the current smoke/full fixture split without opening Chrome:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --list-fixtures
+```
 
 Use strict provenance mode only when intentionally debugging the retrieval
 ladder:
@@ -204,6 +224,9 @@ The smoke check expects:
 - Chrome is installed and can be controlled by AppleScript;
 - this unpacked extension is loaded with id `hhdkchoccmikoefhenobdjipgdppdpoc`;
 - for local-only smoke tests, set `localStorage.afShadowingApiBase = "http://localhost:3000"`; otherwise the tester build defaults to `https://audiofilms-api.dilum.io`.
+- pass `--local-backend-check` only when the local app backend is the explicit
+  test target. The default smoke follows the extension's configured API path,
+  which is remote for the tester build.
 
 ## Local ASR Dogfood
 
@@ -275,16 +298,19 @@ localStorage.removeItem("afShadowingLocalAsrDuration");
 location.reload();
 ```
 
-The default fixture sequence checks:
+The default smoke fixture sequence checks:
 
 - manual Dutch captions: `4EE7m94mJpk`;
+- English manual captions on a multilingual video: `aircAruvnKk`;
+- no-captions empty state: `EColTNIbOko`.
+
+The full regression fixture sequence additionally checks:
+
 - legacy manual Dutch fixture: `ZNQWWW-vvfM`;
 - app sample with browser-visible auto captions: `iDi5MhglYks`;
 - manual captions through backend-orchestrated fallback warning: `KrdVIUmBoE4`;
-- English manual captions on a multilingual video: `aircAruvnKk`;
 - multilingual source switch from English to Arabic on `aircAruvnKk`;
 - Dutch auto-caption-only fixture: `xymyDvCgWDA`;
-- no-captions empty state: `EColTNIbOko`;
 - recovery from no-captions back to manual captions: `4EE7m94mJpk`;
 - synthetic YouTube SPA URL-change recovery: `4EE7m94mJpk` -> `ZNQWWW-vvfM` -> `4EE7m94mJpk`;
 - backend-off degraded state: `4EE7m94mJpk` with `localStorage.afShadowingBackendSubtitlesUrl = "off"`;
