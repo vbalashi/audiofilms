@@ -20,6 +20,8 @@ type PlatformLookupAttempt = {
   body: PlatformLookupResponse | null;
   detail: string | null;
   error: unknown;
+  durationMs: number;
+  serverTiming: string;
 };
 
 export async function OPTIONS(request: Request) {
@@ -27,6 +29,12 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  let lookupMode: LookupMode | null = null;
+  let platformDurationMs = 0;
+  let projectionDurationMs = 0;
+  let platformStatus: number | null = null;
+  let platformServerTiming = '';
   const body = await request.json().catch(() => null);
   const clickedForm = typeof body?.clickedForm === 'string' ? body.clickedForm.trim() : '';
   const sourceLanguageCode =
@@ -34,13 +42,13 @@ export async function POST(request: Request) {
   const contextText = typeof body?.contextText === 'string' ? body.contextText : undefined;
 
   if (!clickedForm) {
-    return jsonResponse(request, { error: 'missing_clicked_form' }, { status: 400 });
+    return jsonResponse(request, { error: 'missing_clicked_form' }, { status: 400, headers: timingHeaders(startedAt, null) });
   }
   if (!sourceLanguageCode) {
-    return jsonResponse(request, { error: 'missing_source_language_code' }, { status: 400 });
+    return jsonResponse(request, { error: 'missing_source_language_code' }, { status: 400, headers: timingHeaders(startedAt, null) });
   }
 
-  const lookupMode = resolveLookupMode(request);
+  lookupMode = resolveLookupMode(request);
   if (!lookupMode) {
     return jsonResponse(
       request,
@@ -50,7 +58,7 @@ export async function POST(request: Request) {
         detail:
           'Guest 2000NL lookup requires DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN, or a forwarded 2000NL user Bearer token.',
       },
-      { status: 401 },
+      { status: 401, headers: timingHeaders(startedAt, null) },
     );
   }
 
@@ -60,6 +68,9 @@ export async function POST(request: Request) {
     contextText,
     lookupMode,
   );
+  platformDurationMs = platformAttempt.durationMs;
+  platformStatus = platformAttempt.response?.status || null;
+  platformServerTiming = platformAttempt.serverTiming;
   let platformResponse = platformAttempt.response;
   let platformBody = platformAttempt.body;
   let translationFallbackReason: string | undefined;
@@ -81,6 +92,9 @@ export async function POST(request: Request) {
       fallbackMode,
     );
     if (fallbackAttempt.response?.ok) {
+      platformDurationMs += fallbackAttempt.durationMs;
+      platformStatus = fallbackAttempt.response.status;
+      platformServerTiming = fallbackAttempt.serverTiming;
       translationFallbackReason =
         platformAttempt.body?.error || platformAttempt.detail || `HTTP ${platformResponse.status}`;
       platformResponse = fallbackAttempt.response;
@@ -98,7 +112,11 @@ export async function POST(request: Request) {
       },
       {
         status: 502,
-        headers: responseHeaders(lookupMode),
+        headers: responseHeaders(lookupMode, timingHeaders(startedAt, lookupMode, {
+          platformDurationMs,
+          platformStatus,
+          platformServerTiming,
+        })),
       },
     );
   }
@@ -113,11 +131,16 @@ export async function POST(request: Request) {
       },
       {
         status: platformResponse.status === 429 ? 429 : 502,
-        headers: responseHeaders(lookupMode),
+        headers: responseHeaders(lookupMode, timingHeaders(startedAt, lookupMode, {
+          platformDurationMs,
+          platformStatus,
+          platformServerTiming,
+        })),
       },
     );
   }
 
+  const projectionStartedAt = Date.now();
   const responseBody = projectDictionaryLookupV2Response(
     platformBody,
     clickedForm,
@@ -128,24 +151,47 @@ export async function POST(request: Request) {
       translationFallbackReason,
     },
   );
+  projectionDurationMs = Date.now() - projectionStartedAt;
 
   if ('error' in responseBody) {
+    logLookupTiming('lookup', clickedForm, lookupMode, 404, startedAt, {
+      platformDurationMs,
+      platformStatus,
+      projectionDurationMs,
+      platformServerTiming,
+    });
     return jsonResponse(
       request,
       responseBody,
       {
         status: 404,
-        headers: responseHeaders(lookupMode),
+        headers: responseHeaders(lookupMode, timingHeaders(startedAt, lookupMode, {
+          platformDurationMs,
+          platformStatus,
+          projectionDurationMs,
+          platformServerTiming,
+        })),
       },
     );
   }
 
+  logLookupTiming('lookup', clickedForm, lookupMode, 200, startedAt, {
+    platformDurationMs,
+    platformStatus,
+    projectionDurationMs,
+    platformServerTiming,
+  });
   return jsonResponse(
     request,
     responseBody,
     {
       status: 200,
-      headers: responseHeaders(lookupMode),
+      headers: responseHeaders(lookupMode, timingHeaders(startedAt, lookupMode, {
+        platformDurationMs,
+        platformStatus,
+        projectionDurationMs,
+        platformServerTiming,
+      })),
     },
   );
 }
@@ -156,6 +202,7 @@ async function fetchPlatformLookup(
   contextText: string | undefined,
   lookupMode: LookupMode,
 ): Promise<PlatformLookupAttempt> {
+  const startedAt = Date.now();
   try {
     const response = await fetch(`${platformApiBase()}/${lookupMode.endpoint}`, {
       method: 'POST',
@@ -176,6 +223,8 @@ async function fetchPlatformLookup(
       body,
       detail: body?.error || body?.detail || safePlatformErrorDetail(text),
       error: null,
+      durationMs: Date.now() - startedAt,
+      serverTiming: response.headers.get('server-timing') || '',
     };
   } catch (error) {
     return {
@@ -183,6 +232,8 @@ async function fetchPlatformLookup(
       body: null,
       detail: error instanceof Error ? error.message : String(error),
       error,
+      durationMs: Date.now() - startedAt,
+      serverTiming: '',
     };
   }
 }
@@ -285,8 +336,8 @@ function platformLookupRequest(
   return baseRequest;
 }
 
-function responseHeaders(lookupMode: LookupMode) {
-  return lookupMode.cacheControl ? { 'Cache-Control': lookupMode.cacheControl } : undefined;
+function responseHeaders(lookupMode: LookupMode, headers: Record<string, string> = {}) {
+  return lookupMode.cacheControl ? { ...headers, 'Cache-Control': lookupMode.cacheControl } : headers;
 }
 
 function mapPlatformError(status: number) {
@@ -294,4 +345,65 @@ function mapPlatformError(status: number) {
   if (status === 404) return 'no_match';
   if (status === 429) return 'rate_limited';
   return 'platform_unavailable';
+}
+
+function timingHeaders(
+  startedAt: number,
+  lookupMode: LookupMode | null,
+  timing: {
+    platformDurationMs?: number;
+    platformStatus?: number | null;
+    projectionDurationMs?: number;
+    platformServerTiming?: string;
+  } = {},
+) {
+  const totalMs = Date.now() - startedAt;
+  const mode = lookupMode?.includeUserState ? 'authenticated' : lookupMode ? 'catalog' : 'none';
+  const values = [
+    timingMetric('af_total', totalMs),
+    timingMetric('af_platform', timing.platformDurationMs || 0),
+    timingMetric('af_projection', timing.projectionDurationMs || 0),
+    `af_mode;desc="${mode}"`,
+  ];
+  if (typeof timing.platformStatus === 'number') {
+    values.push(`af_platform_status;desc="${timing.platformStatus}"`);
+  }
+  if (timing.platformServerTiming) {
+    values.push(`af_platform_server;desc="${sanitizeServerTiming(timing.platformServerTiming)}"`);
+  }
+  return { 'Server-Timing': values.join(', ') };
+}
+
+function timingMetric(name: string, value: number) {
+  return `${name};dur=${Math.max(0, Math.round(value))}`;
+}
+
+function sanitizeServerTiming(value: string) {
+  return value.replace(/["\\\r\n]/g, ' ').slice(0, 180);
+}
+
+function logLookupTiming(
+  operation: string,
+  query: string,
+  lookupMode: LookupMode,
+  status: number,
+  startedAt: number,
+  timing: {
+    platformDurationMs?: number;
+    platformStatus?: number | null;
+    projectionDurationMs?: number;
+    platformServerTiming?: string;
+  },
+) {
+  console.info('[dict.lookup.timing]', {
+    operation,
+    query,
+    mode: lookupMode.includeUserState ? 'authenticated' : 'catalog',
+    status,
+    totalMs: Date.now() - startedAt,
+    platformMs: timing.platformDurationMs || 0,
+    platformStatus: timing.platformStatus,
+    projectionMs: timing.projectionDurationMs || 0,
+    platformServerTiming: timing.platformServerTiming || '',
+  });
 }

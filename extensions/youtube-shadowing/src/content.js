@@ -4267,6 +4267,7 @@
     const phrase = selectedWord.sourceBinding?.phrase || state.phrases[selectedWord.phraseIndex] || state.phrases[state.currentIndex];
     const source = getSelectedPracticeSource();
     const language = selectedWord.sourceBinding?.captionSource?.languageCode || source?.loadedTranscriptResult?.languageCode || source?.languageCode || "auto";
+    const startedAt = Date.now();
 
     try {
       const result = await fetchDictionaryResult({
@@ -4291,6 +4292,8 @@
         word: selectedWord.word,
         language,
         provider: result?.meta?.provider || "",
+        totalMs: Date.now() - startedAt,
+        commandTimings: result?.meta?.commandTimings || null,
       });
       loadGroupedDictionarySearch(selectedWord, language, phrase?.text || "");
     } catch (error) {
@@ -4307,6 +4310,8 @@
         word: selectedWord.word,
         language,
         error: state.selectedWord.lookupError,
+        totalMs: Date.now() - startedAt,
+        commandTimings: payload?.meta?.commandTimings || null,
       });
     } finally {
       if (isCurrentLookup(selectedWord)) {
@@ -4318,6 +4323,7 @@
   async function loadGroupedDictionarySearch(selectedWord, language, contextText, options = {}) {
     const group = options.group || null;
     const cursor = options.cursor || null;
+    const startedAt = Date.now();
     try {
       const result = await fetchDictionarySearchResult({
         word: selectedWord.word,
@@ -4342,6 +4348,8 @@
         word: selectedWord.word,
         language,
         group: group || "preview",
+        totalMs: Date.now() - startedAt,
+        commandTimings: result?.meta?.commandTimings || null,
       });
       render();
     } catch (error) {
@@ -4359,6 +4367,8 @@
         word: selectedWord.word,
         language,
         error: state.selectedWord.groupedSearchError,
+        totalMs: Date.now() - startedAt,
+        commandTimings: payload?.meta?.commandTimings || null,
       });
       render();
     }
@@ -4746,6 +4756,8 @@
       payload = null;
     }
 
+    attachCommandTimings(payload, response);
+
     if (!response.ok && isNoMatchLookupPayload(response, payload)) {
       return payload;
     }
@@ -4782,6 +4794,8 @@
       payload = null;
     }
 
+    attachCommandTimings(payload, response);
+
     if (!response.ok) {
       const message = safeLookupErrorMessage(response, payload, text);
       const error = new Error(`Dictionary search failed: HTTP ${response.status} ${message}`);
@@ -4789,6 +4803,16 @@
       throw error;
     }
 
+    return payload;
+  }
+
+  function attachCommandTimings(payload, response) {
+    if (!payload || typeof payload !== "object" || !response?.timings) return payload;
+    const meta = payload.meta && typeof payload.meta === "object" ? payload.meta : {};
+    payload.meta = {
+      ...meta,
+      commandTimings: response.timings,
+    };
     return payload;
   }
 

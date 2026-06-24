@@ -13,6 +13,11 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
+  let searchMode: SearchMode | null = null;
+  let platformDurationMs = 0;
+  let platformStatus: number | null = null;
+  let platformServerTiming = '';
   const body = await request.json().catch(() => null);
   const clickedForm = typeof body?.clickedForm === 'string' ? body.clickedForm.trim() : '';
   const sourceLanguageCode =
@@ -22,16 +27,25 @@ export async function POST(request: Request) {
   const limit = parseLimit(body?.limit);
 
   if (!clickedForm) {
-    return jsonResponse(request, { error: 'missing_clicked_form' }, { status: 400 });
+    return jsonResponse(request, { error: 'missing_clicked_form' }, {
+      status: 400,
+      headers: timingHeaders(startedAt, null),
+    });
   }
   if (!sourceLanguageCode) {
-    return jsonResponse(request, { error: 'missing_source_language_code' }, { status: 400 });
+    return jsonResponse(request, { error: 'missing_source_language_code' }, {
+      status: 400,
+      headers: timingHeaders(startedAt, null),
+    });
   }
   if (limit === null) {
-    return jsonResponse(request, { error: 'invalid_limit' }, { status: 400 });
+    return jsonResponse(request, { error: 'invalid_limit' }, {
+      status: 400,
+      headers: timingHeaders(startedAt, null),
+    });
   }
 
-  const searchMode = resolveSearchMode(request);
+  searchMode = resolveSearchMode(request);
   if (!searchMode) {
     return jsonResponse(
       request,
@@ -41,10 +55,11 @@ export async function POST(request: Request) {
         detail:
           'Guest 2000NL search requires DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN, or a forwarded 2000NL user Bearer token.',
       },
-      { status: 401 },
+      { status: 401, headers: timingHeaders(startedAt, null) },
     );
   }
 
+  const platformStartedAt = Date.now();
   const response = await fetch(`${platformApiBase()}/${searchMode.endpoint}`, {
     method: 'POST',
     headers: {
@@ -60,8 +75,14 @@ export async function POST(request: Request) {
       ...(cursor ? { cursor } : {}),
     }),
   }).catch((error) => error as Error);
+  platformDurationMs = Date.now() - platformStartedAt;
 
   if (response instanceof Error) {
+    logSearchTiming(clickedForm, searchMode, 502, startedAt, {
+      platformDurationMs,
+      platformStatus,
+      platformServerTiming,
+    });
     return jsonResponse(
       request,
       {
@@ -69,13 +90,27 @@ export async function POST(request: Request) {
         code: 'platform_unavailable',
         detail: response.message,
       },
-      { status: 502, headers: responseHeaders(searchMode) },
+      {
+        status: 502,
+        headers: responseHeaders(searchMode, timingHeaders(startedAt, searchMode, {
+          platformDurationMs,
+          platformStatus,
+          platformServerTiming,
+        })),
+      },
     );
   }
+  platformStatus = response.status;
+  platformServerTiming = response.headers.get('server-timing') || '';
 
   const text = await response.text();
   const payload = parseJson(text);
   if (!response.ok) {
+    logSearchTiming(clickedForm, searchMode, response.status === 429 ? 429 : response.status === 503 ? 503 : 502, startedAt, {
+      platformDurationMs,
+      platformStatus,
+      platformServerTiming,
+    });
     return jsonResponse(
       request,
       payload || {
@@ -85,14 +120,27 @@ export async function POST(request: Request) {
       },
       {
         status: response.status === 429 ? 429 : response.status === 503 ? 503 : 502,
-        headers: responseHeaders(searchMode),
+        headers: responseHeaders(searchMode, timingHeaders(startedAt, searchMode, {
+          platformDurationMs,
+          platformStatus,
+          platformServerTiming,
+        })),
       },
     );
   }
 
+  logSearchTiming(clickedForm, searchMode, 200, startedAt, {
+    platformDurationMs,
+    platformStatus,
+    platformServerTiming,
+  });
   return jsonResponse(request, payload, {
     status: 200,
-    headers: responseHeaders(searchMode),
+    headers: responseHeaders(searchMode, timingHeaders(startedAt, searchMode, {
+      platformDurationMs,
+      platformStatus,
+      platformServerTiming,
+    })),
   });
 }
 
@@ -164,8 +212,8 @@ function resolveSearchMode(request: Request): SearchMode | null {
   return null;
 }
 
-function responseHeaders(searchMode: SearchMode) {
-  return searchMode.cacheControl ? { 'Cache-Control': searchMode.cacheControl } : undefined;
+function responseHeaders(searchMode: SearchMode, headers: Record<string, string> = {}) {
+  return searchMode.cacheControl ? { ...headers, 'Cache-Control': searchMode.cacheControl } : headers;
 }
 
 function mapPlatformError(status: number) {
@@ -173,4 +221,60 @@ function mapPlatformError(status: number) {
   if (status === 429) return 'rate_limited';
   if (status === 503) return 'search_index_not_ready';
   return 'platform_unavailable';
+}
+
+function timingHeaders(
+  startedAt: number,
+  searchMode: SearchMode | null,
+  timing: {
+    platformDurationMs?: number;
+    platformStatus?: number | null;
+    platformServerTiming?: string;
+  } = {},
+) {
+  const totalMs = Date.now() - startedAt;
+  const mode = searchMode?.endpoint === 'search' ? 'authenticated' : searchMode ? 'catalog' : 'none';
+  const values = [
+    timingMetric('af_total', totalMs),
+    timingMetric('af_platform', timing.platformDurationMs || 0),
+    `af_mode;desc="${mode}"`,
+  ];
+  if (typeof timing.platformStatus === 'number') {
+    values.push(`af_platform_status;desc="${timing.platformStatus}"`);
+  }
+  if (timing.platformServerTiming) {
+    values.push(`af_platform_server;desc="${sanitizeServerTiming(timing.platformServerTiming)}"`);
+  }
+  return { 'Server-Timing': values.join(', ') };
+}
+
+function timingMetric(name: string, value: number) {
+  return `${name};dur=${Math.max(0, Math.round(value))}`;
+}
+
+function sanitizeServerTiming(value: string) {
+  return value.replace(/["\\\r\n]/g, ' ').slice(0, 180);
+}
+
+function logSearchTiming(
+  query: string,
+  searchMode: SearchMode,
+  status: number,
+  startedAt: number,
+  timing: {
+    platformDurationMs?: number;
+    platformStatus?: number | null;
+    platformServerTiming?: string;
+  },
+) {
+  console.info('[dict.search.timing]', {
+    operation: 'search',
+    query,
+    mode: searchMode.endpoint === 'search' ? 'authenticated' : 'catalog',
+    status,
+    totalMs: Date.now() - startedAt,
+    platformMs: timing.platformDurationMs || 0,
+    platformStatus: timing.platformStatus,
+    platformServerTiming: timing.platformServerTiming || '',
+  });
 }

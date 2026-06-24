@@ -304,16 +304,20 @@ function backendCommandNeedsTesterToken(operation) {
 
 async function fetchDictionaryCommand(operation, body = null) {
   const command = dictionaryCommand(operation);
+  const startedAt = Date.now();
   const headers = {
     accept: "application/json",
     ...(command.method === "POST" ? { "content-type": "application/json" } : {}),
   };
 
+  const sessionStartedAt = Date.now();
   const session = await getFreshConnectSession();
+  const sessionMs = Date.now() - sessionStartedAt;
   if (session.ok && session.accessToken && shouldAttachDictionaryBearer(command.url)) {
     headers.authorization = `Bearer ${session.accessToken}`;
   }
 
+  const fetchStartedAt = Date.now();
   const response = await fetch(command.url, {
     credentials: "omit",
     method: command.method,
@@ -321,11 +325,20 @@ async function fetchDictionaryCommand(operation, body = null) {
     ...(command.method === "POST" ? { body: JSON.stringify(body || {}) } : {}),
   });
   const text = await response.text();
+  const fetchMs = Date.now() - fetchStartedAt;
 
   return {
     ok: response.ok,
     status: response.status,
     text,
+    timings: {
+      operation,
+      totalMs: Date.now() - startedAt,
+      sessionMs,
+      fetchMs,
+      authenticated: Boolean(session.ok && session.accessToken && headers.authorization),
+      serverTiming: response.headers.get("server-timing") || "",
+    },
   };
 }
 
