@@ -72,9 +72,12 @@ function projectDraftResponseCard(body: unknown, clickedForm: string, languageCo
     ...body,
     draft: {
       ...draft,
-      card: projectOverlayCard(item, clickedForm, languageCode, 0, {
-        allowProgressActions: true,
-      }),
+      card: {
+        ...projectOverlayCard(item, clickedForm, languageCode, 0, {
+          allowProgressActions: true,
+        }),
+        generatedDraftItem: item,
+      },
     },
   };
 }

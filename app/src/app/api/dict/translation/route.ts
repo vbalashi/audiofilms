@@ -11,9 +11,10 @@ export async function OPTIONS(request: Request) {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const entryId = typeof body?.entryId === 'string' ? body.entryId : '';
+  const item = body?.item && typeof body.item === 'object' ? body.item : null;
   const targetLang = typeof body?.targetLang === 'string' ? body.targetLang : undefined;
 
-  if (!entryId) {
+  if (!entryId && !item) {
     return jsonResponse(request, { error: 'missing_entry_id' }, { status: 400 });
   }
   const bearerToken = requireBearerToken(request);
@@ -26,9 +27,14 @@ export async function POST(request: Request) {
   }
 
   const platformBody: Record<string, unknown> = {
-    entryId,
     force: body?.force === true,
   };
+  if (entryId) {
+    platformBody.entryId = entryId;
+  }
+  if (item) {
+    platformBody.item = item;
+  }
   if (targetLang) {
     platformBody.targetLang = targetLang;
   }

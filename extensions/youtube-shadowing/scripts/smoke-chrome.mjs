@@ -934,12 +934,18 @@ function assertGeneratedDraftCardUi() {
   const noMatch = readGeometrySnapshot();
   clickShadowButton("[data-af-generated-draft]");
   const generated = waitForGeneratedDraftCard(waitMs);
+  const generatedTranslate = clickDictionaryTranslate(0);
+  sleep(700);
+  const generatedTranslated = readGeometrySnapshot();
 
   return [
     assertion("generated lookup word clicked", clicked.clicked, clicked.detail),
     assertion("generated no-match state exposes generate action", noMatch.dictionaryUi?.generatedFallbackCardCount === 1, JSON.stringify(noMatch.dictionaryUi)),
     assertion("generated draft renders as overlay card", generated.dictionaryUi?.overlayCardCount === 1, JSON.stringify(generated.dictionaryUi)),
+    assertion("generated draft uses card-only lookup wrapper", /is-card-only/.test(generated.dictionaryUi?.lookupState || ""), generated.dictionaryUi?.lookupState || ""),
     assertion("generated draft card has generated action", (generated.dictionaryUi?.cards?.[0]?.progressActions || []).includes("Start Learning"), JSON.stringify(generated.dictionaryUi?.cards || [])),
+    assertion("generated draft translation action clicked", generatedTranslate === "clicked", generatedTranslate),
+    assertion("generated draft translation renders inline overlays", generatedTranslated.dictionaryUi?.inlineTranslations > 0, JSON.stringify(generatedTranslated.dictionaryUi)),
     assertion("generated draft removes bespoke fallback block", generated.dictionaryUi?.generatedFallbackCardCount === 0, JSON.stringify(generated.dictionaryUi)),
   ];
 }
@@ -2103,7 +2109,15 @@ function clickDictionaryTranslate(index) {
   const buttons = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-overlay-card .af-card-translate") || []);
   const button = buttons[${Number(index)}];
   if (!button) return "not-found";
-  button.click();
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    button.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      buttons: type === "pointerdown" || type === "mousedown" ? 1 : 0,
+    }));
+  }
   return "clicked";
 })()
   `);

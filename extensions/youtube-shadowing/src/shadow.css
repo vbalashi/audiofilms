@@ -620,6 +620,19 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-color: var(--af-danger);
 }
 
+.af-lookup-placeholder.is-card-only {
+  margin-top: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.af-lookup-placeholder.is-card-only .af-overlay-card {
+  margin-top: 0;
+}
+
 .af-lookup-skeleton {
   height: 46px;
   margin-top: 12px;

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { POST as draftPost } from '../../src/app/api/dict/generated-entry/draft/route';
 import { POST as savePost } from '../../src/app/api/dict/generated-entry/route';
+import { POST as translationPost } from '../../src/app/api/dict/translation/route';
 
 function request(path: string, body: unknown, token = 'user-token') {
   return new Request(`https://audiofilms-api.dilum.io${path}`, {
@@ -99,7 +100,7 @@ describe('/api/dict/generated-entry proxy routes', () => {
                 id: null,
                 languageCode: 'nl',
                 headword: 'gedoe',
-                partOfSpeech: 'noun',
+                partOfSpeech: 'zn',
                 content: {
                   sections: [
                     {
@@ -152,6 +153,11 @@ describe('/api/dict/generated-entry proxy routes', () => {
       language: 'nl',
       summary: { definition: 'Een situatie die veel moeite geeft.' },
       dictionary: { name: 'Generated' },
+      generatedDraftItem: expect.objectContaining({
+        entry: expect.objectContaining({
+          headword: 'gedoe',
+        }),
+      }),
       displayActions: [
         {
           id: 'save-and-learn',
@@ -166,6 +172,61 @@ describe('/api/dict/generated-entry proxy routes', () => {
           command: { kind: 'card-translation' },
         },
       ],
+    });
+  });
+
+  it('proxies generated draft item translation without a persisted entry id', async () => {
+    process.env.DICTIONARY_2000NL_API_BASE = 'https://2000nl.example/api/platform/v1';
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: 'ready',
+          overlay: {
+            headword: 'ruimtestraling',
+            meanings: [{ definition: 'космическое излучение' }],
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const item = {
+      entry: {
+        id: 'draft:gdc-1',
+        content: {
+          headword: 'ruimtestraling',
+          languageCode: 'nl',
+          sections: [
+            {
+              id: 'meaning-1',
+              kind: 'meaning',
+              text: 'Straling die afkomstig is uit de ruimte.',
+            },
+          ],
+        },
+      },
+    };
+
+    const response = await translationPost(
+      request('/api/dict/translation', {
+        item,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://2000nl.example/api/platform/v1/translation',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          authorization: 'Bearer user-token',
+        }),
+      }),
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      force: false,
+      item,
     });
   });
 

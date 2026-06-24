@@ -3702,8 +3702,9 @@
       lookup.classList.add("is-empty");
       const draftCard = generatedDraftCard(selectedWord.generatedDraft);
       if (draftCard) {
-        lookupTitle.textContent = draftCard.headword || selectedWord.word;
-        lookupCopy.textContent = draftCard.language || "Generated card";
+        lookup.classList.add("is-card-only");
+        lookupTitle.remove();
+        lookupCopy.remove();
       } else {
         lookupTitle.textContent = "No match";
         lookupCopy.textContent = "No dictionary match was returned for this word.";
@@ -4011,6 +4012,9 @@
       const exampleIndex = sectionKindIndex(section, peers, "example");
       return exampleIndex >= 0 ? translatedExample(translation, exampleIndex) : "";
     }
+    if (section.kind === "note") {
+      return translatedNote(translation);
+    }
     if (section.kind === "idiom") {
       const idiomIndex = sectionKindIndex(section, peers, "idiom");
       return idiomIndex >= 0 ? translatedIdiom(translation, idiomIndex) : "";
@@ -4031,6 +4035,11 @@
       idiom.expression,
       idiom.explanation,
     ].map(cleanTranslationText).find(Boolean) || "";
+  }
+
+  function translatedNote(translation) {
+    const meaning = translationMeaning(translation, 0);
+    return cleanTranslationText(meaning?.context) || cleanTranslationText(meaning?.note);
   }
 
   function sectionKindIndex(section, allSections, kind) {
@@ -4477,7 +4486,9 @@
   }
 
   async function requestDictionaryCardTranslation(card) {
-    if (!card?.entryId || !state.selectedWord) return;
+    const generatedDraftItem = card?.generatedDraftItem || generatedDraftItemFromOverlayCard(card);
+    if (!card?.entryId && !generatedDraftItem) return;
+    if (!state.selectedWord) return;
 
     const selectedWord = state.selectedWord;
     state.selectedWord = {
@@ -4489,7 +4500,8 @@
 
     try {
       const translation = await postDictionaryCommand("dict-translation", {
-        entryId: card.entryId,
+        ...(card.entryId ? { entryId: card.entryId } : {}),
+        ...(generatedDraftItem ? { item: generatedDraftItem } : {}),
       });
       if (!isCurrentLookup(selectedWord)) return;
       state.selectedWord = {
@@ -4511,6 +4523,32 @@
       };
       render();
     }
+  }
+
+  function generatedDraftItemFromOverlayCard(card) {
+    if (!card || card.entryId) return null;
+    const sections = Array.isArray(card.sections)
+      ? card.sections
+          .map((section, index) => ({
+            id: section.id || `section-${index + 1}`,
+            kind: section.kind || "meaning",
+            text: section.text || "",
+            sourcePath: section.sourcePath || `card.sections.${index}`,
+          }))
+          .filter((section) => section.text)
+      : [];
+    if (!card.headword && !sections.length) return null;
+    return {
+      entry: {
+        id: card.id ? `draft:${card.id}` : undefined,
+        content: {
+          headword: card.headword || "",
+          languageCode: card.language || "",
+          sections,
+          summary: card.summary || {},
+        },
+      },
+    };
   }
 
   function isCurrentLookup(selectedWord) {
@@ -4939,7 +4977,8 @@
 
   function mockGeneratedDraftCard(body = {}) {
     const clickedForm = body?.clickedForm || "gedoe";
-    return mockDictionaryCard({
+    return {
+      ...mockDictionaryCard({
       id: "mock-generated-draft",
       entryId: "",
       clickedForm,
@@ -4954,11 +4993,33 @@
           command: { kind: "generated-save-and-start-learning" },
         },
       ],
-    });
+      }),
+      generatedDraftItem: {
+        entry: {
+          id: "draft:mock-generated-draft",
+          content: {
+            headword: clickedForm,
+            languageCode: body?.sourceLanguageCode || "nl",
+            sections: [
+              {
+                id: "meaning-1",
+                kind: "meaning",
+                text: "Een gegenereerde uitleg voor deze selectie.",
+              },
+              {
+                id: "example-1",
+                kind: "example",
+                text: body?.contextText || "Dit is een voorbeeld.",
+              },
+            ],
+          },
+        },
+      },
+    };
   }
 
   function mockDictionaryCard({ id, entryId, clickedForm, headword, phase, progressActions }) {
-    const includeLookupTranslations = entryId !== "entry-translate-error";
+    const includeLookupTranslations = Boolean(entryId) && entryId !== "entry-translate-error";
     return {
       id,
       entryId,

@@ -120,6 +120,7 @@ export type DictionaryOverlayCardV2 = {
     name?: string;
     kind?: string;
   };
+  generatedDraftItem?: unknown;
 };
 
 export type DictionaryOverlayCard = {
