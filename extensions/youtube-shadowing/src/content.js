@@ -3794,6 +3794,7 @@
         const warning = appendElement(lookup, "p", "af-source-option-error");
         warning.textContent = selectedWord.lookupResult.meta.warning;
       }
+      renderGroupedSearchPreviews(lookup, selectedWord);
       return;
     }
 
@@ -3805,6 +3806,7 @@
       lookupCopy.remove();
       const draftCard = generatedDraftCard(selectedWord.generatedDraft);
       renderGeneratedFallback(lookup, selectedWord);
+      renderGroupedSearchPreviews(lookup, selectedWord);
       return;
     }
 
@@ -3820,6 +3822,7 @@
       const warning = appendElement(lookup, "p", "af-source-option-error");
       warning.textContent = selectedWord.lookupResult.meta.warning;
     }
+    renderGroupedSearchPreviews(lookup, selectedWord);
   }
 
   function renderGeneratedFallback(parent, selectedWord) {
