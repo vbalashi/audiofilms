@@ -28,6 +28,7 @@
   const LEARNING_ENABLED_STORAGE_KEY = "afShadowingLearningEnabled";
   const EXAMPLES_EXPANDED_STORAGE_KEY = "afDictionaryExamplesExpanded";
   const THEME_STORAGE_KEY = "afShadowingTheme";
+  const SOURCE_SELECTION_STORAGE_KEY = "afShadowingSourceSelection";
   const MAX_PHRASE_DURATION_MS = 12000;
   const LONG_PAUSE_MS = 1000;
   const PRE_ROLL_MS = 150;
@@ -291,6 +292,116 @@
   function phraseProgressKey(sourceId = state.selectedSourceId) {
     if (!state.videoId || !sourceId) return "";
     return `${state.videoId}::${sourceId}`;
+  }
+
+  function sourceSelectionKey(videoId = state.videoId) {
+    return videoId ? `${SOURCE_SELECTION_STORAGE_KEY}:${videoId}` : "";
+  }
+
+  function readStoredSourceSelection(videoId = state.videoId) {
+    const key = sourceSelectionKey(videoId);
+    if (!key) return null;
+    try {
+      const value = JSON.parse(window.localStorage.getItem(key) || "null");
+      if (!value || value.videoId !== videoId) return null;
+      return {
+        sourceId: String(value.sourceId || ""),
+        sourceKind: String(value.sourceKind || ""),
+        languageCode: String(value.languageCode || ""),
+        textSourceKind: String(value.textSourceKind || ""),
+        updatedAt: String(value.updatedAt || ""),
+      };
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeStoredSourceSelection(source, reason = "source-selected") {
+    const key = sourceSelectionKey();
+    if (!key || !source) return;
+    const selection = {
+      version: 1,
+      videoId: state.videoId,
+      sourceId: source.id,
+      sourceKind: sourceSelectionKind(source),
+      languageCode: source.languageCode || "",
+      textSourceKind: source.loadedTranscriptResult?.practiceSnapshot?.textSource?.kind || "",
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      window.localStorage.setItem(key, JSON.stringify(selection));
+      recordDebugEvent("source-selection-saved", {
+        reason,
+        source: captionTrackApi.sourceDisplayName(source),
+        sourceKind: selection.sourceKind,
+      });
+    } catch (error) {
+      recordDebugEvent("source-selection-save-failed", {
+        reason,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  function sourceSelectionKind(source) {
+    const snapshotKind = source?.loadedTranscriptResult?.practiceSnapshot?.textSource?.kind || "";
+    if (source?.track?.afPracticeSnapshotSource && (snapshotKind === "asr" || source?.track?.kind === "asr")) {
+      return "asr";
+    }
+    if (source?.track?.kind === "asr") return "auto";
+    return "manual";
+  }
+
+  function sourceSelectionRank(source) {
+    return {
+      manual: 0,
+      asr: 1,
+      auto: 2,
+    }[sourceSelectionKind(source)] ?? 3;
+  }
+
+  function choosePreferredPracticeSource(sources, videoId = state.videoId) {
+    const stored = readStoredSourceSelection(videoId);
+    const storedMatch = findStoredSourceSelectionMatch(sources, stored);
+    if (storedMatch) {
+      return { source: storedMatch, reason: "stored-selection" };
+    }
+
+    const ranked = [...sources].sort((left, right) =>
+      sourceSelectionRank(left) - sourceSelectionRank(right) ||
+      sourceLanguageRank(left.languageCode) - sourceLanguageRank(right.languageCode) ||
+      left.index - right.index
+    )[0] || null;
+    return ranked ? { source: ranked, reason: "default-priority" } : null;
+  }
+
+  function sourceLanguageRank(languageCode) {
+    if (typeof captionTrackApi.preferredLanguageRank === "function") {
+      return captionTrackApi.preferredLanguageRank(languageCode);
+    }
+    const normalized = String(languageCode || "").trim().toLowerCase().replace("_", "-");
+    const base = normalized.split("-")[0] || normalized;
+    const preferred = typeof captionTrackApi.preferredLanguageCodes === "function"
+      ? captionTrackApi.preferredLanguageCodes()
+      : ["nl", "en"];
+    const exactIndex = preferred.indexOf(normalized);
+    if (exactIndex >= 0) return exactIndex;
+    const baseIndex = preferred.indexOf(base);
+    return baseIndex >= 0 ? baseIndex : 100;
+  }
+
+  function findStoredSourceSelectionMatch(sources, selection) {
+    if (!selection?.sourceKind) return null;
+    const exact = selection.sourceId
+      ? sources.find((source) => source.id === selection.sourceId)
+      : null;
+    if (exact) return exact;
+
+    return sources.find((source) => {
+      if (sourceSelectionKind(source) !== selection.sourceKind) return false;
+      if (selection.languageCode && source.languageCode !== selection.languageCode) return false;
+      return true;
+    }) || null;
   }
 
   function phraseProgressId(phrase, index) {
@@ -2406,6 +2517,7 @@
         keepExistingOnError: true,
         preserveVideoTime: true,
         refreshCache: true,
+        allowPreferredSourceSwitch: false,
       });
     } finally {
       state.cacheRefreshRequested = false;
@@ -5632,11 +5744,18 @@
       state.tracks = captionTrackApi.getCaptionTracks(playerResponse);
       updateBootDiagnostics({ captionTracksCount: state.tracks.length });
       state.practiceSources = captionTrackApi.buildPracticeSources(state.tracks);
-      const defaultSource = captionTrackApi.chooseDefaultPracticeSource(state.practiceSources);
+      const preferredSource = choosePreferredPracticeSource(state.practiceSources, videoId);
+      const defaultSource = preferredSource?.source || captionTrackApi.chooseDefaultPracticeSource(state.practiceSources);
       if (!defaultSource) {
         throw new Error("No caption tracks found for this video.");
       }
-      await loadPracticeSource(defaultSource, { keepExistingOnError: false, preserveVideoTime: false, loadToken });
+      await loadPracticeSource(defaultSource, {
+        keepExistingOnError: false,
+        preserveVideoTime: false,
+        loadToken,
+        persistSelection: preferredSource?.reason === "stored-selection",
+        sourceSelectionReason: preferredSource?.reason || "initial-default",
+      });
     } catch (error) {
       if (loadToken !== state.loadToken) return;
       state.error = error instanceof Error ? error.message : String(error);
@@ -5736,7 +5855,13 @@
     if (!source || source.id === state.selectedSourceId || state.loading) return;
 
     state.sourceMenuOpen = false;
-    await loadPracticeSource(source, { keepExistingOnError: true, preserveVideoTime: true });
+    await loadPracticeSource(source, {
+      keepExistingOnError: true,
+      preserveVideoTime: true,
+      persistSelection: true,
+      allowPreferredSourceSwitch: false,
+      sourceSelectionReason: "manual-select",
+    });
   }
 
   async function loadPracticeSource(source, options) {
@@ -5816,6 +5941,9 @@
       source.loadedCueSource = transcriptResult.retrievalPath;
       source.loadedTranscriptResult = summarizeTranscriptResult(transcriptResult);
       source.lastRetrievalAttempts = transcriptResult.retrievalAttempts || [];
+      if (options.persistSelection) {
+        writeStoredSourceSelection(source, options.sourceSelectionReason || "source-loaded");
+      }
       state.guidedMode = state.autoPause;
       state.passivePausedKey = "";
       state.error = "";
@@ -5866,8 +5994,56 @@
         state.loading = false;
         holdInitialAutoPauseAfterSourceLoad();
         render();
+        if (options.allowPreferredSourceSwitch !== false) {
+          try {
+            await maybeSwitchToPreferredSource({
+              loadToken,
+              preserveVideoTime: Boolean(options.preserveVideoTime),
+              reason: "post-load",
+            });
+          } catch (error) {
+            recordDebugEvent("source-auto-switch-failed", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
       }
     }
+  }
+
+  async function maybeSwitchToPreferredSource(options = {}) {
+    const loadToken = options.loadToken ?? state.loadToken;
+    if (loadToken !== state.loadToken || state.loading || !state.practiceSources.length) return false;
+
+    const preferred = choosePreferredPracticeSource(state.practiceSources);
+    const target = preferred?.source;
+    if (!target || target.id === state.selectedSourceId) return false;
+
+    const current = getSelectedPracticeSource();
+    if (
+      preferred.reason !== "stored-selection" &&
+      current &&
+      sourceSelectionRank(current) <= sourceSelectionRank(target)
+    ) {
+      return false;
+    }
+
+    recordDebugEvent("source-auto-switch", {
+      reason: options.reason || preferred.reason,
+      selectionReason: preferred.reason,
+      from: current ? captionTrackApi.sourceDisplayName(current) : "",
+      to: captionTrackApi.sourceDisplayName(target),
+      targetKind: sourceSelectionKind(target),
+    });
+    await loadPracticeSource(target, {
+      keepExistingOnError: true,
+      preserveVideoTime: Boolean(options.preserveVideoTime),
+      loadToken,
+      persistSelection: preferred.reason === "stored-selection",
+      allowPreferredSourceSwitch: false,
+      sourceSelectionReason: preferred.reason,
+    });
+    return true;
   }
 
   function holdInitialAutoPauseAfterSourceLoad() {
