@@ -32,7 +32,8 @@
   const MAX_PHRASE_DURATION_MS = 12000;
   const LONG_PAUSE_MS = 1000;
   const PRE_ROLL_MS = 150;
-  const POST_ROLL_MS = 250;
+  const POST_ROLL_MS = 500;
+  const MIN_AUDIBLE_END_TAIL_MS = 300;
   const CONTIGUOUS_BOUNDARY_GUARD_MS = 120;
   const PLAYBACK_RATE_MIN = 0.25;
   const PLAYBACK_RATE_MAX = 2;
@@ -6646,8 +6647,9 @@
     if (!phrase) return 0;
     const nextPhrase = phrases[index + 1];
     const postRollEndMs = phrase.endMs + POST_ROLL_MS;
+    const audibleEndMs = phrase.endMs + MIN_AUDIBLE_END_TAIL_MS;
     if (nextPhrase && nextPhrase.startMs < postRollEndMs) {
-      return Math.max(phrase.endMs, nextPhrase.startMs - CONTIGUOUS_BOUNDARY_GUARD_MS);
+      return Math.min(postRollEndMs, Math.max(audibleEndMs, nextPhrase.startMs - CONTIGUOUS_BOUNDARY_GUARD_MS));
     }
     return postRollEndMs;
   }

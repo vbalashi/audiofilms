@@ -27,15 +27,16 @@ Current constants in `extensions/youtube-shadowing/src/content.js`:
 | Constant | Value | Purpose |
 | --- | ---: | --- |
 | `PRE_ROLL_MS` | `150` | Start slightly before the phrase or adjusted playback start. |
-| `POST_ROLL_MS` | `250` | Let short phrase endings breathe when there is room. |
+| `POST_ROLL_MS` | `500` | Let short phrase endings breathe when there is room. |
+| `MIN_AUDIBLE_END_TAIL_MS` | `300` | Keep a short audible tail after phrase end even at tight boundaries. |
 | `CONTIGUOUS_BOUNDARY_GUARD_MS` | `120` | Avoid leaking into the next phrase when the next phrase begins inside the post-roll window. |
 
 Important policy:
 
 - `playbackStartSec` is playback-only. It does not rewrite transcript text or
   phrase `startSec`.
-- The boundary guard may remove post-roll, but it must not pause before
-  `phrase.endMs`.
+- The boundary guard may remove part of post-roll, but it must preserve an
+  audible tail after `phrase.endMs`.
 - ASR word-level timings are treated as stronger evidence than YouTube rolling
   auto-caption phrase boundaries, but playback still has to handle exact
   zero-gap boundaries.
@@ -185,13 +186,13 @@ phrase end = 67.59
 Guard:
 
 - when the next phrase begins inside the post-roll window, clamp the guarded
-  stop to at least `phrase.endMs`;
-- the guard can remove the `250ms` post-roll, but cannot cut the current
-  phrase.
+  stop to at least `phrase.endMs + MIN_AUDIBLE_END_TAIL_MS`;
+- the guard can remove part of the `500ms` post-roll, but cannot cut the current
+  phrase or its audible tail.
 
 Regression check:
 
-- selecting phrase 14 should pause at or after `67.59s`;
+- selecting phrase 14 should pause around `67.89s`;
 - it may not leak meaningfully into phrase 15;
 - it must not pause at `67.47s`.
 
@@ -218,13 +219,13 @@ next startSec: 75.61
 Expected playback:
 
 ```text
-stop = 73.59 + POST_ROLL_MS = 73.84
+stop = 73.59 + POST_ROLL_MS = 74.09
 ```
 
 Regression check:
 
 - selecting phrase 16 should not stop early;
-- the pause should happen around `73.84s`;
+- the pause should happen around `74.09s`;
 - this case should not be affected by the exact-boundary guard.
 
 ## Manual Regression Procedure
