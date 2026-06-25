@@ -11,7 +11,7 @@ import {
 
 export type AsrJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 
-export type AsrTextSource = 'asr' | 'manual';
+export type AsrTextSource = 'asr' | 'manual' | 'auto';
 export type AsrSourceKind = 'manual' | 'auto';
 
 export type AsrJobRequest = {
@@ -72,6 +72,7 @@ function normalizeSourceKind(value: unknown): AsrSourceKind {
 }
 
 function normalizeTextSource(value: unknown): AsrTextSource {
+  if (value === 'auto') return 'auto';
   return value === 'manual' ? 'manual' : 'asr';
 }
 

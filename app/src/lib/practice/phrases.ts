@@ -107,6 +107,7 @@ function splitPhraseIntoTimedParts(
     elapsed += partDuration;
 
     return {
+      ...(parts.length === 1 ? phrase : {}),
       id: index,
       startSec,
       endSec,
@@ -306,12 +307,15 @@ export function normalizePracticePhrases(
   let buffer = '';
   let bufferStart: number | null = null;
   let bufferEnd = 0;
+  let bufferSource: Phrase | null = null;
+  let bufferPartCount = 0;
 
   const flush = () => {
     const text = buffer.trim().replace(/\s+/g, ' ');
     if (!text) return;
 
     normalized.push({
+      ...(bufferPartCount === 1 && bufferSource ? phrasePlaybackMetadata(bufferSource) : {}),
       id: normalized.length,
       startSec: bufferStart ?? bufferEnd,
       endSec: bufferEnd,
@@ -319,6 +323,8 @@ export function normalizePracticePhrases(
     });
     buffer = '';
     bufferStart = null;
+    bufferSource = null;
+    bufferPartCount = 0;
   };
 
   for (const phrase of mergeContinuationPhrases(phrases, resolvedOptions)) {
@@ -340,10 +346,12 @@ export function normalizePracticePhrases(
 
       if (bufferStart === null) {
         bufferStart = part.startSec;
+        bufferSource = part;
       }
 
       buffer = nextText;
       bufferEnd = Math.max(bufferEnd, part.endSec);
+      bufferPartCount += 1;
 
       if (
         /[.!?]$/.test(part.text) ||
@@ -358,4 +366,12 @@ export function normalizePracticePhrases(
   flush();
 
   return normalized.length > 0 ? normalized : phrases;
+}
+
+function phrasePlaybackMetadata(phrase: Phrase): Partial<Phrase> {
+  return {
+    ...(phrase.playbackStartSec !== undefined ? { playbackStartSec: phrase.playbackStartSec } : {}),
+    ...(phrase.timingFlags?.length ? { timingFlags: [...phrase.timingFlags] } : {}),
+    ...(phrase.wordTimings?.length ? { wordTimings: phrase.wordTimings.map((word) => ({ ...word })) } : {}),
+  };
 }

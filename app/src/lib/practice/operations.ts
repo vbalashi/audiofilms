@@ -314,9 +314,25 @@ async function buildCompletedResult(
       videoId: job.request.videoId,
       requestedLanguage: job.request.language,
     });
+    const alternatives = (result.alternatives || []).map((alternative) => {
+      const alternativeSnapshot = buildPracticeSnapshot(alternative.response, {
+        videoId: job.request.videoId,
+        requestedLanguage: job.request.language,
+      });
+      return {
+        id: alternative.id,
+        label: alternative.label,
+        snapshot: alternativeSnapshot,
+        snapshotRevisionId: alternativeSnapshot.snapshotRevisionId,
+        textSourceRevisionId: alternativeSnapshot.textSource?.revisionId,
+        timingEvidenceRevisionId: alternativeSnapshot.timingEvidence?.revisionId,
+        phraseSetRevisionId: alternativeSnapshot.phraseSet?.revisionId,
+      };
+    });
 
     return {
       snapshot,
+      alternatives,
       snapshotRevisionId: snapshot.snapshotRevisionId,
       textSourceRevisionId: snapshot.textSource?.revisionId,
       timingEvidenceRevisionId: snapshot.timingEvidence?.revisionId,

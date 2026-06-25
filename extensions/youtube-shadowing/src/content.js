@@ -2413,7 +2413,7 @@
     }
   }
 
-  async function startImproveTiming() {
+  async function startImproveTiming(textSourceOverride = "") {
     const source = getSelectedPracticeSource();
     const readiness = practiceReadiness();
     if (!source || !state.videoId || timingOperationState(readiness).active || readiness.state === "precise") return;
@@ -2430,7 +2430,7 @@
     try {
       const operation = await postBackendJson("practice-timing-create", {
         apiBase: state.timingOperationApiBase,
-        payload: buildPracticeTimingPayload(source),
+        payload: buildPracticeTimingPayload(source, textSourceOverride),
       });
       applyTimingOperation(operation);
     } catch (error) {
@@ -2444,15 +2444,16 @@
     }
   }
 
-  function buildPracticeTimingPayload(source) {
+  function buildPracticeTimingPayload(source, textSourceOverride = "") {
     const result = source?.loadedTranscriptResult || state.transcriptResult || {};
     const sourceKind = timingPayloadSourceKind(source, result);
     const artifact = result.practiceArtifact || practiceArtifactFromSnapshot(result.practiceSnapshot);
+    const textSource = textSourceOverride || (sourceKind === "manual" ? "manual" : "auto");
     const payload = {
       videoId: state.videoId,
       lang: result.languageCode || source?.languageCode || "auto",
       sourceKind,
-      textSource: sourceKind === "manual" ? "manual" : "asr",
+      textSource,
       fullAudio: true,
     };
     if (artifact?.snapshotRevisionId) payload.snapshotRevisionId = artifact.snapshotRevisionId;
@@ -2483,6 +2484,7 @@
       scheduleTimingOperationPoll(operation);
     } else {
       clearTimingOperationPoll();
+      registerTimingOperationResultSources(operation);
     }
   }
 
@@ -5757,9 +5759,10 @@
     try {
       state.cueSource = "";
       state.transcriptResult = null;
-      const cachedTimingResult = options.refreshCache
-        ? null
+      const reusableTimingResult = source.track?.afPracticeSnapshotSource && source.loadedTranscriptResult?.practiceSnapshot
+        ? transcriptResultFromLoadedSource(source)
         : await fetchReusableTimingTranscriptResult(source);
+      const cachedTimingResult = options.refreshCache ? null : reusableTimingResult;
       const transcriptResult = cachedTimingResult || await fetchBestAvailableCues(source.track, {
         refreshCache: Boolean(options.refreshCache),
       });
@@ -5769,6 +5772,7 @@
           id: cue.phraseId ?? index,
           startMs: cue.startMs,
           endMs: cue.endMs,
+          playbackStartMs: cue.playbackStartMs,
           text: phraseApi.cleanPhraseText(cue.text),
           cues: [cue],
           index,
@@ -5904,6 +5908,30 @@
     });
   }
 
+  function transcriptResultFromLoadedSource(source) {
+    const result = source.loadedTranscriptResult;
+    const snapshot = result?.practiceSnapshot;
+    if (!snapshot) return null;
+    const operation = {
+      id: source.id,
+      kind: "improve-timing",
+      state: "succeeded",
+      input: {
+        language: result.languageCode || source.languageCode || "",
+        textSource: snapshot.textSource?.kind === "asr" ? "asr" : snapshot.textSource?.kind === "provided-captions" ? "manual" : "auto",
+      },
+      result: {
+        snapshot,
+        diagnostics: {
+          asrJobId: result.actualTrackId || "",
+        },
+      },
+    };
+    return transcriptResultFromPracticeSnapshot(snapshot, operation, {
+      alternativeId: result.actualTrackId || "",
+    });
+  }
+
   async function fetchReusableTimingTranscriptResult(source) {
     if (!state.videoId) return null;
 
@@ -5915,7 +5943,18 @@
           reuseOnly: true,
         },
       });
-      return transcriptResultFromPracticeTimingOperation(operation);
+      const transcriptResult = transcriptResultFromPracticeTimingOperation(operation);
+      const registeredSources = registerTimingOperationResultSources(operation, {
+        mainResult: transcriptResult,
+      });
+      if (registeredSources > 0) {
+        recordDebugEvent("timing-cache-sources-registered", {
+          operationId: operation.id || "",
+          source: captionTrackApi.sourceDisplayName(source),
+          registeredSources,
+        });
+      }
+      return transcriptResult;
     } catch (error) {
       recordDebugEvent("timing-cache-miss", {
         source: captionTrackApi.sourceDisplayName(source),
@@ -5925,10 +5964,73 @@
     }
   }
 
+  function registerTimingOperationResultSources(operation, options = {}) {
+    if (operation?.kind !== "improve-timing" || operation.state !== "succeeded") return 0;
+
+    const selectedSource = getSelectedPracticeSource();
+    const mainResult = Object.prototype.hasOwnProperty.call(options, "mainResult")
+      ? options.mainResult
+      : transcriptResultFromPracticeTimingOperation(operation);
+    if (selectedSource && mainResult) {
+      selectedSource.loadedTranscriptResult = summarizeTranscriptResult(mainResult);
+      selectedSource.loadedCueSource = mainResult.retrievalPath;
+      selectedSource.lastRetrievalAttempts = mainResult.retrievalAttempts || [];
+      selectedSource.error = "";
+      selectedSource.lastError = "";
+    }
+
+    let registeredSources = 0;
+    for (const alternative of operation.result?.alternatives || []) {
+      if (registerPracticeSnapshotSource(operation, alternative)) {
+        registeredSources += 1;
+      }
+    }
+    return registeredSources;
+  }
+
+  function registerPracticeSnapshotSource(operation, alternative) {
+    const snapshot = alternative?.snapshot;
+    const result = transcriptResultFromPracticeSnapshot(snapshot, operation, {
+      alternativeId: alternative?.id || "",
+      label: alternative?.label || "",
+    });
+    if (!result) return false;
+
+    const sourceId = `practice:${operation.id || "timing"}:${alternative?.id || snapshot.snapshotRevisionId || state.practiceSources.length}`;
+    const existing = state.practiceSources.find((source) => source.id === sourceId);
+    const source = existing || {
+      id: sourceId,
+      index: state.practiceSources.length,
+      name: alternative?.label || snapshot.textSource?.label || "ASR transcript",
+      languageCode: snapshot.textSource?.languageCode || operation.input?.language || "",
+      track: {
+        kind: snapshot.textSource?.kind === "asr" ? "asr" : "manual",
+        languageCode: snapshot.textSource?.languageCode || operation.input?.language || "",
+        vssId: sourceId,
+        name: { simpleText: alternative?.label || snapshot.textSource?.label || "ASR transcript" },
+        afPracticeSnapshotSource: true,
+      },
+      error: "",
+      lastError: "",
+      lastRetrievalAttempts: [],
+      loadedCueSource: result.retrievalPath,
+      loadedTranscriptResult: summarizeTranscriptResult(result),
+    };
+
+    source.name = alternative?.label || snapshot.textSource?.label || source.name;
+    source.loadedCueSource = result.retrievalPath;
+    source.loadedTranscriptResult = summarizeTranscriptResult(result);
+    source.lastRetrievalAttempts = result.retrievalAttempts || [];
+    source.error = "";
+    source.lastError = "";
+
+    if (!existing) state.practiceSources.push(source);
+    return true;
+  }
+
   function transcriptResultFromPracticeTimingOperation(operation) {
     const snapshot = operation?.result?.snapshot;
-    const phrases = snapshot?.phraseSet?.phrases;
-    if (operation?.kind !== "improve-timing" || operation.state !== "succeeded" || !Array.isArray(phrases) || !phrases.length) {
+    if (operation?.kind !== "improve-timing" || operation.state !== "succeeded") {
       return null;
     }
 
@@ -5945,33 +6047,49 @@
       return null;
     }
 
+    return transcriptResultFromPracticeSnapshot(snapshot, operation);
+  }
+
+  function transcriptResultFromPracticeSnapshot(snapshot, operation, options = {}) {
+    const phrases = snapshot?.phraseSet?.phrases;
+    if (!Array.isArray(phrases) || !phrases.length) {
+      return null;
+    }
+
     const cues = phrases.map((phrase, index) => ({
       startMs: Math.max(0, Number(phrase.startSec || 0) * 1000),
       endMs: Math.max(0, Number(phrase.endSec || 0) * 1000),
+      playbackStartMs: phrase.playbackStartSec !== undefined
+        ? Math.max(0, Number(phrase.playbackStartSec || 0) * 1000)
+        : undefined,
       text: phraseApi.cleanPhraseText(phrase.text || ""),
       index,
+      timingFlags: Array.isArray(phrase.timingFlags) ? phrase.timingFlags : [],
     })).filter((cue) => cue.text && cue.endMs >= cue.startMs);
 
     if (!cues.length) return null;
 
     const textSource = operation.input?.textSource || snapshot.textSource?.kind || "";
-    const isManualTextSource = textSource === "manual" || snapshot.textSource?.kind === "provided-captions";
+    const isAsrTextSource = snapshot.textSource?.kind === "asr" || textSource === "asr";
+    const isManualTextSource = !isAsrTextSource && (textSource === "manual" || snapshot.textSource?.kind === "provided-captions");
 
     return {
       cues,
-      sourceKind: isManualTextSource ? "manual" : "asr",
+      sourceKind: isAsrTextSource ? "asr" : isManualTextSource ? "manual" : "auto",
       retrievalPath: "practice-timing-cache",
       fetchOrigin: "backend",
       provider: "audiofilms-practice-timing",
       selectedTrackId: "",
-      actualTrackId: operation.result?.diagnostics?.asrJobId || "",
+      actualTrackId: options.alternativeId || operation.result?.diagnostics?.asrJobId || "",
       languageCode: snapshot.textSource?.languageCode || operation.input?.language || "",
       timingExactness: "word-level",
       qualityFlags: [],
       warnings: [
-        isManualTextSource
+        isAsrTextSource
+          ? `ASR job completed: ${cues.length} ASR transcript phrases.`
+          : isManualTextSource
           ? `ASR timing cache aligned ${cues.length} caption phrases.`
-          : `ASR job completed: ${cues.length} ASR transcript phrases.`,
+          : `ASR timing cache aligned ${cues.length} auto-caption phrases.`,
       ],
       retrievalAttempts: [{ path: "practice-timing-cache", status: "ok", cues: cues.length }],
       cacheStatus: "hit",
@@ -6484,7 +6602,8 @@
     }
 
     stopPlaybackTimer();
-    const startSeconds = Math.max(0, phrase.startMs - PRE_ROLL_MS) / 1000;
+    const playbackStartMs = phrasePlaybackStartMs(phrase);
+    const startSeconds = Math.max(0, playbackStartMs - PRE_ROLL_MS) / 1000;
     const endSeconds = playbackEndMsForPhrase(state.phrases, index) / 1000;
     const normalPlaybackRate = syncPlaybackRateFromVideo(video);
     const requestedPlaybackRate = options.slowReplay ? slowReplayPlaybackRate() : normalPlaybackRate;
@@ -6500,6 +6619,8 @@
       navigationEventId: options.navigationEventId || null,
       targetPhrase: describePhraseAtIndex(index),
       seekToSec: roundTime(startSeconds),
+      phraseStartSec: roundTime(phrase.startMs / 1000),
+      playbackStartSec: roundTime(playbackStartMs / 1000),
       expectedPauseAtSec: roundTime(endSeconds),
       playbackRate: requestedPlaybackRate,
       slowReplay: Boolean(options.slowReplay),
@@ -6511,6 +6632,8 @@
       return {
         ok: true,
         seekToSec: roundTime(startSeconds),
+        phraseStartSec: roundTime(phrase.startMs / 1000),
+        playbackStartSec: roundTime(playbackStartMs / 1000),
         expectedPauseAtSec: null,
         autoPause: false,
         playbackRate: requestedPlaybackRate,
@@ -6541,6 +6664,18 @@
       playbackRate: requestedPlaybackRate,
       slowReplay: Boolean(options.slowReplay),
     };
+  }
+
+  function phrasePlaybackStartMs(phrase) {
+    const playbackStartMs = Number(phrase?.playbackStartMs);
+    if (
+      Number.isFinite(playbackStartMs) &&
+      playbackStartMs >= phrase.startMs &&
+      playbackStartMs < phrase.endMs
+    ) {
+      return playbackStartMs;
+    }
+    return phrase.startMs;
   }
 
   function scheduleNavigationObservation(navigationEventId, command, targetIndex, delayMs) {

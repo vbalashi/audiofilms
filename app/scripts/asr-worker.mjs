@@ -134,13 +134,14 @@ function runAsrPipeline(job) {
     engine,
     "--model",
     model,
+    "--text-source",
+    textSource,
   ];
   if (fullAudio) {
     alignArgs.push("--full");
   } else {
     alignArgs.push("--duration", String(durationSec));
   }
-  if (request.refresh) alignArgs.push("--refresh");
 
   execFileSync(process.execPath, alignArgs, {
     cwd: appRoot,
@@ -153,11 +154,58 @@ function runAsrPipeline(job) {
   const wordsPath = path.join(runDir, `${engine}-${modelSlug}-words.json`);
   const previewPath = path.join(runDir, `${engine}-${modelSlug}-practice-preview.json`);
 
-  const preview = textSource === "manual"
-    ? buildManualTextPreview({ videoId, language, fullAudio, durationSec, engine, model, previewPath })
-    : buildAsrTextPreview({ videoId, language, fullAudio, durationSec, engine, model, wordsPath });
-  const practicePhrases = (preview.practicePhrases || []).map((phrase, index) => ({ ...phrase, id: index }));
+  const preview = textSource === "asr"
+    ? buildAsrTextPreview({ videoId, language, fullAudio, durationSec, engine, model, wordsPath })
+    : buildManualTextPreview({ videoId, language, fullAudio, durationSec, engine, model, previewPath });
+  const result = buildSubtitleResult({
+    preview,
+    videoId,
+    language,
+    engine,
+    model,
+    textSource,
+    refresh: request.refresh,
+  });
 
+  if (textSource !== "asr") {
+    const asrPreview = buildAsrTextPreview({ videoId, language, fullAudio, durationSec, engine, model, wordsPath });
+    result.alternatives = [
+      {
+        id: "pure-asr",
+        label: "ASR transcript",
+        response: buildSubtitleResult({
+          preview: asrPreview,
+          videoId,
+          language,
+          engine,
+          model,
+          textSource: "asr",
+          refresh: request.refresh,
+        }),
+      },
+    ];
+  }
+
+  return result;
+}
+
+function buildSubtitleResult({ preview, language, engine, model, textSource, refresh }) {
+  const practicePhrases = (preview.practicePhrases || []).map((phrase, index) => ({ ...phrase, id: index }));
+  const suspiciousLeadingWordGapCount = Number(preview.summary?.suspiciousLeadingWordGapCount || 0);
+  const qualityFlags = [
+    ...(textSource !== "asr" && practicePhrases.some((phrase) => phrase.timingEvidence !== "asr-word-alignment")
+      ? ["inferred-end"]
+      : []),
+    ...(suspiciousLeadingWordGapCount > 0 ? ["asr-suspicious-leading-word-gap"] : []),
+  ];
+  const warnings = [
+    textSource === "asr"
+      ? `ASR job completed: ${practicePhrases.length} ASR transcript phrases.`
+      : `ASR job completed: ${preview.summary.asrAlignedPhraseCount}/${preview.summary.practicePhraseCount} ${textSource} caption phrases use ASR word alignment.`,
+    ...(suspiciousLeadingWordGapCount > 0
+      ? [`Adjusted playback starts for ${suspiciousLeadingWordGapCount} ASR phrases with suspicious leading word gaps.`]
+      : []),
+  ];
   return {
     phrases: practicePhrases,
     practicePhrases,
@@ -165,18 +213,12 @@ function runAsrPipeline(job) {
     meta: {
       provider: "audiofilms-asr-worker",
       fallbackUsed: false,
-      cacheStatus: request.refresh ? "stored" : "hit",
-      sourceKind: textSource === "manual" ? "manual" : "provider",
+      cacheStatus: refresh ? "stored" : "hit",
+      sourceKind: textSource === "manual" ? "manual" : textSource === "auto" ? "auto" : "provider",
       retrievalPath: `asr-job:${engine}:${model}:${textSource}`,
       timingExactness: "word-level",
-      qualityFlags: textSource === "manual" && practicePhrases.some((phrase) => phrase.timingEvidence !== "asr-word-alignment")
-        ? ["inferred-end"]
-        : [],
-      warnings: [
-        textSource === "manual"
-          ? `ASR job completed: ${preview.summary.asrAlignedPhraseCount}/${preview.summary.practicePhraseCount} phrases use ASR word alignment.`
-          : `ASR job completed: ${practicePhrases.length} ASR transcript phrases.`,
-      ],
+      qualityFlags,
+      warnings,
     },
     localAsrPreview: preview.summary,
   };
@@ -213,13 +255,7 @@ function buildAsrTextPreview(options) {
   const asr = JSON.parse(fs.readFileSync(options.wordsPath, "utf8"));
   const segments = mergeAsrSegments(asr.segments || []);
   const practicePhrases = segments
-    .map((segment, index) => ({
-      id: index,
-      startSec: Number(segment.start),
-      endSec: Number(segment.end),
-      text: String(segment.text || "").trim(),
-      timingEvidence: "asr-segment",
-    }))
+    .map((segment, index) => asrSegmentToPracticePhrase(segment, segments[index - 1], index))
     .filter((phrase) => Number.isFinite(phrase.startSec) && Number.isFinite(phrase.endSec) && phrase.endSec > phrase.startSec && phrase.text);
 
   return {
@@ -235,9 +271,76 @@ function buildAsrTextPreview(options) {
       asrAlignedPhraseCount: practicePhrases.length,
       fallbackPhraseCount: 0,
       textSource: "asr",
+      suspiciousLeadingWordGapCount: practicePhrases.filter((phrase) => phrase.timingFlags?.includes("asr-suspicious-leading-word-gap")).length,
     },
     practicePhrases,
   };
+}
+
+function asrSegmentToPracticePhrase(segment, previousSegment, index) {
+  const words = normalizeAsrWords(segment.words);
+  const timingAdjustment = suspiciousLeadingWordGapAdjustment({
+    segmentStart: Number(segment.start),
+    previousEnd: previousSegment ? Number(previousSegment.end) : null,
+    words,
+  });
+  return {
+    id: index,
+    startSec: Number(segment.start),
+    endSec: Number(segment.end),
+    ...(timingAdjustment ? { playbackStartSec: timingAdjustment.playbackStartSec } : {}),
+    text: String(segment.text || "").trim(),
+    timingEvidence: "asr-segment",
+    ...(timingAdjustment ? { timingFlags: ["asr-suspicious-leading-word-gap"] } : {}),
+    ...(words.length ? { wordTimings: words } : {}),
+  };
+}
+
+function normalizeAsrWords(words) {
+  if (!Array.isArray(words)) return [];
+  return words
+    .map((word) => ({
+      word: String(word.word || "").trim(),
+      startSec: Number(word.start),
+      endSec: Number(word.end),
+      ...(Number.isFinite(Number(word.probability)) ? { probability: Number(word.probability) } : {}),
+    }))
+    .filter((word) => word.word && Number.isFinite(word.startSec) && Number.isFinite(word.endSec) && word.endSec > word.startSec)
+    .sort((left, right) => left.startSec - right.startSec || left.endSec - right.endSec);
+}
+
+function suspiciousLeadingWordGapAdjustment({ segmentStart, previousEnd, words }) {
+  if (!Number.isFinite(segmentStart) || !Number.isFinite(previousEnd) || words.length < 2) return null;
+
+  const previousBoundaryGapSec = Math.max(0, segmentStart - previousEnd);
+  const firstWordGapSec = words[1].startSec - words[0].endSec;
+  if (previousBoundaryGapSec > 0.3 || firstWordGapSec < 0.9) return null;
+
+  const internalGaps = [];
+  for (let index = 1; index < words.length; index += 1) {
+    const gapSec = words[index].startSec - words[index - 1].endSec;
+    if (Number.isFinite(gapSec) && gapSec > 0) internalGaps.push(gapSec);
+  }
+  const laterGaps = internalGaps.slice(1);
+  const medianLaterGapSec = median(laterGaps);
+  const outlierThresholdSec = Math.max(0.9, medianLaterGapSec * 3);
+  if (firstWordGapSec < outlierThresholdSec) return null;
+
+  return {
+    playbackStartSec: words[1].startSec,
+    previousBoundaryGapSec,
+    firstWordGapSec,
+    medianLaterGapSec,
+  };
+}
+
+function median(values) {
+  const sorted = values.filter(Number.isFinite).sort((left, right) => left - right);
+  if (!sorted.length) return 0;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 function mergeAsrSegments(segments) {

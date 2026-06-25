@@ -3,6 +3,15 @@ export type Phrase = {
   startSec: number;
   endSec: number;
   text: string;
+  timingEvidence?: string;
+  playbackStartSec?: number;
+  timingFlags?: string[];
+  wordTimings?: Array<{
+    word: string;
+    startSec: number;
+    endSec: number;
+    probability?: number;
+  }>;
 };
 
 export type SubtitleSourceKind =
@@ -27,7 +36,9 @@ export type SubtitleQualityFlag =
   | 'overlap-cues'
   | 'inferred-end'
   | 'long-cues'
-  | 'rolling-caption';
+  | 'rolling-caption'
+  | 'suspicious-auto-timing'
+  | 'asr-suspicious-leading-word-gap';
 
 export type SubtitleRetrievalAttempt = {
   path: string;
@@ -75,6 +86,11 @@ export type SubtitleResponse = {
     warnings?: string[];
     retrievalAttempts?: SubtitleRetrievalAttempt[];
   };
+  alternatives?: Array<{
+    id: string;
+    label: string;
+    response: SubtitleResponse;
+  }>;
 };
 
 export type SubtitleLanguagePreference = string | 'auto';

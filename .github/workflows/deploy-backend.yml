@@ -3,6 +3,12 @@ name: Deploy AudioFilms backend
 on:
   push:
     branches: [main]
+    paths:
+      - "app/**"
+      - "compose.yaml"
+      - ".github/workflows/deploy-backend.yml"
+      - "!**/*.md"
+      - "!app/**/docs/**"
   workflow_dispatch:
 
 concurrency:

@@ -78,4 +78,38 @@ describe('subtitle service practice phrase cache handling', () => {
     ]);
     expect(result.meta?.cacheStatus).toBe('hit');
   });
+
+  it('keeps fresh auto captions usable when timing quality is suspicious', async () => {
+    vi.doMock('../../src/lib/providers', () => ({
+      getSubtitleProviderCandidates: () => [
+        {
+          type: 'yt-dlp',
+          provider: {
+            fetchSubtitles: vi.fn(async () => ({
+              language: 'nl',
+              sourceKind: 'auto',
+              retrievalPath: 'yt-dlp-auto',
+              timingExactness: 'exact',
+              qualityFlags: [],
+              warnings: [],
+              phrases: Array.from({ length: 12 }, (_value, index) => ({
+                id: index,
+                startSec: index,
+                endSec: index + 0.5,
+                text: `woord een twee drie ${index}`,
+              })),
+            })),
+          },
+        },
+      ],
+    }));
+
+    const { loadSubtitles } = await import('../../src/lib/subtitleService');
+
+    const result = await loadSubtitles('SJvlUB4F-G0', 'nl', { sourceKind: 'auto' });
+
+    expect(result.phrases).toHaveLength(12);
+    expect(result.meta?.qualityFlags).toContain('suspicious-auto-timing');
+    expect(result.meta?.warnings?.[0]).toContain('yt-dlp auto captions have unreliable timing');
+  });
 });

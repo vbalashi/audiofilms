@@ -14,6 +14,7 @@ const durationSec = Number(valueFor("--duration") || "90");
 const refresh = hasFlag("--refresh");
 const fullAudio = hasFlag("--full");
 const skipInstall = hasFlag("--skip-install");
+const textSource = normalizeTextSource(valueFor("--text-source") || valueFor("--textSource") || "manual");
 const engine = valueFor("--engine") || process.env.ASR_ENGINE || "faster-whisper";
 const engineConfig = getEngineConfig(engine);
 const modelName = valueFor("--model") || process.env.ASR_MODEL || engineConfig.defaultModel;
@@ -42,7 +43,7 @@ const asrJsonPath = path.join(runDir, `${asrOutputPrefix}-words.json`);
 const manualJsonPath = path.join(runDir, "manual-captions.json");
 const reportPath = path.join(runDir, `${asrOutputPrefix}-alignment-report.md`);
 
-console.log(`[local-asr] fixture=${videoId} lang=${language} duration=${fullAudio ? "full" : `${durationSec}s`} engine=${engineConfig.name}`);
+console.log(`[local-asr] fixture=${videoId} lang=${language} duration=${fullAudio ? "full" : `${durationSec}s`} engine=${engineConfig.name} textSource=${textSource}`);
 
 if (!fs.existsSync(audioPath) || refresh) {
   downloadAudio(audioPath);
@@ -50,11 +51,13 @@ if (!fs.existsSync(audioPath) || refresh) {
   console.log(`[local-asr] Reusing ${audioPath}`);
 }
 
-if (!fs.existsSync(manualJsonPath) || refresh) {
-  const manual = fetchManualCaptions();
-  fs.writeFileSync(manualJsonPath, JSON.stringify(manual, null, 2), "utf8");
-} else {
-  console.log(`[local-asr] Reusing ${manualJsonPath}`);
+if (textSource !== "asr") {
+  if (!fs.existsSync(manualJsonPath) || refresh) {
+    const manual = fetchSourceCaptions(textSource);
+    fs.writeFileSync(manualJsonPath, JSON.stringify(manual, null, 2), "utf8");
+  } else {
+    console.log(`[local-asr] Reusing ${manualJsonPath}`);
+  }
 }
 
 ensureEngine();
@@ -65,9 +68,10 @@ if (!fs.existsSync(asrJsonPath) || refresh) {
   console.log(`[local-asr] Reusing ${asrJsonPath}`);
 }
 
-const manualPayload = JSON.parse(fs.readFileSync(manualJsonPath, "utf8"));
 const asrPayload = JSON.parse(fs.readFileSync(asrJsonPath, "utf8"));
-const report = buildAlignmentReport(manualPayload, asrPayload);
+const report = textSource === "asr"
+  ? buildPureAsrReport(asrPayload)
+  : buildAlignmentReport(JSON.parse(fs.readFileSync(manualJsonPath, "utf8")), asrPayload);
 fs.writeFileSync(reportPath, renderReport(report), "utf8");
 
 console.log(renderSummary(report));
@@ -83,6 +87,11 @@ function valueFor(name) {
   if (exactIndex >= 0) return args[exactIndex + 1] || "";
   const prefixed = args.find((arg) => arg.startsWith(`${name}=`));
   return prefixed ? prefixed.slice(name.length + 1) : "";
+}
+
+function normalizeTextSource(value) {
+  if (value === "asr" || value === "auto" || value === "manual") return value;
+  return "manual";
 }
 
 function ensureDir(dir) {
@@ -165,8 +174,9 @@ function formatDuration(seconds) {
   return `00:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
 }
 
-function fetchManualCaptions() {
-  console.log("[local-asr] Fetching manual captions with yt-dlp metadata");
+function fetchSourceCaptions(sourceKind) {
+  const sourceLabel = sourceKind === "auto" ? "automatic" : "manual";
+  console.log(`[local-asr] Fetching ${sourceLabel} captions with yt-dlp metadata`);
   const infoText = execFileSync(ytDlpPath, [
     "--skip-download",
     "--dump-single-json",
@@ -176,17 +186,17 @@ function fetchManualCaptions() {
     maxBuffer: 50 * 1024 * 1024,
   });
   const info = JSON.parse(infoText);
-  const sourceMap = info.subtitles || {};
-  const trackKey = chooseTrackKey(sourceMap, language);
+  const sourceMap = sourceKind === "auto" ? info.automatic_captions || {} : info.subtitles || {};
+  const trackKey = chooseTrackKey(sourceMap, language, sourceKind === "auto");
   if (!trackKey) {
-    throw new Error(`No manual subtitle track found for ${language}`);
+    throw new Error(`No ${sourceLabel} subtitle track found for ${language}`);
   }
 
   const track = sourceMap[trackKey] || [];
   const vtt = track.find((item) => item.ext === "vtt" && item.url && item.protocol !== "m3u8_native") ||
     track.find((item) => item.ext === "vtt" && item.url);
   if (!vtt?.url) {
-    throw new Error(`No VTT manual subtitle URL found for ${trackKey}`);
+    throw new Error(`No VTT ${sourceLabel} subtitle URL found for ${trackKey}`);
   }
 
   const raw = fetchText(vtt.url);
@@ -201,6 +211,7 @@ function fetchManualCaptions() {
   return {
     videoId,
     language,
+    sourceKind,
     trackKey,
     title: info.title || "",
     durationSec: info.duration || null,
@@ -208,8 +219,14 @@ function fetchManualCaptions() {
   };
 }
 
-function chooseTrackKey(sourceMap, lang) {
+function chooseTrackKey(sourceMap, lang, preferOriginalAuto = false) {
   const keys = Object.keys(sourceMap || {});
+  if (preferOriginalAuto) {
+    return keys.find((key) => key === `${lang}-orig`) ||
+      keys.find((key) => key === lang) ||
+      keys.find((key) => key.startsWith(`${lang}-`)) ||
+      "";
+  }
   return keys.find((key) => key === lang) ||
     keys.find((key) => key.startsWith(`${lang}-`)) ||
     "";
@@ -343,6 +360,49 @@ function buildAlignmentReport(manualPayload, asrPayload) {
       .filter((token) => !matchedAsr.has(token.index))
       .slice(0, 20)
       .map((token) => token.raw),
+  };
+}
+
+function buildPureAsrReport(asrPayload) {
+  const asrTokens = tokenizeAsrWords(asrPayload.words || []);
+  return {
+    generatedAt: new Date().toISOString(),
+    videoId,
+    language,
+    durationSec: fullAudio ? Number(asrPayload.durationSec || asrPayload.duration || 0) : durationSec,
+    fullAudio,
+    textSource: "asr",
+    engine: asrPayload.engine || engineConfig.name,
+    model: asrPayload.model,
+    device: asrPayload.device,
+    computeType: asrPayload.computeType,
+    manualTrackKey: "",
+    title: "",
+    manualCueCount: 0,
+    manualTokenCount: 0,
+    asrSegmentCount: asrPayload.segments?.length || 0,
+    asrWordCount: asrTokens.length,
+    matchedTokenCount: 0,
+    manualCoverage: 0,
+    asrCoverage: 1,
+    zeroLengthWordCount: asrTokens.filter((token) => token.end <= token.start).length,
+    oddDurationWordCount: asrTokens.filter((token) => token.end - token.start > 1.2 || token.end <= token.start).length,
+    projectedCueCount: asrPayload.segments?.length || 0,
+    projectedExactCueCount: asrPayload.segments?.length || 0,
+    lowConfidenceCueCount: 0,
+    examples: [],
+    projectedSamples: (asrPayload.segments || []).slice(0, 10).map((segment, index) => ({
+      cueId: index,
+      text: String(segment.text || "").trim(),
+      coverage: 1,
+      localAsrDensity: 1,
+      asrSpanSec: Number(segment.end) - Number(segment.start),
+      timingEvidence: "asr-segment",
+      startSec: Number(segment.start),
+      endSec: Number(segment.end),
+    })),
+    unmatchedManualSamples: [],
+    unmatchedAsrSamples: [],
   };
 }
 

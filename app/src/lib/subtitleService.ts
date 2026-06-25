@@ -130,36 +130,35 @@ export async function loadSubtitles(
   const cachedTimingIssue = cached?.language ? findUnusableTimingIssue(cached) : null;
 
   if (cached?.language) {
-    if (cachedTimingIssue) {
-      console.warn(
-        `[SubtitleService] Ignoring cached subtitles for ${videoId}: ${timingIssueMessage(cachedTimingIssue)}`,
-      );
-    } else {
-      console.log(
-        `[SubtitleService] Returning cached subtitles for ${videoId} (language: ${cached.language})`,
-      );
-      return withPracticePhrases({
-        ...cached,
-        meta: cached.meta
-          ? {
-            ...cached.meta,
-            cacheStatus: 'hit',
-          }
-          : {
-            provider: 'cache',
-            fallbackUsed: false,
-            cacheStatus: 'hit',
-          },
-      });
-    }
+    console.log(
+      `[SubtitleService] Returning cached subtitles for ${videoId} (language: ${cached.language})`,
+    );
+    const warning = cachedTimingIssue ? timingIssueMessage(cachedTimingIssue) : '';
+    const meta = cached.meta
+      ? {
+        ...cached.meta,
+        cacheStatus: 'hit' as const,
+        warning: cached.meta.warning || warning || undefined,
+        warnings: warning
+          ? Array.from(new Set([...(cached.meta.warnings || []), warning]))
+          : cached.meta.warnings,
+        qualityFlags: warning
+          ? Array.from(new Set([...(cached.meta.qualityFlags || []), 'suspicious-auto-timing' as const]))
+          : cached.meta.qualityFlags,
+      }
+      : {
+        provider: 'cache',
+        fallbackUsed: false,
+        cacheStatus: 'hit' as const,
+      };
+    return withPracticePhrases({
+      ...cached,
+      meta,
+    });
   }
 
   if (options.refresh) {
     console.log(`[SubtitleService] Cache refresh requested for ${videoId}`);
-  } else if (cachedTimingIssue) {
-    console.log(
-      `[SubtitleService] Cached data failed timing quality for ${videoId}, refetching`,
-    );
   } else if (cached) {
     console.log(
       `[SubtitleService] Cached data missing language field for ${videoId}, refetching`,
@@ -232,7 +231,14 @@ export async function loadSubtitles(
       };
       const timingIssue = findUnusableTimingIssue(response);
       if (timingIssue) {
-        throw new Error(timingIssueMessage(timingIssue));
+        const warning = timingIssueMessage(timingIssue);
+        const meta = response.meta!;
+        response.meta = {
+          ...meta,
+          warning: meta.warning || warning,
+          warnings: [...(meta.warnings || []), warning],
+          qualityFlags: Array.from(new Set([...(meta.qualityFlags || []), 'suspicious-auto-timing'])),
+        };
       }
 
       const shouldStore = !(

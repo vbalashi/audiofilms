@@ -260,4 +260,28 @@ describe('normalizePracticePhrases', () => {
       },
     ]);
   });
+
+  it('preserves playback-only ASR start adjustment on single practice phrases', () => {
+    const phrases: Phrase[] = [
+      {
+        id: 7,
+        startSec: 36.91,
+        endSec: 43.03,
+        playbackStartSec: 40.81,
+        timingFlags: ['asr-suspicious-leading-word-gap'],
+        text: 'Het is al een paar dagen heel warm.',
+      },
+    ];
+
+    expect(normalizePracticePhrases(phrases)).toEqual([
+      {
+        id: 0,
+        startSec: 36.91,
+        endSec: 43.03,
+        playbackStartSec: 40.81,
+        timingFlags: ['asr-suspicious-leading-word-gap'],
+        text: 'Het is al een paar dagen heel warm.',
+      },
+    ]);
+  });
 });

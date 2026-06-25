@@ -365,3 +365,16 @@ Continue Stage 1 rolling cleanup before changing runtime behavior:
 2. Manually review `RJrjzCuCHpo` auto output as a timing fallback, then decide if manual display text is still important enough for Stage 2.
 3. If the manual review passes, productize Stage 1 normalization behind the provider/source selection layer.
 4. If display-text quality is still not good enough on manual+ASR videos, prototype Stage 2 on `RJrjzCuCHpo`.
+
+Related follow-up:
+
+```text
+docs/exec-plans/active/asr-word-timestamp-refinement.md
+```
+
+That note tracks a narrower June 25, 2026 finding from `SJvlUB4F-G0`: pure ASR
+text can be much better than YouTube rolling auto captions, but Whisper-family
+word timings can still assign a phrase start to the previous phrase boundary and
+leave a long internal gap before the actual dense speech. Treat that as a
+timestamp-refinement project layered on top of this rolling/alignment plan, not
+as a reason to add another user-facing button.

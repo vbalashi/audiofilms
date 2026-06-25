@@ -112,6 +112,15 @@ export type PracticeTimingOperation = {
   retryAfterMs: number;
   result?: {
     snapshot?: PracticeSnapshot;
+    alternatives?: Array<{
+      id: string;
+      label: string;
+      snapshot: PracticeSnapshot;
+      snapshotRevisionId: string;
+      textSourceRevisionId?: string;
+      timingEvidenceRevisionId?: string;
+      phraseSetRevisionId?: string;
+    }>;
     snapshotRevisionId?: string;
     textSourceRevisionId?: string;
     timingEvidenceRevisionId?: string;
