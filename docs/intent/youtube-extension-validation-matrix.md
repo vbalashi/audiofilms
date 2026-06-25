@@ -89,6 +89,9 @@ For extension smoke checks:
   `start-learning` for signed-in learners. The service worker remains the only
   component that attaches the 2000NL Connect token to generated draft/save
   requests.
+- ASR playback guard regressions are checked against
+  `docs/runbooks/youtube-shadowing-playback-regression-log.md` before changing
+  phrase replay, auto-pause, timing cache reuse, or ASR word timestamp handling.
 
 For local app API checks:
 
@@ -108,6 +111,7 @@ For local app API checks:
 | Multilingual Arabic source switch and lookup | `aircAruvnKk` English -> Arabic | Non-Latin/RTL manual captions should remain selectable, renderable, and word-clickable from the source menu | Arabic manual source loads, source badge updates, row contains Arabic text, word click opens dictionary context, no visible error | API passing: 217 Arabic phrases; extension smoke passing with 213 phrase units |
 | Legacy extension NOS fixture | `ZNQWWW-vvfM` | Earlier extension target with manual Dutch and auto/original Dutch tracks | Extension should prefer first non-ASR Dutch track and show source metadata | API passing: 149 phrases; extension SPA smoke passing |
 | Dutch auto-caption-only video | `xymyDvCgWDA` | Ensure auto captions are selected and labeled as degraded only if quality flags say so | Shows `Auto · exact` or degraded flags when appropriate | API and extension smoke passing with `overlap-cues` warning |
+| ASR playback edge-case video | `SJvlUB4F-G0` | Pure ASR source; cached timing job has suspicious leading-word gap, exact zero-gap boundary, and normal post-roll cases | ASR source appears from timing cache; phrase 8 uses `playbackStartSec`; phrase 14 does not clip the final word at an exact boundary; phrase 16 keeps normal post-roll | Manual regression fixture; see `docs/runbooks/youtube-shadowing-playback-regression-log.md` |
 | Manual/ASR divergence video | `RJrjzCuCHpo` | YouTube exposes manual Dutch plus auto Dutch; manual has a 22s long cue, ASR has rolling captions/word timing, and backend provider can return the same 138-cue transcript for both | Treat manual as degraded via `long-cues`; do not assume backend `sourceKind=auto` proves that the actual YouTube ASR track was loaded unless provider/origin and cue shape confirm it | Diagnostic case, not in full smoke yet |
 | No captions video | `EColTNIbOko` | Empty-state behavior | Clear no-subtitles error, no fake transcript fallback, compact empty UI without playback controls | API and extension smoke passing |
 | Backend failed degraded state | `4EE7m94mJpk` with unavailable backend URL | Caption tracks exist, YouTube timedtext is empty, and backend provider cannot be reached | Clear provider-failed error, `0 / 0`, hidden playback controls, no stale phrases | Passing in normal Chrome smoke |

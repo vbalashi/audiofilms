@@ -11,6 +11,7 @@ This is a follow-up to:
 
 - `docs/exec-plans/active/subtitle-source-quality-shootout.md`
 - `docs/exec-plans/active/rolling-caption-alignment-quality.md`
+- `docs/runbooks/youtube-shadowing-playback-regression-log.md`
 
 ## Current Trigger Case
 
@@ -28,7 +29,9 @@ Observed with the public Dell backend and the YouTube extension on June 25,
   - a `pure-asr` alternative source;
 - the `pure-asr` alternative has much cleaner learner text than YouTube rolling
   auto captions on this fixture;
-- phrase 8 in the UI (`index=7`) starts too early for shadowing:
+- phrase 8 in the UI (`index=7`) starts too early for shadowing. This case and
+  later playback-stop edge cases are preserved as repeatable regression checks
+  in `docs/runbooks/youtube-shadowing-playback-regression-log.md`:
 
 ```text
 36.91 - 43.03  Het is al een paar dagen heel warm.

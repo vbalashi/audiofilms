@@ -13,7 +13,9 @@ Read these files in order:
 3. `docs/intent/youtube-extension-designer-brief.md` for current product/UI intent and terminology.
 4. `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md` when backend/API fields are involved.
 5. `docs/intent/youtube-extension-validation-matrix.md` for current fixtures and latest pass/fail evidence.
-6. Optional historical context only:
+6. `docs/runbooks/youtube-shadowing-playback-regression-log.md` before changing
+   ASR timing, phrase playback, replay stop behavior, or auto-pause guards.
+7. Optional historical context only:
    `docs/exec-plans/active/youtube-extension-stabilization-and-rebuild.md`.
    Do not implement old UI labels, shortcut maps, source badges, or ASR
    non-goals from that file when they conflict with the designer brief or
