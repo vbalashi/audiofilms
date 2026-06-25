@@ -6471,7 +6471,7 @@
     const nextPhrase = phrases[index + 1];
     const postRollEndMs = phrase.endMs + POST_ROLL_MS;
     if (nextPhrase && nextPhrase.startMs < postRollEndMs) {
-      return Math.max(phrase.startMs, nextPhrase.startMs - CONTIGUOUS_BOUNDARY_GUARD_MS);
+      return Math.max(phrase.endMs, nextPhrase.startMs - CONTIGUOUS_BOUNDARY_GUARD_MS);
     }
     return postRollEndMs;
   }
