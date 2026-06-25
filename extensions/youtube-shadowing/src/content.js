@@ -4862,9 +4862,6 @@
       return window.__afShadowingConfig.dictionaryEndpoint();
     }
 
-    const configured = window.localStorage.getItem("afShadowingDictionaryUrl") || "";
-    if (configured === "off") return "";
-    if (configured) return configured;
     return "https://audiofilms-api.dilum.io/api/dict";
   }
 

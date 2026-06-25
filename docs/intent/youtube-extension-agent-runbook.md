@@ -140,18 +140,22 @@ normal Google Chrome and supports `--reload-extension`.
 ## Backend Requirement
 
 The extension runtime defaults to the remote tester API documented in
-`extensions/youtube-shadowing/README.md`. Caption fallback requests now use the
-practice captions operation boundary so backend snapshot revisions are
-available for dictionary provenance:
+`extensions/youtube-shadowing/README.md`. Treat that remote host as the normal
+QA target: deploy backend changes first, then validate through
+`https://audiofilms-api.dilum.io`. Use localhost only when explicitly building
+or debugging a new local backend path before deployment.
+
+Caption fallback requests now use the practice captions operation boundary so
+backend snapshot revisions are available for dictionary provenance:
 
 ```text
 https://audiofilms-api.dilum.io/api/practice/captions
 ```
 
 Local regression smoke fixtures can still be pointed at the local AudioFilms app
-API when that is the explicit test target. The local preflight is now opt-in
-with `--local-backend-check` and checks `/api/get-subs` as a lightweight
-subtitle-read health check:
+API when that is the explicit test target. This is not the default release or
+regression path. The local preflight is opt-in with `--local-backend-check` and
+checks `/api/get-subs` as a lightweight subtitle-read health check:
 
 ```text
 http://localhost:3000/api/get-subs
@@ -168,9 +172,11 @@ http://localhost:3000/api/get-subs?videoId=4EE7m94mJpk&lang=nl&sourceKind=manual
 If the local backend is intentionally unavailable, omit `--local-backend-check`.
 Do not use that as evidence that local backend integration works.
 
-Dictionary lookup defaults to the configured AudioFilms API base plus
-`/api/dict/lookup`, which is remote unless localStorage explicitly overrides the
-API base. The local development command path is:
+Dictionary lookup defaults to the AudioFilms service-worker command path and
+remote `/api/dict/lookup`. Keep dictionary UI smoke on the remote host. If the
+task is specifically local backend development, test the backend route directly
+or use a deliberately modified local build; do not treat YouTube `localStorage`
+as the dictionary runtime switch. The local backend route for that exception is:
 
 ```text
 http://localhost:3000/api/dict/lookup
@@ -281,10 +287,10 @@ Current subtitle backend expectation:
 - The app default subtitle extractor is `yt-dlp`, with Supadata as an explicit subtitle provider fallback when configured.
 - The extension still tries YouTube page timed text first. If YouTube returns `HTTP 429`, it falls back to the configured `/api/practice/captions` endpoint, which defaults to `https://audiofilms-api.dilum.io/api/practice/captions`.
 - For private local ASR dogfood, set `localStorage.afShadowingLocalAsr = "on"` on the
-  YouTube watch page. This deliberately tries
-  `http://localhost:3000/api/local-asr-practice` before YouTube `timedtext`,
-  so the extension is testing the local transcript/alignment path rather than
-  the ordinary caption path.
+  YouTube watch page only when the local ASR prototype itself is the target.
+  The compatibility endpoint `http://localhost:3000/api/local-asr-practice`
+  deliberately tests the local transcript/alignment path rather than the
+  ordinary remote caption path.
 - Private local ASR dogfood can use the full video by default. Do not set
   `localStorage.afShadowingLocalAsrDuration` unless you explicitly want a
   bounded smoke. Remote tester jobs should stay duration-bounded unless the

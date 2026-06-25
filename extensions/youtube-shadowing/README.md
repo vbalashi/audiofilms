@@ -106,13 +106,17 @@ AF_DICTIONARY_URL=$AF_API_BASE/api/dict
 AF_2000NL_CONNECT_BASE=https://2000.dilum.io
 ```
 
-Local development keeps the existing overrides:
+Remote API validation is the default for this extension. Use localhost only
+when intentionally building or debugging a new local backend path before
+deployment; ordinary QA should deploy the backend first and then test the
+remote host.
+
+Local development keeps limited overrides:
 
 ```js
 localStorage.afShadowingApiBase = "http://localhost:3000";
 localStorage.afShadowingBackendSubtitlesUrl = "off"; // disable backend fallback
 localStorage.afShadowingLocalAsrUrl = "http://localhost:3000/api/local-asr-practice"; // private compatibility only
-localStorage.afShadowingDictionaryUrl = "http://localhost:3000/api/dict";
 ```
 
 The manifest grants the specific remote host `https://audiofilms-api.dilum.io/*`, not a wildcard `*.dilum.io`, so service movement should happen behind DNS or through `afShadowingApiBase` rather than new extension code.
@@ -402,7 +406,8 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - Dictionary lookup goes through the service worker command path to
   `https://audiofilms-api.dilum.io/api/dict/lookup` by default. The content
   script sends only a command and body; it does not choose the authenticated
-  request URL.
+  request URL. Treat remote dictionary lookup as the normal verification path;
+  localhost dictionary checks are only for deliberate local backend development.
 - 2000NL-backed guest lookup must not use a shared end-user token in production.
   `DICTIONARY_2000NL_ACCESS_TOKEN` is only a short-lived local dogfood fallback
   when the AudioFilms app explicitly enables it. Write routes such as

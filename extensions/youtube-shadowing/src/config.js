@@ -55,7 +55,7 @@
   }
 
   function dictionaryEndpoint() {
-    return endpoint("dictionary", "afShadowingDictionaryUrl");
+    return endpoint("dictionary");
   }
 
   function trustedTesterToken() {
