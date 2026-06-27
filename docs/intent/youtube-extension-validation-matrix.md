@@ -76,7 +76,13 @@ For extension smoke checks:
 - Dictionary V2 card UI is covered with a controlled smoke fixture: card title,
   chips, sections, phase-dependent progress actions, card translation ready
   state, card translation error state, and hidden/frozen cards with no progress
-  row.
+  row. This fixture uses `afShadowingDictionaryMock`; it is a UI and layout
+  regression check, not proof of dictionary backend correctness. Run it through
+  `--full` before UI release candidates, or directly with
+  `node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry`
+  after changes to layout, cards, generated drafts, span selection, popovers, or
+  visual layering. It saves local screenshot evidence under
+  `extensions/youtube-shadowing/.smoke-artifacts/`.
 - Source-aware dictionary actions use a frozen `DictionarySourceBinding`
   captured at word click. Manual smoke should cover backend captions, direct
   timed-text fallback, transcript-panel fallback, source switch after lookup,
@@ -130,7 +136,7 @@ For local app API checks:
 | Failed source switch | `4EE7m94mJpk` manual -> auto with unavailable backend URL | A working source is already loaded, but the newly selected source fails | Keep previous source, count, and phrase visible; record error on failed source option | Passing in normal Chrome smoke |
 | SPA navigation | `4EE7m94mJpk` -> `ZNQWWW-vvfM` -> `4EE7m94mJpk` | YouTube watch-page navigation reset | Video id, tracks, phrases, and selected source reset | Passing in normal Chrome smoke |
 | Logged-out clean Chrome profile | Temporary Chrome for Testing profile | Boot reproducibility without existing profile state | Boot marker and toggle appear after extension load and tab reload | Passing in CDP smoke |
-| Viewport variants | `4EE7m94mJpk` | Compact UI responsiveness | No overlap at narrow/wide widths; YouTube recommendations not replaced | Passing DOM-geometry smoke; screenshots captured |
+| Viewport and mocked dictionary UI variants | `4EE7m94mJpk` with mocked dictionary cards | Compact UI responsiveness plus controlled dictionary-card, generated-draft, span-selection, and popover states | No overlap at narrow/wide widths; panels stay in viewport; mocked dictionary card actions/translations render without layout regression | Full smoke and focused `--only-geometry`; local screenshots saved under `.smoke-artifacts/`; not a backend dictionary test |
 
 ## Latest Run
 

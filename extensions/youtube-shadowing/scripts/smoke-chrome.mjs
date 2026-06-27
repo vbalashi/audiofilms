@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { mkdirSync } from "node:fs";
 
 const EXTENSION_ID = "hhdkchoccmikoefhenobdjipgdppdpoc";
+const SMOKE_ARTIFACT_DIR = "extensions/youtube-shadowing/.smoke-artifacts";
 
 const FIXTURES = [
   {
@@ -641,10 +643,15 @@ function runGeometryScenario() {
 
     resizeChrome(430, 900);
     sleep(1200);
+    setDebugVisible(false);
     const narrowWithDictionary = readGeometrySnapshot();
+    const narrowEvidence = captureChromeScreenshot("geometry-narrow-dictionary");
 
     resizeChrome(1344, 900);
     const generatedDraftAssertions = assertGeneratedDraftCardUi();
+    setDebugVisible(false);
+    const wideEvidence = captureChromeScreenshot("geometry-wide-generated-draft");
+    const evidencePaths = [wideEvidence, narrowEvidence].filter(Boolean);
 
     const assertions = [
       assertion("geometry lookup word clicked", lookupClick.clicked, lookupClick.detail),
@@ -663,6 +670,7 @@ function runGeometryScenario() {
       assertion("phrase navigation has three compact controls", wideBeforeLookup.primaryUi?.phraseButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
       assertion("dictionary ready body starts at cards", wideWithDictionary.dictionaryUi?.hasSelectedCard === false && wideWithDictionary.dictionaryUi?.overlayCardCount > 0, JSON.stringify(wideWithDictionary.dictionaryUi)),
       assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
+      assertion("geometry screenshot evidence captured", evidencePaths.length === 2, evidencePaths.join(" | ")),
       ...accountPlacementAssertions,
       ...dictionaryCardAssertions,
       ...spanSelectionAssertions,
@@ -681,7 +689,7 @@ function runGeometryScenario() {
       snapshot: {
         source: `${wideBeforeLookup.viewport.width}x${wideBeforeLookup.viewport.height} -> ${narrowWithDictionary.viewport.width}x${narrowWithDictionary.viewport.height}`,
         count: wideBeforeLookup.count,
-        message: "",
+        message: evidencePaths.join(" | "),
         error: wideBeforeLookup.error,
       },
     };
@@ -2673,6 +2681,22 @@ tell application "Google Chrome"
 end tell
   `);
   sleep(500);
+}
+
+function captureChromeScreenshot(label) {
+  mkdirSync(SMOKE_ARTIFACT_DIR, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const path = `${SMOKE_ARTIFACT_DIR}/${timestamp}-${label}.png`;
+  runAppleScript(`
+tell application "Google Chrome"
+  activate
+end tell
+  `);
+  sleep(250);
+  execFileSync("screencapture", ["-x", path], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  return path;
 }
 
 function chromeEval(js) {
