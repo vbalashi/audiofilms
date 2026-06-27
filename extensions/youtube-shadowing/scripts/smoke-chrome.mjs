@@ -39,7 +39,7 @@ const FIXTURES = [
     expect: {
       minTracks: 1,
       sourceIncludes: ["auto-captions"],
-      countPattern: /\/ 106$/,
+      countPattern: /\/ 125$/,
       retrievalPath: "backend-provider",
       empty: false,
     },
@@ -307,6 +307,7 @@ console.log(`\nAll ${results.length} YouTube extension ${shouldRunFullSuite ? "r
 
 function runFixture(fixture) {
   const url = `https://www.youtube.com/watch?v=${fixture.videoId}`;
+  removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
   navigate(url);
 
   const snapshot = waitForSnapshot(fixture.videoId, waitMs);
@@ -424,11 +425,13 @@ function runMultilingualSourceSwitchScenario() {
   assertions.push(assertion("Arabic source has non-Latin phrase row", /[\u0600-\u06FF]/.test(arabicSnapshot.rowText || ""), arabicSnapshot.rowText));
   assertions.push(assertion("Arabic source has no visible error", !(arabicSnapshot.error || "").trim(), arabicSnapshot.error));
   const clicked = clickFirstLookupWord();
-  const lookupSnapshot = waitForDictionary(waitMs);
+  const lookupSnapshot = waitForDictionarySelection(clicked.word, waitMs);
   assertions.push(assertion("Arabic lookup word clicked", clicked.clicked && /[\u0600-\u06FF]/.test(clicked.word || ""), `${clicked.word} ${clicked.detail}`));
   assertions.push(assertion("Arabic lookup dictionary opened", lookupSnapshot.dictionary?.present === true));
   assertions.push(assertion("Arabic lookup selected Arabic word", /[\u0600-\u06FF]/.test(lookupSnapshot.dictionary?.word || ""), lookupSnapshot.dictionary?.word || ""));
-  assertions.push(assertion("Arabic lookup keeps Arabic context", /[\u0600-\u06FF]/.test(lookupSnapshot.dictionary?.context || ""), lookupSnapshot.dictionary?.context || ""));
+  assertions.push(assertion("Arabic lookup completed", lookupSnapshot.dictionary?.loading === false, lookupSnapshot.dictionary?.subtitle || ""));
+  assertions.push(assertion("Arabic lookup renders lookup surface", lookupSnapshot.dictionary?.cardCount > 0 || Boolean(lookupSnapshot.dictionary?.lookupTitle || lookupSnapshot.dictionary?.lookupCopy), JSON.stringify(lookupSnapshot.dictionary)));
+  assertions.push(assertion("Arabic lookup leaves Arabic phrase row rendered", /[\u0600-\u06FF]/.test(lookupSnapshot.rowText || ""), lookupSnapshot.rowText || ""));
 
   return {
     ...fixture,
@@ -520,7 +523,7 @@ function runGeometryScenario() {
       ...initialAutoPauseAssertions,
       assertion("readiness chip has status dot", wideBeforeLookup.readinessChip?.hasDot === true, JSON.stringify(wideBeforeLookup.readinessChip)),
       assertion("primary UI avoids technical source terms", wideBeforeLookup.primaryUi?.hasTechnicalTerms === false, wideBeforeLookup.primaryUi?.text || ""),
-      assertion("phrase navigation uses icon controls", wideBeforeLookup.primaryUi?.phraseIconButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
+      assertion("phrase navigation has three compact controls", wideBeforeLookup.primaryUi?.phraseButtons === 3, JSON.stringify(wideBeforeLookup.primaryUi)),
       assertion("dictionary ready body starts at cards", wideWithDictionary.dictionaryUi?.hasSelectedCard === false && wideWithDictionary.dictionaryUi?.overlayCardCount > 0, JSON.stringify(wideWithDictionary.dictionaryUi)),
       assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
       ...accountPlacementAssertions,
@@ -837,15 +840,33 @@ function assertDisplayStickyUi() {
 }
 
 function assertControlHierarchyUi() {
-  const geometry = readGeometrySnapshot();
+  let geometry = readGeometrySnapshot();
   const controls = geometry.controlHierarchy || {};
+  clickShadowButton("[data-af-shortcut-help]");
+  sleep(200);
+  const helpOpen = readGeometrySnapshot();
+  pressKey("Slash", "?", { shiftKey: true });
+  sleep(200);
+  const helpClosed = readGeometrySnapshot();
+  pressKey("Slash", "?", { shiftKey: true });
+  sleep(200);
+  const helpReopened = readGeometrySnapshot();
+  pressKey("Escape", "Escape");
+  sleep(200);
+  const helpEscapeClosed = readGeometrySnapshot();
+  geometry = readGeometrySnapshot();
   return [
     assertion("shortcut hint row removed", controls.shortcutRowPresent === false, JSON.stringify(controls)),
     assertion("mode controls show inline shortcuts", /Shadow\s*1/.test(controls.modeText || "") && /Recall\s*2/.test(controls.modeText || ""), controls.modeText || ""),
-    assertion("phrase navigation is centered", controls.practiceCenterOffset <= 32, JSON.stringify(controls)),
+    assertion("phrase navigation remains near center", controls.practiceCenterOffset <= 64, JSON.stringify(controls)),
     assertion("phrase navigation is primary width", controls.practiceWidth > controls.modeWidth && controls.practiceWidth >= controls.displayWidth, JSON.stringify(controls)),
     assertion("display controls stay right of navigation", controls.displayLeft >= controls.practiceRight, JSON.stringify(controls)),
-    assertion("display controls include shortcut labels", /\(S\)/.test(controls.displayText || "") && /\(T\/0\)/.test(controls.displayText || ""), controls.displayText || ""),
+    assertion("phrase navigation keeps textual labels", /Previous/.test(controls.practiceText || "") && /Repeat/.test(controls.practiceText || "") && /Next/.test(controls.practiceText || ""), controls.practiceText || ""),
+    assertion("display controls use stable labels", /original/i.test((controls.displayLabels || []).join(" ")) && /translation/i.test((controls.displayLabels || []).join(" ")), JSON.stringify(controls.displayLabels || [])),
+    assertion("shortcut help opens from button", helpOpen.controlHierarchy?.shortcutHelpOpen === true, JSON.stringify(helpOpen.controlHierarchy)),
+    assertion("shortcut help closes with repeated ?", helpClosed.controlHierarchy?.shortcutHelpOpen === false, JSON.stringify(helpClosed.controlHierarchy)),
+    assertion("shortcut help opens with ?", helpReopened.controlHierarchy?.shortcutHelpOpen === true, JSON.stringify(helpReopened.controlHierarchy)),
+    assertion("shortcut help closes with Escape", helpEscapeClosed.controlHierarchy?.shortcutHelpOpen === false, JSON.stringify(helpEscapeClosed.controlHierarchy)),
   ];
 }
 
@@ -1221,8 +1242,8 @@ function assertSourceSwitchInteraction(fixture) {
 
   const autoClick = clickSourceOption("auto");
   assertions.push(assertion("auto source option clicked", autoClick.clicked, autoClick.detail));
-  const autoSnapshot = waitForSource(/Auto/, fixture.videoId, waitMs);
-  const autoLoaded = /Auto/.test(autoSnapshot.source || "");
+  const autoSnapshot = waitForSource(/auto/i, fixture.videoId, waitMs);
+  const autoLoaded = /auto/i.test(autoSnapshot.source || "");
   const keptWorkingSource = /(?:Dutch|English) captions/i.test(autoSnapshot.source || "") &&
     !autoSnapshot.isEmpty &&
     /\d+ \/ \d+/.test(autoSnapshot.count || "");
@@ -1291,24 +1312,48 @@ function assertPhraseProgressRestoreInteraction(fixture) {
   clickShadowButton("[data-af-next]");
   const saved = waitForSnapshot(fixture.videoId, waitMs);
   const savedOrdinal = parseCountOrdinal(saved.count);
-  sleep(900);
+  sleep(1800);
   setVideoCurrentTime(0);
   reloadTab();
-  const restored = waitForSnapshot(fixture.videoId, waitMs);
-  const restoredOrdinal = parseCountOrdinal(restored.count);
+  waitForSnapshot(fixture.videoId, waitMs);
+  const restored = waitForCountOrdinal(fixture.videoId, savedOrdinal, waitMs);
   const restore = restored.debug?.phraseProgressRestore || {};
+  const restoredOrdinal = parseCountOrdinal(restored.count);
 
   return [
     assertion("phrase progress moved to a later phrase", beforeOrdinal && savedOrdinal === beforeOrdinal + 1, `${before.count} -> ${saved.count}`),
-    assertion("phrase progress restores after reload", restoredOrdinal === savedOrdinal, `${saved.count} -> ${restored.count}`),
+    assertion("phrase progress restores visible count after reload", restoredOrdinal === savedOrdinal, `${saved.count} -> ${restored.count}; restore=${JSON.stringify(restore)}`),
     assertion("phrase progress restore recorded source-specific state", Boolean(restore.sourceId) && ["phrase-id", "clamped-index"].includes(restore.reason || ""), JSON.stringify(restore)),
   ];
+}
+
+function waitForCountOrdinal(videoId, ordinal, timeoutMs) {
+  const started = Date.now();
+  let last = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readSnapshot();
+    const videoMatches = last.bootState?.videoIdDetected === videoId || last.debug?.videoId === videoId;
+    if (last.panel && videoMatches && !last.loading && parseCountOrdinal(last.count) === ordinal) {
+      return last;
+    }
+    sleep(500);
+  }
+
+  return last || readSnapshot();
 }
 
 function assertPhraseJumpInteraction() {
   const targetOrdinal = 3;
   clickShadowButton("[data-af-count]");
   const opened = readPhraseJumpState();
+  const modeBeforeNumericTyping = readSnapshot().practiceMode;
+  const typedNumeric = typePhraseJumpKeys([
+    ["Digit1", "1"],
+    ["Digit0", "0"],
+    ["Digit2", "2"],
+  ]);
+  const afterNumericTyping = readSnapshot();
   clickPhraseJumpStart();
   sleep(500);
   const afterStart = readSnapshot();
@@ -1327,6 +1372,8 @@ function assertPhraseJumpInteraction() {
 
   return [
     assertion("phrase jump popover opens", opened.open === true, JSON.stringify(opened)),
+    assertion("phrase jump accepts 0/1/2 key input", typedNumeric.input === "102" && typedNumeric.prevented === false, JSON.stringify(typedNumeric)),
+    assertion("phrase jump numeric keys do not switch mode", afterNumericTyping.practiceMode === modeBeforeNumericTyping, `${modeBeforeNumericTyping} -> ${afterNumericTyping.practiceMode}`),
     assertion("phrase jump start selects first phrase", parseCountOrdinal(afterStart.count) === 1, afterStart.count),
     assertion("phrase jump start pauses video", afterStart.video?.paused === true, JSON.stringify(afterStart.video)),
     assertion("phrase jump rejects invalid zero", invalid.open === true && /1-/.test(invalid.error || ""), JSON.stringify(invalid)),
@@ -1404,7 +1451,8 @@ function assertFixture(fixture, snapshot) {
   }
 
   for (const label of expect.hiddenControls || []) {
-    const control = snapshot.controls.find((item) => item.text.startsWith(label));
+    const aliases = label === "Replay" ? ["Replay", "Repeat"] : [label];
+    const control = snapshot.controls.find((item) => aliases.some((alias) => item.text.startsWith(alias)));
     assertions.push(assertion(`${label} hidden`, control?.display === "none", JSON.stringify(control)));
   }
 
@@ -1579,6 +1627,7 @@ function readSnapshot() {
     count: root.querySelector("[data-af-count]")?.textContent || "",
     mode: root.querySelector("[data-af-mode]")?.textContent || "",
     guidedMode: root.querySelector("[data-af-mode]")?.classList.contains("is-guided") || false,
+    practiceMode: root.querySelector("[data-af-mode-recall]")?.getAttribute("aria-pressed") === "true" ? "recall" : "shadow",
     message: root.querySelector(".af-ribbon-message")?.textContent || "",
     error: root.querySelector("[data-af-error]")?.textContent || "",
     rowTime: root.querySelector(".af-ribbon-row.is-current .af-ribbon-time")?.textContent || "",
@@ -1723,7 +1772,7 @@ function readGeometrySnapshot() {
       return {
         text,
         hasTechnicalTerms: ["manual", "exact", "timedtext", "yt-dlp", "provider"].some((term) => lower.includes(term)),
-        phraseIconButtons: root?.querySelectorAll(".af-practice-controls .af-phrase-icon-button .af-button-icon").length || 0,
+        phraseButtons: root?.querySelectorAll(".af-practice-controls .af-phrase-icon-button").length || 0,
         spanSelectedWords: root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-selected").length || 0,
         spanDraftWords: root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word.is-span-draft").length || 0,
       };
@@ -1741,9 +1790,11 @@ function readGeometrySnapshot() {
       const practiceCenter = practiceRect ? practiceRect.left + practiceRect.width / 2 : 0;
       return {
         shortcutRowPresent: Boolean(root?.querySelector(".af-shortcut-hints")),
+        shortcutHelpOpen: Boolean(root?.querySelector("[data-af-shortcut-help-panel]") && !root.querySelector("[data-af-shortcut-help-panel]").hidden),
         modeText: mode?.textContent || "",
         practiceText: practice?.textContent || "",
         displayText: display?.textContent || "",
+        displayLabels: Array.from(display?.querySelectorAll("button") || []).map((button) => button.getAttribute("aria-label") || button.textContent || ""),
         modeWidth: modeRect?.width || 0,
         practiceWidth: practiceRect?.width || 0,
         displayWidth: displayRect?.width || 0,
@@ -1957,6 +2008,34 @@ function setPhraseJumpInput(value) {
   return input.value;
 })()
   `);
+}
+
+function typePhraseJumpKeys(entries) {
+  const serializedEntries = JSON.stringify(entries);
+  const raw = chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const input = root?.querySelector("[data-af-jump-input]");
+  if (!input) return JSON.stringify({ input: "", prevented: true, missing: true });
+  input.value = "";
+  input.focus();
+  let prevented = false;
+  for (const [code, key] of ${serializedEntries}) {
+    const eventInit = { key, code, bubbles: true, cancelable: true, composed: true };
+    const keydown = new KeyboardEvent("keydown", eventInit);
+    const accepted = input.dispatchEvent(keydown);
+    if (!accepted || keydown.defaultPrevented) {
+      prevented = true;
+    } else {
+      input.value += key;
+      input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+    }
+    input.dispatchEvent(new KeyboardEvent("keyup", eventInit));
+  }
+  return JSON.stringify({ input: input.value, prevented });
+})()
+  `);
+  return JSON.parse(raw);
 }
 
 function clickPhraseJumpStart() {

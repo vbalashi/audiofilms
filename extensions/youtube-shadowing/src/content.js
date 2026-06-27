@@ -106,6 +106,7 @@
     timingOperationPollTimer: null,
     utilityMenuOpen: false,
     settingsMenuOpen: false,
+    shortcutHelpOpen: false,
     phraseJumpMenuOpen: false,
     phraseJumpInput: "",
     phraseJumpError: "",
@@ -850,6 +851,33 @@
     settingsButton.title = "Settings";
     const settingsMenu = appendElement(settings, "div", "af-utility-popover af-settings-popover");
     settingsMenu.dataset.afSettingsMenu = "";
+    const help = appendElement(metaRight, "div", "af-help-wrap");
+    const helpButton = appendButton(help, "", "afShortcutHelp");
+    helpButton.className = "af-icon-button af-help-toggle";
+    helpButton.innerHTML = `${iconSvg("help")}<span class="af-sr-only">Keyboard shortcuts</span>`;
+    helpButton.setAttribute("aria-label", "Keyboard shortcuts");
+    helpButton.setAttribute("aria-haspopup", "dialog");
+    helpButton.setAttribute("aria-expanded", "false");
+    helpButton.title = "Keyboard shortcuts (?)";
+    const helpPanel = appendElement(help, "section", "af-shortcut-help");
+    helpPanel.dataset.afShortcutHelpPanel = "";
+    helpPanel.setAttribute("aria-label", "AudioFilms keyboard shortcuts");
+    helpPanel.hidden = true;
+    appendElement(helpPanel, "div", "af-shortcut-help-title").textContent = "Shortcuts";
+    const helpList = appendElement(helpPanel, "dl", "af-shortcut-help-list");
+    [
+      ["Space", "YouTube play/pause"],
+      ["Left / Right", "Previous / next phrase"],
+      ["Down", "Repeat phrase"],
+      ["Up or S", "Show original"],
+      ["T or 0", "Show translation"],
+      ["1 / 2", "Shadow / Recall mode"],
+      ["?", "Open or close shortcuts"],
+      ["Esc", "Close panels"],
+    ].forEach(([key, label]) => {
+      appendElement(helpList, "dt", "").textContent = key;
+      appendElement(helpList, "dd", "").textContent = label;
+    });
     const utility = appendElement(metaRight, "div", "af-utility-menu");
     const utilityButton = appendButton(utility, "", "afUtilityToggle");
     utilityButton.className = "af-icon-button af-utility-toggle";
@@ -914,24 +942,29 @@
     const practiceControls = appendElement(controls, "div", "af-control-group af-practice-controls");
     const prevButton = appendButton(practiceControls, "", "afPrev");
     prevButton.classList.add("af-phrase-icon-button");
-    prevButton.innerHTML = `${iconSvg("prev")}<span class="af-button-shortcut">←</span><span class="af-sr-only">Prev</span>`;
+    prevButton.dataset.afCompactIcon = "←";
+    prevButton.innerHTML = `${iconSvg("prev")}<span class="af-button-label">Previous</span>`;
     prevButton.setAttribute("aria-label", "Previous phrase");
     prevButton.title = "Previous phrase (ArrowLeft)";
     const replayButton = appendButton(practiceControls, "", "afReplay");
     replayButton.classList.add("af-phrase-icon-button");
-    replayButton.innerHTML = `${iconSvg("replay")}<span class="af-button-shortcut">↓</span><span class="af-sr-only">Replay</span>`;
+    replayButton.dataset.afCompactIcon = "↻";
+    replayButton.innerHTML = `${iconSvg("replay")}<span class="af-button-label">Repeat</span>`;
     replayButton.setAttribute("aria-label", "Replay current phrase");
     replayButton.title = "Replay current phrase (ArrowDown)";
     const nextButton = appendButton(practiceControls, "", "afNext");
     nextButton.classList.add("af-phrase-icon-button");
-    nextButton.innerHTML = `${iconSvg("next")}<span class="af-button-shortcut">→</span><span class="af-sr-only">Next</span>`;
+    nextButton.dataset.afCompactIcon = "→";
+    nextButton.innerHTML = `${iconSvg("next")}<span class="af-button-label">Next</span>`;
     nextButton.setAttribute("aria-label", "Next phrase");
     nextButton.title = "Next phrase (ArrowRight)";
 
     const displayControls = appendElement(controls, "div", "af-control-group af-display-controls");
-    const originalButton = appendButton(displayControls, "Show Original", "afToggle");
+    const originalButton = appendButton(displayControls, "", "afToggle");
+    originalButton.classList.add("af-display-toggle");
     originalButton.title = "Show or hide original text (S)";
-    const translationButton = appendButton(displayControls, "Show Translation", "afPhraseTranslation");
+    const translationButton = appendButton(displayControls, "", "afPhraseTranslation");
+    translationButton.classList.add("af-display-toggle");
     translationButton.title = "Show phrase translation (T or 0)";
     createIssueReportDialog(panel);
     const resizeHandle = appendElement(panel, "button", "af-panel-resize-handle");
@@ -949,6 +982,7 @@
     panel.querySelector("[data-af-source-toggle]").addEventListener("click", toggleSourceMenu);
     panel.querySelector("[data-af-theme-toggle]").addEventListener("click", cycleThemePreference);
     panel.querySelector("[data-af-settings-toggle]").addEventListener("click", toggleSettingsMenu);
+    panel.querySelector("[data-af-shortcut-help]").addEventListener("click", toggleShortcutHelp);
     panel.querySelector("[data-af-utility-toggle]").addEventListener("click", toggleUtilityMenu);
     panel.querySelector("[data-af-learner-text-smaller]").addEventListener("click", () => adjustLearnerTextScale(-0.1));
     panel.querySelector("[data-af-learner-text-reset]").addEventListener("click", resetLearnerTextScale);
@@ -1239,6 +1273,16 @@
         '<path d="m22 22-5-10-5 10"/>',
         '<path d="M14 18h6"/>',
       ],
+      eye: [
+        '<path d="M2.06 12.35a1 1 0 0 1 0-.7C3.52 7.34 7.6 4 12 4s8.48 3.34 9.94 7.65a1 1 0 0 1 0 .7C20.48 16.66 16.4 20 12 20s-8.48-3.34-9.94-7.65z"/>',
+        '<circle cx="12" cy="12" r="3"/>',
+      ],
+      "eye-off": [
+        '<path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c4.4 0 8.48 3.34 9.94 7.65a1 1 0 0 1-.08.86 12.08 12.08 0 0 1-2.04 2.7"/>',
+        '<path d="M6.61 6.61A12.34 12.34 0 0 0 2.06 11.65a1 1 0 0 0 0 .7C3.52 16.66 7.6 20 12 20a10.64 10.64 0 0 0 5.39-1.61"/>',
+        '<path d="M2 2l20 20"/>',
+        '<path d="M9.88 9.88a3 3 0 0 0 4.24 4.24"/>',
+      ],
       theme: [
         '<circle cx="12" cy="12" r="4"/>',
         '<path d="M12 2v2"/>',
@@ -1253,6 +1297,11 @@
       settings: [
         '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>',
         '<circle cx="12" cy="12" r="3"/>',
+      ],
+      help: [
+        '<circle cx="12" cy="12" r="10"/>',
+        '<path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 2-3 4"/>',
+        '<path d="M12 17h.01"/>',
       ],
     }[kind] || [];
     return [
@@ -1325,6 +1374,8 @@
     const themeToggle = panel.querySelector("[data-af-theme-toggle]");
     const settingsToggle = panel.querySelector("[data-af-settings-toggle]");
     const settingsMenu = panel.querySelector("[data-af-settings-menu]");
+    const helpToggle = panel.querySelector("[data-af-shortcut-help]");
+    const helpPanel = panel.querySelector("[data-af-shortcut-help-panel]");
     const utilityToggle = panel.querySelector("[data-af-utility-toggle]");
     const utilityMenu = panel.querySelector("[data-af-utility-menu]");
     const learnerTextSmaller = panel.querySelector("[data-af-learner-text-smaller]");
@@ -1367,6 +1418,7 @@
     count.setAttribute("aria-expanded", state.phraseJumpMenuOpen ? "true" : "false");
     count.title = hasPhrases ? "Jump to phrase" : "No phrases to jump to";
     jumpMenu.classList.toggle("is-open", state.phraseJumpMenuOpen && hasPhrases);
+    positionUtilityMenu(panel, jumpMenu, state.phraseJumpMenuOpen && hasPhrases);
     jumpInput.value = state.phraseJumpInput || (hasPhrases ? String(state.currentIndex + 1) : "");
     jumpInput.max = hasPhrases ? String(state.phrases.length) : "";
     jumpInput.disabled = state.loading || !hasPhrases;
@@ -1385,12 +1437,20 @@
     settingsToggle.classList.toggle("is-active", state.settingsMenuOpen);
     settingsMenu.classList.toggle("is-open", state.settingsMenuOpen);
     positionUtilityMenu(panel, settingsMenu, state.settingsMenuOpen);
+    helpToggle.setAttribute("aria-expanded", state.shortcutHelpOpen ? "true" : "false");
+    helpToggle.classList.toggle("is-active", state.shortcutHelpOpen);
+    helpPanel.hidden = !state.shortcutHelpOpen;
+    positionUtilityMenu(panel, helpPanel, state.shortcutHelpOpen);
     const originalSticky = state.practiceMode === "shadow" && state.shadowTextVisible;
     const translationSticky = state.practiceMode === "shadow" && state.phraseTranslationStickyVisible;
-    toggle.textContent = originalControlLabel();
+    renderDisplayToggleButton(toggle, {
+      icon: state.textVisible ? "eye" : "eye-off",
+      label: originalControlLabel(),
+    });
     toggle.classList.toggle("is-active", state.textVisible);
     toggle.classList.toggle("is-sticky", originalSticky);
     toggle.setAttribute("aria-pressed", state.textVisible ? "true" : "false");
+    toggle.setAttribute("aria-label", originalControlLabel());
     toggle.title = originalControlTitle();
     modeShadow.classList.toggle("is-active", state.practiceMode === "shadow");
     modeRecall.classList.toggle("is-active", state.practiceMode === "recall");
@@ -1398,12 +1458,16 @@
     modeRecall.title = "Recall mode (2)";
     modeShadow.setAttribute("aria-pressed", state.practiceMode === "shadow" ? "true" : "false");
     modeRecall.setAttribute("aria-pressed", state.practiceMode === "recall" ? "true" : "false");
-    phraseTranslation.textContent = translationControlLabel();
+    renderDisplayToggleButton(phraseTranslation, {
+      icon: "translate",
+      label: translationControlLabel(),
+    });
     phraseTranslation.classList.toggle("is-active", state.phraseTranslationVisible);
     phraseTranslation.classList.toggle("is-sticky", translationSticky);
     phraseTranslation.hidden = isEmpty;
     phraseTranslation.disabled = state.loading || !hasPhrases;
     phraseTranslation.setAttribute("aria-pressed", state.phraseTranslationVisible ? "true" : "false");
+    phraseTranslation.setAttribute("aria-label", translationControlLabel());
     phraseTranslation.title = phraseTranslationControlTitle(currentPhraseTranslation);
     utilityToggle.setAttribute("aria-expanded", state.utilityMenuOpen ? "true" : "false");
     utilityToggle.classList.toggle("is-active", state.utilityMenuOpen);
@@ -1431,6 +1495,7 @@
     markIssue.textContent = state.issueDialogOpen ? "Reporting..." : "Mark Issue";
     markIssue.setAttribute("aria-expanded", state.issueDialogOpen ? "true" : "false");
     renderIssueReportDialog(issueDialog);
+    positionIssueReportDialog(panel, issueDialog);
     error.textContent = state.error;
 
     playbackButtons.forEach((button) => {
@@ -1496,13 +1561,7 @@
   }
 
   function originalControlLabel() {
-    if (state.practiceMode === "recall") {
-      return state.textVisible ? "Original current (S)" : "Reveal (S)";
-    }
-    if (state.shadowTextVisible) {
-      return state.textVisible ? "Original sticky (S)" : "Original current (S)";
-    }
-    return state.textVisible ? "Original current (S)" : "Original hidden (S)";
+    return state.textVisible ? "Hide original" : "Show original";
   }
 
   function originalControlTitle() {
@@ -1517,11 +1576,23 @@
   }
 
   function translationControlLabel() {
-    if (state.practiceMode === "recall") return "Prompt (T/0)";
-    if (state.phraseTranslationStickyVisible) {
-      return state.phraseTranslationVisible ? "Translation sticky (T/0)" : "Translation current (T/0)";
-    }
-    return state.phraseTranslationVisible ? "Translation current (T/0)" : "Translate (T/0)";
+    return state.phraseTranslationVisible ? "Hide translation" : "Show translation";
+  }
+
+  function renderDisplayToggleButton(button, options) {
+    if (!(button instanceof HTMLElement)) return;
+    button.innerHTML = [
+      iconSvg(options.icon),
+      `<span class="af-sr-only">${escapeHtml(options.label)}</span>`,
+    ].join("");
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   function renderDisplayPreferenceControls(controls) {
@@ -1580,13 +1651,25 @@
   function positionUtilityMenu(panel, utilityMenu, isOpen = state.utilityMenuOpen) {
     if (!isOpen) {
       utilityMenu.classList.remove("is-below");
+      utilityMenu.classList.remove("is-above");
       return;
     }
 
     window.requestAnimationFrame(() => {
       const panelRect = panel.getBoundingClientRect();
       const menuHeight = utilityMenu.getBoundingClientRect().height || utilityMenu.scrollHeight || 0;
-      utilityMenu.classList.toggle("is-below", panelRect.top < menuHeight + 12);
+      const shouldPlaceBelow = panelRect.top < menuHeight + 12;
+      utilityMenu.classList.toggle("is-below", shouldPlaceBelow);
+      utilityMenu.classList.toggle("is-above", !shouldPlaceBelow);
+    });
+  }
+
+  function positionIssueReportDialog(panel, issueDialog) {
+    if (!(issueDialog instanceof HTMLElement) || !state.issueDialogOpen) return;
+    window.requestAnimationFrame(() => {
+      const panelRect = panel.getBoundingClientRect();
+      const dialogHeight = issueDialog.getBoundingClientRect().height || issueDialog.scrollHeight || 0;
+      issueDialog.classList.toggle("is-below", panelRect.top < dialogHeight + 12);
     });
   }
 
@@ -1670,6 +1753,22 @@
     panel.style.top = geometry.y === null ? "" : `${geometry.y}px`;
     panel.style.width = geometry.width === null ? "" : `${geometry.width}px`;
     panel.style.height = panelKey === "phraseRibbon" || geometry.height === null ? "" : `${geometry.height}px`;
+    clampRenderedPanelToViewport(panel);
+  }
+
+  function clampRenderedPanelToViewport(panel) {
+    if (!(panel instanceof HTMLElement)) return;
+    const margin = 8;
+    const rect = panel.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const nextLeft = clampNumber(rect.left, margin, Math.max(margin, window.innerWidth - rect.width - margin), margin);
+    const nextTop = clampNumber(rect.top, margin, Math.max(margin, window.innerHeight - rect.height - margin), margin);
+    if (Math.abs(nextLeft - rect.left) > 0.5) {
+      panel.style.left = `${nextLeft}px`;
+    }
+    if (Math.abs(nextTop - rect.top) > 0.5) {
+      panel.style.top = `${nextTop}px`;
+    }
   }
 
   function applyDebugPanelGeometry(panel, overrideGeometry = null) {
@@ -2101,6 +2200,7 @@
     state.lastMenuTrigger = state.utilityMenuOpen ? "utility" : null;
     if (state.utilityMenuOpen) {
       state.settingsMenuOpen = false;
+      state.shortcutHelpOpen = false;
       state.accountMenuOpen = false;
       state.sourceMenuOpen = false;
       state.phraseJumpMenuOpen = false;
@@ -2115,6 +2215,22 @@
     state.lastMenuTrigger = state.settingsMenuOpen ? "settings" : null;
     if (state.settingsMenuOpen) {
       state.utilityMenuOpen = false;
+      state.shortcutHelpOpen = false;
+      state.accountMenuOpen = false;
+      state.sourceMenuOpen = false;
+      state.phraseJumpMenuOpen = false;
+    }
+    render();
+  }
+
+  function toggleShortcutHelp(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    state.shortcutHelpOpen = !state.shortcutHelpOpen;
+    state.lastMenuTrigger = state.shortcutHelpOpen ? "help" : null;
+    if (state.shortcutHelpOpen) {
+      state.utilityMenuOpen = false;
+      state.settingsMenuOpen = false;
       state.accountMenuOpen = false;
       state.sourceMenuOpen = false;
       state.phraseJumpMenuOpen = false;
@@ -2130,6 +2246,7 @@
     if (state.accountMenuOpen) {
       state.utilityMenuOpen = false;
       state.settingsMenuOpen = false;
+      state.shortcutHelpOpen = false;
       state.sourceMenuOpen = false;
       state.phraseJumpMenuOpen = false;
     }
@@ -2324,10 +2441,11 @@
   }
 
   function closeOpenMenus() {
-    if (!state.utilityMenuOpen && !state.settingsMenuOpen && !state.accountMenuOpen && !state.sourceMenuOpen && !state.phraseJumpMenuOpen) return false;
-    const trigger = state.lastMenuTrigger || (state.sourceMenuOpen ? "source" : state.utilityMenuOpen ? "utility" : state.settingsMenuOpen ? "settings" : state.accountMenuOpen ? "account" : "jump");
+    if (!state.utilityMenuOpen && !state.settingsMenuOpen && !state.shortcutHelpOpen && !state.accountMenuOpen && !state.sourceMenuOpen && !state.phraseJumpMenuOpen) return false;
+    const trigger = state.lastMenuTrigger || (state.sourceMenuOpen ? "source" : state.utilityMenuOpen ? "utility" : state.settingsMenuOpen ? "settings" : state.shortcutHelpOpen ? "help" : state.accountMenuOpen ? "account" : "jump");
     state.utilityMenuOpen = false;
     state.settingsMenuOpen = false;
+    state.shortcutHelpOpen = false;
     state.accountMenuOpen = false;
     state.sourceMenuOpen = false;
     state.phraseJumpMenuOpen = false;
@@ -2345,6 +2463,7 @@
       source: "[data-af-source-toggle]",
       utility: "[data-af-utility-toggle]",
       settings: "[data-af-settings-toggle]",
+      help: "[data-af-shortcut-help]",
       account: "[data-af-account]",
       jump: "[data-af-count]",
     }[trigger];
@@ -2386,6 +2505,9 @@
         "[data-af-settings-toggle]",
         "[data-af-settings-menu]",
         "[data-af-settings-menu] *",
+        "[data-af-shortcut-help]",
+        "[data-af-shortcut-help-panel]",
+        "[data-af-shortcut-help-panel] *",
         "[data-af-account]",
         "[data-af-account-menu]",
         "[data-af-account-menu] *",
@@ -2416,6 +2538,7 @@
       state.sourceMenuOpen = false;
       state.utilityMenuOpen = false;
       state.settingsMenuOpen = false;
+      state.shortcutHelpOpen = false;
       state.accountMenuOpen = false;
     }
     render();
@@ -3139,6 +3262,7 @@
     if (state.sourceMenuOpen) {
       state.utilityMenuOpen = false;
       state.settingsMenuOpen = false;
+      state.shortcutHelpOpen = false;
       state.accountMenuOpen = false;
       state.phraseJumpMenuOpen = false;
     }
@@ -3181,8 +3305,7 @@
 
     const translation = appendElement(row, "div", "af-phrase-translation");
     if (state.practiceMode === "recall") {
-      translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase, index));
-      translation.textContent = state.textVisible ? "Original revealed" : "Reveal original when ready.";
+      translation.setAttribute("aria-hidden", "true");
     } else if (state.phraseTranslationVisible) {
       translation.classList.toggle("is-unavailable", !phraseTranslationText(phrase, index));
       translation.textContent = phraseTranslationCopy(phrase, index);
@@ -6054,14 +6177,18 @@
     if (!video) return;
 
     state.guidedMode = true;
-    syncPassivePlayback(video);
+    if (!state.lastPhraseProgressRestore) {
+      syncPassivePlayback(video);
+    }
 
     if (video.paused) return;
 
     const currentMs = video.currentTime * 1000;
     const index = findPlaybackPhraseIndex(state.phrases, currentMs);
-    const phrase = state.phrases[index] || state.phrases[state.currentIndex];
-    if (phrase && index !== state.currentIndex) {
+    const phrase = state.lastPhraseProgressRestore
+      ? state.phrases[state.currentIndex]
+      : state.phrases[index] || state.phrases[state.currentIndex];
+    if (!state.lastPhraseProgressRestore && phrase && index !== state.currentIndex) {
       state.currentIndex = index;
       schedulePhraseProgressSave("auto-pause-load-sync");
     }
@@ -7107,6 +7234,12 @@
       return;
     }
 
+    if (isShortcutHelpKey(event)) {
+      blockYouTubeShortcutWithOptions(event);
+      toggleShortcutHelp(event);
+      return;
+    }
+
     if (event.code === "ArrowRight") {
       blockYouTubeShortcutWithOptions(event);
       nextPhrase();
@@ -7188,6 +7321,10 @@
     return event.code === "KeyT" || event.code === "Digit0" || event.code === "Numpad0";
   }
 
+  function isShortcutHelpKey(event) {
+    return event.code === "Slash" && event.shiftKey;
+  }
+
   function allowsShiftShortcut(event) {
     return event.code === "KeyS"
       || event.code === "KeyT"
@@ -7210,8 +7347,15 @@
 
   function shouldIgnoreKeyEvent(event) {
     if (event.metaKey || event.ctrlKey || event.altKey) return true;
-    if (event.shiftKey && !allowsShiftShortcut(event)) return true;
+    if (event.shiftKey && !allowsShiftShortcut(event) && !isShortcutHelpKey(event)) return true;
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    if (path.some((element) => isKeyboardInputElement(element))) return true;
     const target = event.target;
+    if (isKeyboardInputElement(target)) return true;
+    return false;
+  }
+
+  function isKeyboardInputElement(target) {
     if (!(target instanceof HTMLElement)) return false;
     const tagName = target.tagName.toLowerCase();
     return tagName === "input" || tagName === "textarea" || target.isContentEditable;
@@ -7324,12 +7468,16 @@
 
   function createPhraseFallback() {
     const cleanPhraseText = (text) => text
-      .replace(/\s*(?:\.{3}|…)\s*(?=\p{Ll})/gu, " ")
+      .replace(/\s*(?:\.{3}|…)\s*(?=\p{L})/gu, " ")
       .replace(/^(?:\.{3}|…)\s*/, "")
       .replace(/\s+([,.;:!?])/g, "$1")
       .replace(/\s+/g, " ")
       .trim();
     const hasSentenceEnding = (text) => /(?:[.!?]|\.{3}|…|।|؟)$/.test(text.trim());
+    const shouldJoinAfterEllipsis = (currentText, nextText) => (
+      /(?:\.{3}|…)$/.test(String(currentText || "").trim())
+      && /^\p{N}/u.test(String(nextText || "").trim())
+    );
     const wordCount = (text) => {
       const matches = String(text || "").match(/[\p{L}\p{N}]+/gu);
       return matches ? matches.length : 0;
@@ -7359,7 +7507,7 @@
           const nextDuration = cue.endMs - current.startMs;
           const nextText = cleanPhraseText(`${current.text} ${cue.text}`);
           const shouldBreak =
-            hasSentenceEnding(current.text) ||
+            (hasSentenceEnding(current.text) && !shouldJoinAfterEllipsis(current.text, cue.text)) ||
             pause > longPauseMs ||
             nextDuration > maxPhraseDurationMs ||
             wordCount(nextText) > maxWords ||

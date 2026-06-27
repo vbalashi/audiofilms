@@ -36,7 +36,7 @@
 
   function normalizeLookupWord(token) {
     return String(token || "")
-      .replace(/^[^\p{L}\p{N}]+/gu, "")
+      .replace(/^[^\p{L}\p{N}'’‘]+/gu, "")
       .replace(/[^\p{L}\p{N}]+$/gu, "");
   }
 

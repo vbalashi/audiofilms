@@ -22,7 +22,7 @@
       const nextDuration = cue.endMs - current.startMs;
       const nextText = cleanPhraseText(`${current.text} ${cue.text}`);
       const shouldBreak =
-        hasSentenceEnding(current.text) ||
+        (hasSentenceEnding(current.text) && !shouldJoinAfterEllipsis(current.text, cue.text)) ||
         pause > longPauseMs ||
         nextDuration > maxPhraseDurationMs ||
         wordCount(nextText) > maxWords ||
@@ -57,7 +57,7 @@
 
   function cleanPhraseText(text) {
     return text
-      .replace(/\s*(?:\.{3}|…)\s*(?=\p{Ll})/gu, " ")
+      .replace(/\s*(?:\.{3}|…)\s*(?=\p{L})/gu, " ")
       .replace(/^(?:\.{3}|…)\s*/, "")
       .replace(/\s+([,.;:!?])/g, "$1")
       .replace(/\s+/g, " ")
@@ -66,6 +66,11 @@
 
   function hasSentenceEnding(text) {
     return /(?:[.!?]|\.{3}|…|।|؟)$/.test(text.trim());
+  }
+
+  function shouldJoinAfterEllipsis(currentText, nextText) {
+    return /(?:\.{3}|…)$/.test(String(currentText || "").trim())
+      && /^\p{N}/u.test(String(nextText || "").trim());
   }
 
   function wordCount(text) {
@@ -77,6 +82,7 @@
     buildPhrases,
     cleanPhraseText,
     hasSentenceEnding,
+    shouldJoinAfterEllipsis,
     wordCount,
   };
 })();

@@ -104,13 +104,13 @@ For local app API checks:
 
 | Fixture | Video ID | Purpose | Expected Result | Current Status |
 | --- | --- | --- | --- | --- |
-| NOS TRAPPIST-1 manual Dutch | `4EE7m94mJpk` | Current extension happy path; manual Dutch captions; direct timedtext returns empty in Chrome; ASR transcript timing may exist for the same video | Extension reuses timing cache only when it matches the selected text source. Manual Dutch should stay on manual caption text unless a manual-text alignment cache exists; ASR transcript cache must not replace manual captions on mixed-language boundaries | Needs refreshed Chrome smoke after text-source-specific timing-cache fix |
-| App sample video | `iDi5MhglYks` | Main app sample and provider quality comparison video; browser-visible YouTube track differs from provider result | API returns Dutch manual phrases; extension follows browser-visible auto-generated source and labels it as auto | API passing: 213 manual phrases; extension smoke passing with 106 auto-visible phrases |
-| Provider fallback stress video | `KrdVIUmBoE4` | Browser-visible manual captions where the primary provider can be unavailable and fallback provider must carry the load | Extension shows manual exact phrases plus a source warning instead of stale phrases or a hard failure | API passing via `yt-dlp` fallback: 162 phrases; extension smoke passing |
-| Multilingual English manual video | `aircAruvnKk` | Many manual caption languages are available; first YouTube manual track is not the preferred language | Extension should choose preferred English manual captions instead of arbitrary first manual track | API passing: 286 English phrases; extension smoke passing with 271 phrase units |
-| Multilingual Arabic source switch and lookup | `aircAruvnKk` English -> Arabic | Non-Latin/RTL manual captions should remain selectable, renderable, and word-clickable from the source menu | Arabic manual source loads, source badge updates, row contains Arabic text, word click opens dictionary context, no visible error | API passing: 217 Arabic phrases; extension smoke passing with 213 phrase units |
-| Legacy extension NOS fixture | `ZNQWWW-vvfM` | Earlier extension target with manual Dutch and auto/original Dutch tracks | Extension should prefer first non-ASR Dutch track and show source metadata | API passing: 149 phrases; extension SPA smoke passing |
-| Dutch auto-caption-only video | `xymyDvCgWDA` | Ensure auto captions are selected and labeled as degraded only if quality flags say so | Shows `Auto · exact` or degraded flags when appropriate | API and extension smoke passing with `overlap-cues` warning |
+| NOS TRAPPIST-1 manual Dutch | `4EE7m94mJpk` | Current extension happy path; manual Dutch captions; direct timedtext returns empty in Chrome; ASR transcript timing may exist for the same video | Extension reuses timing cache only when it matches the selected text source. Manual Dutch should stay on manual caption text unless a manual-text alignment cache exists; ASR transcript cache must not replace manual captions on mixed-language boundaries | Chrome smoke passing with 165 manual phrase units; visible phrase-progress restore is checked after reload |
+| App sample video | `iDi5MhglYks` | Main app sample and provider quality comparison video; browser-visible YouTube track differs from provider result | API returns Dutch manual phrases; extension follows browser-visible auto-generated source and labels it as auto | Extension smoke passing with 125 auto-visible phrase units |
+| Provider fallback stress video | `KrdVIUmBoE4` | Browser-visible manual captions where the primary provider can be unavailable and fallback provider must carry the load | Extension shows manual captions plus readiness instead of stale phrases or a hard failure | Extension smoke passing with 175 phrase units |
+| Multilingual English manual video | `aircAruvnKk` | Many manual caption languages are available; first YouTube manual track is not the preferred language | Extension should choose preferred English manual captions instead of arbitrary first manual track | Extension smoke passing with 269 English phrase units |
+| Multilingual Arabic source switch and lookup | `aircAruvnKk` English -> Arabic | Non-Latin/RTL manual captions should remain selectable, renderable, and word-clickable from the source menu | Arabic source loads, source badge updates, row contains Arabic text, word click opens dictionary lookup surface, no visible error | Extension smoke passing with 219 Arabic phrase units and no-card lookup surface |
+| Legacy extension NOS fixture | `ZNQWWW-vvfM` | Earlier extension target with manual Dutch and auto/original Dutch tracks | Extension should prefer first non-ASR Dutch track and show source metadata | Extension smoke passing with 139 manual phrase units |
+| Dutch auto-caption-only video | `xymyDvCgWDA` | Ensure auto captions are selected and labeled as degraded only if quality flags say so | Shows auto captions with degraded/rough readiness when appropriate | Extension smoke passing with 26 rough auto-caption phrase units |
 | ASR playback edge-case video | `SJvlUB4F-G0` | Pure ASR source; cached timing job has suspicious leading-word gap, exact zero-gap boundary, and normal post-roll cases | ASR source appears from timing cache; phrase 8 uses `playbackStartSec`; phrase 14 does not clip the final word at an exact boundary; phrase 16 keeps normal post-roll | Manual regression fixture; see `docs/runbooks/youtube-shadowing-playback-regression-log.md` |
 | Manual/ASR divergence video | `RJrjzCuCHpo` | YouTube exposes manual Dutch plus auto Dutch; manual has a 22s long cue, ASR has rolling captions/word timing, and backend provider can return the same 138-cue transcript for both | Treat manual as degraded via `long-cues`; do not assume backend `sourceKind=auto` proves that the actual YouTube ASR track was loaded unless provider/origin and cue shape confirm it | Diagnostic case, not in full smoke yet |
 | No captions video | `EColTNIbOko` | Empty-state behavior | Clear no-subtitles error, no fake transcript fallback, compact empty UI without playback controls | API and extension smoke passing |
@@ -121,6 +121,34 @@ For local app API checks:
 | Viewport variants | `4EE7m94mJpk` | Compact UI responsiveness | No overlap at narrow/wide widths; YouTube recommendations not replaced | Passing DOM-geometry smoke; screenshots captured |
 
 ## Latest Run
+
+### 2026-06-27: Chrome Smoke Audit And Contract Refresh
+
+Status: full normal-Chrome regression passing after removing stale smoke
+expectations and fixing phrase-progress restore.
+
+Validated:
+
+- Default smoke passed for Dutch captions, English captions, and no-captions
+  states.
+- Full regression passed all 15 fixtures/scenarios, including SPA navigation,
+  backend-off/backend-failed degraded states, failed source-switch recovery,
+  Arabic source switch and lookup, and viewport geometry.
+- Phrase-progress restore now asserts the visible phrase count after reload
+  instead of accepting diagnostics as a substitute for UI state.
+- The previous Arabic lookup assertion expected the removed `.af-context-text`
+  element. The current dictionary-ready contract starts at overlay cards or a
+  no-card lookup surface, so the smoke now verifies Arabic word selection,
+  lookup completion, and Arabic phrase-row preservation.
+- The phrase-jump keyboard assertion now reads `practiceMode` from the regular
+  smoke snapshot; `undefined -> undefined` is no longer accepted as evidence.
+
+Remaining interpretation note:
+
+- Several full-regression fixtures are source-matrix checks that validate
+  source selection, readiness labels, and phrase rendering only. They are useful
+  coverage, but they should not be read as full interaction coverage for every
+  video.
 
 ### 2026-06-23: Generated Dictionary Fallback Route Checks
 

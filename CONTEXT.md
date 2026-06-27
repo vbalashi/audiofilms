@@ -69,7 +69,8 @@ Timing evidence from YouTube auto-generated captions. It may be denser than uplo
 _Avoid_: Manual timing, aligned timing
 
 **Practice Readiness**:
-A compact learner-facing status for how ready the current video is for phrase-by-phrase practice. It summarizes whether usable practice phrases exist, whether timing evidence is degraded or high confidence, whether relevant ASR/alignment data is available, and whether blocking warnings exist; it does not replace practice source, cue source, timing evidence, or display text metadata.
+A compact visual indication for how ready the current video is for phrase-by-phrase practice. It should be expressed through subtle status color or icon treatment with explanation in help/details, not as a prominent standalone label; it does not replace practice source, cue source, timing evidence, or display text metadata.
+The initial product vocabulary is red/unavailable when no usable captions were loaded, yellow/rough when usable text exists with coarse or approximate timing, and green/precise when high-confidence word-level or aligned timing is available.
 _Avoid_: Source quality, ASR status, caption quality
 
 **Get Captions**:
@@ -85,8 +86,20 @@ The learner-visible text for a practice phrase. Display text can come from manua
 _Avoid_: Timing evidence, cue source, provider
 
 **Text Source**:
-The source selected for learner-visible display text, such as uploaded captions, YouTube auto-captions, or an ASR transcript. The selected text source does not necessarily determine timing evidence after ASR/alignment is available.
+The source selected for learner-visible display text, such as the same language/caption label YouTube shows, a provider caption result, or an ASR transcript. When the source is YouTube-derived, the learner-facing label should match YouTube's label and add AudioFilms enrichment separately, rather than renaming the source.
 _Avoid_: Timing source, source selector, practice readiness
+
+**Secondary Caption Comparison**:
+An optional tester-oriented view that lets a user compare another caption or transcript source against the active display text, for example to inspect whether manual YouTube subtitles differ from high-quality ASR-like text.
+_Avoid_: Primary subtitle, translation, learner prompt
+
+**Timing Enrichment**:
+A compact note that the selected text source is being replayed or aligned with timing evidence from a different process, such as ASR word timing. It should name the timing evidence, not restate generic readiness words such as precise or rough.
+_Avoid_: Practice readiness, text source, source label
+
+**Segmented Sentence Replay**:
+A practice display where a long sentence remains visible as one sentence, while replay, highlighting, and navigation operate over smaller timed segments within that sentence.
+_Avoid_: Separate sentence, provider cue, paragraph mode
 
 **Practice Mode**:
 The learner's active exercise mode for a practice phrase. Initial modes are Shadow and Recall; they change what prompt is shown and what the learner is trying to produce, without changing the underlying video.
@@ -131,6 +144,18 @@ _Avoid_: Target language, definition language
 **Dictionary Meaning Card**:
 A learner-facing dictionary candidate for one specific meaning/card identity returned by the dictionary authority. Learning and review actions such as Learn, Known, Again, Hard, Good, and Easy apply to this card, not to the clicked word globally.
 _Avoid_: Word card, lookup result, definition
+
+**Dictionary Card Render Variant**:
+A presentation form of a Dictionary Meaning Card chosen for the context where it was found, such as headword, within-definition, example-sentence, alphabetical, or generated draft. Render variants may collapse differently, but expansion should return to the same full card model.
+_Avoid_: Separate result type, text block, boxed group item
+
+**Dictionary Match Context**:
+The lookup section or evidence that made a Dictionary Meaning Card relevant to the clicked form, such as a headword match, matched definition snippet, matched example sentence, or alphabetical neighbor. It guides the collapsed preview without changing the card's identity.
+_Avoid_: Card type, source, definition number
+
+**Translation Regeneration**:
+An explicit request to refresh a dictionary-card translation overlay when the current translation is wrong or unsatisfactory. In the first AudioFilms extension model, this should follow the 2000NL long-press Translate pattern and request a global forced re-translation through the platform contract.
+_Avoid_: Toggle translation, per-user note, bug report
 
 **Generated Draft Card**:
 A learner-facing Dictionary Meaning Card produced from the clicked form and phrase context before it has a durable dictionary entry identity. It may be rendered like a normal card with a temporary draft identity, but saving and learning are still explicit user actions.
