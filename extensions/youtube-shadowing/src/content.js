@@ -5317,6 +5317,7 @@
   function dictionaryMockResponse(operation, body = null) {
     const mockMode = window.localStorage.getItem("afShadowingDictionaryMock");
     if (mockMode !== "cards" && mockMode !== "generated") return null;
+    recordDictionaryMockCommand(operation, body, mockMode);
     if (operation === "dict-lookup") {
       if (mockMode === "generated") {
         return jsonCommandResponse({
@@ -5408,6 +5409,21 @@
       });
     }
     return null;
+  }
+
+  function recordDictionaryMockCommand(operation, body, mockMode) {
+    const commands = Array.isArray(window.__afShadowingDictionaryMockCommands)
+      ? window.__afShadowingDictionaryMockCommands
+      : [];
+    commands.push({
+      operation,
+      mockMode,
+      body,
+      at: new Date().toISOString(),
+    });
+    window.__afShadowingDictionaryMockCommands = commands.slice(-50);
+    document.documentElement.dataset.afShadowingDictionaryMockCommands =
+      JSON.stringify(window.__afShadowingDictionaryMockCommands);
   }
 
   function jsonCommandResponse(body, ok = true, status = 200) {

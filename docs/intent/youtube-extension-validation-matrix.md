@@ -84,6 +84,12 @@ For extension smoke checks:
   the action payload keeps the original video id, caption artifact/revision or
   extension fallback fingerprint, phrase locator, and clicked-token offsets
   instead of rebuilding provenance from current page state.
+  The focused Chrome command is
+  `node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-dictionary-source-binding`.
+  Run it after dictionary action, source binding, source switching, or card
+  progress changes. It uses mocked dictionary cards to inspect the frontend
+  action payload and verifies that source switching closes stale cards, so it
+  does not prove 2000NL persistence or auth.
 - No-match dictionary lookup renders the generated-card fallback as a
   connect-required state for guests and as draft -> save -> explicit
   `start-learning` for signed-in learners. The service worker remains the only
@@ -114,6 +120,7 @@ For local app API checks:
 | Provider fallback stress video | `KrdVIUmBoE4` | Browser-visible manual captions where the primary provider can be unavailable and fallback provider must carry the load | Extension shows manual captions plus readiness instead of stale phrases or a hard failure | Extension smoke passing with 175 phrase units |
 | Multilingual English manual video | `aircAruvnKk` | Many manual caption languages are available; first YouTube manual track is not the preferred language | Extension should choose preferred English manual captions instead of arbitrary first manual track | Extension smoke passing with 269 English phrase units |
 | Multilingual Arabic source switch and lookup | `aircAruvnKk` English -> Arabic | Non-Latin/RTL manual captions should remain selectable, renderable, and word-clickable from the source menu | Arabic source loads, source badge updates, row contains Arabic text, word click opens dictionary lookup surface, no visible error | Extension smoke passing with 219 Arabic phrase units and no-card lookup surface |
+| Dictionary source binding action | `4EE7m94mJpk` with mocked dictionary cards | Focused frontend provenance check: click word, press a progress action, then switch source | `dict-action.sourceContext` references the frozen video, caption artifact, phrase locator, clicked form, and token offsets captured at word click; source switch closes stale dictionary cards | Focused opt-in smoke: `--only-dictionary-source-binding`; not a backend persistence test |
 | Legacy extension NOS fixture | `ZNQWWW-vvfM` | Earlier extension target with manual Dutch and auto/original Dutch tracks | Extension should prefer first non-ASR Dutch track and show source metadata | Extension smoke passing with 139 manual phrase units |
 | Dutch auto-caption-only video | `xymyDvCgWDA` | Ensure auto captions are selected and labeled as degraded only if quality flags say so | Shows auto captions with degraded/rough readiness when appropriate | Extension smoke passing with 26 rough auto-caption phrase units |
 | ASR playback edge-case video | `SJvlUB4F-G0` | Pure ASR source; cached timing job has suspicious leading-word gap, exact zero-gap boundary, and normal post-roll cases | ASR source appears from timing cache; phrase 8 uses `playbackStartSec`; phrase 14 does not clip the final word at an exact boundary; phrase 16 keeps normal post-roll | Focused opt-in smoke: `--only-asr-edge`; see `docs/runbooks/youtube-shadowing-playback-regression-log.md` |

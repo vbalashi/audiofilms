@@ -204,6 +204,11 @@ const ASR_EDGE_FIXTURE = {
   },
 };
 
+const DICTIONARY_SOURCE_BINDING_FIXTURE = {
+  name: "dictionary-source-binding",
+  videoId: "4EE7m94mJpk",
+};
+
 const args = new Set(process.argv.slice(2));
 const profile = getArgValue("--profile") || (args.has("--full") ? "full" : "smoke");
 const shouldRunFullSuite = profile === "full";
@@ -224,6 +229,7 @@ const shouldOnlySourceSwitchFailed = args.has("--only-source-switch-failed");
 const shouldOnlyMultilingualSwitch = args.has("--only-multilingual-switch");
 const shouldOnlyGeometry = args.has("--only-geometry");
 const shouldOnlyAsrEdge = args.has("--only-asr-edge");
+const shouldOnlyDictionarySourceBinding = args.has("--only-dictionary-source-binding");
 const fixtureFilter = getArgValue("--only");
 const waitMs = Number(getArgValue("--wait-ms") || 18000);
 
@@ -238,13 +244,13 @@ if (shouldListFixtures) {
 
 const fixtures = fixtureFilter
   ? FIXTURES.filter((fixture) => fixture.name === fixtureFilter || fixture.videoId === fixtureFilter)
-  : (shouldOnlyBackendOff || shouldOnlyBackendFailed || shouldOnlySourceSwitchFailed || shouldOnlyMultilingualSwitch || shouldOnlyGeometry || shouldOnlyAsrEdge)
+  : (shouldOnlyBackendOff || shouldOnlyBackendFailed || shouldOnlySourceSwitchFailed || shouldOnlyMultilingualSwitch || shouldOnlyGeometry || shouldOnlyAsrEdge || shouldOnlyDictionarySourceBinding)
     ? []
   : shouldRunFullSuite
     ? FIXTURES
     : FIXTURES.filter((fixture) => DEFAULT_FIXTURE_NAMES.has(fixture.name));
 
-if (!fixtures.length && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
+if (!fixtures.length && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
   fail(`No fixtures matched --only=${fixtureFilter}`);
 }
 
@@ -252,6 +258,7 @@ console.log(`AudioFilms YouTube extension ${shouldRunFullSuite ? "full regressio
 if (!shouldRunFullSuite && !fixtureFilter) {
   console.log("Use --full for SPA, backend-degraded, source-switch, multilingual-switch, and geometry regression scenarios.");
   console.log("Use --only-asr-edge for the focused ASR playback edge-case check.");
+  console.log("Use --only-dictionary-source-binding for focused dictionary provenance checks.");
 }
 
 if (shouldRunLocalBackendCheck) {
@@ -275,40 +282,46 @@ if (shouldOnlyAsrEdge) {
   printFixtureResult(asrEdgeResult);
 }
 
-if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldSkipSpaCheck) {
+if (shouldOnlyDictionarySourceBinding) {
+  const dictionarySourceBindingResult = runDictionarySourceBindingScenario();
+  results.push(dictionarySourceBindingResult);
+  printFixtureResult(dictionarySourceBindingResult);
+}
+
+if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldSkipSpaCheck) {
   for (const fixture of runSpaNavigationScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
   for (const fixture of runBackendOffScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
   for (const fixture of runBackendFailedScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
   const sourceSwitchFailedResult = runSourceSwitchFailedScenario();
   results.push(sourceSwitchFailedResult);
   printFixtureResult(sourceSwitchFailedResult);
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
   const multilingualSwitchResult = runMultilingualSourceSwitchScenario();
   results.push(multilingualSwitchResult);
   printFixtureResult(multilingualSwitchResult);
 }
 
-if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyAsrEdge && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
+if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
   const geometryResult = runGeometryScenario();
   results.push(geometryResult);
   printFixtureResult(geometryResult);
@@ -324,8 +337,10 @@ console.log(`\nAll ${results.length} YouTube extension ${shouldRunFullSuite ? "r
 
 function runFixture(fixture) {
   const url = `https://www.youtube.com/watch?v=${fixture.videoId}`;
-  removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
   navigate(url);
+  removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+  removeLocalStorageItem("afShadowingDictionaryMock");
+  reloadTab();
 
   const snapshot = waitForSnapshot(fixture.videoId, waitMs);
   const assertions = assertFixture(fixture, snapshot);
@@ -499,6 +514,68 @@ function runAsrEdgeScenario() {
     assertions,
     snapshot: phrase16.snapshot || asrSnapshot,
   };
+}
+
+function runDictionarySourceBindingScenario() {
+  const fixture = DICTIONARY_SOURCE_BINDING_FIXTURE;
+  const assertions = [];
+  let previousDictionaryMock = null;
+  let hadPreviousDictionaryMock = false;
+
+  try {
+    navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
+    previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
+    hadPreviousDictionaryMock = previousDictionaryMock !== null;
+    removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+    setLocalStorageItem("afShadowingDictionaryMock", "cards");
+    reloadTab();
+    clearDictionaryMockCommands();
+    const initial = waitForSnapshot(fixture.videoId, waitMs);
+    assertions.push(assertion("dictionary source binding panel loaded", initial.panel === true, JSON.stringify({ source: initial.source, count: initial.count, error: initial.error })));
+    assertions.push(assertion("dictionary source binding starts on captions", /captions/i.test(initial.source || ""), initial.source));
+
+    const clicked = clickFirstLookupWord();
+    const lookupSnapshot = waitForDictionarySelection(clicked.word, waitMs);
+    const clickedOrdinal = parseCountOrdinal(lookupSnapshot.count);
+    assertions.push(assertion("dictionary source binding lookup clicked", clicked.clicked === true, clicked.detail));
+    assertions.push(assertion("dictionary source binding lookup ready", lookupSnapshot.dictionary?.cardCount === 3, JSON.stringify(lookupSnapshot.dictionary)));
+
+    clearDictionaryMockCommands();
+    const actionClick = clickDictionaryProgressAction(0, "Learn");
+    const commands = waitForDictionaryMockCommand("dict-action", waitMs);
+    const actionCommand = lastDictionaryMockCommand(commands, "dict-action");
+    const sourceContext = actionCommand?.body?.sourceContext || {};
+    assertions.push(assertion("dictionary source binding action clicked", actionClick === "clicked", actionClick));
+    assertions.push(assertion("dictionary source binding captured action payload", Boolean(actionCommand?.body), JSON.stringify(actionCommand || {})));
+    assertions.push(assertion("dictionary source binding keeps original video", sourceContext.source?.externalId === fixture.videoId, JSON.stringify(sourceContext.source || {})));
+    assertions.push(assertion("dictionary source binding keeps clicked form", sourceContext.selection?.clickedForm === clicked.word, JSON.stringify(sourceContext.selection || {})));
+    assertions.push(assertion("dictionary source binding keeps original phrase locator", sourceContext.location?.phraseIndex === clickedOrdinal - 1 && Boolean(sourceContext.location?.phraseTextHash), JSON.stringify(sourceContext.location || {})));
+    assertions.push(assertion("dictionary source binding keeps original caption artifact", /audiofilms_/.test(sourceContext.artifact?.producer || "") && Boolean(sourceContext.artifact?.textContentFingerprint || sourceContext.artifact?.phraseSetRevisionId), JSON.stringify(sourceContext.artifact || {})));
+
+    const sourceBeforeSwitch = lookupSnapshot.source || "";
+    const menu = openSourceMenu();
+    const autoClick = clickSourceOption("auto");
+    const switched = waitForSource(/auto/i, fixture.videoId, waitMs);
+    const afterSwitchDictionary = readSnapshot().dictionary;
+    assertions.push(assertion("dictionary source binding source menu opened", menu.opened === true, menu.detail));
+    assertions.push(assertion("dictionary source binding switched source after lookup", autoClick.clicked === true && /auto/i.test(switched.source || ""), `${autoClick.detail} -> ${switched.source}`));
+    assertions.push(assertion("dictionary source binding source actually changed", sourceBeforeSwitch !== switched.source, `${sourceBeforeSwitch} -> ${switched.source}`));
+    assertions.push(assertion("dictionary source switch closes stale cards", afterSwitchDictionary?.present === false, JSON.stringify(afterSwitchDictionary || {})));
+
+    return {
+      ...fixture,
+      ok: assertions.every((item) => item.ok),
+      assertions,
+      snapshot: switched,
+    };
+  } finally {
+    removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+    if (hadPreviousDictionaryMock) {
+      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
+    } else {
+      removeLocalStorageItem("afShadowingDictionaryMock");
+    }
+  }
 }
 
 function runBackendOverrideScenario(fixtures, backendUrl) {
@@ -2341,6 +2418,68 @@ function clickDictionaryTranslate(index) {
   `);
 }
 
+function clickDictionaryProgressAction(cardIndex, label) {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const cards = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-overlay-card") || []);
+  const card = cards[${Number(cardIndex)}];
+  const buttons = Array.from(card?.querySelectorAll(".af-review-actions button") || []);
+  const needle = ${JSON.stringify(label)}.toLocaleLowerCase();
+  const button = buttons.find((candidate) => (candidate.textContent || "").trim().toLocaleLowerCase() === needle) || buttons[0];
+  if (!button) return "not-found";
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    button.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      buttons: type === "pointerdown" || type === "mousedown" ? 1 : 0,
+    }));
+  }
+  return "clicked";
+})()
+  `);
+}
+
+function clearDictionaryMockCommands() {
+  chromeEval(`
+(() => {
+  window.__afShadowingDictionaryMockCommands = [];
+  document.documentElement.dataset.afShadowingDictionaryMockCommands = "[]";
+  return "ok";
+})()
+  `);
+}
+
+function readDictionaryMockCommands() {
+  const raw = chromeEval(`
+(() => document.documentElement.dataset.afShadowingDictionaryMockCommands || "[]")()
+  `);
+  return JSON.parse(raw);
+}
+
+function waitForDictionaryMockCommand(operation, timeoutMs) {
+  const started = Date.now();
+  let commands = [];
+
+  while (Date.now() - started < timeoutMs) {
+    commands = readDictionaryMockCommands();
+    if (commands.some((command) => command.operation === operation)) {
+      return commands;
+    }
+    sleep(250);
+  }
+
+  return commands;
+}
+
+function lastDictionaryMockCommand(commands, operation) {
+  const matching = (Array.isArray(commands) ? commands : [])
+    .filter((command) => command.operation === operation);
+  return matching[matching.length - 1] || null;
+}
+
 function setDebugVisible(visible) {
   const result = chromeEval(`
 (() => {
@@ -2584,6 +2723,7 @@ function printFixtureList() {
   console.log("  - viewport geometry and mocked dictionary card states");
   console.log("\nFocused opt-in scenarios:");
   console.log(`  - ${ASR_EDGE_FIXTURE.name} (${ASR_EDGE_FIXTURE.videoId}) via --only-asr-edge`);
+  console.log(`  - ${DICTIONARY_SOURCE_BINDING_FIXTURE.name} (${DICTIONARY_SOURCE_BINDING_FIXTURE.videoId}) via --only-dictionary-source-binding`);
 }
 
 function parseTimestampSeconds(text) {
