@@ -2575,7 +2575,11 @@
     video.pause();
     video.currentTime = Math.max(0, phrase.startMs / 1000);
     state.currentIndex = targetIndex;
-    state.guidedHold = null;
+    state.guidedHold = {
+      index: targetIndex,
+      holdSeconds: video.currentTime,
+      createdAt: Date.now(),
+    };
     state.passivePausedKey = "";
     state.phraseJumpMenuOpen = false;
     state.phraseJumpError = "";

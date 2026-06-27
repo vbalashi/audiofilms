@@ -195,6 +195,15 @@ const MULTILINGUAL_SOURCE_SWITCH_FIXTURE = {
   },
 };
 
+const ASR_EDGE_FIXTURE = {
+  name: "asr-playback-edge-cases",
+  videoId: "SJvlUB4F-G0",
+  expect: {
+    countPattern: /\/ 150$/,
+    sourcePattern: /ASR/i,
+  },
+};
+
 const args = new Set(process.argv.slice(2));
 const profile = getArgValue("--profile") || (args.has("--full") ? "full" : "smoke");
 const shouldRunFullSuite = profile === "full";
@@ -214,6 +223,7 @@ const shouldOnlyBackendFailed = args.has("--only-backend-failed");
 const shouldOnlySourceSwitchFailed = args.has("--only-source-switch-failed");
 const shouldOnlyMultilingualSwitch = args.has("--only-multilingual-switch");
 const shouldOnlyGeometry = args.has("--only-geometry");
+const shouldOnlyAsrEdge = args.has("--only-asr-edge");
 const fixtureFilter = getArgValue("--only");
 const waitMs = Number(getArgValue("--wait-ms") || 18000);
 
@@ -228,19 +238,20 @@ if (shouldListFixtures) {
 
 const fixtures = fixtureFilter
   ? FIXTURES.filter((fixture) => fixture.name === fixtureFilter || fixture.videoId === fixtureFilter)
-  : (shouldOnlyBackendOff || shouldOnlyBackendFailed || shouldOnlySourceSwitchFailed || shouldOnlyMultilingualSwitch || shouldOnlyGeometry)
+  : (shouldOnlyBackendOff || shouldOnlyBackendFailed || shouldOnlySourceSwitchFailed || shouldOnlyMultilingualSwitch || shouldOnlyGeometry || shouldOnlyAsrEdge)
     ? []
   : shouldRunFullSuite
     ? FIXTURES
     : FIXTURES.filter((fixture) => DEFAULT_FIXTURE_NAMES.has(fixture.name));
 
-if (!fixtures.length && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
+if (!fixtures.length && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
   fail(`No fixtures matched --only=${fixtureFilter}`);
 }
 
 console.log(`AudioFilms YouTube extension ${shouldRunFullSuite ? "full regression" : "smoke"} profile`);
 if (!shouldRunFullSuite && !fixtureFilter) {
   console.log("Use --full for SPA, backend-degraded, source-switch, multilingual-switch, and geometry regression scenarios.");
+  console.log("Use --only-asr-edge for the focused ASR playback edge-case check.");
 }
 
 if (shouldRunLocalBackendCheck) {
@@ -258,40 +269,46 @@ for (const fixture of fixtures) {
   printFixtureResult(result);
 }
 
-if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldSkipSpaCheck) {
+if (shouldOnlyAsrEdge) {
+  const asrEdgeResult = runAsrEdgeScenario();
+  results.push(asrEdgeResult);
+  printFixtureResult(asrEdgeResult);
+}
+
+if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldSkipSpaCheck) {
   for (const fixture of runSpaNavigationScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
   for (const fixture of runBackendOffScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
   for (const fixture of runBackendFailedScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
   const sourceSwitchFailedResult = runSourceSwitchFailedScenario();
   results.push(sourceSwitchFailedResult);
   printFixtureResult(sourceSwitchFailedResult);
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry && !shouldOnlyAsrEdge) {
   const multilingualSwitchResult = runMultilingualSourceSwitchScenario();
   results.push(multilingualSwitchResult);
   printFixtureResult(multilingualSwitchResult);
 }
 
-if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
+if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyAsrEdge && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
   const geometryResult = runGeometryScenario();
   results.push(geometryResult);
   printFixtureResult(geometryResult);
@@ -438,6 +455,49 @@ function runMultilingualSourceSwitchScenario() {
     ok: assertions.every((item) => item.ok),
     assertions,
     snapshot: lookupSnapshot,
+  };
+}
+
+function runAsrEdgeScenario() {
+  const fixture = ASR_EDGE_FIXTURE;
+  const assertions = [];
+  removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+  navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
+  const initial = waitForSnapshot(fixture.videoId, waitMs);
+  assertions.push(assertion("ASR edge panel loaded", initial.panel === true, JSON.stringify({ boot: initial.boot, source: initial.source, count: initial.count, error: initial.error })));
+  assertions.push(assertion("ASR edge has no initial visible error", !(initial.error || "").trim(), initial.error));
+
+  const menu = openSourceMenu();
+  assertions.push(assertion("ASR edge source menu opens", menu.opened === true, menu.detail));
+  assertions.push(assertion("ASR transcript option appears from cache", menu.options.some((option) => /ASR/i.test(option)), menu.options.join(" | ")));
+  const asrClick = clickSourceOptionByText("ASR");
+  assertions.push(assertion("ASR transcript option clicked", asrClick.clicked || /ASR/i.test(initial.source || ""), asrClick.detail || initial.source));
+  const asrSnapshot = asrClick.clicked
+    ? waitForStableSourceText(fixture.expect.sourcePattern, fixture.videoId, waitMs)
+    : initial;
+  assertions.push(assertion("ASR source selected", fixture.expect.sourcePattern.test(asrSnapshot.source || ""), asrSnapshot.source));
+  assertions.push(assertion("ASR phrase count is cached transcript", fixture.expect.countPattern.test(asrSnapshot.count || ""), asrSnapshot.count));
+  assertions.push(assertion("ASR row rendered", Boolean(asrSnapshot.rowText), asrSnapshot.rowText));
+
+  const phrase8 = replayAsrPhrase(8);
+  const phrase14 = replayAsrPhrase(14);
+  const phrase16 = replayAsrPhrase(16);
+
+  assertions.push(
+    assertion("ASR phrase 8 selected", parseCountOrdinal(phrase8.snapshot.count) === 8, phrase8.snapshot.count),
+    assertion("ASR phrase 8 keeps full text", /Het is al een paar dagen heel warm/i.test(phrase8.snapshot.rowText || ""), phrase8.snapshot.rowText),
+    assertion("ASR phrase 8 uses playbackStartSec", nearlyEqual(phrase8.seek?.playbackStartSec, 40.81, 0.08) && nearlyEqual(phrase8.seek?.seekToSec, 40.66, 0.12), JSON.stringify(phrase8.seek)),
+    assertion("ASR phrase 14 selected", parseCountOrdinal(phrase14.snapshot.count) === 14, phrase14.snapshot.count),
+    assertion("ASR phrase 14 does not clip exact boundary", nearlyEqual(phrase14.seek?.expectedPauseAtSec, 67.89, 0.12), JSON.stringify(phrase14.seek)),
+    assertion("ASR phrase 16 selected", parseCountOrdinal(phrase16.snapshot.count) === 16, phrase16.snapshot.count),
+    assertion("ASR phrase 16 keeps normal post-roll", nearlyEqual(phrase16.seek?.expectedPauseAtSec, 74.09, 0.12), JSON.stringify(phrase16.seek)),
+  );
+
+  return {
+    ...fixture,
+    ok: assertions.every((item) => item.ok),
+    assertions,
+    snapshot: phrase16.snapshot || asrSnapshot,
   };
 }
 
@@ -1190,6 +1250,57 @@ function assertNextStaysOnTargetInteraction() {
 function parseCountOrdinal(countText) {
   const match = String(countText || "").match(/^(\d+)\s*\/\s*\d+/);
   return match ? Number(match[1]) : null;
+}
+
+function nearlyEqual(actual, expected, tolerance) {
+  return Number.isFinite(Number(actual)) && Math.abs(Number(actual) - expected) <= tolerance;
+}
+
+function replayAsrPhrase(ordinal) {
+  jumpToPhraseOrdinal(ordinal);
+  const selected = waitForCountOrdinal(ASR_EDGE_FIXTURE.videoId, ordinal, waitMs);
+  pressKey("ArrowDown", "ArrowDown");
+  const replayed = waitForSeekStarted(ordinal, 3000);
+  return {
+    snapshot: replayed.snapshot || selected,
+    seek: replayed.seek,
+  };
+}
+
+function jumpToPhraseOrdinal(ordinal) {
+  clickShadowButton("[data-af-count]");
+  setPhraseJumpInput(String(ordinal));
+  clickPhraseJumpGo();
+}
+
+function waitForSeekStarted(ordinal, timeoutMs) {
+  const started = Date.now();
+  let last = null;
+  let lastSeek = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readSnapshot();
+    lastSeek = latestSeekStartedEvent(last, ordinal);
+    if (lastSeek) {
+      return { snapshot: last, seek: lastSeek };
+    }
+    sleep(250);
+  }
+
+  return { snapshot: last || readSnapshot(), seek: lastSeek };
+}
+
+function latestSeekStartedEvent(snapshot, ordinal) {
+  const events = Array.isArray(snapshot?.debug?.navigationEvents)
+    ? snapshot.debug.navigationEvents
+    : [];
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event?.type === "seek-started" && event?.targetPhrase?.ordinal === ordinal) {
+      return event;
+    }
+  }
+  return null;
 }
 
 function assertKeyboardNavigationInteraction() {
@@ -2471,6 +2582,8 @@ function printFixtureList() {
   console.log("  - failed source switch recovery");
   console.log("  - multilingual source switch and lookup");
   console.log("  - viewport geometry and mocked dictionary card states");
+  console.log("\nFocused opt-in scenarios:");
+  console.log(`  - ${ASR_EDGE_FIXTURE.name} (${ASR_EDGE_FIXTURE.videoId}) via --only-asr-edge`);
 }
 
 function parseTimestampSeconds(text) {

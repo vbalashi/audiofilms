@@ -232,6 +232,14 @@ Regression check:
 
 After backend deploy or unpacked extension reload:
 
+Automated focused smoke:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-asr-edge
+```
+
+Manual fallback:
+
 1. Open `https://www.youtube.com/watch?v=SJvlUB4F-G0`.
 2. Reload the unpacked extension and reload the YouTube tab.
 3. Open AudioFilms and select `ASR transcript`.
