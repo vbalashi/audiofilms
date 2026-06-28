@@ -250,6 +250,30 @@ AUDIOFILMS_BUILD_AT
 AUDIOFILMS_COMMIT_SHA
 ```
 
+Release identity is local to AudioFilms; do not synchronize the version number
+with 2000NL. In the tester era, keep major version `0`, start a new minor line
+for a coherent user-visible milestone, and let the deploy workflow derive the
+patch/build number from commits after the latest semver tag.
+
+Before a push that is expected to deploy a milestone to Live Tester Deployment,
+state the release decision:
+
+- stay on the current release line; or
+- start a new minor release line with an annotated tag such as `v0.1.0`.
+
+The first baseline tag should be created once the current tester milestone is
+accepted:
+
+```bash
+git tag -a v0.1.0 -m "AudioFilms tester baseline v0.1.0"
+git push origin v0.1.0
+```
+
+If no semver tag exists yet, the workflow uses `app/package.json` as the release
+line fallback and emits a warning instead of deploying `0.0.0`. Tagged milestone
+deploys are still preferred because they make the patch/build count easy to
+reason about.
+
 Manual trigger is available from GitHub Actions via `workflow_dispatch`.
 
 ## Reverse Proxy / TLS

@@ -23,6 +23,8 @@ export type IssueReportRecord = {
   includeDiagnostics: boolean;
   diagnostics?: Record<string, unknown>;
   extensionVersion?: string;
+  extensionBuildInfo?: Record<string, unknown>;
+  backendBuildInfo?: Record<string, unknown>;
   browserUserAgent?: string;
   pageUrl?: string;
   videoId?: string;
@@ -132,6 +134,8 @@ export function normalizeIssueReport(input: NormalizeInput): IssueReportRecord {
     includeDiagnostics,
     diagnostics,
     extensionVersion: cleanOptionalString(record.extensionVersion, 120),
+    extensionBuildInfo: cleanRecord(record.extensionBuildInfo),
+    backendBuildInfo: cleanRecord(record.backendBuildInfo),
     browserUserAgent: cleanOptionalString(record.browserUserAgent, 500) || cleanOptionalString(input.userAgent, 500),
     pageUrl: summary.pageUrl,
     videoId: summary.videoId,

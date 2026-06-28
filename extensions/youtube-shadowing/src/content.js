@@ -9,6 +9,7 @@
   const phraseTokenApi = window.__afShadowingPhraseTokens;
   const diagnosticsReportApi = window.__afShadowingDiagnosticsReport;
   const displayPreferencesApi = window.__afShadowingDisplayPreferences;
+  const buildInfoApi = window.__afShadowingBuildInfo;
 
   try {
     bootAudioFilmsYouTubeShadowing();
@@ -86,6 +87,8 @@
     debugEvents: [],
     navigationEvents: [],
     lastIssueReport: null,
+    backendBuildInfo: null,
+    backendBuildError: "",
     navigationEventSeq: 0,
     cues: [],
     phrases: [],
@@ -148,6 +151,7 @@
   initializeDisplayPreferences();
   subscribeToDisplayPreferenceChanges();
   syncTwoThousandNlAccount();
+  refreshBackendBuildInfo();
 
   function updateBootDiagnostics(updates) {
     Object.assign(state.bootDiagnostics, updates, {
@@ -2865,6 +2869,8 @@
           includeDiagnostics: state.issueIncludeDiagnostics,
           diagnostics,
           extensionVersion: extensionVersion(),
+          extensionBuildInfo: extensionBuildInfo(),
+          backendBuildInfo: state.backendBuildInfo,
           browserUserAgent: navigator.userAgent,
         },
       });
@@ -2902,6 +2908,65 @@
       return chrome.runtime.getManifest().version || "";
     } catch (_error) {
       return "";
+    }
+  }
+
+  function extensionBuildInfo() {
+    const info = typeof buildInfoApi?.buildInfo === "function"
+      ? buildInfoApi.buildInfo()
+      : {};
+    return {
+      manifestVersion: extensionVersion(),
+      manifestName: info.manifestName || "",
+      extensionId: info.extensionId || "",
+      channel: info.channel || "",
+      buildId: info.buildId || "",
+      sourceCommit: info.sourceCommit || "",
+      builtAt: info.builtAt || "",
+      loadedAt: info.loadedAt || "",
+      apiBase: apiBaseForBackendCommands(),
+    };
+  }
+
+  async function refreshBackendBuildInfo() {
+    const apiBase = apiBaseForBackendCommands();
+    if (!apiBase) return;
+    const checkedAt = new Date().toISOString();
+    try {
+      const response = await fetch(new URL("/api/health", `${apiBase}/`).toString(), {
+        credentials: "omit",
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      });
+      const body = await response.json();
+      state.backendBuildInfo = {
+        apiBase,
+        checkedAt,
+        service: body?.service || "",
+        status: body?.status || "",
+        version: body?.version || "",
+        builtAt: body?.builtAt || "",
+        commit: body?.commit || "",
+      };
+      state.backendBuildError = "";
+      recordDebugEvent("backend-build-info", {
+        apiBase,
+        version: state.backendBuildInfo.version,
+        builtAt: state.backendBuildInfo.builtAt,
+        commit: state.backendBuildInfo.commit,
+      });
+    } catch (error) {
+      state.backendBuildInfo = {
+        apiBase,
+        checkedAt,
+      };
+      state.backendBuildError = error instanceof Error ? error.message : String(error || "");
+      recordDebugEvent("backend-build-info-failed", {
+        apiBase,
+        error: state.backendBuildError,
+      });
+    } finally {
+      render();
     }
   }
 
@@ -2955,6 +3020,9 @@
   function formatDebugState() {
     const selectedSource = getSelectedPracticeSource();
     return JSON.stringify({
+      extensionBuild: extensionBuildInfo(),
+      backendBuild: state.backendBuildInfo,
+      backendBuildError: state.backendBuildError,
       boot: state.bootDiagnostics,
       videoId: state.videoId,
       selectedSource: selectedSource ? captionTrackApi.formatSourceDebug(selectedSource) : null,
@@ -3033,6 +3101,9 @@
       visibleError: state.error,
       navigationEvents: state.navigationEvents,
       debugEvents: state.debugEvents,
+      extensionBuildInfo: extensionBuildInfo(),
+      backendBuildInfo: state.backendBuildInfo,
+      backendBuildError: state.backendBuildError,
     }), null, 2);
   }
 

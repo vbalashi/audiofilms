@@ -497,6 +497,8 @@ directory for local runs.
 
 The diagnostic payload can include:
 
+- extension manifest version, extension build/source identity, configured API
+  base, and reachable backend health version/date/commit;
 - current video and URL;
 - selected practice source;
 - fetch origin/provider and retrieval path, so page-loaded captions can be distinguished from backend-orchestrated captions;
@@ -517,6 +519,17 @@ For service worker or manifest/runtime errors:
 1. Open `chrome://extensions/?id=hhdkchoccmikoefhenobdjipgdppdpoc`.
 2. Inspect extension errors on the detail page.
 3. Open the service worker inspector if Chrome exposes the service worker link.
+
+Before sending or loading a tester package where build identity matters, stamp
+the extension source identity from the repo root:
+
+```bash
+node extensions/youtube-shadowing/scripts/stamp-build-info.mjs
+```
+
+The stamped `src/buildInfo.js` value is shown in Copy Debug and submitted issue
+reports together with the configured backend API base and `/api/health`
+version/date/commit.
 
 For page injection failures, check:
 

@@ -80,9 +80,21 @@ jobs:
           COMMIT=$(git rev-parse --short origin/main)
           COMMIT_FULL=$(git rev-parse origin/main)
 
-          LATEST_TAG=$(git describe --tags --abbrev=0 origin/main 2>/dev/null || echo "v0.0.0")
-          TAG_BASE="${LATEST_TAG#v}"
-          PATCH_COUNT=$(git rev-list "${LATEST_TAG}..origin/main" --count 2>/dev/null || echo "0")
+          PACKAGE_VERSION=$(node -pe "require('./app/package.json').version" 2>/dev/null || echo "0.1.0")
+          if LATEST_TAG=$(git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 origin/main 2>/dev/null); then
+            TAG_BASE="${LATEST_TAG#v}"
+            PATCH_COUNT=$(git rev-list "${LATEST_TAG}..origin/main" --count 2>/dev/null || echo "0")
+          else
+            TAG_BASE="${PACKAGE_VERSION}"
+            PATCH_COUNT=$(git rev-list origin/main --count 2>/dev/null || echo "0")
+            echo "::warning::No semver git tag found on origin/main; using app/package.json ${PACKAGE_VERSION} as the tester-era release line. Create a vX.Y.0 tag before milestone deploys."
+          fi
+
+          if [[ ! "${TAG_BASE}" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "::error::AudioFilms release base must be semver X.Y.Z, got '${TAG_BASE}'"
+            exit 1
+          fi
+
           TAG_MAJOR=$(echo "${TAG_BASE}" | cut -d. -f1)
           TAG_MINOR=$(echo "${TAG_BASE}" | cut -d. -f2)
           AUDIOFILMS_BUILD_VERSION="${TAG_MAJOR}.${TAG_MINOR}.${PATCH_COUNT}"
