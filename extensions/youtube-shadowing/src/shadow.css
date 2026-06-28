@@ -742,7 +742,17 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-dictionary-search-item.is-expanded {
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
   cursor: default;
+}
+
+.af-dictionary-search-item.is-expanded:hover,
+.af-dictionary-search-item.is-expanded:focus-visible {
+  background: transparent;
+  border-color: transparent;
 }
 
 .af-dictionary-search-item-header {
@@ -813,13 +823,11 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-dictionary-search-expanded {
   display: grid;
-  gap: 10px;
-  padding-top: 2px;
+  gap: 8px;
 }
 
 .af-dictionary-search-expanded .af-overlay-card {
   margin-top: 0;
-  background: rgba(var(--af-panel-rgb), 0.72);
 }
 
 .af-dictionary-search-expanded .af-overlay-card:first-child {

@@ -4024,18 +4024,19 @@
         row.setAttribute("role", "button");
         row.setAttribute("aria-label", `${dictionarySearchOpenLabel(item)}: ${dictionarySearchItemTitle(item)}`);
       }
-      const itemHeader = appendElement(row, "div", "af-dictionary-search-item-header");
-      const itemTitle = appendElement(itemHeader, "div", "af-dictionary-search-item-title");
-      itemTitle.textContent = dictionarySearchItemTitle(item);
-      renderChipList(itemHeader, dictionarySearchItemChips(item), "af-search-chip-list");
-      const text = dictionarySearchItemText(item);
-      const body = appendElement(row, "div", "af-dictionary-search-item-body");
-      if (text) {
-        const copy = appendElement(body, "p", "af-dictionary-search-item-text");
-        renderHighlightedText(copy, text, item?.match?.matchedText);
-      }
       if (isExpanded) {
         renderDictionarySearchExpanded(row, loadedState);
+      } else {
+        const itemHeader = appendElement(row, "div", "af-dictionary-search-item-header");
+        const itemTitle = appendElement(itemHeader, "div", "af-dictionary-search-item-title");
+        itemTitle.textContent = dictionarySearchItemTitle(item);
+        renderChipList(itemHeader, dictionarySearchItemChips(item), "af-search-chip-list");
+        const text = dictionarySearchItemText(item);
+        const body = appendElement(row, "div", "af-dictionary-search-item-body");
+        if (text) {
+          const copy = appendElement(body, "p", "af-dictionary-search-item-text");
+          renderHighlightedText(copy, text, item?.match?.matchedText);
+        }
       }
       const affordance = appendElement(row, "button", "af-dictionary-search-open");
       affordance.type = "button";

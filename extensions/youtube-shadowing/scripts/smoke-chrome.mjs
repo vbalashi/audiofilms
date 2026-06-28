@@ -2394,7 +2394,9 @@ function readGeometrySnapshot() {
         searchItemCount: dictionary.querySelectorAll(".af-dictionary-search-item").length,
         searchExpandedCardCount: dictionary.querySelectorAll(".af-dictionary-search-expanded .af-overlay-card").length,
         searchItems: Array.from(dictionary.querySelectorAll(".af-dictionary-search-item")).map((item) => ({
-          title: item.querySelector(".af-dictionary-search-item-title")?.textContent.trim() || "",
+          title: item.querySelector(".af-dictionary-search-item-title")?.textContent.trim() ||
+            item.querySelector(".af-dictionary-search-expanded .af-overlay-card-title")?.textContent.trim() ||
+            "",
           text: item.querySelector(".af-dictionary-search-item-text")?.textContent.trim() || "",
           openLabel: item.querySelector(".af-dictionary-search-open")?.textContent.trim() || "",
           expandedCards: item.querySelectorAll(".af-dictionary-search-expanded .af-overlay-card").length,
