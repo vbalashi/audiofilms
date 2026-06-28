@@ -4011,10 +4011,19 @@
     count.textContent = String(group.total || group.items?.length || 0);
 
     const list = appendElement(section, "div", "af-dictionary-search-items");
-    for (const item of group.items || []) {
-      const row = appendButton(list, "", `afSearchOpen-${group.id}-${item?.resultKey || item?.entry?.id || ""}`);
+    (group.items || []).forEach((item, index) => {
+      const itemKey = dictionarySearchItemKey(group.id, item, index);
+      const isExpanded = Boolean(selectedWord.groupedSearchExpandedByKey?.[itemKey]);
+      const loadedState = selectedWord.groupedSearchCardsByKey?.[itemKey] || null;
+      const row = appendElement(list, "div", "af-dictionary-search-item");
       row.className = "af-dictionary-search-item";
-      row.type = "button";
+      row.classList.toggle("is-expanded", isExpanded);
+      row.dataset.afSearchItemKey = itemKey;
+      row.tabIndex = isExpanded ? -1 : 0;
+      if (!isExpanded) {
+        row.setAttribute("role", "button");
+        row.setAttribute("aria-label", `${dictionarySearchOpenLabel(item)}: ${dictionarySearchItemTitle(item)}`);
+      }
       const itemHeader = appendElement(row, "div", "af-dictionary-search-item-header");
       const itemTitle = appendElement(itemHeader, "div", "af-dictionary-search-item-title");
       itemTitle.textContent = dictionarySearchItemTitle(item);
@@ -4025,18 +4034,26 @@
         const copy = appendElement(body, "p", "af-dictionary-search-item-text");
         renderHighlightedText(copy, text, item?.match?.matchedText);
       }
-      const affordance = appendElement(row, "span", "af-dictionary-search-open");
-      affordance.textContent = dictionarySearchOpenLabel(item);
-      row.addEventListener("click", () => {
-        const nextWord = dictionarySearchItemTitle(item);
-        if (!nextWord) return;
-        selectLookupWord(nextWord, selectedWord.phraseIndex, {
-          originalToken: nextWord,
-          source: "dictionary-search-preview",
-          resultKey: item?.resultKey || "",
+      if (isExpanded) {
+        renderDictionarySearchExpanded(row, loadedState);
+      }
+      const affordance = appendElement(row, "button", "af-dictionary-search-open");
+      affordance.type = "button";
+      affordance.textContent = isExpanded ? "Collapse card" : dictionarySearchOpenLabel(item);
+      affordance.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      affordance.addEventListener("click", () => toggleDictionarySearchItem(selectedWord, group, item, itemKey));
+      if (!isExpanded) {
+        row.addEventListener("click", (event) => {
+          if (event.target?.closest?.("button, a")) return;
+          toggleDictionarySearchItem(selectedWord, group, item, itemKey);
         });
-      });
-    }
+        row.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          toggleDictionarySearchItem(selectedWord, group, item, itemKey);
+        });
+      }
+    });
 
     if (group.page?.hasMore && group.page.nextCursor) {
       const more = appendButton(section, "More results", `afSearchMore-${group.id}`);
@@ -4071,6 +4088,14 @@
     return "Headwords";
   }
 
+  function dictionarySearchItemKey(groupId, item, index) {
+    return [
+      groupId || "group",
+      item?.resultKey || item?.entry?.id || dictionarySearchItemTitle(item) || "item",
+      index,
+    ].join("::");
+  }
+
   function dictionarySearchItemTitle(item) {
     const headword = item?.entry?.headword || "";
     return headword || state.selectedWord?.word || "Dictionary card";
@@ -4093,6 +4118,37 @@
 
   function dictionarySearchOpenLabel(item) {
     return item?.kind === "generated" || item?.entry?.draft ? "Expand draft" : "Expand full card";
+  }
+
+  function renderDictionarySearchExpanded(parent, loadedState) {
+    const expanded = appendElement(parent, "div", "af-dictionary-search-expanded");
+    if (!loadedState || loadedState.status === "loading") {
+      const loading = appendElement(expanded, "p", "af-dictionary-copy");
+      loading.textContent = "Loading card...";
+      return;
+    }
+    if (loadedState.status === "error") {
+      const error = appendElement(expanded, "p", "af-source-option-error");
+      error.textContent = loadedState.error || "Card lookup failed.";
+      return;
+    }
+    const cards = focusedDictionarySearchCards(loadedState);
+    if (!cards.length) {
+      const empty = appendElement(expanded, "p", "af-dictionary-copy");
+      empty.textContent = "No full card found.";
+      return;
+    }
+    for (const card of cards) {
+      renderOverlayCard(expanded, card);
+    }
+  }
+
+  function focusedDictionarySearchCards(loadedState) {
+    const cards = loadedState?.result?.cards || [];
+    const entryId = loadedState?.entryId || "";
+    if (!entryId) return cards;
+    const matching = cards.filter((card) => card?.id === entryId);
+    return matching.length ? matching : cards;
   }
 
   function renderHighlightedText(parent, text, highlight) {
@@ -4741,6 +4797,8 @@
       groupedSearchResult: null,
       groupedSearchError: "",
       groupedSearchLoadingGroup: "",
+      groupedSearchExpandedByKey: {},
+      groupedSearchCardsByKey: {},
     };
     state.currentIndex = phraseIndex;
     schedulePhraseProgressSave("lookup-word");
@@ -4857,6 +4915,86 @@
         totalMs: Date.now() - startedAt,
         commandTimings: payload?.meta?.commandTimings || null,
       });
+      render();
+    }
+  }
+
+  function toggleDictionarySearchItem(selectedWord, group, item, itemKey) {
+    if (!state.selectedWord || !isCurrentLookup(selectedWord)) return;
+    const expandedByKey = { ...(state.selectedWord.groupedSearchExpandedByKey || {}) };
+    const cardsByKey = { ...(state.selectedWord.groupedSearchCardsByKey || {}) };
+
+    if (expandedByKey[itemKey]) {
+      delete expandedByKey[itemKey];
+      state.selectedWord = {
+        ...state.selectedWord,
+        groupedSearchExpandedByKey: expandedByKey,
+      };
+      render();
+      return;
+    }
+
+    expandedByKey[itemKey] = true;
+    if (!cardsByKey[itemKey]) {
+      cardsByKey[itemKey] = {
+        status: "loading",
+        result: null,
+        error: "",
+        entryId: item?.entry?.id || "",
+      };
+    }
+    state.selectedWord = {
+      ...state.selectedWord,
+      groupedSearchExpandedByKey: expandedByKey,
+      groupedSearchCardsByKey: cardsByKey,
+    };
+    render();
+
+    if (cardsByKey[itemKey].status === "loading" && !cardsByKey[itemKey].result) {
+      loadDictionarySearchItemCard(selectedWord, item, itemKey);
+    }
+  }
+
+  async function loadDictionarySearchItemCard(selectedWord, item, itemKey) {
+    const phrase = selectedWord.sourceBinding?.phrase || state.phrases[selectedWord.phraseIndex] || {};
+    const source = getSelectedPracticeSource();
+    const language = selectedWord.sourceBinding?.captionSource?.languageCode ||
+      source?.loadedTranscriptResult?.languageCode ||
+      source?.languageCode ||
+      "auto";
+    const word = dictionarySearchItemTitle(item);
+    const context = dictionarySearchItemText(item) || phrase.text || "";
+    try {
+      const result = await fetchDictionaryResult({ word, language, context });
+      if (!isCurrentLookup(selectedWord)) return;
+      state.selectedWord = {
+        ...state.selectedWord,
+        groupedSearchCardsByKey: {
+          ...(state.selectedWord.groupedSearchCardsByKey || {}),
+          [itemKey]: {
+            status: "ready",
+            result,
+            error: "",
+            entryId: item?.entry?.id || "",
+          },
+        },
+      };
+      render();
+    } catch (error) {
+      if (!isCurrentLookup(selectedWord)) return;
+      const payload = error?.payload || {};
+      state.selectedWord = {
+        ...state.selectedWord,
+        groupedSearchCardsByKey: {
+          ...(state.selectedWord.groupedSearchCardsByKey || {}),
+          [itemKey]: {
+            status: "error",
+            result: null,
+            error: payload.error || (error instanceof Error ? error.message : String(error)),
+            entryId: item?.entry?.id || "",
+          },
+        },
+      };
       render();
     }
   }

@@ -741,6 +741,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-color: var(--af-border-strong);
 }
 
+.af-dictionary-search-item.is-expanded {
+  cursor: default;
+}
+
 .af-dictionary-search-item-header {
   display: flex;
   align-items: center;
@@ -801,8 +805,25 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: rgba(var(--af-panel-soft-rgb), 0.55);
   border: 1px dashed var(--af-border);
   border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
   font-size: 11px;
   font-weight: 850;
+}
+
+.af-dictionary-search-expanded {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.af-dictionary-search-expanded .af-overlay-card {
+  margin-top: 0;
+  background: rgba(var(--af-panel-rgb), 0.72);
+}
+
+.af-dictionary-search-expanded .af-overlay-card:first-child {
+  margin-top: 0;
 }
 
 .af-search-chip-list {

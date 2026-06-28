@@ -774,13 +774,21 @@ function runDictionaryBehaviorScenario() {
       assertion("behavior more preserves scroll context", Math.abs((afterMore.dictionaryUi?.scrollTop || 0) - beforeMoreScroll) < 120, JSON.stringify({ beforeMoreScroll, after: afterMore.dictionaryUi?.scrollTop })),
     );
 
-    const firstPreview = beforeMore.dictionaryUi?.searchItems?.[0];
-    const previewClick = clickDictionarySearchItem(0);
-    const previewLookup = waitForDictionarySelection(firstPreview?.title || "", waitMs);
+    const previewIndex = Math.max(
+      0,
+      (beforeMore.dictionaryUi?.searchItems || []).findIndex((item) => item.title?.toLocaleLowerCase() === "doppen"),
+    );
+    const firstPreview = beforeMore.dictionaryUi?.searchItems?.[previewIndex];
+    const previewClick = clickDictionarySearchItem(previewIndex);
+    const previewExpanded = waitForSearchInlineCard(1, waitMs);
+    const previewLookup = readSnapshot();
+    const expandedPreviewItem = (previewExpanded.dictionaryUi?.searchItems || [])[previewIndex] || null;
     evidencePaths.push(captureChromeScreenshot("dictionary-behavior-preview-open"));
     assertions.push(
       assertion("behavior preview row clicked", previewClick === "clicked", previewClick),
-      assertion("behavior preview opens that full card", Boolean(firstPreview?.title) && previewLookup.dictionary?.word?.toLocaleLowerCase() === firstPreview.title.toLocaleLowerCase(), JSON.stringify({ firstPreview, dictionary: previewLookup.dictionary })),
+      assertion("behavior preview keeps current dictionary word", previewLookup.dictionary?.word?.toLocaleLowerCase() === "jaar", JSON.stringify({ firstPreview, dictionary: previewLookup.dictionary })),
+      assertion("behavior preview expands inline full card", (previewExpanded.dictionaryUi?.searchExpandedCardCount || 0) >= 1, JSON.stringify({ firstPreview, dictionary: previewExpanded.dictionaryUi })),
+      assertion("behavior preview focuses matched doppen card", expandedPreviewItem?.title?.toLocaleLowerCase() === "doppen" && expandedPreviewItem.expandedCards === 1, JSON.stringify(expandedPreviewItem)),
       assertion("behavior preview affordance uses Expand full card copy", (beforeMore.dictionaryUi?.searchOpenLabels || []).every((label) => /^Expand full card$/i.test(label)), JSON.stringify(beforeMore.dictionaryUi?.searchOpenLabels || [])),
     );
 
@@ -2044,6 +2052,21 @@ function waitForSearchItemGrowth(previousCount, timeoutMs) {
   return last || readGeometrySnapshot();
 }
 
+function waitForSearchInlineCard(expectedCount, timeoutMs) {
+  const started = Date.now();
+  let last = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readGeometrySnapshot();
+    if ((last.dictionaryUi?.searchExpandedCardCount || 0) >= expectedCount) {
+      return last;
+    }
+    sleep(500);
+  }
+
+  return last || readGeometrySnapshot();
+}
+
 function findAndClickLookupWord(word, videoId) {
   jumpToPhraseOrdinal(1);
   let snapshot = waitForCountOrdinal(videoId, 1, waitMs);
@@ -2369,10 +2392,12 @@ function readGeometrySnapshot() {
         searchHeadingPresent: Boolean(dictionary.querySelector(".af-dictionary-search-heading")),
         searchGroupTitles: Array.from(dictionary.querySelectorAll(".af-dictionary-search-group-title")).map((title) => title.textContent.trim()),
         searchItemCount: dictionary.querySelectorAll(".af-dictionary-search-item").length,
+        searchExpandedCardCount: dictionary.querySelectorAll(".af-dictionary-search-expanded .af-overlay-card").length,
         searchItems: Array.from(dictionary.querySelectorAll(".af-dictionary-search-item")).map((item) => ({
           title: item.querySelector(".af-dictionary-search-item-title")?.textContent.trim() || "",
           text: item.querySelector(".af-dictionary-search-item-text")?.textContent.trim() || "",
           openLabel: item.querySelector(".af-dictionary-search-open")?.textContent.trim() || "",
+          expandedCards: item.querySelectorAll(".af-dictionary-search-expanded .af-overlay-card").length,
           chips: Array.from(item.querySelectorAll(".af-chip")).map((chip) => chip.textContent.trim()),
         })),
         searchOpenLabels: Array.from(dictionary.querySelectorAll(".af-dictionary-search-open")).map((item) => item.textContent.trim()),
