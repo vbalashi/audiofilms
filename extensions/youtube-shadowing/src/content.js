@@ -4025,7 +4025,7 @@
         row.setAttribute("aria-label", `${dictionarySearchOpenLabel(item)}: ${dictionarySearchItemTitle(item)}`);
       }
       if (isExpanded) {
-        renderDictionarySearchExpanded(row, loadedState);
+        renderDictionarySearchExpanded(row, loadedState, () => toggleDictionarySearchItem(selectedWord, group, item, itemKey));
       } else {
         const itemHeader = appendElement(row, "div", "af-dictionary-search-item-header");
         const itemTitle = appendElement(itemHeader, "div", "af-dictionary-search-item-title");
@@ -4038,11 +4038,13 @@
           renderHighlightedText(copy, text, item?.match?.matchedText);
         }
       }
-      const affordance = appendElement(row, "button", "af-dictionary-search-open");
-      affordance.type = "button";
-      affordance.textContent = isExpanded ? "Collapse card" : dictionarySearchOpenLabel(item);
-      affordance.setAttribute("aria-expanded", isExpanded ? "true" : "false");
-      affordance.addEventListener("click", () => toggleDictionarySearchItem(selectedWord, group, item, itemKey));
+      if (!isExpanded) {
+        const affordance = appendElement(row, "button", "af-dictionary-search-open");
+        affordance.type = "button";
+        affordance.textContent = dictionarySearchOpenLabel(item);
+        affordance.setAttribute("aria-expanded", "false");
+        affordance.addEventListener("click", () => toggleDictionarySearchItem(selectedWord, group, item, itemKey));
+      }
       if (!isExpanded) {
         row.addEventListener("click", (event) => {
           if (event.target?.closest?.("button, a")) return;
@@ -4121,7 +4123,7 @@
     return item?.kind === "generated" || item?.entry?.draft ? "Expand draft" : "Expand full card";
   }
 
-  function renderDictionarySearchExpanded(parent, loadedState) {
+  function renderDictionarySearchExpanded(parent, loadedState, onCollapse) {
     const expanded = appendElement(parent, "div", "af-dictionary-search-expanded");
     if (!loadedState || loadedState.status === "loading") {
       const loading = appendElement(expanded, "p", "af-dictionary-copy");
@@ -4140,7 +4142,12 @@
       return;
     }
     for (const card of cards) {
-      renderOverlayCard(expanded, card);
+      renderOverlayCard(expanded, card, {
+        collapseAction: {
+          label: "Collapse card",
+          onClick: onCollapse,
+        },
+      });
     }
   }
 
@@ -4319,7 +4326,7 @@
     return null;
   }
 
-  function renderOverlayCard(parent, card) {
+  function renderOverlayCard(parent, card, options = {}) {
     const entry = appendElement(parent, "div", "af-overlay-card");
     entry.classList.add(`is-phase-${card?.progress?.phase || "guest"}`);
     if (isGeneratedDictionaryCard(card)) {
@@ -4340,13 +4347,14 @@
       const translationLine = appendElement(titleWrap, "div", "af-overlay-headword-translation");
       translationLine.textContent = headwordTranslation;
     }
+    const headerActions = appendElement(header, "div", "af-overlay-card-actions");
     const translationActions = displayActionsByGroup(card, "translation");
     if (translationActions.length) {
       const translationVisible = cardTranslationsVisible(card);
       const translationPending = Boolean(
         state.translationPendingByCardId[card.id] || card?.translation?.status === "pending",
       );
-      const translateButton = appendButton(header, "", `afAction-${translationActions[0].id}`);
+      const translateButton = appendButton(headerActions, "", `afAction-${translationActions[0].id}`);
       translateButton.className = "af-card-translate";
       translateButton.disabled = translationPending || !cardCanRequestTranslation(card);
       translateButton.innerHTML = `${iconSvg("translate")}<span class="af-sr-only">${translationVisible ? "Hide translation" : "Show translation"}</span>`;
@@ -4362,6 +4370,17 @@
       );
       translateButton.setAttribute("aria-pressed", translationVisible ? "true" : "false");
       translateButton.addEventListener("click", () => performDisplayAction(card, translationActions[0]));
+    }
+    if (options.collapseAction?.onClick) {
+      const collapseButton = appendButton(headerActions, "", `afPreviewCollapse-${card.id || "card"}`);
+      collapseButton.className = "af-card-collapse";
+      collapseButton.innerHTML = `${iconSvg("collapse")}<span class="af-sr-only">${options.collapseAction.label || "Collapse card"}</span>`;
+      collapseButton.title = options.collapseAction.label || "Collapse card";
+      collapseButton.setAttribute("aria-label", options.collapseAction.label || "Collapse card");
+      collapseButton.addEventListener("click", options.collapseAction.onClick);
+    }
+    if (!headerActions.childElementCount) {
+      headerActions.remove();
     }
 
     const summary = card.summary || {};

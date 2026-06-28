@@ -789,6 +789,7 @@ function runDictionaryBehaviorScenario() {
       assertion("behavior preview keeps current dictionary word", previewLookup.dictionary?.word?.toLocaleLowerCase() === "jaar", JSON.stringify({ firstPreview, dictionary: previewLookup.dictionary })),
       assertion("behavior preview expands inline full card", (previewExpanded.dictionaryUi?.searchExpandedCardCount || 0) >= 1, JSON.stringify({ firstPreview, dictionary: previewExpanded.dictionaryUi })),
       assertion("behavior preview focuses matched doppen card", expandedPreviewItem?.title?.toLocaleLowerCase() === "doppen" && expandedPreviewItem.expandedCards === 1, JSON.stringify(expandedPreviewItem)),
+      assertion("behavior preview collapse is card header action", expandedPreviewItem?.collapseActions?.includes("Collapse card") && !expandedPreviewItem.openLabel, JSON.stringify(expandedPreviewItem)),
       assertion("behavior preview affordance uses Expand full card copy", (beforeMore.dictionaryUi?.searchOpenLabels || []).every((label) => /^Expand full card$/i.test(label)), JSON.stringify(beforeMore.dictionaryUi?.searchOpenLabels || [])),
     );
 
@@ -2377,6 +2378,7 @@ function readGeometrySnapshot() {
           chips: card.querySelectorAll(".af-chip").length,
           progressActions: Array.from(card.querySelectorAll(".af-review-actions button")).map((button) => button.textContent.trim()),
           translateActions: Array.from(card.querySelectorAll(".af-card-translate")).map((button) => button.textContent.trim()),
+          collapseActions: Array.from(card.querySelectorAll(".af-card-collapse")).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),
           expandButtons: Array.from(card.querySelectorAll(".af-overlay-expand-toggle")).map((button) => button.textContent.trim()),
           sections: Array.from(card.querySelectorAll(".af-overlay-section")).map((section) => {
             const copy = section.querySelector(".af-dictionary-copy:not(.af-overlay-section-label)");
@@ -2400,6 +2402,7 @@ function readGeometrySnapshot() {
           text: item.querySelector(".af-dictionary-search-item-text")?.textContent.trim() || "",
           openLabel: item.querySelector(".af-dictionary-search-open")?.textContent.trim() || "",
           expandedCards: item.querySelectorAll(".af-dictionary-search-expanded .af-overlay-card").length,
+          collapseActions: Array.from(item.querySelectorAll(".af-dictionary-search-expanded .af-card-collapse")).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),
           chips: Array.from(item.querySelectorAll(".af-chip")).map((chip) => chip.textContent.trim()),
         })),
         searchOpenLabels: Array.from(dictionary.querySelectorAll(".af-dictionary-search-open")).map((item) => item.textContent.trim()),

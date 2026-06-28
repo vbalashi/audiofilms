@@ -1009,6 +1009,34 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font: inherit;
 }
 
+.af-overlay-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.af-card-collapse {
+  display: grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  color: var(--af-muted);
+  background: var(--af-control);
+  border: 1px solid var(--af-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.af-card-collapse:hover,
+.af-card-collapse:focus-visible {
+  color: var(--af-text);
+  border-color: var(--af-border-strong);
+}
+
 .af-card-translate[aria-pressed="true"] {
   color: var(--af-success-text);
   background: var(--af-success-soft);
