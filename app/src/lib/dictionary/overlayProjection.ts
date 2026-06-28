@@ -132,6 +132,7 @@ export function projectOverlayCard(
     stringValue(item.entry?.headword) ||
     item.match?.matchedForm ||
     clickedForm;
+  const meaningId = numberValue(content.meaningId) ?? numberValue(content.meaning_id);
   const partOfSpeech = stringValue(content.partOfSpeech) || stringValue(item.entry?.partOfSpeech);
   const article = normalizedArticle(
     stringValue(content.article) ||
@@ -161,6 +162,7 @@ export function projectOverlayCard(
     headword,
     headwordTranslation: stringValue(content.headwordTranslation) || undefined,
     language: item.entry?.languageCode || sourceLanguageCode,
+    meaningId: meaningId ?? undefined,
     partOfSpeech: partOfSpeech || undefined,
     article: article || undefined,
     match: {
@@ -403,6 +405,15 @@ function normalizedTranslationStatus(value: unknown): OverlayTranslationStatus |
 
 function stringValue(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function numberValue(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
 }
 
 function arrayValue(value: unknown) {

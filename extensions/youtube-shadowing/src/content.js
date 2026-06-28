@@ -125,6 +125,8 @@
     visibleTranslationsByCardId: {},
     translationPendingByCardId: {},
     cardActionFeedbackByCardId: {},
+    cardMenuOpenId: "",
+    cardMenuFeedbackByCardId: {},
     themePreference: initialDisplayPreferences.theme,
     accountStatus: "guest",
     accountUser: null,
@@ -1277,6 +1279,11 @@
         '<path d="M7 2h1"/>',
         '<path d="m22 22-5-10-5 10"/>',
         '<path d="M14 18h6"/>',
+      ],
+      more: [
+        '<circle cx="12" cy="12" r="1"/>',
+        '<circle cx="19" cy="12" r="1"/>',
+        '<circle cx="5" cy="12" r="1"/>',
       ],
       eye: [
         '<path d="M2.06 12.35a1 1 0 0 1 0-.7C3.52 7.34 7.6 4 12 4s8.48 3.34 9.94 7.65a1 1 0 0 1 0 .7C20.48 16.66 16.4 20 12 20s-8.48-3.34-9.94-7.65z"/>',
@@ -2795,13 +2802,17 @@
     return message || "Timing improvement failed.";
   }
 
-  function openIssueReportDialog() {
+  function openIssueReportDialog(options = {}) {
     const report = formatIssueReport();
     recordDebugEvent("issue-marked", {
       navigationEventId: state.navigationEvents.at(-1)?.id || null,
       currentIndex: state.currentIndex,
+      source: options.source || "manual",
     });
     state.lastIssueReport = report;
+    if (options.category) state.issueCategory = options.category;
+    if (options.description !== undefined) state.issueDescription = options.description;
+    if (options.expectedBehavior !== undefined) state.issueExpectedBehavior = options.expectedBehavior;
     state.issueDialogOpen = true;
     state.issueSubmitStatus = "";
     state.issueSubmitError = "";
@@ -4371,6 +4382,18 @@
       translateButton.setAttribute("aria-pressed", translationVisible ? "true" : "false");
       translateButton.addEventListener("click", () => performDisplayAction(card, translationActions[0]));
     }
+    if (card?.id && !isGeneratedDictionaryCard(card)) {
+      const menuButton = appendButton(headerActions, "", `afCardMenu-${card.id}`);
+      menuButton.className = "af-card-menu-button";
+      menuButton.innerHTML = `${iconSvg("more")}<span class="af-sr-only">Card actions</span>`;
+      menuButton.title = "Card actions";
+      menuButton.setAttribute("aria-label", "Card actions");
+      menuButton.setAttribute("aria-expanded", state.cardMenuOpenId === card.id ? "true" : "false");
+      menuButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggleCardMenu(card.id);
+      });
+    }
     if (options.collapseAction?.onClick) {
       const collapseButton = appendButton(headerActions, "", `afPreviewCollapse-${card.id || "card"}`);
       collapseButton.className = "af-card-collapse";
@@ -4381,6 +4404,9 @@
     }
     if (!headerActions.childElementCount) {
       headerActions.remove();
+    }
+    if (card?.id && state.cardMenuOpenId === card.id) {
+      renderCardActionMenu(entry, card);
     }
 
     const summary = card.summary || {};
@@ -4403,10 +4429,6 @@
 
     renderReviewActions(entry, card);
 
-    if (feedback?.message) {
-      const status = appendElement(entry, "p", "af-dictionary-copy af-card-inline-feedback");
-      status.textContent = feedback.message;
-    }
   }
 
   function overlayTitle(card) {
@@ -4430,11 +4452,18 @@
     return [
       card.partOfSpeech ? { kind: "part-of-speech", label: card.partOfSpeech } : null,
       ...projected.filter((chip) => chip.kind === "part-of-speech" && chip.label !== card.partOfSpeech),
-      ...projected.filter((chip) => chip.kind === "list"),
+      definitionNumberChip(card.meaningId),
       card.dictionary?.name || card.dictionary?.slug
         ? { kind: "dictionary", label: card.dictionary.name || card.dictionary.slug }
         : null,
     ].filter(Boolean);
+  }
+
+  function definitionNumberChip(value) {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return null;
+    const label = `#${Math.trunc(numeric)}`;
+    return { kind: "definition-index", label, value: label, title: `Definition ${Math.trunc(numeric)}` };
   }
 
   function renderChipList(parent, chips, className = "af-chip-list") {
@@ -4443,6 +4472,7 @@
     for (const chip of chips) {
       const item = appendElement(list, "span", `af-chip ${chipClassName(chip)}`);
       item.textContent = chip.label || chip;
+      if (chip.title) item.title = chip.title;
     }
   }
 
@@ -4459,11 +4489,16 @@
     const hiddenCount = Math.max(0, visibleSections.length - renderedSections.length);
     const details = appendElement(parent, "div", "af-overlay-details");
     details.classList.toggle("is-open", expanded);
+    details.classList.toggle("has-leading-context", renderedSections[0]?.kind === "context");
     const content = appendElement(details, "div", "af-overlay-details-content");
     for (const section of renderedSections) {
       const block = appendElement(content, "div", `af-overlay-section is-${section.kind || "meaning"}`);
       if (section.kind === "idiom") {
         renderIdiomSection(block, section, card, sections, translation);
+        continue;
+      }
+      if (section.kind === "context") {
+        renderContextSection(block, section, card, sections, translation);
         continue;
       }
       if (shouldRenderSectionMicroLabel(section)) {
@@ -4482,17 +4517,89 @@
       const toggle = appendElement(details, "button", "af-overlay-expand-toggle");
       toggle.type = "button";
       toggle.innerHTML = expanded
-        ? `<span>Collapse full card</span>${iconSvg("collapse")}`
-        : `<span>Show ${hiddenCount} more ${hiddenCount === 1 ? "detail" : "details"}</span>${iconSvg("expand")}`;
+        ? `<span>Show less</span>${iconSvg("collapse")}`
+        : `<span>Show ${hiddenCount} ${hiddenCount === 1 ? "detail" : "details"}</span>${iconSvg("expand")}`;
       toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
       toggle.addEventListener("click", () => toggleCardExpanded(cardId));
     }
   }
 
+  function toggleCardMenu(cardId) {
+    state.cardMenuOpenId = state.cardMenuOpenId === cardId ? "" : cardId;
+    render();
+  }
+
+  function renderCardActionMenu(parent, card) {
+    const menu = appendElement(parent, "div", "af-card-action-menu");
+    menu.setAttribute("role", "menu");
+    const wrongTranslation = appendButton(menu, "Report wrong translation", "afCardReportWrongTranslation");
+    wrongTranslation.setAttribute("role", "menuitem");
+    wrongTranslation.addEventListener("click", () => reportCardTranslationIssue(card));
+    const translationOk = appendButton(menu, "Translation looks right", "afCardTranslationOk");
+    translationOk.setAttribute("role", "menuitem");
+    translationOk.addEventListener("click", () => markCardTranslationOk(card));
+    const dictionaryIssue = appendButton(menu, "Report dictionary issue", "afCardReportDictionaryIssue");
+    dictionaryIssue.setAttribute("role", "menuitem");
+    dictionaryIssue.addEventListener("click", () => reportCardDictionaryIssue(card));
+    const menuFeedback = state.cardMenuFeedbackByCardId[card?.id];
+    if (menuFeedback) {
+      const note = appendElement(menu, "p", "af-card-menu-feedback");
+      note.textContent = menuFeedback;
+    }
+  }
+
+  function reportCardTranslationIssue(card) {
+    state.cardMenuOpenId = "";
+    openIssueReportDialog({
+      source: "dictionary-card-menu",
+      category: "translation",
+      description: `Dictionary card translation looks wrong.\n\nCard: ${card?.headword || card?.clickedForm || ""}\nEntry: ${card?.entryId || card?.id || ""}\nClicked form: ${card?.clickedForm || ""}`,
+      expectedBehavior: "Translation should match the selected dictionary sense and examples.",
+    });
+  }
+
+  function reportCardDictionaryIssue(card) {
+    state.cardMenuOpenId = "";
+    openIssueReportDialog({
+      source: "dictionary-card-menu",
+      category: "dictionary",
+      description: `Dictionary card content looks wrong.\n\nCard: ${card?.headword || card?.clickedForm || ""}\nEntry: ${card?.entryId || card?.id || ""}\nClicked form: ${card?.clickedForm || ""}`,
+      expectedBehavior: "Definition, context, examples, and idioms should match the intended dictionary sense.",
+    });
+  }
+
+  function markCardTranslationOk(card) {
+    if (!card?.id) return;
+    state.cardMenuOpenId = card.id;
+    state.cardMenuFeedbackByCardId = {
+      ...state.cardMenuFeedbackByCardId,
+      [card.id]: "Translation marked ok for this session.",
+    };
+    recordDebugEvent("dictionary-card-translation-ok", {
+      cardId: card.id,
+      entryId: card.entryId || null,
+      headword: card.headword || "",
+      clickedForm: card.clickedForm || "",
+    });
+    render();
+  }
+
   function collapsedOverlaySections(sections) {
+    const context = sections.find((section) => section.kind === "context");
     const firstExample = sections.find((section) => section.kind === "example");
     const firstDetail = sections.find((section) => section.kind !== "example");
+    if (context) return [context, firstExample].filter(Boolean);
     return [firstExample || firstDetail].filter(Boolean);
+  }
+
+  function renderContextSection(parent, section, card, allSections, translation) {
+    renderTranslatedLine(
+      parent,
+      "p",
+      "af-dictionary-copy af-overlay-context",
+      section.text,
+      lookupOrOverlaySection(card, section, allSections, translation),
+    );
   }
 
   function renderIdiomSection(parent, section, card, allSections, translation) {
@@ -4533,6 +4640,7 @@
       if (["bw", "adverb"].includes(value)) return "is-pos-bw";
       if (["idiom"].includes(value)) return "is-pos-bn";
     }
+    if (kind === "definition-index") return "is-definition-index";
     if (kind === "list") return "is-list";
     if (value === "draft" || value === "needs save") return "is-draft";
     return "";
@@ -4645,6 +4753,9 @@
     if (section.kind === "note") {
       return translatedNote(translation);
     }
+    if (section.kind === "context") {
+      return translatedNote(translation);
+    }
     if (section.kind === "idiom") {
       const idiomIndex = sectionKindIndex(section, peers, "idiom");
       return idiomIndex >= 0 ? translatedIdiom(translation, idiomIndex) : "";
@@ -4698,15 +4809,6 @@
   function renderReviewActions(parent, card = null) {
     const displayActions = displayActionsByGroup(card, "progress");
     const feedback = state.cardActionFeedbackByCardId[card?.id];
-    if (
-      feedback?.status === "saved"
-      && ["learn", "save-and-learn"].includes(feedback.actionId)
-    ) {
-      const section = appendElement(parent, "div", "af-card-review");
-      const saved = appendElement(section, "div", "af-card-learning-state");
-      saved.textContent = feedback.message || "Added to learning";
-      return;
-    }
     if (!displayActions.length) {
       if (state.accountStatus !== "signed-in") {
         renderConnectPrompt(parent);
@@ -4720,10 +4822,19 @@
       const button = appendButton(actions, displayAction.label || displayAction.id, `afAction-${displayAction.id}`);
       const isActive = feedback?.actionId === displayAction.id && feedback.status !== "error";
       const isGeneratedSave = displayAction?.command?.kind === "generated-save-and-start-learning";
-      button.disabled = (!card?.entryId && !isGeneratedSave) || feedback?.status === "pending";
+      button.disabled = (!card?.entryId && !isGeneratedSave) ||
+        feedback?.status === "pending" ||
+        (feedback?.status === "saved" && feedback.actionId === displayAction.id);
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
       button.classList.toggle("is-action-pending", feedback?.actionId === displayAction.id && feedback.status === "pending");
       button.classList.toggle("is-action-saved", feedback?.actionId === displayAction.id && feedback.status === "saved");
+      button.classList.toggle("is-action-error", feedback?.actionId === displayAction.id && feedback.status === "error");
+      if (feedback?.actionId === displayAction.id && feedback.message) {
+        button.textContent = feedback.message;
+      }
+      if (feedback?.actionId === displayAction.id && feedback.message) {
+        button.title = feedback.message;
+      }
       button.addEventListener("click", () => performDisplayAction(card, displayAction));
     }
   }
@@ -4793,6 +4904,8 @@
     state.visibleTranslationsByCardId = {};
     state.translationPendingByCardId = {};
     state.cardActionFeedbackByCardId = {};
+    state.cardMenuOpenId = "";
+    state.cardMenuFeedbackByCardId = {};
     if (!options.preserveSelectedSpan) {
       state.selectedSpan = null;
     }
@@ -5074,7 +5187,9 @@
         cardActionError: "",
       };
       render();
-      await lookupSelectedWord(state.selectedWord);
+      if (action !== "start-learning") {
+        await lookupSelectedWord(state.selectedWord);
+      }
     } catch (error) {
       if (!isCurrentLookup(selectedWord)) return;
       const failedFeedback = dictionaryActionApi.errorFeedback(card, displayAction, action, error);
@@ -5853,6 +5968,8 @@
           headwordTranslation: "строить; выстраивать; формировать",
           definition: "bouwen; tot een geheel maken",
           definitionTranslation: "строить; создать единое целое",
+          context: "iemand bouwt iets op",
+          contextTranslation: "кто-то что-то выстраивает",
           example: "Na de brand is het huis weer opnieuw opgebouwd.",
           exampleTranslation: "После пожара дом снова отстроили.",
           partOfSpeech: "ww",
@@ -6016,8 +6133,11 @@
     headwordTranslation = "apple",
     definition = "A round fruit used in learner examples.",
     definitionTranslation = "круглый фрукт для учебных примеров",
+    context = "",
+    contextTranslation = "",
     example = `${clickedForm} valt niet ver van de boom.`,
     exampleTranslation = "яблоко от яблони недалеко падает",
+    meaningId = 1,
     partOfSpeech = "noun",
     phase,
     progressActions,
@@ -6029,6 +6149,7 @@
       clickedForm,
       headword,
       language: "Dutch",
+      meaningId,
       partOfSpeech,
       match: { relation: "exact", confidence: 1 },
       summary: {
@@ -6044,6 +6165,13 @@
       ],
       sections: [
         { kind: "meaning", label: "Definition", text: definition },
+        ...(context
+          ? [{
+              kind: "context",
+              text: context,
+              ...(includeLookupTranslations && contextTranslation ? { translation: contextTranslation } : {}),
+            }]
+          : []),
         {
           kind: "example",
           text: example,

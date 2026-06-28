@@ -152,6 +152,36 @@ describe('dictionary overlay V2 projection', () => {
     expect(card.chips).toEqual([{ kind: 'part-of-speech', label: 'zn' }]);
   });
 
+  it('preserves the 2000NL meaning id for sense-number chips', () => {
+    const card = projectOverlayCard(
+      baseItem({
+        entry: {
+          ...baseItem().entry,
+          id: 'entry:kop:2',
+          headword: 'kop',
+          partOfSpeech: 'zn',
+          content: {
+            meaningId: 2,
+            sections: [
+              {
+                id: 'meaning-2',
+                kind: 'meaning',
+                text: 'de bovenkant van sommige dingen',
+                sourcePath: 'content.sections.0',
+              },
+            ],
+          },
+        },
+      }),
+      'kop',
+      'nl',
+      0,
+      { allowProgressActions: true },
+    );
+
+    expect(card.meaningId).toBe(2);
+  });
+
   it('projects no-match payloads without fallback or legacy provider cards', () => {
     const response = projectDictionaryLookupV2Response(
       { query: 'zzzz', items: [] },

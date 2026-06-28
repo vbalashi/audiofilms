@@ -567,16 +567,25 @@ function runDictionarySourceBindingScenario() {
     const clicked = clickFirstLookupWord();
     const lookupSnapshot = waitForDictionarySelection(clicked.word, waitMs);
     const clickedOrdinal = parseCountOrdinal(lookupSnapshot.count);
+    const menuClick = clickDictionaryCardMenu(0);
+    sleep(300);
+    const menuSnapshot = readGeometrySnapshot();
     assertions.push(assertion("dictionary source binding lookup clicked", clicked.clicked === true, clicked.detail));
     assertions.push(assertion("dictionary source binding lookup ready", lookupSnapshot.dictionary?.cardCount === 3, JSON.stringify(lookupSnapshot.dictionary)));
+    assertions.push(assertion("dictionary card renders definition number chip", menuSnapshot.dictionaryUi?.cards?.[0]?.chipLabels?.includes("#1"), JSON.stringify(menuSnapshot.dictionaryUi?.cards?.[0] || {})));
+    assertions.push(assertion("dictionary card menu opens quick actions", menuClick === "clicked" && ["Report wrong translation", "Translation looks right", "Report dictionary issue"].every((label) => menuSnapshot.dictionaryUi?.cards?.[0]?.menuActions?.includes(label)), JSON.stringify(menuSnapshot.dictionaryUi?.cards?.[0] || {})));
 
     clearDictionaryMockCommands();
     const actionClick = clickDictionaryProgressAction(0, "Learn");
     const commands = waitForDictionaryMockCommand("dict-action", waitMs);
+    sleep(1000);
+    const afterAction = readGeometrySnapshot();
     const actionCommand = lastDictionaryMockCommand(commands, "dict-action");
     const sourceContext = actionCommand?.body?.sourceContext || {};
     assertions.push(assertion("dictionary source binding action clicked", actionClick === "clicked", actionClick));
     assertions.push(assertion("dictionary source binding captured action payload", Boolean(actionCommand?.body), JSON.stringify(actionCommand || {})));
+    assertions.push(assertion("dictionary source binding keeps action feedback in button", afterAction.dictionaryUi?.cards?.[0]?.progressActions?.includes("Started learning"), JSON.stringify(afterAction.dictionaryUi?.cards?.[0] || {})));
+    assertions.push(assertion("dictionary source binding omits separate action status row", !afterAction.dictionaryUi?.actionStatus, afterAction.dictionaryUi?.actionStatus || ""));
     assertions.push(assertion("dictionary source binding keeps original video", sourceContext.source?.externalId === fixture.videoId, JSON.stringify(sourceContext.source || {})));
     assertions.push(assertion("dictionary source binding keeps clicked form", sourceContext.selection?.clickedForm === clicked.word, JSON.stringify(sourceContext.selection || {})));
     assertions.push(assertion("dictionary source binding keeps original phrase locator", sourceContext.location?.phraseIndex === clickedOrdinal - 1 && Boolean(sourceContext.location?.phraseTextHash), JSON.stringify(sourceContext.location || {})));
@@ -803,7 +812,7 @@ function runDictionaryBehaviorScenario() {
       assertion("behavior lookup opens real kop card", kopClicked.clicked === true && kopLookup.dictionary?.word?.toLocaleLowerCase() === "kop", JSON.stringify({ clicked: kopClicked, dictionary: kopLookup.dictionary })),
       assertion(
         "behavior fully visible kop card does not start with collapse affordance",
-        !firstKopCard.expandButtons?.some((label) => /^Collapse full card$/i.test(label)),
+        !firstKopCard.expandButtons?.some((label) => /^Show less$/i.test(label)),
         JSON.stringify(firstKopCard),
       ),
     );
@@ -1354,6 +1363,7 @@ function assertDictionaryCardUi() {
   return [
     assertion("dictionary mock card count", before.dictionaryUi?.overlayCardCount === 3, JSON.stringify(before.dictionaryUi)),
     assertion("dictionary card anatomy has title and chips", before.dictionaryUi?.cards?.every((card) => card.title && card.chips > 0), JSON.stringify(before.dictionaryUi?.cards || [])),
+    assertion("dictionary card anatomy includes definition number chip", before.dictionaryUi?.cards?.every((card) => card.chipLabels?.some((label) => /^#\d+$/.test(label))), JSON.stringify(before.dictionaryUi?.cards || [])),
     assertion("dictionary not-started actions show Learn only", firstCardActions.length === 1 && firstCardActions[0] === "Learn", firstCardActions.join("|")),
     assertion("dictionary progress actions do not show Known", !allProgressActions.includes("Known"), allProgressActions.join("|")),
     assertion("dictionary review actions show four grades", ["Again", "Hard", "Good", "Easy"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),
@@ -2376,8 +2386,10 @@ function readGeometrySnapshot() {
         cards: Array.from(dictionary.querySelectorAll(".af-overlay-card")).map((card) => ({
           title: card.querySelector(".af-overlay-card-title")?.textContent || "",
           chips: card.querySelectorAll(".af-chip").length,
+          chipLabels: Array.from(card.querySelectorAll(".af-chip")).map((chip) => chip.textContent.trim()),
           progressActions: Array.from(card.querySelectorAll(".af-review-actions button")).map((button) => button.textContent.trim()),
           translateActions: Array.from(card.querySelectorAll(".af-card-translate")).map((button) => button.textContent.trim()),
+          menuActions: Array.from(card.querySelectorAll(".af-card-action-menu button")).map((button) => button.textContent.trim()),
           collapseActions: Array.from(card.querySelectorAll(".af-card-collapse")).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),
           expandButtons: Array.from(card.querySelectorAll(".af-overlay-expand-toggle")).map((button) => button.textContent.trim()),
           sections: Array.from(card.querySelectorAll(".af-overlay-section")).map((section) => {
@@ -2826,6 +2838,27 @@ function clickDictionaryTranslate(index) {
 (() => {
   const root = document.querySelector("#audiofilms-root")?.shadowRoot;
   const buttons = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-overlay-card .af-card-translate") || []);
+  const button = buttons[${Number(index)}];
+  if (!button) return "not-found";
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    button.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+      buttons: type === "pointerdown" || type === "mousedown" ? 1 : 0,
+    }));
+  }
+  return "clicked";
+})()
+  `);
+}
+
+function clickDictionaryCardMenu(index) {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const buttons = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-overlay-card .af-card-menu-button") || []);
   const button = buttons[${Number(index)}];
   if (!button) return "not-found";
   for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {

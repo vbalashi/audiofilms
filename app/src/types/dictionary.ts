@@ -68,6 +68,7 @@ export type DictionaryOverlayCardV2 = {
   headword: string;
   headwordTranslation?: string;
   language: string;
+  meaningId?: number;
   partOfSpeech?: string;
   article?: string;
   match?: {

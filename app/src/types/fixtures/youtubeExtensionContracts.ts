@@ -17,6 +17,7 @@ const baseCard = {
   clickedForm: 'loopt',
   headword: 'lopen',
   language: 'nl',
+  meaningId: 1,
   partOfSpeech: 'verb',
   match: {
     matchedForm: 'loopt',
