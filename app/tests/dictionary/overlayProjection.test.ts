@@ -342,6 +342,81 @@ describe('dictionary overlay V2 projection', () => {
     });
   });
 
+  it('preserves 2000NL idiom expression and explanation as distinct sections', () => {
+    const response = projectDictionaryLookupV2Response(
+      {
+        query: 'jaar',
+        items: [
+          baseItem({
+            entry: {
+              id: 'entry:jaar',
+              languageCode: 'nl',
+              headword: 'jaar',
+              partOfSpeech: 'zn',
+              gender: 'het',
+              isNt22000: true,
+              contentFingerprint: 'content:jaar:v1',
+              content: {
+                article: 'het',
+                partOfSpeech: 'zn',
+                sections: [
+                  {
+                    id: 'meaning-1',
+                    sourcePath: 'raw.meanings[0].definition',
+                    kind: 'meaning',
+                    text: 'de periode van 1 januari tot en met 31 december; de periode waarin de aarde een keer om de zon draait',
+                  },
+                  {
+                    id: 'example-1-1',
+                    sourcePath: 'raw.meanings[0].examples[0]',
+                    kind: 'example',
+                    text: 'wij gaan twee keer per jaar met vakantie',
+                  },
+                  {
+                    id: 'idiom-1-1',
+                    sourcePath: 'raw.meanings[0].idioms[0]',
+                    kind: 'idiom',
+                    label: 'al heel lang',
+                    text: 'sinds jaar en dag',
+                  },
+                  {
+                    id: 'example-1-5',
+                    sourcePath: 'raw.meanings[0].examples[4]',
+                    kind: 'example',
+                    text: 'hij is al sinds jaar en dag lid van de vereniging',
+                  },
+                ],
+              },
+            },
+            match: { queriedForm: 'jaar', matchedForm: 'jaar', relation: 'exact' },
+          }),
+        ],
+      },
+      'jaar',
+      'nl',
+      'Dit jaar...',
+      { allowProgressActions: false },
+    );
+
+    expect('error' in response).toBe(false);
+    if ('error' in response) throw new Error('expected success response');
+    const idiom = response.cards[0].sections.find((section) => section.kind === 'idiom');
+    expect(idiom).toEqual({
+      id: 'idiom-1-1',
+      sourcePath: 'raw.meanings[0].idioms[0]',
+      kind: 'idiom',
+      label: 'al heel lang',
+      text: 'sinds jaar en dag',
+      translation: undefined,
+    });
+    expect(response.cards[0].sections.map((section) => section.sourcePath)).toEqual([
+      'raw.meanings[0].definition',
+      'raw.meanings[0].examples[0]',
+      'raw.meanings[0].idioms[0]',
+      'raw.meanings[0].examples[4]',
+    ]);
+  });
+
   it('omits progress actions for hidden, frozen, and guest catalog cards', () => {
     const hidden = baseItem({
       cardCapabilitiesByType: {

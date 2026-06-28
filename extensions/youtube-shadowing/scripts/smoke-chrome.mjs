@@ -233,6 +233,7 @@ const shouldOnlyGeometry = args.has("--only-geometry");
 const shouldOnlyAsrEdge = args.has("--only-asr-edge");
 const shouldOnlyDictionarySourceBinding = args.has("--only-dictionary-source-binding");
 const shouldOnlyDictionaryUi = args.has("--only-dictionary-ui");
+const shouldOnlyDictionaryBehavior = args.has("--only-dictionary-behavior");
 const shouldOnlyFocusedScenario = shouldOnlyBackendOff ||
   shouldOnlyBackendFailed ||
   shouldOnlySourceSwitchFailed ||
@@ -240,7 +241,8 @@ const shouldOnlyFocusedScenario = shouldOnlyBackendOff ||
   shouldOnlyGeometry ||
   shouldOnlyAsrEdge ||
   shouldOnlyDictionarySourceBinding ||
-  shouldOnlyDictionaryUi;
+  shouldOnlyDictionaryUi ||
+  shouldOnlyDictionaryBehavior;
 const fixtureFilter = getArgValue("--only");
 const dictionaryUiVideoId = getArgValue("--dictionary-video") || "4EE7m94mJpk";
 const dictionaryUiWord = getArgValue("--dictionary-word") || "";
@@ -274,6 +276,7 @@ if (!shouldRunFullSuite && !fixtureFilter) {
   console.log("Use --only-asr-edge for the focused ASR playback edge-case check.");
   console.log("Use --only-dictionary-source-binding for focused dictionary provenance checks.");
   console.log("Use --only-dictionary-ui for focused dictionary card rendering screenshots.");
+  console.log("Use --only-dictionary-behavior for focused dictionary interaction regression checks.");
 }
 
 if (shouldRunLocalBackendCheck) {
@@ -307,6 +310,12 @@ if (shouldOnlyDictionaryUi) {
   const dictionaryUiResult = runDictionaryUiScenario();
   results.push(dictionaryUiResult);
   printFixtureResult(dictionaryUiResult);
+}
+
+if (shouldOnlyDictionaryBehavior) {
+  const dictionaryBehaviorResult = runDictionaryBehaviorScenario();
+  results.push(dictionaryBehaviorResult);
+  printFixtureResult(dictionaryBehaviorResult);
 }
 
 if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyFocusedScenario && !shouldSkipSpaCheck) {
@@ -684,6 +693,121 @@ function runDictionaryUiScenario() {
         count: initial.count,
         message: evidencePaths.join(" | "),
         error: ready.error,
+      },
+    };
+  } finally {
+    removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+    if (hadPreviousDictionaryMock) {
+      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
+    } else {
+      removeLocalStorageItem("afShadowingDictionaryMock");
+    }
+  }
+}
+
+function runDictionaryBehaviorScenario() {
+  const fixture = {
+    name: "dictionary-behavior-regression",
+    videoId: dictionaryUiVideoId,
+    expect: {},
+  };
+  const assertions = [];
+  const evidencePaths = [];
+  let previousDictionaryMock = null;
+  let hadPreviousDictionaryMock = false;
+
+  try {
+    resizeChrome(900, 900);
+    navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
+    previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
+    hadPreviousDictionaryMock = previousDictionaryMock !== null;
+    removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+    removeLocalStorageItem("afShadowingDictionaryMock");
+    reloadTab();
+    const initial = waitForSnapshot(fixture.videoId, waitMs);
+    pauseVideo();
+    setDebugVisible(false);
+
+    const jaarClicked = clickLookupWord("jaar");
+    const jaarLookup = waitForDictionarySelection("jaar", waitMs);
+    expandDictionaryCards();
+    sleep(500);
+    const jaarExpanded = readGeometrySnapshot();
+    evidencePaths.push(captureChromeScreenshot("dictionary-behavior-jaar-expanded"));
+    const idiom = firstSectionByKind(jaarExpanded, "idiom");
+    assertions.push(
+      assertion("behavior panel loaded", initial.panel === true, JSON.stringify({ source: initial.source, count: initial.count, error: initial.error })),
+      assertion("behavior lookup opens real jaar card", jaarClicked.clicked === true && jaarLookup.dictionary?.word?.toLocaleLowerCase() === "jaar", JSON.stringify({ clicked: jaarClicked, dictionary: jaarLookup.dictionary })),
+      assertion("behavior jaar card exposes idiom section", Boolean(idiom), JSON.stringify(jaarExpanded.dictionaryUi?.cards?.[0]?.sections || [])),
+      assertion(
+        "behavior idiom renders expression before explanation",
+        Boolean(idiom) && textIndexOrder(idiom.renderedText, "sinds jaar en dag", "al heel lang"),
+        JSON.stringify(idiom || {}),
+      ),
+    );
+
+    const translateOn = clickDictionaryTranslate(0);
+    sleep(1200);
+    const translated = readGeometrySnapshot();
+    const translateOff = clickDictionaryTranslate(0);
+    sleep(600);
+    const translationHidden = readGeometrySnapshot();
+    assertions.push(
+      assertion("behavior translate can be enabled", translateOn === "clicked" && translated.dictionaryUi?.inlineTranslations > 0, JSON.stringify({ translateOn, dictionary: translated.dictionaryUi })),
+      assertion("behavior translate can be disabled", translateOff === "clicked" && translationHidden.dictionaryUi?.inlineTranslations === 0, JSON.stringify({ translateOff, dictionary: translationHidden.dictionaryUi })),
+    );
+
+    scrollDictionaryToSearchPreviews();
+    sleep(500);
+    const beforeMore = readGeometrySnapshot();
+    const beforeMoreScroll = beforeMore.dictionaryUi?.scrollTop || 0;
+    const moreClick = clickDictionarySearchMore("examples");
+    sleep(150);
+    const duringMore = readGeometrySnapshot();
+    const afterMore = waitForSearchItemGrowth(beforeMore.dictionaryUi?.searchItemCount || 0, waitMs);
+    evidencePaths.push(captureChromeScreenshot("dictionary-behavior-after-more"));
+    const growth = (afterMore.dictionaryUi?.searchItemCount || 0) - (beforeMore.dictionaryUi?.searchItemCount || 0);
+    assertions.push(
+      assertion("behavior more button clicked", moreClick === "clicked", moreClick),
+      assertion("behavior more keeps existing preview rows while loading", (duringMore.dictionaryUi?.searchItemCount || 0) >= (beforeMore.dictionaryUi?.searchItemCount || 0), JSON.stringify({ before: beforeMore.dictionaryUi, during: duringMore.dictionaryUi })),
+      assertion("behavior more appends one preview page", growth > 0 && growth <= 6, JSON.stringify({ before: beforeMore.dictionaryUi?.searchItemCount, after: afterMore.dictionaryUi?.searchItemCount, growth })),
+      assertion("behavior more preserves scroll context", Math.abs((afterMore.dictionaryUi?.scrollTop || 0) - beforeMoreScroll) < 120, JSON.stringify({ beforeMoreScroll, after: afterMore.dictionaryUi?.scrollTop })),
+    );
+
+    const firstPreview = beforeMore.dictionaryUi?.searchItems?.[0];
+    const previewClick = clickDictionarySearchItem(0);
+    const previewLookup = waitForDictionarySelection(firstPreview?.title || "", waitMs);
+    evidencePaths.push(captureChromeScreenshot("dictionary-behavior-preview-open"));
+    assertions.push(
+      assertion("behavior preview row clicked", previewClick === "clicked", previewClick),
+      assertion("behavior preview opens that full card", Boolean(firstPreview?.title) && previewLookup.dictionary?.word?.toLocaleLowerCase() === firstPreview.title.toLocaleLowerCase(), JSON.stringify({ firstPreview, dictionary: previewLookup.dictionary })),
+      assertion("behavior preview affordance uses Expand full card copy", (beforeMore.dictionaryUi?.searchOpenLabels || []).every((label) => /^Expand full card$/i.test(label)), JSON.stringify(beforeMore.dictionaryUi?.searchOpenLabels || [])),
+    );
+
+    const kopClicked = clickLookupWord("kop");
+    const kopLookup = waitForDictionarySelection("kop", waitMs);
+    sleep(500);
+    const kop = readGeometrySnapshot();
+    evidencePaths.push(captureChromeScreenshot("dictionary-behavior-kop"));
+    const firstKopCard = kop.dictionaryUi?.cards?.[0] || {};
+    assertions.push(
+      assertion("behavior lookup opens real kop card", kopClicked.clicked === true && kopLookup.dictionary?.word?.toLocaleLowerCase() === "kop", JSON.stringify({ clicked: kopClicked, dictionary: kopLookup.dictionary })),
+      assertion(
+        "behavior fully visible kop card does not start with collapse affordance",
+        !firstKopCard.expandButtons?.some((label) => /^Collapse full card$/i.test(label)),
+        JSON.stringify(firstKopCard),
+      ),
+    );
+
+    return {
+      ...fixture,
+      ok: assertions.every((item) => item.ok),
+      assertions,
+      snapshot: {
+        source: initial.source,
+        count: initial.count,
+        message: evidencePaths.filter(Boolean).join(" | "),
+        error: kop.error || jaarExpanded.error,
       },
     };
   } finally {
@@ -1900,6 +2024,34 @@ function waitForDictionaryUiReady(timeoutMs) {
   return last || readGeometrySnapshot();
 }
 
+function waitForSearchItemGrowth(previousCount, timeoutMs) {
+  const started = Date.now();
+  let last = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readGeometrySnapshot();
+    if ((last.dictionaryUi?.searchItemCount || 0) > previousCount) {
+      return last;
+    }
+    sleep(500);
+  }
+
+  return last || readGeometrySnapshot();
+}
+
+function firstSectionByKind(snapshot, kind) {
+  return (snapshot.dictionaryUi?.cards || [])
+    .flatMap((card) => card.sections || [])
+    .find((section) => section.kind === kind) || null;
+}
+
+function textIndexOrder(text, first, second) {
+  const value = String(text || "").toLocaleLowerCase();
+  const firstIndex = value.indexOf(String(first || "").toLocaleLowerCase());
+  const secondIndex = value.indexOf(String(second || "").toLocaleLowerCase());
+  return firstIndex >= 0 && secondIndex >= 0 && firstIndex < secondIndex;
+}
+
 function waitForReplaySnapshot(mode, timeoutMs) {
   const started = Date.now();
   let last = null;
@@ -2174,10 +2326,28 @@ function readGeometrySnapshot() {
           chips: card.querySelectorAll(".af-chip").length,
           progressActions: Array.from(card.querySelectorAll(".af-review-actions button")).map((button) => button.textContent.trim()),
           translateActions: Array.from(card.querySelectorAll(".af-card-translate")).map((button) => button.textContent.trim()),
+          expandButtons: Array.from(card.querySelectorAll(".af-overlay-expand-toggle")).map((button) => button.textContent.trim()),
+          sections: Array.from(card.querySelectorAll(".af-overlay-section")).map((section) => {
+            const copy = section.querySelector(".af-dictionary-copy:not(.af-overlay-section-label)");
+            return {
+              kind: Array.from(section.classList).find((name) => name.startsWith("is-"))?.replace(/^is-/, "") || "",
+              label: section.querySelector(".af-overlay-section-label")?.textContent.trim() || "",
+              text: copy?.childNodes?.[0]?.textContent?.trim() || copy?.textContent?.trim() || "",
+              renderedText: section.textContent.trim(),
+            };
+          }),
         })),
+        scrollTop: Math.round(dictionary.scrollTop || 0),
         searchHeadingPresent: Boolean(dictionary.querySelector(".af-dictionary-search-heading")),
         searchGroupTitles: Array.from(dictionary.querySelectorAll(".af-dictionary-search-group-title")).map((title) => title.textContent.trim()),
         searchItemCount: dictionary.querySelectorAll(".af-dictionary-search-item").length,
+        searchItems: Array.from(dictionary.querySelectorAll(".af-dictionary-search-item")).map((item) => ({
+          title: item.querySelector(".af-dictionary-search-item-title")?.textContent.trim() || "",
+          text: item.querySelector(".af-dictionary-search-item-text")?.textContent.trim() || "",
+          openLabel: item.querySelector(".af-dictionary-search-open")?.textContent.trim() || "",
+          chips: Array.from(item.querySelectorAll(".af-chip")).map((chip) => chip.textContent.trim()),
+        })),
+        searchOpenLabels: Array.from(dictionary.querySelectorAll(".af-dictionary-search-open")).map((item) => item.textContent.trim()),
         searchItemTextWidths: Array.from(dictionary.querySelectorAll(".af-dictionary-search-item-text")).map((item) => Math.round(item.getBoundingClientRect().width)),
         searchItemTextSamples: Array.from(dictionary.querySelectorAll(".af-dictionary-search-item-text")).slice(0, 3).map((item) => item.textContent.trim()),
         translationBlocks: dictionary.querySelectorAll(".af-card-translation").length,
@@ -2638,6 +2808,37 @@ function clickDictionaryProgressAction(cardIndex, label) {
   `);
 }
 
+function clickDictionarySearchItem(index) {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const items = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-dictionary-search-item") || []);
+  const item = items[${Number(index)}];
+  if (!item) return "not-found";
+  item.click();
+  return "clicked";
+})()
+  `);
+}
+
+function clickDictionarySearchMore(groupId) {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const groups = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-dictionary-search-group") || []);
+  const needle = ${JSON.stringify(String(groupId || "").toLocaleLowerCase())};
+  const group = groups.find((candidate) => {
+    const title = candidate.querySelector(".af-dictionary-search-group-title")?.textContent || "";
+    return title.toLocaleLowerCase().includes(needle);
+  }) || groups[0];
+  const button = group?.querySelector(".af-dictionary-search-more");
+  if (!button) return "not-found";
+  button.click();
+  return "clicked";
+})()
+  `);
+}
+
 function clearDictionaryMockCommands() {
   chromeEval(`
 (() => {
@@ -2988,6 +3189,7 @@ function printFixtureList() {
   console.log(`  - ${ASR_EDGE_FIXTURE.name} (${ASR_EDGE_FIXTURE.videoId}) via --only-asr-edge`);
   console.log(`  - ${DICTIONARY_SOURCE_BINDING_FIXTURE.name} (${DICTIONARY_SOURCE_BINDING_FIXTURE.videoId}) via --only-dictionary-source-binding`);
   console.log("  - dictionary-ui-focused via --only-dictionary-ui [--dictionary-video=<id>] [--dictionary-word=<word>] [--dictionary-mock=cards|off]");
+  console.log("  - dictionary-behavior-regression via --only-dictionary-behavior [--dictionary-video=<id>]");
 }
 
 function parseTimestampSeconds(text) {

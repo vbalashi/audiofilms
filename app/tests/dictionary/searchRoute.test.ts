@@ -78,6 +78,57 @@ describe('/api/dict/search', () => {
     await expect(response.json()).resolves.toEqual(platformSearchPayload);
   });
 
+  it('keeps page size explicit for incremental preview loading', async () => {
+    vi.stubEnv('DICTIONARY_2000NL_API_BASE', 'https://2000.example/api/platform/v1');
+    vi.stubEnv('DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN', 'catalog-token');
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        query: 'jaar',
+        groups: [
+          {
+            id: 'examples',
+            total: null,
+            items: [],
+            page: { limit: 5, hasMore: true, nextCursor: 'cursor-next' },
+          },
+        ],
+        contractVersion: 'dictionary-search-v1',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await POST(searchRequest({
+      clickedForm: 'jaar',
+      sourceLanguageCode: 'nl',
+      group: 'examples',
+      limit: 5,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://2000.example/api/platform/v1/catalog/search',
+      expect.objectContaining({
+        body: JSON.stringify({
+          query: 'jaar',
+          languageCode: 'nl',
+          group: 'examples',
+          limit: 5,
+        }),
+      }),
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      groups: [
+        {
+          id: 'examples',
+          page: { limit: 5, hasMore: true, nextCursor: 'cursor-next' },
+        },
+      ],
+    });
+  });
+
   it('uses catalog search for guest requests', async () => {
     vi.stubEnv('DICTIONARY_2000NL_API_BASE', 'https://2000.example/api/platform/v1');
     vi.stubEnv('DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN', 'catalog-token');
