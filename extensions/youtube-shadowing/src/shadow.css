@@ -805,11 +805,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-weight: 850;
 }
 
-.af-dictionary-search-open::after {
-  content: "v";
-  font-size: 12px;
-}
-
 .af-search-chip-list {
   display: flex;
   flex: 0 0 auto;
@@ -1035,6 +1030,19 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-overlay-idiom {
   color: var(--af-warning-text);
+}
+
+.af-overlay-idiom-expression {
+  color: var(--af-text);
+  font-weight: 720;
+}
+
+.af-overlay-idiom-explanation {
+  margin-top: 4px;
+  color: var(--af-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 .af-overlay-details {

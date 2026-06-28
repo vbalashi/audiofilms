@@ -2424,12 +2424,12 @@
     ) {
       return state.exampleExpansionOverrides[cardId] === true;
     }
-    return state.examplesExpanded;
+    return false;
   }
 
   function toggleCardTranslation(card) {
     if (!card?.id || !state.selectedWord || !cardCanRequestTranslation(card)) return;
-    const currentlyVisible = state.visibleTranslationsByCardId[card.id] === true;
+    const currentlyVisible = cardTranslationsVisible(card);
     state.visibleTranslationsByCardId = {
       ...state.visibleTranslationsByCardId,
       [card.id]: !currentlyVisible,
@@ -3971,7 +3971,7 @@
 
     const container = appendElement(parent, "div", "af-dictionary-search-groups");
 
-    if (status === "loading") {
+    if (status === "loading" && !selectedWord.groupedSearchResult?.groups?.length) {
       const loading = appendElement(container, "p", "af-dictionary-copy");
       loading.textContent = "Loading examples and related dictionary text...";
       return;
@@ -4028,14 +4028,13 @@
       const affordance = appendElement(row, "span", "af-dictionary-search-open");
       affordance.textContent = dictionarySearchOpenLabel(item);
       row.addEventListener("click", () => {
-        if (selectedWord?.lookupResult?.cards?.length) {
-          const firstCard = selectedWord.lookupResult.cards[0];
-          state.exampleExpansionOverrides = {
-            ...state.exampleExpansionOverrides,
-            [firstCard.id]: true,
-          };
-        }
-        render();
+        const nextWord = dictionarySearchItemTitle(item);
+        if (!nextWord) return;
+        selectLookupWord(nextWord, selectedWord.phraseIndex, {
+          originalToken: nextWord,
+          source: "dictionary-search-preview",
+          resultKey: item?.resultKey || "",
+        });
       });
     }
 
@@ -4051,7 +4050,8 @@
           "auto";
         state.selectedWord = {
           ...state.selectedWord,
-          groupedSearchStatus: "loading",
+          groupedSearchStatus: "ready",
+          groupedSearchLoadingGroup: group.id,
           groupedSearchError: "",
         };
         render();
@@ -4092,7 +4092,7 @@
   }
 
   function dictionarySearchOpenLabel(item) {
-    return item?.kind === "generated" || item?.entry?.draft ? "Open draft" : "Open card";
+    return item?.kind === "generated" || item?.entry?.draft ? "Expand draft" : "Expand full card";
   }
 
   function renderHighlightedText(parent, text, highlight) {
@@ -4278,14 +4278,14 @@
     const title = appendElement(titleWrap, "div", "af-overlay-card-title");
     renderOverlayCardTitle(title, card);
     renderChipList(titleWrap, overlayChips(card));
-    const headwordTranslation = lookupOrOverlayHeadword(card, cardTranslation, { alwaysUseLookup: true });
+    const headwordTranslation = lookupOrOverlayHeadword(card, cardTranslation);
     if (headwordTranslation) {
       const translationLine = appendElement(titleWrap, "div", "af-overlay-headword-translation");
       translationLine.textContent = headwordTranslation;
     }
     const translationActions = displayActionsByGroup(card, "translation");
     if (translationActions.length) {
-      const translationVisible = state.visibleTranslationsByCardId[card.id] === true;
+      const translationVisible = cardTranslationsVisible(card);
       const translationPending = Boolean(
         state.translationPendingByCardId[card.id] || card?.translation?.status === "pending",
       );
@@ -4314,7 +4314,7 @@
         "p",
         "af-dictionary-copy af-overlay-definition",
         summary.definition,
-        lookupOrOverlayDefinition(card, cardTranslation, 0, { alwaysUseLookup: true }),
+        lookupOrOverlayDefinition(card, cardTranslation, 0),
       );
     }
 
@@ -4386,6 +4386,10 @@
     const content = appendElement(details, "div", "af-overlay-details-content");
     for (const section of renderedSections) {
       const block = appendElement(content, "div", `af-overlay-section is-${section.kind || "meaning"}`);
+      if (section.kind === "idiom") {
+        renderIdiomSection(block, section, card, sections, translation);
+        continue;
+      }
       if (shouldRenderSectionMicroLabel(section)) {
         const label = appendElement(block, "p", "af-dictionary-copy af-overlay-section-label");
         label.textContent = sectionMicroLabel(section);
@@ -4395,7 +4399,7 @@
         "p",
         "af-dictionary-copy",
         section.text,
-        lookupOrOverlaySection(card, section, sections, translation, { alwaysUseLookup: true }),
+        lookupOrOverlaySection(card, section, sections, translation),
       );
     }
     if (hiddenCount > 0 || expanded) {
@@ -4413,6 +4417,21 @@
     const firstExample = sections.find((section) => section.kind === "example");
     const firstDetail = sections.find((section) => section.kind !== "example");
     return [firstExample || firstDetail].filter(Boolean);
+  }
+
+  function renderIdiomSection(parent, section, card, allSections, translation) {
+    renderTranslatedLine(
+      parent,
+      "p",
+      "af-dictionary-copy af-overlay-idiom-expression",
+      section.text,
+      lookupOrOverlaySection(card, section, allSections, translation),
+    );
+    const explanation = sectionMicroLabel(section);
+    if (explanation) {
+      const note = appendElement(parent, "p", "af-dictionary-copy af-overlay-idiom-explanation");
+      note.textContent = explanation;
+    }
   }
 
   function shouldRenderSectionMicroLabel(section) {
@@ -4721,6 +4740,7 @@
       groupedSearchStatus: "idle",
       groupedSearchResult: null,
       groupedSearchError: "",
+      groupedSearchLoadingGroup: "",
     };
     state.currentIndex = phraseIndex;
     schedulePhraseProgressSave("lookup-word");
@@ -4796,7 +4816,7 @@
         context: contextText || "",
         group,
         cursor,
-        limit: group ? 20 : 5,
+        limit: 5,
       });
       if (!isCurrentLookup(selectedWord)) return;
       state.selectedWord = {
@@ -4807,6 +4827,7 @@
           result,
           group,
         ),
+        groupedSearchLoadingGroup: "",
         groupedSearchError: "",
       };
       recordDebugEvent("dictionary-search-loaded", {
@@ -4824,6 +4845,7 @@
       state.selectedWord = {
         ...state.selectedWord,
         groupedSearchStatus: unavailable ? "unavailable" : "error",
+        groupedSearchLoadingGroup: "",
         groupedSearchError: unavailable
           ? "Search previews are still being prepared."
           : payload.error || (error instanceof Error ? error.message : String(error)),

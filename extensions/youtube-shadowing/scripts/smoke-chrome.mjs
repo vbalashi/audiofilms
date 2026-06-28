@@ -728,7 +728,7 @@ function runDictionaryBehaviorScenario() {
     pauseVideo();
     setDebugVisible(false);
 
-    const jaarClicked = clickLookupWord("jaar");
+    const jaarClicked = findAndClickLookupWord("jaar", fixture.videoId);
     const jaarLookup = waitForDictionarySelection("jaar", waitMs);
     expandDictionaryCards();
     sleep(500);
@@ -784,7 +784,7 @@ function runDictionaryBehaviorScenario() {
       assertion("behavior preview affordance uses Expand full card copy", (beforeMore.dictionaryUi?.searchOpenLabels || []).every((label) => /^Expand full card$/i.test(label)), JSON.stringify(beforeMore.dictionaryUi?.searchOpenLabels || [])),
     );
 
-    const kopClicked = clickLookupWord("kop");
+    const kopClicked = findAndClickLookupWord("kop", fixture.videoId);
     const kopLookup = waitForDictionarySelection("kop", waitMs);
     sleep(500);
     const kop = readGeometrySnapshot();
@@ -1579,6 +1579,11 @@ function parseCountOrdinal(countText) {
   return match ? Number(match[1]) : null;
 }
 
+function parseCountTotal(countText) {
+  const match = String(countText || "").match(/^\d+\s*\/\s*(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
 function nearlyEqual(actual, expected, tolerance) {
   return Number.isFinite(Number(actual)) && Math.abs(Number(actual) - expected) <= tolerance;
 }
@@ -2037,6 +2042,29 @@ function waitForSearchItemGrowth(previousCount, timeoutMs) {
   }
 
   return last || readGeometrySnapshot();
+}
+
+function findAndClickLookupWord(word, videoId) {
+  jumpToPhraseOrdinal(1);
+  let snapshot = waitForCountOrdinal(videoId, 1, waitMs);
+  const total = parseCountTotal(snapshot.count) || 180;
+  const target = String(word || "").toLocaleLowerCase();
+
+  for (let index = 0; index < total; index += 1) {
+    const clicked = clickLookupWord(target);
+    if (clicked.clicked) return clicked;
+    clickShadowButton("[data-af-next]");
+    sleep(350);
+    snapshot = readSnapshot();
+  }
+
+  return {
+    clicked: false,
+    word: target,
+    detail: "word-not-found-after-phrase-scan",
+    count: snapshot?.count || "",
+    rowText: snapshot?.rowText || "",
+  };
 }
 
 function firstSectionByKind(snapshot, kind) {
