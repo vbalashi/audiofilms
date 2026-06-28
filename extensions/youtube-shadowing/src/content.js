@@ -120,6 +120,7 @@
     examplesExpanded: initialDisplayPreferences.examplesExpanded,
     exampleExpansionOverrides: {},
     visibleTranslationsByCardId: {},
+    translationPendingByCardId: {},
     cardActionFeedbackByCardId: {},
     themePreference: initialDisplayPreferences.theme,
     accountStatus: "guest",
@@ -2396,15 +2397,23 @@
   }
 
   function toggleCardExamples(cardId) {
+    toggleCardExpanded(cardId);
+  }
+
+  function toggleCardExpanded(cardId) {
     if (!cardId) return;
     state.exampleExpansionOverrides = {
       ...state.exampleExpansionOverrides,
-      [cardId]: !exampleSectionExpanded(cardId),
+      [cardId]: !cardExpanded(cardId),
     };
     render();
   }
 
   function exampleSectionExpanded(cardId) {
+    return cardExpanded(cardId);
+  }
+
+  function cardExpanded(cardId) {
     if (
       cardId
       && Object.prototype.hasOwnProperty.call(state.exampleExpansionOverrides, cardId)
@@ -2438,6 +2447,17 @@
     }
 
     requestDictionaryCardTranslation(card);
+  }
+
+  function setCardTranslationPending(cardId, pending) {
+    if (!cardId) return;
+    const next = { ...state.translationPendingByCardId };
+    if (pending) {
+      next[cardId] = true;
+    } else {
+      delete next[cardId];
+    }
+    state.translationPendingByCardId = next;
   }
 
   function closeOpenMenus() {
@@ -3879,8 +3899,6 @@
     if (status === "idle") return;
 
     const container = appendElement(parent, "div", "af-dictionary-search-groups");
-    const heading = appendElement(container, "div", "af-dictionary-search-heading");
-    heading.textContent = "Search previews";
 
     if (status === "loading") {
       const loading = appendElement(container, "p", "af-dictionary-copy");
@@ -3923,14 +3941,31 @@
 
     const list = appendElement(section, "div", "af-dictionary-search-items");
     for (const item of group.items || []) {
-      const row = appendElement(list, "div", "af-dictionary-search-item");
-      const itemTitle = appendElement(row, "div", "af-dictionary-search-item-title");
+      const row = appendButton(list, "", `afSearchOpen-${group.id}-${item?.resultKey || item?.entry?.id || ""}`);
+      row.className = "af-dictionary-search-item";
+      row.type = "button";
+      const itemHeader = appendElement(row, "div", "af-dictionary-search-item-header");
+      const itemTitle = appendElement(itemHeader, "div", "af-dictionary-search-item-title");
       itemTitle.textContent = dictionarySearchItemTitle(item);
+      renderChipList(itemHeader, dictionarySearchItemChips(item), "af-search-chip-list");
       const text = dictionarySearchItemText(item);
+      const body = appendElement(row, "div", "af-dictionary-search-item-body");
       if (text) {
-        const copy = appendElement(row, "p", "af-dictionary-search-item-text");
-        copy.textContent = text;
+        const copy = appendElement(body, "p", "af-dictionary-search-item-text");
+        renderHighlightedText(copy, text, item?.match?.matchedText);
       }
+      const affordance = appendElement(row, "span", "af-dictionary-search-open");
+      affordance.textContent = dictionarySearchOpenLabel(item);
+      row.addEventListener("click", () => {
+        if (selectedWord?.lookupResult?.cards?.length) {
+          const firstCard = selectedWord.lookupResult.cards[0];
+          state.exampleExpansionOverrides = {
+            ...state.exampleExpansionOverrides,
+            [firstCard.id]: true,
+          };
+        }
+        render();
+      });
     }
 
     if (group.page?.hasMore && group.page.nextCursor) {
@@ -3958,20 +3993,56 @@
   }
 
   function dictionarySearchGroupLabel(groupId) {
-    if (groupId === "examples") return "Example sentences";
+    if (groupId === "examples") return "Within examples";
     if (groupId === "definitions") return "Within definitions";
     if (groupId === "alphabetical") return "Alphabetical";
+    if (groupId === "generated") return "Generated";
     return "Headwords";
   }
 
   function dictionarySearchItemTitle(item) {
     const headword = item?.entry?.headword || "";
-    const kind = item?.field?.kind || item?.match?.relation || item?.kind || "";
-    return [headword, kind].filter(Boolean).join(" · ");
+    return headword || state.selectedWord?.word || "Dictionary card";
+  }
+
+  function dictionarySearchItemChips(item) {
+    const chips = [];
+    const partOfSpeech = item?.entry?.partOfSpeech || item?.entry?.part_of_speech || "";
+    if (partOfSpeech) chips.push({ kind: "part-of-speech", label: partOfSpeech });
+    const kind = item?.field?.kind || item?.kind || item?.match?.relation || "";
+    if (kind && ["idiom", "generated", "draft"].includes(kind)) {
+      chips.push({ kind: kind === "idiom" ? "part-of-speech" : "other", label: kind });
+    }
+    return chips;
   }
 
   function dictionarySearchItemText(item) {
     return item?.field?.text || item?.entry?.summaryDefinition || item?.match?.matchedText || "";
+  }
+
+  function dictionarySearchOpenLabel(item) {
+    return item?.kind === "generated" || item?.entry?.draft ? "Open draft" : "Open card";
+  }
+
+  function renderHighlightedText(parent, text, highlight) {
+    const value = typeof text === "string" ? text : "";
+    const needle = typeof highlight === "string" ? highlight.trim() : "";
+    if (!value || !needle) {
+      parent.textContent = value;
+      return;
+    }
+    const haystack = value.toLowerCase();
+    const lowerNeedle = needle.toLowerCase();
+    const index = haystack.indexOf(lowerNeedle);
+    if (index < 0) {
+      parent.textContent = value;
+      return;
+    }
+    parent.textContent = "";
+    parent.append(document.createTextNode(value.slice(0, index)));
+    const mark = appendElement(parent, "strong", "af-dictionary-search-highlight");
+    mark.textContent = value.slice(index, index + needle.length);
+    parent.append(document.createTextNode(value.slice(index + needle.length)));
   }
 
   function renderDictionaryLookup(parent) {
@@ -4122,6 +4193,10 @@
 
   function renderOverlayCard(parent, card) {
     const entry = appendElement(parent, "div", "af-overlay-card");
+    entry.classList.add(`is-phase-${card?.progress?.phase || "guest"}`);
+    if (isGeneratedDictionaryCard(card)) {
+      entry.classList.add("is-generated-draft");
+    }
     const feedback = state.cardActionFeedbackByCardId[card.id];
     if (feedback?.status) {
       entry.classList.add(`is-action-${feedback.status}`);
@@ -4130,17 +4205,33 @@
     const titleWrap = appendElement(header, "div", "af-overlay-title-wrap");
     const cardTranslation = visibleCardTranslation(card);
     const title = appendElement(titleWrap, "div", "af-overlay-card-title");
-    renderOverlayCardTitle(title, card, cardTranslation);
+    renderOverlayCardTitle(title, card);
     renderChipList(titleWrap, overlayChips(card));
+    const headwordTranslation = lookupOrOverlayHeadword(card, cardTranslation, { alwaysUseLookup: true });
+    if (headwordTranslation) {
+      const translationLine = appendElement(titleWrap, "div", "af-overlay-headword-translation");
+      translationLine.textContent = headwordTranslation;
+    }
     const translationActions = displayActionsByGroup(card, "translation");
     if (translationActions.length) {
       const translationVisible = state.visibleTranslationsByCardId[card.id] === true;
+      const translationPending = Boolean(
+        state.translationPendingByCardId[card.id] || card?.translation?.status === "pending",
+      );
       const translateButton = appendButton(header, "", `afAction-${translationActions[0].id}`);
       translateButton.className = "af-card-translate";
-      translateButton.disabled = !cardCanRequestTranslation(card);
+      translateButton.disabled = translationPending || !cardCanRequestTranslation(card);
       translateButton.innerHTML = `${iconSvg("translate")}<span class="af-sr-only">${translationVisible ? "Hide translation" : "Show translation"}</span>`;
-      translateButton.title = translationVisible ? "Hide translation" : "Show translation";
-      translateButton.setAttribute("aria-label", translationVisible ? "Hide translation" : "Show translation");
+      translateButton.classList.toggle("is-pending", translationPending);
+      translateButton.title = translationPending
+        ? "Translation loading"
+        : translationVisible
+          ? "Hide translation"
+          : "Show translation";
+      translateButton.setAttribute(
+        "aria-label",
+        translationPending ? "Translation loading" : translationVisible ? "Hide translation" : "Show translation",
+      );
       translateButton.setAttribute("aria-pressed", translationVisible ? "true" : "false");
       translateButton.addEventListener("click", () => performDisplayAction(card, translationActions[0]));
     }
@@ -4152,7 +4243,7 @@
         "p",
         "af-dictionary-copy af-overlay-definition",
         summary.definition,
-        lookupOrOverlayDefinition(card, cardTranslation, 0),
+        lookupOrOverlayDefinition(card, cardTranslation, 0, { alwaysUseLookup: true }),
       );
     }
 
@@ -4175,7 +4266,7 @@
     return card.headword || card.clickedForm || state.selectedWord?.word || "Dictionary card";
   }
 
-  function renderOverlayCardTitle(parent, card, translation = null) {
+  function renderOverlayCardTitle(parent, card) {
     clearElement(parent);
     const titleText = appendElement(parent, "span", "af-overlay-card-title-text");
     const titleLine = appendElement(titleText, "span", "af-overlay-card-title-line");
@@ -4185,7 +4276,6 @@
     }
     const headword = appendElement(titleLine, "span", "af-overlay-card-headword");
     headword.textContent = overlayTitle(card);
-    renderInlineTranslation(titleText, lookupOrOverlayHeadword(card, translation));
   }
 
   function overlayChips(card) {
@@ -4204,7 +4294,7 @@
     if (!chips.length) return;
     const list = appendElement(parent, "div", className);
     for (const chip of chips) {
-      const item = appendElement(list, "span", "af-chip");
+      const item = appendElement(list, "span", `af-chip ${chipClassName(chip)}`);
       item.textContent = chip.label || chip;
     }
   }
@@ -4216,40 +4306,70 @@
     if (!visibleSections.length) return;
 
     const cardId = card?.id || "";
-    const expanded = exampleSectionExpanded(cardId);
+    const expanded = cardExpanded(cardId);
+    const collapsedSections = collapsedOverlaySections(visibleSections);
+    const renderedSections = expanded ? visibleSections : collapsedSections;
+    const hiddenCount = Math.max(0, visibleSections.length - renderedSections.length);
     const details = appendElement(parent, "div", "af-overlay-details");
     details.classList.toggle("is-open", expanded);
-    const summary = appendElement(details, "button", "af-overlay-details-summary");
-    summary.type = "button";
-    summary.innerHTML = `${iconSvg(expanded ? "collapse" : "expand")}<span>Examples</span>`;
-    summary.setAttribute("aria-expanded", expanded ? "true" : "false");
-    summary.addEventListener("click", () => toggleCardExamples(cardId));
     const content = appendElement(details, "div", "af-overlay-details-content");
-    content.hidden = !expanded;
-    for (const section of visibleSections) {
+    for (const section of renderedSections) {
       const block = appendElement(content, "div", `af-overlay-section is-${section.kind || "meaning"}`);
+      if (shouldRenderSectionMicroLabel(section)) {
+        const label = appendElement(block, "p", "af-dictionary-copy af-overlay-section-label");
+        label.textContent = sectionMicroLabel(section);
+      }
       renderTranslatedLine(
         block,
         "p",
         "af-dictionary-copy",
         section.text,
-        lookupOrOverlaySection(card, section, sections, translation),
+        lookupOrOverlaySection(card, section, sections, translation, { alwaysUseLookup: true }),
       );
-      if (section.label) {
-        const label = appendElement(block, "p", "af-dictionary-copy af-overlay-section-label");
-        label.textContent = section.label;
-      }
+    }
+    if (hiddenCount > 0 || expanded) {
+      const toggle = appendElement(details, "button", "af-overlay-expand-toggle");
+      toggle.type = "button";
+      toggle.innerHTML = expanded
+        ? `<span>Collapse full card</span>${iconSvg("collapse")}`
+        : `<span>Show ${hiddenCount} more ${hiddenCount === 1 ? "detail" : "details"}</span>${iconSvg("expand")}`;
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+      toggle.addEventListener("click", () => toggleCardExpanded(cardId));
     }
   }
 
-  function sectionLabel(kind) {
+  function collapsedOverlaySections(sections) {
+    const firstExample = sections.find((section) => section.kind === "example");
+    const firstDetail = sections.find((section) => section.kind !== "example");
+    return [firstExample || firstDetail].filter(Boolean);
+  }
+
+  function shouldRenderSectionMicroLabel(section) {
+    return ["idiom", "note", "form"].includes(section?.kind || "");
+  }
+
+  function sectionMicroLabel(section) {
+    if (section?.label && !/^example$/i.test(section.label)) return section.label;
     return {
-      meaning: "Meaning",
-      example: "Example",
-      idiom: "Idiom",
-      form: "Form",
-      note: "Note",
-    }[kind] || "Detail";
+      idiom: "idiom",
+      form: "form",
+      note: "usage note",
+    }[section?.kind] || "";
+  }
+
+  function chipClassName(chip) {
+    const value = String(chip?.value || chip?.label || "").toLowerCase();
+    const kind = String(chip?.kind || "").toLowerCase();
+    if (kind === "part-of-speech" || ["ww", "verb"].includes(value)) {
+      if (["ww", "verb"].includes(value)) return "is-pos-ww";
+      if (["zn", "noun", "zelfstandig naamwoord"].includes(value)) return "is-pos-zn";
+      if (["bn", "adjective"].includes(value)) return "is-pos-bn";
+      if (["bw", "adverb"].includes(value)) return "is-pos-bw";
+      if (["idiom"].includes(value)) return "is-pos-bn";
+    }
+    if (kind === "list") return "is-list";
+    if (value === "draft" || value === "needs save") return "is-draft";
+    return "";
   }
 
   function progressSignal(progress) {
@@ -4310,20 +4430,20 @@
     return Boolean(card?.entryId || card?.generatedDraftItem || generatedDraftItemFromOverlayCard(card));
   }
 
-  function lookupOrOverlayHeadword(card, translation) {
-    if (!cardTranslationsVisible(card)) return "";
+  function lookupOrOverlayHeadword(card, translation, options = {}) {
+    if (!options.alwaysUseLookup && !cardTranslationsVisible(card)) return "";
     return cleanTranslationText(card?.headwordTranslation) || translatedHeadword(translation);
   }
 
-  function lookupOrOverlayDefinition(card, translation, meaningIndex = 0) {
-    if (!cardTranslationsVisible(card)) return "";
+  function lookupOrOverlayDefinition(card, translation, meaningIndex = 0, options = {}) {
+    if (!options.alwaysUseLookup && !cardTranslationsVisible(card)) return "";
     return cleanTranslationText(card?.summary?.definitionTranslation) ||
       translatedDefinition(translation, meaningIndex);
   }
 
-  function lookupOrOverlaySection(card, section, allSections, translation) {
+  function lookupOrOverlaySection(card, section, allSections, translation, options = {}) {
     if (!section) return "";
-    if (!cardTranslationsVisible(card)) return "";
+    if (!options.alwaysUseLookup && !cardTranslationsVisible(card)) return "";
     return cleanTranslationText(section.translation) ||
       translatedSection(section, allSections, translation);
   }
@@ -4411,6 +4531,16 @@
 
   function renderReviewActions(parent, card = null) {
     const displayActions = displayActionsByGroup(card, "progress");
+    const feedback = state.cardActionFeedbackByCardId[card?.id];
+    if (
+      feedback?.status === "saved"
+      && ["learn", "save-and-learn"].includes(feedback.actionId)
+    ) {
+      const section = appendElement(parent, "div", "af-card-review");
+      const saved = appendElement(section, "div", "af-card-learning-state");
+      saved.textContent = feedback.message || "Added to learning";
+      return;
+    }
     if (!displayActions.length) {
       if (state.accountStatus !== "signed-in") {
         renderConnectPrompt(parent);
@@ -4419,7 +4549,6 @@
     }
     const section = appendElement(parent, "div", "af-card-review");
     const actions = appendElement(section, "div", "af-review-actions");
-    const feedback = state.cardActionFeedbackByCardId[card?.id];
 
     for (const displayAction of displayActions) {
       const button = appendButton(actions, displayAction.label || displayAction.id, `afAction-${displayAction.id}`);
@@ -4435,7 +4564,26 @@
 
   function displayActionsByGroup(card, group) {
     return (Array.isArray(card?.displayActions) ? card.displayActions : [])
-      .filter((displayAction) => (displayAction.group || "progress") === group);
+      .filter((displayAction) => (displayAction.group || "progress") === group)
+      .filter((displayAction) => shouldRenderDisplayAction(card, displayAction));
+  }
+
+  function shouldRenderDisplayAction(card, displayAction) {
+    if (!displayAction) return false;
+    if (
+      displayAction.group === "progress"
+      && displayAction.id === "known"
+      && ["not-started", "encountered", undefined].includes(card?.progress?.phase)
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function isGeneratedDictionaryCard(card) {
+    return Boolean(card?.generatedDraftItem || card?.displayActions?.some((action) =>
+      action?.command?.kind === "generated-save-and-start-learning"
+    ));
   }
 
   function renderConnectPrompt(parent) {
@@ -4477,6 +4625,7 @@
     state.dictionaryLookupSeq = lookupSeq;
     state.exampleExpansionOverrides = {};
     state.visibleTranslationsByCardId = {};
+    state.translationPendingByCardId = {};
     state.cardActionFeedbackByCardId = {};
     if (!options.preserveSelectedSpan) {
       state.selectedSpan = null;
@@ -4935,9 +5084,9 @@
     if (!state.selectedWord) return;
 
     const selectedWord = state.selectedWord;
+    setCardTranslationPending(card.id, true);
     state.selectedWord = {
       ...state.selectedWord,
-      cardActionStatus: "Loading translation...",
       cardActionError: "",
     };
     render();
@@ -4948,6 +5097,7 @@
         ...(generatedDraftItem ? { item: generatedDraftItem } : {}),
       });
       if (!isCurrentLookup(selectedWord)) return;
+      setCardTranslationPending(card.id, false);
       state.selectedWord = {
         ...state.selectedWord,
         cardActionStatus: "",
@@ -4960,6 +5110,7 @@
       render();
     } catch (error) {
       if (!isCurrentLookup(selectedWord)) return;
+      setCardTranslationPending(card.id, false);
       state.selectedWord = {
         ...state.selectedWord,
         cardActionStatus: "",
@@ -5447,18 +5598,29 @@
           id: "mock-learn",
           entryId: "entry-learn",
           clickedForm,
-          headword: "appel",
+          headword: "opbouwen",
+          headwordTranslation: "строить; выстраивать; формировать",
+          definition: "bouwen; tot een geheel maken",
+          definitionTranslation: "строить; создать единое целое",
+          example: "Na de brand is het huis weer opnieuw opgebouwd.",
+          exampleTranslation: "После пожара дом снова отстроили.",
+          partOfSpeech: "ww",
           phase: "encountered",
           progressActions: [
             progressDisplayAction("learn", "Learn", "start-learning"),
-            progressDisplayAction("known", "Known", "mark-known", undefined, true),
           ],
         }),
         mockDictionaryCard({
           id: "mock-review",
           entryId: "entry-review",
           clickedForm,
-          headword: "appel",
+          headword: "groen licht",
+          headwordTranslation: "зеленый свет; разрешение; одобрение",
+          definition: "toestemming krijgen om iets te doen",
+          definitionTranslation: "получить разрешение что-то сделать",
+          example: "Na weken wachten kreeg het project eindelijk groen licht.",
+          exampleTranslation: "После недель ожидания проект наконец получил разрешение.",
+          partOfSpeech: "idiom",
           phase: "reviewing",
           progressActions: [
             progressDisplayAction("again", "Again", "review-card", "fail", true),
@@ -5471,7 +5633,13 @@
           id: "mock-frozen",
           entryId: "entry-translate-error",
           clickedForm,
-          headword: "appel",
+          headword: "opgebouwd",
+          headwordTranslation: "",
+          definition: "voltooid deelwoord van opbouwen; opnieuw tot stand gebracht",
+          definitionTranslation: "",
+          example: "Het huis is na de brand opnieuw opgebouwd.",
+          exampleTranslation: "",
+          partOfSpeech: "ww",
           phase: "frozen",
           progressActions: [],
         }),
@@ -5589,7 +5757,20 @@
     };
   }
 
-  function mockDictionaryCard({ id, entryId, clickedForm, headword, phase, progressActions }) {
+  function mockDictionaryCard({
+    id,
+    entryId,
+    clickedForm,
+    headword,
+    headwordTranslation = "apple",
+    definition = "A round fruit used in learner examples.",
+    definitionTranslation = "круглый фрукт для учебных примеров",
+    example = `${clickedForm} valt niet ver van de boom.`,
+    exampleTranslation = "яблоко от яблони недалеко падает",
+    partOfSpeech = "noun",
+    phase,
+    progressActions,
+  }) {
     const includeLookupTranslations = Boolean(entryId) && entryId !== "entry-translate-error";
     return {
       id,
@@ -5597,27 +5778,33 @@
       clickedForm,
       headword,
       language: "Dutch",
-      partOfSpeech: "noun",
+      partOfSpeech,
       match: { relation: "exact", confidence: 1 },
       summary: {
-        definition: "A round fruit used in learner examples.",
-        ...(includeLookupTranslations ? { definitionTranslation: "круглый фрукт для учебных примеров" } : {}),
-        example: `${clickedForm} valt niet ver van de boom.`,
-        ...(includeLookupTranslations ? { exampleTranslation: "яблоко от яблони недалеко падает" } : {}),
+        definition,
+        ...(includeLookupTranslations && definitionTranslation ? { definitionTranslation } : {}),
+        example,
+        ...(includeLookupTranslations && exampleTranslation ? { exampleTranslation } : {}),
       },
-      ...(includeLookupTranslations ? { headwordTranslation: "apple" } : {}),
+      ...(includeLookupTranslations && headwordTranslation ? { headwordTranslation } : {}),
       chips: [
-        { kind: "part-of-speech", label: "noun" },
+        { kind: "part-of-speech", label: partOfSpeech },
         { kind: "language", label: "Dutch" },
       ],
       sections: [
-        { kind: "meaning", label: "Definition", text: "A round fruit used in learner examples." },
+        { kind: "meaning", label: "Definition", text: definition },
         {
           kind: "example",
-          label: "Example",
-          text: `${clickedForm} valt niet ver van de boom.`,
-          ...(includeLookupTranslations ? { translation: "The apple does not fall far from the tree." } : {}),
+          text: example,
+          ...(includeLookupTranslations && exampleTranslation ? { translation: exampleTranslation } : {}),
         },
+        ...(partOfSpeech === "idiom"
+          ? [{
+              kind: "note",
+              label: "usage note",
+              text: "Used for permission from a person, organization, or authority.",
+            }]
+          : []),
       ],
       ...(includeLookupTranslations
         ? {

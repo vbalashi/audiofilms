@@ -232,7 +232,19 @@ const shouldOnlyMultilingualSwitch = args.has("--only-multilingual-switch");
 const shouldOnlyGeometry = args.has("--only-geometry");
 const shouldOnlyAsrEdge = args.has("--only-asr-edge");
 const shouldOnlyDictionarySourceBinding = args.has("--only-dictionary-source-binding");
+const shouldOnlyDictionaryUi = args.has("--only-dictionary-ui");
+const shouldOnlyFocusedScenario = shouldOnlyBackendOff ||
+  shouldOnlyBackendFailed ||
+  shouldOnlySourceSwitchFailed ||
+  shouldOnlyMultilingualSwitch ||
+  shouldOnlyGeometry ||
+  shouldOnlyAsrEdge ||
+  shouldOnlyDictionarySourceBinding ||
+  shouldOnlyDictionaryUi;
 const fixtureFilter = getArgValue("--only");
+const dictionaryUiVideoId = getArgValue("--dictionary-video") || "4EE7m94mJpk";
+const dictionaryUiWord = getArgValue("--dictionary-word") || "";
+const dictionaryUiMock = getArgValue("--dictionary-mock") || "";
 const waitMs = Number(getArgValue("--wait-ms") || 18000);
 
 if (!["smoke", "full"].includes(profile)) {
@@ -246,13 +258,13 @@ if (shouldListFixtures) {
 
 const fixtures = fixtureFilter
   ? FIXTURES.filter((fixture) => fixture.name === fixtureFilter || fixture.videoId === fixtureFilter)
-  : (shouldOnlyBackendOff || shouldOnlyBackendFailed || shouldOnlySourceSwitchFailed || shouldOnlyMultilingualSwitch || shouldOnlyGeometry || shouldOnlyAsrEdge || shouldOnlyDictionarySourceBinding)
+  : shouldOnlyFocusedScenario
     ? []
   : shouldRunFullSuite
     ? FIXTURES
     : FIXTURES.filter((fixture) => DEFAULT_FIXTURE_NAMES.has(fixture.name));
 
-if (!fixtures.length && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
+if (!fixtures.length && !shouldOnlyFocusedScenario) {
   fail(`No fixtures matched --only=${fixtureFilter}`);
 }
 
@@ -261,6 +273,7 @@ if (!shouldRunFullSuite && !fixtureFilter) {
   console.log("Use --full for SPA, backend-degraded, source-switch, multilingual-switch, and geometry regression scenarios.");
   console.log("Use --only-asr-edge for the focused ASR playback edge-case check.");
   console.log("Use --only-dictionary-source-binding for focused dictionary provenance checks.");
+  console.log("Use --only-dictionary-ui for focused dictionary card rendering screenshots.");
 }
 
 if (shouldRunLocalBackendCheck) {
@@ -290,40 +303,46 @@ if (shouldOnlyDictionarySourceBinding) {
   printFixtureResult(dictionarySourceBindingResult);
 }
 
-if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldSkipSpaCheck) {
+if (shouldOnlyDictionaryUi) {
+  const dictionaryUiResult = runDictionaryUiScenario();
+  results.push(dictionaryUiResult);
+  printFixtureResult(dictionaryUiResult);
+}
+
+if (shouldRunFullSuite && !fixtureFilter && !shouldOnlyFocusedScenario && !shouldSkipSpaCheck) {
   for (const fixture of runSpaNavigationScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendOffCheck) || shouldOnlyBackendOff) && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldOnlyDictionaryUi) {
   for (const fixture of runBackendOffScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipBackendFailedCheck) || shouldOnlyBackendFailed) && !shouldOnlyBackendOff && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldOnlyDictionaryUi) {
   for (const fixture of runBackendFailedScenario()) {
     results.push(fixture);
     printFixtureResult(fixture);
   }
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipSourceSwitchFailedCheck) || shouldOnlySourceSwitchFailed) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldOnlyDictionaryUi) {
   const sourceSwitchFailedResult = runSourceSwitchFailedScenario();
   results.push(sourceSwitchFailedResult);
   printFixtureResult(sourceSwitchFailedResult);
 }
 
-if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding) {
+if (((shouldRunFullSuite && !fixtureFilter && !shouldSkipMultilingualSwitchCheck) || shouldOnlyMultilingualSwitch) && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyGeometry && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldOnlyDictionaryUi) {
   const multilingualSwitchResult = runMultilingualSourceSwitchScenario();
   results.push(multilingualSwitchResult);
   printFixtureResult(multilingualSwitchResult);
 }
 
-if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
+if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnlyBackendFailed && !shouldOnlySourceSwitchFailed && !shouldOnlyMultilingualSwitch && !shouldOnlyAsrEdge && !shouldOnlyDictionarySourceBinding && !shouldOnlyDictionaryUi && !shouldSkipGeometryCheck) || shouldOnlyGeometry) {
   const geometryResult = runGeometryScenario();
   results.push(geometryResult);
   printFixtureResult(geometryResult);
@@ -569,6 +588,103 @@ function runDictionarySourceBindingScenario() {
       ok: assertions.every((item) => item.ok),
       assertions,
       snapshot: switched,
+    };
+  } finally {
+    removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+    if (hadPreviousDictionaryMock) {
+      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
+    } else {
+      removeLocalStorageItem("afShadowingDictionaryMock");
+    }
+  }
+}
+
+function runDictionaryUiScenario() {
+  const fixture = {
+    name: "dictionary-ui-focused",
+    videoId: dictionaryUiVideoId,
+    expect: {},
+  };
+  const assertions = [];
+  let previousDictionaryMock = null;
+  let hadPreviousDictionaryMock = false;
+
+  try {
+    resizeChrome(900, 900);
+    navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
+    previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
+    hadPreviousDictionaryMock = previousDictionaryMock !== null;
+    removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+    if (dictionaryUiMock && dictionaryUiMock !== "off") {
+      setLocalStorageItem("afShadowingDictionaryMock", dictionaryUiMock);
+    } else {
+      removeLocalStorageItem("afShadowingDictionaryMock");
+    }
+    reloadTab();
+    const initial = waitForSnapshot(fixture.videoId, waitMs);
+    pauseVideo();
+    setDebugVisible(false);
+
+    let clicked = dictionaryUiWord ? clickLookupWord(dictionaryUiWord) : clickFirstLookupWord();
+    if (!clicked.clicked && dictionaryUiWord) {
+      clicked = clickFirstLookupWord();
+    }
+    const lookupSnapshot = waitForDictionarySelection(clicked.word, waitMs);
+    const ready = waitForDictionaryUiReady(waitMs);
+    expandDictionaryCards();
+    sleep(500);
+    setDebugVisible(false);
+    const beforeTranslate = readGeometrySnapshot();
+    const focusedEvidence = captureChromeScreenshot("dictionary-ui-focused");
+    scrollDictionaryToCardDetails();
+    sleep(500);
+    const detailsEvidence = captureChromeScreenshot("dictionary-ui-focused-details");
+    scrollDictionaryToSearchPreviews();
+    sleep(500);
+    const previewEvidence = captureChromeScreenshot("dictionary-ui-focused-previews");
+    scrollDictionaryToTop();
+    sleep(300);
+    const translateClick = clickDictionaryTranslate(0);
+    sleep(900);
+    const afterTranslate = readGeometrySnapshot();
+    const translatedEvidence = captureChromeScreenshot("dictionary-ui-focused-translated");
+    const evidencePaths = [focusedEvidence, detailsEvidence, previewEvidence, translatedEvidence].filter(Boolean);
+    const previewWidths = beforeTranslate.dictionaryUi?.searchItemTextWidths || [];
+    const minPreviewWidth = previewWidths.length ? Math.min(...previewWidths) : null;
+    const translationStyles = afterTranslate.dictionaryUi?.inlineTranslationStyles || [];
+
+    assertions.push(
+      assertion("dictionary ui panel loaded", initial.panel === true, JSON.stringify({ source: initial.source, count: initial.count, error: initial.error })),
+      assertion("dictionary ui lookup word clicked", clicked.clicked === true, clicked.detail),
+      assertion("dictionary ui lookup ready", lookupSnapshot.dictionary?.present === true && lookupSnapshot.dictionary?.loading === false, JSON.stringify(lookupSnapshot.dictionary || {})),
+      assertion("dictionary ui renders overlay cards", ready.dictionaryUi?.overlayCardCount > 0, JSON.stringify(ready.dictionaryUi || {})),
+      assertion("dictionary ui omits search previews heading", beforeTranslate.dictionaryUi?.searchHeadingPresent === false, JSON.stringify(beforeTranslate.dictionaryUi || {})),
+      assertion("dictionary ui search preview text keeps usable width", minPreviewWidth === null || minPreviewWidth >= 120, JSON.stringify({ widths: previewWidths, samples: beforeTranslate.dictionaryUi?.searchItemTextSamples || [] })),
+      assertion("dictionary ui does not show translation loading copy", !/loading translation/i.test(beforeTranslate.dictionaryUi?.actionStatus || ""), beforeTranslate.dictionaryUi?.actionStatus || ""),
+      assertion("dictionary ui screenshot evidence captured", evidencePaths.length === 4, evidencePaths.join(" | ")),
+    );
+
+    if (translateClick === "clicked" && translationStyles.length) {
+      assertions.push(
+        assertion("dictionary ui translate action clicked", true, translateClick),
+        assertion("dictionary ui translations render italic", translationStyles.every((style) => style.fontStyle === "italic"), JSON.stringify(translationStyles)),
+        assertion("dictionary ui translations use normal weight", translationStyles.every((style) => Number(style.fontWeight) <= 600), JSON.stringify(translationStyles)),
+        assertion("dictionary ui translation stays inline", afterTranslate.dictionaryUi?.translationBlocks === 0, JSON.stringify(afterTranslate.dictionaryUi || {})),
+      );
+    } else {
+      assertions.push(assertion("dictionary ui translate action optional", true, translateClick));
+    }
+
+    return {
+      ...fixture,
+      ok: assertions.every((item) => item.ok),
+      assertions,
+      snapshot: {
+        source: initial.source,
+        count: initial.count,
+        message: evidencePaths.join(" | "),
+        error: ready.error,
+      },
     };
   } finally {
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
@@ -1097,6 +1213,7 @@ function assertDictionaryCardUi() {
   const afterErrorTranslation = readGeometrySnapshot();
 
   const allProgressActions = before.dictionaryUi?.cards?.flatMap((card) => card.progressActions || []) || [];
+  const firstCardActions = before.dictionaryUi?.cards?.[0]?.progressActions || [];
   const reviewCard = before.dictionaryUi?.cards?.find((card) => (card.progressActions || []).includes("Again"));
   const frozenCard = before.dictionaryUi?.cards?.find((card) => /frozen/i.test(card.title || "")) ||
     before.dictionaryUi?.cards?.[2];
@@ -1104,7 +1221,8 @@ function assertDictionaryCardUi() {
   return [
     assertion("dictionary mock card count", before.dictionaryUi?.overlayCardCount === 3, JSON.stringify(before.dictionaryUi)),
     assertion("dictionary card anatomy has title and chips", before.dictionaryUi?.cards?.every((card) => card.title && card.chips > 0), JSON.stringify(before.dictionaryUi?.cards || [])),
-    assertion("dictionary not-started actions show Learn/Known", ["Learn", "Known"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),
+    assertion("dictionary not-started actions show Learn only", firstCardActions.length === 1 && firstCardActions[0] === "Learn", firstCardActions.join("|")),
+    assertion("dictionary progress actions do not show Known", !allProgressActions.includes("Known"), allProgressActions.join("|")),
     assertion("dictionary review actions show four grades", ["Again", "Hard", "Good", "Easy"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),
     assertion("dictionary frozen card has no progress row", frozenCard && (frozenCard.progressActions || []).length === 0, JSON.stringify(frozenCard || {})),
     assertion("dictionary translate action clicked", firstTranslate === "clicked", firstTranslate),
@@ -1767,6 +1885,21 @@ function waitForGeometryDictionaryCards(timeoutMs) {
   return last || readGeometrySnapshot();
 }
 
+function waitForDictionaryUiReady(timeoutMs) {
+  const started = Date.now();
+  let last = null;
+
+  while (Date.now() - started < timeoutMs) {
+    last = readGeometrySnapshot();
+    if (last.dictionaryUi?.overlayCardCount > 0) {
+      return last;
+    }
+    sleep(500);
+  }
+
+  return last || readGeometrySnapshot();
+}
+
 function waitForReplaySnapshot(mode, timeoutMs) {
   const started = Date.now();
   let last = null;
@@ -2042,8 +2175,22 @@ function readGeometrySnapshot() {
           progressActions: Array.from(card.querySelectorAll(".af-review-actions button")).map((button) => button.textContent.trim()),
           translateActions: Array.from(card.querySelectorAll(".af-card-translate")).map((button) => button.textContent.trim()),
         })),
+        searchHeadingPresent: Boolean(dictionary.querySelector(".af-dictionary-search-heading")),
+        searchGroupTitles: Array.from(dictionary.querySelectorAll(".af-dictionary-search-group-title")).map((title) => title.textContent.trim()),
+        searchItemCount: dictionary.querySelectorAll(".af-dictionary-search-item").length,
+        searchItemTextWidths: Array.from(dictionary.querySelectorAll(".af-dictionary-search-item-text")).map((item) => Math.round(item.getBoundingClientRect().width)),
+        searchItemTextSamples: Array.from(dictionary.querySelectorAll(".af-dictionary-search-item-text")).slice(0, 3).map((item) => item.textContent.trim()),
         translationBlocks: dictionary.querySelectorAll(".af-card-translation").length,
         inlineTranslations: dictionary.querySelectorAll(".af-inline-translation").length,
+        inlineTranslationStyles: Array.from(dictionary.querySelectorAll(".af-inline-translation")).slice(0, 4).map((item) => {
+          const style = getComputedStyle(item);
+          return {
+            color: style.color,
+            fontSize: style.fontSize,
+            fontStyle: style.fontStyle,
+            fontWeight: style.fontWeight,
+          };
+        }),
         actionStatus: dictionary.querySelector(".af-card-action-status")?.textContent || "",
         actionError: dictionary.querySelector(".af-source-option-error")?.textContent || "",
         spanTranslationPresent: Boolean(dictionary.querySelector(".af-span-translation-card")),
@@ -2279,6 +2426,47 @@ function clickFirstLookupWord(options = {}) {
   return JSON.parse(raw);
 }
 
+function clickLookupWord(preferredWord, options = {}) {
+  const eventOptions = JSON.stringify({
+    shiftKey: Boolean(options.shiftKey),
+    ctrlKey: Boolean(options.ctrlKey),
+    metaKey: Boolean(options.metaKey),
+  });
+  const raw = chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const preferred = ${JSON.stringify(String(preferredWord || "").toLocaleLowerCase())};
+  const words = Array.from(root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word") || []);
+  const word = words.find((candidate) => {
+    const value = String(candidate.dataset.afLookupWord || candidate.textContent || "").toLocaleLowerCase();
+    return value === preferred;
+  });
+  if (!word) {
+    return JSON.stringify({ clicked: false, word: preferred, detail: "preferred-word-not-found" });
+  }
+  const value = word.dataset.afLookupWord || word.textContent || "";
+  const options = ${eventOptions};
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    word.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      shiftKey: options.shiftKey,
+      ctrlKey: options.ctrlKey,
+      metaKey: options.metaKey,
+    }));
+  }
+  return JSON.stringify({
+    clicked: true,
+    word: value,
+    detail: word.textContent || value,
+    modifiers: options,
+  });
+})()
+  `);
+  return JSON.parse(raw);
+}
+
 function dragFirstPhraseSpan() {
   const raw = chromeEval(`
 (() => {
@@ -2465,6 +2653,57 @@ function readDictionaryMockCommands() {
 (() => document.documentElement.dataset.afShadowingDictionaryMockCommands || "[]")()
   `);
   return JSON.parse(raw);
+}
+
+function expandDictionaryCards() {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const buttons = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-overlay-expand-toggle[aria-expanded='false']") || []);
+  for (const button of buttons) {
+    button.click();
+  }
+  return String(buttons.length);
+})()
+  `);
+}
+
+function scrollDictionaryToCardDetails() {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const panel = root?.querySelector("#af-shadowing-dictionary-panel");
+  const details = panel?.querySelector(".af-overlay-details-content");
+  if (!panel || !details) return "not-found";
+  details.scrollIntoView({ block: "start", inline: "nearest" });
+  return "scrolled";
+})()
+  `);
+}
+
+function scrollDictionaryToSearchPreviews() {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const panel = root?.querySelector("#af-shadowing-dictionary-panel");
+  const previews = panel?.querySelector(".af-dictionary-search-groups");
+  if (!panel || !previews) return "not-found";
+  previews.scrollIntoView({ block: "start", inline: "nearest" });
+  return "scrolled";
+})()
+  `);
+}
+
+function scrollDictionaryToTop() {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const panel = root?.querySelector("#af-shadowing-dictionary-panel");
+  if (!panel) return "not-found";
+  panel.scrollTop = 0;
+  return "scrolled";
+})()
+  `);
 }
 
 function waitForDictionaryMockCommand(operation, timeoutMs) {
@@ -2748,6 +2987,7 @@ function printFixtureList() {
   console.log("\nFocused opt-in scenarios:");
   console.log(`  - ${ASR_EDGE_FIXTURE.name} (${ASR_EDGE_FIXTURE.videoId}) via --only-asr-edge`);
   console.log(`  - ${DICTIONARY_SOURCE_BINDING_FIXTURE.name} (${DICTIONARY_SOURCE_BINDING_FIXTURE.videoId}) via --only-dictionary-source-binding`);
+  console.log("  - dictionary-ui-focused via --only-dictionary-ui [--dictionary-video=<id>] [--dictionary-word=<word>] [--dictionary-mock=cards|off]");
 }
 
 function parseTimestampSeconds(text) {

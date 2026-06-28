@@ -665,7 +665,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-dictionary-search-groups {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--af-border);
@@ -683,10 +683,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 .af-dictionary-search-group {
   display: grid;
   gap: 8px;
-  padding: 10px;
-  background: var(--af-panel-soft);
-  border: 1px solid var(--af-border);
-  border-radius: 7px;
 }
 
 .af-dictionary-search-group-header {
@@ -698,9 +694,12 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-dictionary-search-group-title {
   min-width: 0;
-  color: var(--af-text);
-  font-size: 12px;
+  color: var(--af-muted);
+  font-family: var(--af-mono);
+  font-size: 11px;
   font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .af-dictionary-search-count {
@@ -722,27 +721,99 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-dictionary-search-item {
+  display: grid;
+  gap: 10px;
+  width: 100%;
   min-width: 0;
-  padding: 8px;
-  background: var(--af-panel);
+  padding: 11px;
+  color: inherit;
+  background: var(--af-panel-soft);
   border: 1px solid var(--af-border);
-  border-radius: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.af-dictionary-search-item:hover,
+.af-dictionary-search-item:focus-visible {
+  background: var(--af-panel);
+  border-color: var(--af-border-strong);
+}
+
+.af-dictionary-search-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  min-width: 0;
 }
 
 .af-dictionary-search-item-title {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
-  color: var(--af-muted);
-  font-size: 11px;
+  color: var(--af-text);
+  font-size: 13px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.af-dictionary-search-item-body {
+  position: relative;
+  min-width: 0;
+  padding-left: 13px;
+}
+
+.af-dictionary-search-item-body::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 3px;
+  background: var(--af-border-strong);
+  border-radius: 999px;
+}
+
 .af-dictionary-search-item-text {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--af-text);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 650;
   line-height: 1.4;
+}
+
+.af-dictionary-search-highlight {
+  color: var(--af-translation);
+  font-weight: 850;
+}
+
+.af-dictionary-search-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 27px;
+  color: var(--af-muted);
+  background: rgba(var(--af-panel-soft-rgb), 0.55);
+  border: 1px dashed var(--af-border);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.af-dictionary-search-open::after {
+  content: "v";
+  font-size: 12px;
+}
+
+.af-search-chip-list {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
 }
 
 .af-dictionary-search-more {
@@ -765,7 +836,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: var(--af-panel);
   border: 1px solid var(--af-border);
   border-radius: 8px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.28);
 }
 
 .af-overlay-card.is-action-pending {
@@ -791,6 +862,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-overlay-title-wrap {
+  display: grid;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -854,6 +927,49 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   white-space: nowrap;
 }
 
+.af-chip.is-pos-ww {
+  color: var(--af-danger-text);
+  background: var(--af-danger-soft);
+  border-color: rgba(252, 165, 165, 0.6);
+}
+
+.af-chip.is-pos-zn {
+  color: #bfdbfe;
+  background: rgba(30, 64, 175, 0.28);
+  border-color: rgba(147, 197, 253, 0.55);
+}
+
+.af-chip.is-pos-bn {
+  color: var(--af-success-text);
+  background: var(--af-success-soft);
+  border-color: rgba(52, 211, 153, 0.55);
+}
+
+.af-chip.is-pos-bw {
+  color: var(--af-warning-text);
+  background: var(--af-warning-soft);
+  border-color: rgba(245, 158, 11, 0.55);
+}
+
+.af-chip.is-list {
+  color: var(--af-accent-strong);
+  background: var(--af-accent-soft);
+  border-color: rgba(165, 180, 252, 0.48);
+}
+
+.af-chip.is-draft {
+  color: var(--af-warning-text);
+  background: var(--af-warning-soft);
+  border-color: rgba(245, 158, 11, 0.55);
+}
+
+.af-overlay-headword-translation {
+  color: var(--af-translation);
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
 .af-card-translate {
   display: grid;
   flex: 0 0 auto;
@@ -875,6 +991,21 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-color: var(--af-success);
 }
 
+.af-card-translate.is-pending {
+  background: linear-gradient(110deg, var(--af-control), var(--af-accent-soft), var(--af-control));
+  background-size: 180% 100%;
+  animation: af-card-translation-pending 1.1s linear infinite;
+}
+
+@keyframes af-card-translation-pending {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 180% 50%;
+  }
+}
+
 .af-card-translate:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -892,9 +1023,9 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   display: block;
   margin-top: 4px;
   color: var(--af-translation);
-  font-size: 12px;
+  font-size: 13px;
   font-style: italic;
-  font-weight: 650;
+  font-weight: 500;
   line-height: 1.35;
 }
 
@@ -911,23 +1042,27 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-top: 1px solid var(--af-border);
 }
 
-.af-overlay-details-summary {
+.af-overlay-expand-toggle {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
-  padding: 10px 0 0;
+  min-height: 31px;
+  margin-top: 8px;
+  padding: 6px 8px;
   color: var(--af-muted);
-  background: transparent;
-  border: 0;
+  background: rgba(var(--af-panel-soft-rgb), 0.55);
+  border: 1px dashed var(--af-border);
+  border-radius: 7px;
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 850;
-  text-align: left;
+  text-align: center;
 }
 
-.af-overlay-details-summary .af-button-icon {
+.af-overlay-expand-toggle .af-button-icon {
   width: 13px;
   height: 13px;
 }
@@ -943,15 +1078,40 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-overlay-section {
-  padding: 8px;
-  background: var(--af-panel-soft);
-  border: 1px solid var(--af-border);
-  border-radius: 6px;
+  position: relative;
+  display: block;
+  min-width: 0;
+  padding: 0 0 0 13px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.af-overlay-section::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 0;
+  width: 3px;
+  background: var(--af-success);
+  border-radius: 999px;
+}
+
+.af-overlay-section.is-note::before,
+.af-overlay-section.is-form::before {
+  background: var(--af-border-strong);
 }
 
 .af-overlay-section-label {
-  margin-top: 4px;
-  color: var(--af-muted);
+  margin: 0 0 5px;
+  color: var(--af-dim);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.af-overlay-section .af-dictionary-copy {
+  margin-top: 0;
 }
 
 .af-lookup-placeholder-title,
@@ -977,7 +1137,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-review-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
   gap: 8px;
 }
 
@@ -1000,6 +1160,12 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: var(--af-success-soft);
   border-color: var(--af-success);
   box-shadow: inset 0 0 0 1px var(--af-success-soft);
+}
+
+.af-review-actions button:only-child {
+  color: var(--af-success-text);
+  background: var(--af-success-soft);
+  border-color: var(--af-success);
 }
 
 .af-review-actions button.is-action-pending {
@@ -1025,8 +1191,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-review-actions [data-af-action-good] {
-  border-color: var(--af-accent);
-  color: var(--af-accent);
+  border-color: var(--af-success);
+  color: var(--af-success-text);
 }
 
 .af-review-actions [data-af-action-easy] {
@@ -1039,6 +1205,20 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   color: var(--af-success-text);
   font-size: 12px;
   font-weight: 750;
+}
+
+.af-card-learning-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 10px;
+  color: var(--af-success-text);
+  background: var(--af-success-soft);
+  border: 1px solid var(--af-success);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .af-overlay-card.is-action-error .af-card-inline-feedback {
