@@ -65,6 +65,7 @@ services:
       HOME: /data/audiofilms/home
       XDG_CACHE_HOME: /data/audiofilms/cache
       HF_HOME: /data/audiofilms/huggingface
+      AUDIOFILMS_PUBLIC_API_BASE: ${AUDIOFILMS_PUBLIC_API_BASE:-}
       AUDIOFILMS_DATA_DIR: /data/audiofilms
       AUDIOFILMS_CACHE_DIR: /data/audiofilms/cache
       AUDIOFILMS_ASR_CACHE_DIR: /data/audiofilms/asr-cache
