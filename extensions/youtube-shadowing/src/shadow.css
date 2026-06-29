@@ -400,9 +400,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 #af-shadowing-dictionary-panel.is-span-selected .af-dictionary-title {
   color: var(--af-muted);
   font-family: var(--af-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 850;
-  letter-spacing: 0.06em;
+  line-height: 1;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -2801,10 +2802,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: var(--af-panel);
 }
 
-.af-span-eyebrow {
-  margin-bottom: 6px;
-}
-
 .af-span-source {
   color: var(--af-muted);
 }
@@ -2843,8 +2840,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-translation-field {
-  margin-top: 10px;
-  padding: 9px 0 0;
+  margin-top: 12px;
+  padding: 10px 0 0;
   background: transparent;
   border: 0;
   border-top: 1px solid var(--af-border);
@@ -2857,20 +2854,19 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-translation-field.is-note {
-  padding: 9px 0 0 10px;
+  padding: 10px 0 0;
   background: transparent;
   border-top-color: var(--af-border);
-  border-left: 3px solid rgba(214, 187, 126, 0.56);
 }
 
 .af-translation-label {
   display: flex;
   align-items: center;
-  color: var(--af-muted);
-  font-size: 11px;
-  font-weight: 800;
+  color: #8d97a6;
+  font-size: 10px;
+  font-weight: 850;
   font-family: var(--af-mono);
-  letter-spacing: 0;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
@@ -2879,7 +2875,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-translation-field.is-context .af-translation-label {
-  color: var(--af-green);
+  color: #a6b0bf;
 }
 
 .af-translation-field.is-context .af-translation-dot {
@@ -2887,7 +2883,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-translation-field.is-literal .af-translation-label {
-  color: var(--af-blue);
+  color: #7f8998;
 }
 
 .af-translation-field.is-literal .af-translation-dot {
@@ -2895,7 +2891,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-translation-field.is-note .af-translation-label {
-  color: var(--af-yellow);
+  color: #a89669;
 }
 
 .af-translation-field.is-note .af-translation-dot {
@@ -2924,7 +2920,9 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-span-comment-text {
+  padding-left: 10px;
   color: var(--af-muted);
+  border-left: 3px solid rgba(214, 187, 126, 0.56);
   font-style: italic;
   font-weight: 600;
 }

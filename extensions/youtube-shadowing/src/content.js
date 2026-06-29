@@ -4158,8 +4158,6 @@
     if (!span) return;
 
     const card = appendElement(parent, "div", "af-dictionary-card af-span-translation-card");
-    const eyebrow = appendElement(card, "div", "af-dictionary-eyebrow af-span-eyebrow");
-    eyebrow.textContent = "Selected phrase";
     renderSelectedSpanTitle(card, span);
 
     if (span.status === "loading") {
