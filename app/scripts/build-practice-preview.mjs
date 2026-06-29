@@ -107,6 +107,7 @@ function buildPreview(manual, asr) {
         endSec: cue.end,
         text: cue.text,
       })),
+    sourceMeta: manual.meta || {},
     summary: {
       sourceCueCount: manual.cues?.length || 0,
       practicePhraseCount: practicePhrases.length,

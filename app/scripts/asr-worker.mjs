@@ -214,16 +214,17 @@ function buildSubtitleResult({ preview, language, engine, model, textSource, ref
       ? [`Adjusted playback starts for ${suspiciousLeadingWordGapCount} ASR phrases with suspicious leading word gaps.`]
       : []),
   ];
+  const sourceMeta = textSource === "asr" ? {} : preview.sourceMeta || {};
   return {
     phrases: sourcePhrases,
     practicePhrases,
     language,
     meta: {
-      provider: "audiofilms-asr-worker",
+      provider: sourceMeta.provider || "audiofilms-asr-worker",
       fallbackUsed: false,
       cacheStatus: refresh ? "stored" : "hit",
-      sourceKind: textSource === "manual" ? "manual" : textSource === "auto" ? "auto" : "provider",
-      retrievalPath: `asr-job:${engine}:${model}:${textSource}`,
+      sourceKind: sourceMeta.sourceKind || (textSource === "manual" ? "manual" : textSource === "auto" ? "auto" : "provider"),
+      retrievalPath: sourceMeta.retrievalPath || `asr-job:${engine}:${model}:${textSource}`,
       timingExactness: "word-level",
       qualityFlags,
       warnings,
