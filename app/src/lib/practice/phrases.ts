@@ -278,6 +278,9 @@ function shouldKeepContinuationGroupAsReplaySegments(
   options: Required<PracticePhraseOptions>,
 ) {
   if (group.length >= 3) return true;
+  if (group.length === 2 && wordCount(cleanContinuationSegmentText(group[1], 1)) <= 3) {
+    return false;
+  }
   if (
     wordCount(displayText) > options.maxWords ||
     displayText.length > options.maxCharacters
@@ -332,7 +335,24 @@ function isEllipsisContinuation(previous: Phrase, next: Phrase, options: Require
   );
 }
 
-function resolveEllipsisContinuationGroups(
+function isPunctuationContinuation(previous: Phrase, next: Phrase, options: Required<PracticePhraseOptions>) {
+  const previousText = previous.text.trim();
+  const nextText = next.text.trim();
+  if (!previousText || !nextText) return false;
+  if (hasTrailingEllipsis(previousText)) return false;
+  if (/[.!?]$/.test(previousText)) return false;
+  if (!startsWithContinuationCue(nextText)) return false;
+  return continuationGapOk(previous, next, options.maxContinuationGapSec);
+}
+
+function isSentenceContinuation(previous: Phrase, next: Phrase, options: Required<PracticePhraseOptions>) {
+  return (
+    isEllipsisContinuation(previous, next, options) ||
+    isPunctuationContinuation(previous, next, options)
+  );
+}
+
+function resolveSentenceContinuationGroups(
   phrases: Phrase[],
   options: Required<PracticePhraseOptions>,
 ) {
@@ -343,7 +363,7 @@ function resolveEllipsisContinuationGroups(
 
     while (
       index + 1 < phrases.length &&
-      isEllipsisContinuation(group.at(-1)!, phrases[index + 1], options)
+      isSentenceContinuation(group.at(-1)!, phrases[index + 1], options)
     ) {
       index += 1;
       group.push({ ...phrases[index] });
@@ -389,7 +409,7 @@ function mergeContinuationPhrases(
 ) {
   const merged: Phrase[] = [];
 
-  for (const phrase of resolveEllipsisContinuationGroups(phrases, options)) {
+  for (const phrase of resolveSentenceContinuationGroups(phrases, options)) {
     const previous = merged.at(-1);
 
     if (!previous) {

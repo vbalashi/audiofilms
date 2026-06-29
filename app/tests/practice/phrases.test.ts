@@ -184,6 +184,48 @@ describe('normalizePracticePhrases', () => {
     expect(normalized.at(-1)?.displayEndChar).toBe(fullSentence.length);
   });
 
+  it('keeps comma-led continuation captions as replay segments with one display sentence', () => {
+    const fullSentence = "And before jumping into the math for how one layer influences the next, or how training works, let's just talk about why it's even reasonable to expect a layered structure like this to behave intelligently.";
+    const normalized = normalizePracticePhrases([
+      {
+        id: 77,
+        startSec: 332.56,
+        endSec: 336.337,
+        text: 'And before jumping into the math for how one layer influences the next,',
+      },
+      {
+        id: 78,
+        startSec: 336.337,
+        endSec: 340.062,
+        text: "or how training works, let's just talk about why it's even reasonable",
+      },
+      {
+        id: 79,
+        startSec: 340.062,
+        endSec: 343.52,
+        text: 'to expect a layered structure like this to behave intelligently.',
+      },
+    ]);
+
+    expect(normalized).toHaveLength(3);
+    expect(normalized.every((phrase) => phrase.displayText === fullSentence)).toBe(true);
+    expect(normalized.every((phrase) => phrase.translationText === fullSentence)).toBe(true);
+    expect(normalized.every((phrase) => phrase.segmentRole === 'sentence-segment')).toBe(true);
+    expect(new Set(normalized.map((phrase) => phrase.displaySegmentId)).size).toBe(1);
+    expect(normalized.map((phrase) => phrase.text)).toEqual([
+      'And before jumping into the math for how one layer influences the next,',
+      "or how training works, let's just talk about why it's even reasonable",
+      'to expect a layered structure like this to behave intelligently.',
+    ]);
+    expect(normalized.map((phrase) => [phrase.startSec, phrase.endSec])).toEqual([
+      [332.56, 336.337],
+      [336.337, 340.062],
+      [340.062, 343.52],
+    ]);
+    expect(normalized[0].displayStartChar).toBe(0);
+    expect(normalized.at(-1)?.displayEndChar).toBe(fullSentence.length);
+  });
+
   it('keeps short numeric title suffixes with the preceding phrase', () => {
     const phrases: Phrase[] = [
       {
