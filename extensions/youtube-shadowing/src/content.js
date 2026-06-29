@@ -3227,6 +3227,12 @@
       startSec: roundTime(phrase.startMs / 1000),
       endSec: roundTime(phrase.endMs / 1000),
       text: phrase.text,
+      displayText: phraseDisplayText(phrase),
+      translationText: phraseTranslationSourceText(phrase),
+      displayStartChar: finiteInteger(phrase.displayStartChar),
+      displayEndChar: finiteInteger(phrase.displayEndChar),
+      displaySegmentId: phrase.displaySegmentId || "",
+      segmentRole: phrase.segmentRole || "",
     };
   }
 
@@ -3412,7 +3418,7 @@
     if (!shouldShowOriginalText(index)) {
       appendElement(text, "span", "af-ribbon-mask");
     } else {
-      renderClickablePhraseText(text, phrase.text, index);
+      renderClickablePhraseText(text, phraseDisplayText(phrase), index, phraseDisplaySegmentRange(phrase));
     }
 
     const translation = appendElement(row, "div", "af-phrase-translation");
@@ -3456,13 +3462,12 @@
 
   function phraseTranslationKey(phrase, index = state.currentIndex) {
     if (!phrase) return "";
+    const sourceText = phraseTranslationSourceText(phrase);
     return [
       state.videoId || "video",
       state.selectedSourceId || "source",
-      phrase.index ?? index,
-      phrase.startMs ?? "",
-      phrase.endMs ?? "",
-      String(phrase.text || "").slice(0, 80),
+      phrase.displaySegmentId || String(phrase.index ?? index),
+      String(sourceText || "").slice(0, 120),
     ].join("|");
   }
 
@@ -3470,9 +3475,7 @@
     return [
       state.videoId || "video",
       state.selectedSourceId || "source",
-      phrase.index ?? index,
-      phrase.startMs ?? 0,
-      phrase.endMs ?? 0,
+      phrase.displaySegmentId || String(phrase.index ?? index),
     ].join(":");
   }
 
@@ -3515,9 +3518,9 @@
     try {
       const translation = await postDictionaryCommand("phrase-translation", {
         phraseId: phraseTranslationId(phrase, index),
-        sourceText: phrase.text || "",
+        sourceText: phraseTranslationSourceText(phrase),
         sourceLanguageCode,
-        contextText: phrase.text || "",
+        contextText: phraseDisplayText(phrase),
         ...(targetLanguageCode ? { targetLanguageCode } : {}),
         purpose: "youtube-phrase-practice",
       });
@@ -3613,7 +3616,33 @@
     return state.textVisible;
   }
 
-  function renderClickablePhraseText(parent, text, phraseIndex) {
+  function phraseDisplayText(phrase) {
+    return String(phrase?.displayText || phrase?.text || "").trim();
+  }
+
+  function phraseTranslationSourceText(phrase) {
+    return String(phrase?.translationText || phrase?.displayText || phrase?.text || "").trim();
+  }
+
+  function phraseDisplaySegmentRange(phrase) {
+    const displayText = phraseDisplayText(phrase);
+    if (!displayText || displayText === String(phrase?.text || "").trim()) return null;
+    const start = finiteInteger(phrase?.displayStartChar);
+    const end = finiteInteger(phrase?.displayEndChar);
+    if (start !== null && end !== null && end > start && start >= 0 && end <= displayText.length) {
+      return { start, end };
+    }
+    const replayText = String(phrase?.text || "").trim();
+    const found = replayText ? displayText.indexOf(replayText) : -1;
+    return found >= 0 ? { start: found, end: found + replayText.length } : null;
+  }
+
+  function segmentOverlapsRange(segment, range) {
+    if (!range) return false;
+    return segment.charEnd > range.start && segment.charStart < range.end;
+  }
+
+  function renderClickablePhraseText(parent, text, phraseIndex, replayRange = null) {
     const segments = phraseTokenApi.tokenizeClickablePhraseText(text);
     for (const segment of segments) {
       if (segment.kind !== "word") {
@@ -3629,6 +3658,7 @@
       word.dataset.afTokenIndex = String(segment.tokenIndex);
       word.dataset.afCharStart = String(segment.charStart);
       word.dataset.afCharEnd = String(segment.charEnd);
+      word.classList.toggle("is-replay-segment", segmentOverlapsRange(segment, replayRange));
       word.classList.toggle(
         "is-selected",
         state.selectedWord?.phraseIndex === phraseIndex && wordsEqual(state.selectedWord.word, segment.lookupWord),
@@ -3736,13 +3766,14 @@
     const endTokenIndex = Math.max(draft.startTokenIndex, draft.endTokenIndex);
     if (endTokenIndex <= startTokenIndex) return false;
 
-    const tokens = phraseTokenApi.tokenizeClickablePhraseText(phrase.text)
+    const displayText = phraseDisplayText(phrase);
+    const tokens = phraseTokenApi.tokenizeClickablePhraseText(displayText)
       .filter((segment) => segment.kind === "word" && segment.tokenIndex >= startTokenIndex && segment.tokenIndex <= endTokenIndex);
     if (tokens.length < 2) return false;
 
     const charStart = Math.min(...tokens.map((token) => token.charStart));
     const charEnd = Math.max(...tokens.map((token) => token.charEnd));
-    const text = String(phrase.text || "").slice(charStart, charEnd).trim();
+    const text = displayText.slice(charStart, charEnd).trim();
     if (!text || !text.includes(" ")) return false;
 
     const span = {
@@ -3752,7 +3783,7 @@
       charStart,
       charEnd,
       text,
-      contextText: phrase.text || "",
+      contextText: displayText,
       tokens,
       status: "loading",
       translatedText: "",
@@ -5046,7 +5077,7 @@
       const result = await fetchDictionaryResult({
         word: selectedWord.word,
         language,
-        context: phrase?.text || "",
+        context: phraseDisplayText(phrase),
       });
       if (!isCurrentLookup(selectedWord)) return;
       state.selectedWord = {
@@ -5068,7 +5099,7 @@
         totalMs: Date.now() - startedAt,
         commandTimings: result?.meta?.commandTimings || null,
       });
-      loadGroupedDictionarySearch(selectedWord, language, phrase?.text || "");
+      loadGroupedDictionarySearch(selectedWord, language, phraseDisplayText(phrase));
     } catch (error) {
       if (!isCurrentLookup(selectedWord)) return;
       const payload = error?.payload || {};
@@ -5193,7 +5224,7 @@
       source?.languageCode ||
       "auto";
     const word = dictionarySearchItemTitle(item);
-    const context = dictionarySearchItemText(item) || phrase.text || "";
+    const context = dictionarySearchItemText(item) || phraseDisplayText(phrase);
     try {
       const result = await fetchDictionaryResult({ word, language, context });
       if (!isCurrentLookup(selectedWord)) return;
@@ -7066,6 +7097,12 @@
         ? Math.max(0, Number(phrase.playbackStartSec || 0) * 1000)
         : undefined,
       text: phraseApi.cleanPhraseText(phrase.text || ""),
+      displayText: phraseApi.cleanPhraseText(phrase.displayText || ""),
+      translationText: phraseApi.cleanPhraseText(phrase.translationText || ""),
+      displayStartChar: finiteInteger(phrase.displayStartChar),
+      displayEndChar: finiteInteger(phrase.displayEndChar),
+      displaySegmentId: String(phrase.displaySegmentId || ""),
+      segmentRole: String(phrase.segmentRole || ""),
       index,
       timingFlags: Array.isArray(phrase.timingFlags) ? phrase.timingFlags : [],
     })).filter((cue) => cue.text && cue.endMs >= cue.startMs);
@@ -7646,9 +7683,12 @@
   }
 
   function estimateWordStartMs(phrase, selection = {}) {
-    const textLength = Math.max(String(phrase.text || "").length, 1);
+    const range = phraseDisplaySegmentRange(phrase);
+    const segmentStartChar = range?.start ?? 0;
+    const segmentEndChar = range?.end ?? String(phrase.text || "").length;
+    const textLength = Math.max(segmentEndChar - segmentStartChar, 1);
     const charStart = clampNumber(
-      finiteInteger(selection.charStart),
+      finiteInteger(selection.charStart) - segmentStartChar,
       0,
       textLength,
       0,

@@ -313,6 +313,12 @@
         startMs: Number(phrase.startSec) * 1000,
         endMs: Number(phrase.endSec) * 1000,
         text: cleanCaptionText(phrase.text || ""),
+        displayText: cleanCaptionText(phrase.displayText || ""),
+        translationText: cleanCaptionText(phrase.translationText || ""),
+        displayStartChar: finiteInteger(phrase.displayStartChar),
+        displayEndChar: finiteInteger(phrase.displayEndChar),
+        displaySegmentId: String(phrase.displaySegmentId || ""),
+        segmentRole: String(phrase.segmentRole || ""),
         phraseId: phrase.id ?? index,
       }))
       .filter((cue) => Number.isFinite(cue.startMs) && Number.isFinite(cue.endMs) && cue.endMs > cue.startMs && cue.text)
@@ -397,6 +403,11 @@
       languageCode: snapshot.textSource?.languageCode || "",
       quality: snapshot.timingEvidence?.quality || "",
     };
+  }
+
+  function finiteInteger(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.round(number) : null;
   }
 
   function sourceKindFromPracticeTextSource(textSource) {

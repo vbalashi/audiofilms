@@ -3,6 +3,23 @@ export type Phrase = {
   startSec: number;
   endSec: number;
   text: string;
+  /**
+   * Optional full learner-visible text when replay/navigation uses a shorter
+   * segment inside a longer sentence.
+   */
+  displayText?: string;
+  /**
+   * Character range of `text` inside `displayText`.
+   */
+  displayStartChar?: number;
+  displayEndChar?: number;
+  /**
+   * Text that should be translated for this phrase. For segmented sentence
+   * replay this is usually the full sentence, not the shorter replay segment.
+   */
+  translationText?: string;
+  displaySegmentId?: string;
+  segmentRole?: 'complete-sentence' | 'sentence-segment';
   timingEvidence?: string;
   playbackStartSec?: number;
   timingFlags?: string[];

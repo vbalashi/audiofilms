@@ -38,6 +38,22 @@ function splitLongText(text: string, options: Required<PracticePhraseOptions>) {
   return chunks.length > 0 ? chunks : [text];
 }
 
+function partRangesInDisplayText(displayText: string, parts: string[]) {
+  const ranges: Array<{ text: string; start: number; end: number }> = [];
+  let cursor = 0;
+
+  for (const part of parts) {
+    const cleanPart = part.trim();
+    const start = displayText.indexOf(cleanPart, cursor);
+    const resolvedStart = start >= 0 ? start : cursor;
+    const resolvedEnd = resolvedStart + cleanPart.length;
+    ranges.push({ text: cleanPart, start: resolvedStart, end: resolvedEnd });
+    cursor = resolvedEnd;
+  }
+
+  return ranges;
+}
+
 function mergeShortTrailingChunk(
   chunks: string[],
   options: Required<PracticePhraseOptions>,
@@ -92,14 +108,15 @@ function splitPhraseIntoTimedParts(
   });
 
   const totalChars = parts.reduce((sum, part) => sum + part.length, 0);
+  const displayRanges = partRangesInDisplayText(text, parts);
   let elapsed = 0;
 
-  return parts.map((part, index) => {
+  return displayRanges.map((range, index) => {
     const isLast = index === parts.length - 1;
     const partDuration = isLast
       ? duration - elapsed
       : totalChars > 0
-        ? duration * (part.length / totalChars)
+        ? duration * (range.text.length / totalChars)
         : 0;
     const startSec = phrase.startSec + elapsed;
     const endSec = isLast ? phrase.endSec : startSec + partDuration;
@@ -111,7 +128,20 @@ function splitPhraseIntoTimedParts(
       id: index,
       startSec,
       endSec,
-      text: part,
+      text: range.text,
+      ...(parts.length > 1
+        ? {
+            displayText: text,
+            translationText: text,
+            displayStartChar: range.start,
+            displayEndChar: range.end,
+            displaySegmentId: `${phrase.id ?? 'phrase'}:${Math.round(phrase.startSec * 1000)}-${Math.round(phrase.endSec * 1000)}`,
+            segmentRole: 'sentence-segment' as const,
+            timingFlags: [
+              ...new Set([...(phrase.timingFlags || []), 'segmented-sentence-replay']),
+            ],
+          }
+        : {}),
     };
   });
 }
@@ -227,6 +257,119 @@ function shouldMergeShortSentenceTail(
   );
 }
 
+function cleanContinuationSegmentText(phrase: Phrase, index: number) {
+  const withoutTrailing = stripTrailingEllipsis(phrase.text);
+  const clean = index === 0 ? withoutTrailing : stripLeadingEllipsis(withoutTrailing);
+  return clean.trim().replace(/\s+/g, ' ');
+}
+
+function continuationGroupDisplayText(group: Phrase[]) {
+  return group
+    .map((phrase, index) => cleanContinuationSegmentText(phrase, index))
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function shouldKeepContinuationGroupAsReplaySegments(
+  group: Phrase[],
+  displayText: string,
+  options: Required<PracticePhraseOptions>,
+) {
+  if (group.length >= 3) return true;
+  if (
+    wordCount(displayText) > options.maxWords ||
+    displayText.length > options.maxCharacters
+  ) {
+    return true;
+  }
+
+  const meaningfulSegments = group.filter(
+    (phrase, index) => wordCount(cleanContinuationSegmentText(phrase, index)) >= 7,
+  );
+  const combinedDuration = Math.max(...group.map((phrase) => phrase.endSec)) - group[0].startSec;
+  return meaningfulSegments.length >= 2 && combinedDuration >= 6;
+}
+
+function applySegmentedSentenceGroupContext(group: Phrase[], displayText: string) {
+  const segmentId = `continuation:${group[0].id ?? 'phrase'}:${Math.round(group[0].startSec * 1000)}-${Math.round(group.at(-1)!.endSec * 1000)}`;
+  let cursor = 0;
+
+  return group.map((phrase, index) => {
+    const text = cleanContinuationSegmentText(phrase, index);
+    const start = displayText.indexOf(text, cursor);
+    const displayStartChar = start >= 0 ? start : cursor;
+    const displayEndChar = displayStartChar + text.length;
+    cursor = displayEndChar;
+
+    return {
+      ...phrase,
+      text,
+      displayText,
+      translationText: displayText,
+      displayStartChar,
+      displayEndChar,
+      displaySegmentId: segmentId,
+      segmentRole: 'sentence-segment' as const,
+      timingFlags: [
+        ...new Set([...(phrase.timingFlags || []), 'segmented-sentence-replay']),
+      ],
+    };
+  });
+}
+
+function continuationGapOk(previous: Phrase, next: Phrase, maxContinuationGapSec: number) {
+  const gapSec = next.startSec - previous.endSec;
+  return Number.isFinite(gapSec) && gapSec >= 0 && gapSec <= maxContinuationGapSec;
+}
+
+function isEllipsisContinuation(previous: Phrase, next: Phrase, options: Required<PracticePhraseOptions>) {
+  return (
+    hasTrailingEllipsis(previous.text) &&
+    startsWithContinuationCue(next.text) &&
+    continuationGapOk(previous, next, options.maxContinuationGapSec)
+  );
+}
+
+function resolveEllipsisContinuationGroups(
+  phrases: Phrase[],
+  options: Required<PracticePhraseOptions>,
+) {
+  const resolved: Phrase[] = [];
+
+  for (let index = 0; index < phrases.length; index += 1) {
+    const group = [{ ...phrases[index] }];
+
+    while (
+      index + 1 < phrases.length &&
+      isEllipsisContinuation(group.at(-1)!, phrases[index + 1], options)
+    ) {
+      index += 1;
+      group.push({ ...phrases[index] });
+    }
+
+    if (group.length === 1) {
+      resolved.push(group[0]);
+      continue;
+    }
+
+    const displayText = continuationGroupDisplayText(group);
+    if (!shouldKeepContinuationGroupAsReplaySegments(group, displayText, options)) {
+      resolved.push({
+        ...group[0],
+        endSec: group.at(-1)!.endSec,
+        text: displayText,
+      });
+      continue;
+    }
+
+    resolved.push(...applySegmentedSentenceGroupContext(group, displayText));
+  }
+
+  return resolved;
+}
+
 function joinPracticeText(left: string, right: string) {
   const cleanLeft = left.trim();
   const cleanRight = right.trim();
@@ -246,7 +389,7 @@ function mergeContinuationPhrases(
 ) {
   const merged: Phrase[] = [];
 
-  for (const phrase of phrases) {
+  for (const phrase of resolveEllipsisContinuationGroups(phrases, options)) {
     const previous = merged.at(-1);
 
     if (!previous) {
@@ -331,6 +474,18 @@ export function normalizePracticePhrases(
     const parts = splitPhraseIntoTimedParts(phrase, resolvedOptions);
 
     for (const part of parts) {
+      if (part.segmentRole === 'sentence-segment') {
+        flush();
+        normalized.push({
+          ...phrasePlaybackMetadata(part),
+          id: normalized.length,
+          startSec: part.startSec,
+          endSec: part.endSec,
+          text: part.text.trim().replace(/\s+/g, ' '),
+        });
+        continue;
+      }
+
       let nextText = joinPracticeText(buffer, part.text);
       if (
         buffer &&
@@ -370,6 +525,12 @@ export function normalizePracticePhrases(
 
 function phrasePlaybackMetadata(phrase: Phrase): Partial<Phrase> {
   return {
+    ...(phrase.displayText ? { displayText: phrase.displayText } : {}),
+    ...(phrase.displayStartChar !== undefined ? { displayStartChar: phrase.displayStartChar } : {}),
+    ...(phrase.displayEndChar !== undefined ? { displayEndChar: phrase.displayEndChar } : {}),
+    ...(phrase.translationText ? { translationText: phrase.translationText } : {}),
+    ...(phrase.displaySegmentId ? { displaySegmentId: phrase.displaySegmentId } : {}),
+    ...(phrase.segmentRole ? { segmentRole: phrase.segmentRole } : {}),
     ...(phrase.playbackStartSec !== undefined ? { playbackStartSec: phrase.playbackStartSec } : {}),
     ...(phrase.timingFlags?.length ? { timingFlags: [...phrase.timingFlags] } : {}),
     ...(phrase.wordTimings?.length ? { wordTimings: phrase.wordTimings.map((word) => ({ ...word })) } : {}),

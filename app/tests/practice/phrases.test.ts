@@ -79,6 +79,111 @@ describe('normalizePracticePhrases', () => {
     expect(normalized.every((phrase) => phrase.text.length <= 140)).toBe(true);
   });
 
+  it('keeps full sentence display and translation context for segmented replay', () => {
+    const fullSentence = 'De onderzoeker vertelde dat de kleine rode ster al jaren nauwkeurig wordt gevolgd door verschillende telescopen, omdat zulke lange waarnemingen helpen om subtiele signalen van planeten te herkennen.';
+    const normalized = normalizePracticePhrases([
+      {
+        id: 4,
+        startSec: 10,
+        endSec: 24,
+        text: fullSentence,
+      },
+    ]);
+
+    expect(normalized.length).toBeGreaterThan(1);
+    expect(normalized.every((phrase) => phrase.displayText === fullSentence)).toBe(true);
+    expect(normalized.every((phrase) => phrase.translationText === fullSentence)).toBe(true);
+    expect(normalized.every((phrase) => phrase.segmentRole === 'sentence-segment')).toBe(true);
+    expect(normalized.every((phrase) => phrase.timingFlags?.includes('segmented-sentence-replay'))).toBe(true);
+    expect(normalized.map((phrase) => phrase.text).join(' ')).toBe(fullSentence);
+    expect(normalized[0].displayStartChar).toBe(0);
+    expect(normalized.at(-1)?.displayEndChar).toBe(fullSentence.length);
+  });
+
+  it('keeps long continuation captions as short replay segments with one full display sentence', () => {
+    const fullSentence = 'Als de zon een felle stadionlamp is dan heeft deze rode dwerg de felheid van een heel klein kaarsvlammetje.';
+    const normalized = normalizePracticePhrases([
+      {
+        id: 43,
+        startSec: 155.6,
+        endSec: 158.04,
+        text: 'Als de zon een felle stadionlamp is...',
+      },
+      {
+        id: 44,
+        startSec: 158.32,
+        endSec: 162.52,
+        text: 'dan heeft deze rode dwerg de felheid van een heel klein kaarsvlammetje.',
+      },
+    ]);
+
+    expect(normalized).toEqual([
+      expect.objectContaining({
+        id: 0,
+        startSec: 155.6,
+        endSec: 158.04,
+        text: 'Als de zon een felle stadionlamp is',
+        displayText: fullSentence,
+        translationText: fullSentence,
+        displayStartChar: 0,
+        displayEndChar: 'Als de zon een felle stadionlamp is'.length,
+        segmentRole: 'sentence-segment',
+      }),
+      expect.objectContaining({
+        id: 1,
+        startSec: 158.32,
+        endSec: 162.52,
+        text: 'dan heeft deze rode dwerg de felheid van een heel klein kaarsvlammetje.',
+        displayText: fullSentence,
+        translationText: fullSentence,
+        displayStartChar: 'Als de zon een felle stadionlamp is '.length,
+        displayEndChar: fullSentence.length,
+        segmentRole: 'sentence-segment',
+      }),
+    ]);
+    expect(normalized[0].displaySegmentId).toBe(normalized[1].displaySegmentId);
+  });
+
+  it('supports continuation sentences split across more than two replay segments', () => {
+    const fullSentence = 'Wanneer een spreker heel lang doorgaat met uitleggen over telescopen en metingen dan moet de leerling nog steeds de hele gedachte kunnen lezen terwijl de audio in korte stukken blijft oefenen.';
+    const normalized = normalizePracticePhrases([
+      {
+        id: 10,
+        startSec: 20,
+        endSec: 23,
+        text: 'Wanneer een spreker heel lang doorgaat met uitleggen over telescopen...',
+      },
+      {
+        id: 11,
+        startSec: 23.2,
+        endSec: 27,
+        text: '...en metingen dan moet de leerling nog steeds de hele gedachte kunnen lezen...',
+      },
+      {
+        id: 12,
+        startSec: 27.2,
+        endSec: 31,
+        text: '...terwijl de audio in korte stukken blijft oefenen.',
+      },
+    ]);
+
+    expect(normalized).toHaveLength(3);
+    expect(normalized.every((phrase) => phrase.displayText === fullSentence)).toBe(true);
+    expect(normalized.every((phrase) => phrase.translationText === fullSentence)).toBe(true);
+    expect(new Set(normalized.map((phrase) => phrase.displaySegmentId)).size).toBe(1);
+    expect(normalized.map((phrase) => phrase.text)).toEqual([
+      'Wanneer een spreker heel lang doorgaat met uitleggen over telescopen',
+      'en metingen dan moet de leerling nog steeds de hele gedachte kunnen lezen',
+      'terwijl de audio in korte stukken blijft oefenen.',
+    ]);
+    expect(normalized.map((phrase) => [phrase.startSec, phrase.endSec])).toEqual([
+      [20, 23],
+      [23.2, 27],
+      [27.2, 31],
+    ]);
+    expect(normalized.at(-1)?.displayEndChar).toBe(fullSentence.length);
+  });
+
   it('keeps short numeric title suffixes with the preceding phrase', () => {
     const phrases: Phrase[] = [
       {
@@ -145,7 +250,7 @@ describe('normalizePracticePhrases', () => {
     ]);
   });
 
-  it('counts apostrophes and hyphenated numeric names as one word for continuation limits', () => {
+  it('segments long ellipsis continuations while keeping apostrophes and hyphenated numeric names stable', () => {
     const phrases: Phrase[] = [
       {
         id: 3,
@@ -162,12 +267,20 @@ describe('normalizePracticePhrases', () => {
     ];
 
     expect(normalizePracticePhrases(phrases)).toEqual([
-      {
+      expect.objectContaining({
         id: 0,
         startSec: 3.64,
+        endSec: 7.12,
+        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman',
+        displayText: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam TRAPPIST-1.',
+      }),
+      expect.objectContaining({
+        id: 1,
+        startSec: 7.4,
         endSec: 12.04,
-        text: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam TRAPPIST-1.',
-      },
+        text: 'brandt een kleine rode ster met de naam TRAPPIST-1.',
+        displayText: 'Hoog aan de nachthemel, verscholen in het sterrenbeeld Waterman brandt een kleine rode ster met de naam TRAPPIST-1.',
+      }),
     ]);
   });
 

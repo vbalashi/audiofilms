@@ -190,6 +190,12 @@ function buildPhraseSet(
       startSec: roundTime(phrase.startSec),
       endSec: roundTime(phrase.endSec),
       text: phrase.text,
+      displayText: phrase.displayText || null,
+      displayStartChar: phrase.displayStartChar ?? null,
+      displayEndChar: phrase.displayEndChar ?? null,
+      translationText: phrase.translationText || null,
+      displaySegmentId: phrase.displaySegmentId || null,
+      segmentRole: phrase.segmentRole || null,
     })),
   };
   const revision = revisionId('phrase-set', revisionPayload);

@@ -41,6 +41,12 @@
         locatorConfidence: locatorConfidenceFromTranscript(transcript),
         text: boundedText(phrase?.text || "", 1000),
         textHash: stableFingerprint(phrase?.text || ""),
+        displayText: boundedText(phraseDisplayText(phrase), 1400),
+        displayTextHash: stableFingerprint(phraseDisplayText(phrase)),
+        displayStartChar: finiteInteger(phrase?.displayStartChar),
+        displayEndChar: finiteInteger(phrase?.displayEndChar),
+        displaySegmentId: boundedText(phrase?.displaySegmentId || "", 200),
+        segmentRole: boundedText(phrase?.segmentRole || "", 80),
       },
       selection: {
         clickedForm: boundedText(input.word || selection.originalToken || "", 160),
@@ -80,7 +86,7 @@
         tokenIndex: finiteInteger(binding.selection?.tokenIndex),
         charStart: finiteInteger(binding.selection?.charStart),
         charEnd: finiteInteger(binding.selection?.charEnd),
-        contextText: binding.phrase?.text || "",
+        contextText: binding.phrase?.displayText || binding.phrase?.text || "",
       },
       observation: {
         currentPlaybackTimeMs: finiteInteger(observation.currentPlaybackTimeMs),
@@ -198,6 +204,10 @@
   function boundedText(value, maxLength) {
     const text = String(value || "").replace(/\s+/g, " ").trim();
     return text.length > maxLength ? text.slice(0, maxLength) : text;
+  }
+
+  function phraseDisplayText(phrase) {
+    return phrase?.displayText || phrase?.text || "";
   }
 
   function stripEmpty(value) {
