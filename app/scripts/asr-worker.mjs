@@ -142,6 +142,9 @@ function runAsrPipeline(job) {
   } else {
     alignArgs.push("--duration", String(durationSec));
   }
+  if (request.refresh) {
+    alignArgs.push("--refresh");
+  }
 
   execFileSync(process.execPath, alignArgs, {
     cwd: appRoot,
