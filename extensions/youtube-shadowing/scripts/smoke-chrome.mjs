@@ -581,10 +581,10 @@ function runDictionarySourceBindingScenario() {
     assertions.push(assertion("dictionary source binding lookup clicked", clicked.clicked === true, clicked.detail));
     assertions.push(assertion("dictionary source binding lookup ready", lookupSnapshot.dictionary?.cardCount === 3, JSON.stringify(lookupSnapshot.dictionary)));
     assertions.push(assertion("dictionary card renders definition number chip", menuSnapshot.dictionaryUi?.cards?.[0]?.chipLabels?.includes("#1"), JSON.stringify(menuSnapshot.dictionaryUi?.cards?.[0] || {})));
-    assertions.push(assertion("dictionary card menu opens quick actions", menuClick === "clicked" && ["Report wrong translation", "Translation looks right", "Report dictionary issue"].every((label) => menuSnapshot.dictionaryUi?.cards?.[0]?.menuActions?.includes(label)), JSON.stringify(menuSnapshot.dictionaryUi?.cards?.[0] || {})));
+    assertions.push(assertion("dictionary card menu opens quick actions", menuClick === "clicked" && ["Inaccurate translation", "Translation looks right", "Report dictionary issue"].every((label) => menuSnapshot.dictionaryUi?.cards?.[0]?.menuActions?.includes(label)), JSON.stringify(menuSnapshot.dictionaryUi?.cards?.[0] || {})));
 
     clearDictionaryMockCommands();
-    const actionClick = clickDictionaryProgressAction(0, "Learn");
+    const actionClick = clickDictionaryProgressAction(0, "Start Learning");
     const commands = waitForDictionaryMockCommand("dict-action", waitMs);
     sleep(1000);
     const afterAction = readGeometrySnapshot();
@@ -789,9 +789,9 @@ function runDictionaryBehaviorScenario() {
       assertion("behavior preview row clicked", previewClick === "clicked", previewClick),
       assertion("behavior preview keeps current dictionary word", previewLookup.dictionary?.word?.toLocaleLowerCase() === "jaar", JSON.stringify({ firstPreview, dictionary: previewLookup.dictionary })),
       assertion("behavior preview expands inline full card", (previewExpanded.dictionaryUi?.searchExpandedCardCount || 0) >= 1, JSON.stringify({ firstPreview, dictionary: previewExpanded.dictionaryUi })),
-      assertion("behavior preview focuses matched doppen card", expandedPreviewItem?.title?.toLocaleLowerCase() === "doppen" && expandedPreviewItem.expandedCards === 1, JSON.stringify(expandedPreviewItem)),
+      assertion("behavior preview focuses matched doppen card", /^doppen/i.test(expandedPreviewItem?.title || "") && expandedPreviewItem.expandedCards === 1, JSON.stringify(expandedPreviewItem)),
       assertion("behavior preview collapse is card header action", expandedPreviewItem?.collapseActions?.includes("Collapse card") && !expandedPreviewItem.openLabel, JSON.stringify(expandedPreviewItem)),
-      assertion("behavior preview affordance uses Expand full card copy", (beforeMore.dictionaryUi?.searchOpenLabels || []).every((label) => /^Expand full card$/i.test(label)), JSON.stringify(beforeMore.dictionaryUi?.searchOpenLabels || [])),
+      assertion("behavior preview rows omit explicit expand affordance", (beforeMore.dictionaryUi?.searchOpenLabels || []).length === 0, JSON.stringify(beforeMore.dictionaryUi?.searchOpenLabels || [])),
     );
 
     const kopClicked = findAndClickLookupWord("kop", fixture.videoId);
@@ -1279,6 +1279,7 @@ function assertSpanSelectionUi() {
     assertion("span drag previews draft range before release", drag.draftWords >= 2, JSON.stringify(drag)),
     assertion("span selection opens translation card", spanGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span translation keeps original words clickable", spanGeometry.dictionaryUi?.spanWordCount >= 2, JSON.stringify(spanGeometry.dictionaryUi)),
+    assertion("span translation offers start learning action", (spanGeometry.dictionaryUi?.spanActions || []).includes("Start Learning"), JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span card omits redundant context line", spanGeometry.dictionaryUi?.hasSpanContext === false, JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span word lookup keeps selected phrase pinned", spanWordLookupGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanWordLookupGeometry.dictionaryUi)),
     assertion("span word lookup switches to clicked word", spanWordLookupGeometry.dictionaryUi?.lookupWord === clickedSpanWord.lookupWord, JSON.stringify({ clickedSpanWord, dictionaryUi: spanWordLookupGeometry.dictionaryUi })),
@@ -1363,7 +1364,7 @@ function assertDictionaryCardUi() {
     assertion("dictionary card anatomy has title and chips", before.dictionaryUi?.cards?.every((card) => card.title && card.chips > 0), JSON.stringify(before.dictionaryUi?.cards || [])),
     assertion("dictionary card anatomy includes definition number chip", before.dictionaryUi?.cards?.every((card) => card.chipLabels?.some((label) => /^#\d+$/.test(label))), JSON.stringify(before.dictionaryUi?.cards || [])),
     assertion("dictionary audio button appears for ready and resolvable card audio", before.dictionaryUi?.cards?.[0]?.audioButtons === 1 && before.dictionaryUi?.cards?.[1]?.audioButtons === 1 && before.dictionaryUi?.cards?.[2]?.audioButtons === 0, JSON.stringify(before.dictionaryUi?.cards || [])),
-    assertion("dictionary not-started actions show Learn only", firstCardActions.length === 1 && firstCardActions[0] === "Learn", firstCardActions.join("|")),
+    assertion("dictionary not-started actions show Start Learning only", firstCardActions.length === 1 && firstCardActions[0] === "Start Learning", firstCardActions.join("|")),
     assertion("dictionary progress actions do not show Known", !allProgressActions.includes("Known"), allProgressActions.join("|")),
     assertion("dictionary review actions show four grades", ["Again", "Hard", "Good", "Easy"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),
     assertion("dictionary frozen card has no progress row", frozenCard && (frozenCard.progressActions || []).length === 0, JSON.stringify(frozenCard || {})),
@@ -2441,6 +2442,7 @@ function readGeometrySnapshot() {
         spanTranslationPresent: Boolean(dictionary.querySelector(".af-span-translation-card")),
         hasSpanContext: Boolean(dictionary.querySelector(".af-span-source")?.textContent?.trim()),
         spanWordCount: dictionary.querySelectorAll(".af-span-word").length,
+        spanActions: Array.from(dictionary.querySelectorAll(".af-span-actions button")).map((button) => button.textContent.trim()),
         spanWords: Array.from(dictionary.querySelectorAll(".af-span-word")).map((word) => ({
           text: word.textContent || "",
           lookupWord: word.dataset.afLookupWord || "",

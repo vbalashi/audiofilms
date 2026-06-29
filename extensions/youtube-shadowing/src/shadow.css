@@ -2934,6 +2934,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   margin-top: 12px;
 }
 
+.af-span-actions button {
+  flex: 1 1 150px;
+}
+
 .af-span-word {
   padding: 4px 7px;
   color: var(--af-accent);
@@ -2958,6 +2962,14 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-span-clear-button {
   margin-top: 0;
+}
+
+.af-span-save-button {
+  margin-top: 0;
+}
+
+.af-span-save-feedback {
+  margin-top: 8px;
 }
 
 .af-ribbon-controls button:hover:not(:disabled) {

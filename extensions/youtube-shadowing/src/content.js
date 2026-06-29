@@ -2876,7 +2876,7 @@
   }
 
   function openIssueReportDialog(options = {}) {
-    const report = formatIssueReport();
+    const report = formatIssueReport(options.reportOptions || {});
     recordDebugEvent("issue-marked", {
       navigationEventId: state.navigationEvents.at(-1)?.id || null,
       currentIndex: state.currentIndex,
@@ -3249,6 +3249,9 @@
       extensionBuildInfo: extensionBuildInfo(),
       backendBuildInfo: state.backendBuildInfo,
       backendBuildError: state.backendBuildError,
+      ...(options.extraDiagnostics && typeof options.extraDiagnostics === "object"
+        ? options.extraDiagnostics
+        : {}),
     }), null, 2);
   }
 
@@ -3968,6 +3971,121 @@
     render();
   }
 
+  async function saveSelectedSpanCard(span) {
+    if (!span || state.selectedSpan !== span) return;
+    if (state.accountStatus !== "signed-in") {
+      state.selectedSpan = {
+        ...span,
+        saveStatus: "idle",
+        saveError: "Connect 2000NL to save selected phrases.",
+      };
+      render();
+      return;
+    }
+
+    const basePayload = selectedSpanGeneratedEntryPayload(span);
+    if (!basePayload.ok) {
+      state.selectedSpan = {
+        ...span,
+        saveStatus: "idle",
+        saveError: basePayload.error,
+      };
+      render();
+      return;
+    }
+
+    state.selectedSpan = {
+      ...span,
+      saveStatus: "saving",
+      saveError: "",
+    };
+    const savingSpan = state.selectedSpan;
+    render();
+
+    try {
+      const draft = await postDictionaryCommand("dict-generated-draft", basePayload.value);
+      if (state.selectedSpan !== savingSpan) return;
+      const draftPayload = generatedDraftPayload(draft?.draft);
+      if (!draftPayload) {
+        throw new Error("Generated draft is missing candidate identity.");
+      }
+      const savePayload = selectedSpanGeneratedEntryPayload(savingSpan, draft?.draft, "generated-entry-save");
+      if (!savePayload.ok) {
+        throw new Error(savePayload.error);
+      }
+      const saved = await postDictionaryCommand("dict-generated-save", savePayload.value);
+      const entryId = saved?.entryId;
+      if (entryId) {
+        await postDictionaryCommand("dict-action", {
+          action: "start-learning",
+          entryId,
+          clientEventId: createMutationTurnId(),
+          sourceContext: selectedSpanSourceContext(savingSpan, entryId, "start-learning"),
+        });
+      }
+      if (state.selectedSpan !== savingSpan) return;
+      state.selectedSpan = {
+        ...savingSpan,
+        saveStatus: "saved",
+        saveError: "",
+        savedEntryId: entryId || "",
+      };
+      render();
+    } catch (error) {
+      if (state.selectedSpan !== savingSpan) return;
+      state.selectedSpan = {
+        ...savingSpan,
+        saveStatus: "idle",
+        saveError: error instanceof Error ? error.message : String(error),
+      };
+      render();
+    }
+  }
+
+  function selectedSpanGeneratedEntryPayload(span, draft = null, action = "generated-entry-draft") {
+    const phrase = state.phrases[span.phraseIndex] || state.phrases[state.currentIndex];
+    const source = getSelectedPracticeSource();
+    const language =
+      source?.loadedTranscriptResult?.languageCode ||
+      source?.languageCode ||
+      state.transcriptResult?.languageCode ||
+      "auto";
+    if (!span.text) return { ok: false, error: "Missing selected phrase." };
+    if (!language || language === "auto") return { ok: false, error: "Missing source language." };
+    return {
+      ok: true,
+      value: {
+        clickedForm: span.text,
+        sourceLanguageCode: language,
+        contextText: span.contextText || phraseDisplayText(phrase),
+        sourceContext: selectedSpanSourceContext(span, "", action),
+        ...(generatedDraftPayload(draft) || {}),
+      },
+    };
+  }
+
+  function selectedSpanSourceContext(span, entryId = "", action = "generated-entry-draft") {
+    return buildDictionaryActionSourceContext(
+      selectedSpanSourceBinding(span),
+      {
+        id: entryId || "generated-span-draft",
+        entryId,
+        clickedForm: span.text,
+        headword: span.text,
+      },
+      action,
+    );
+  }
+
+  function selectedSpanSourceBinding(span) {
+    return createDictionarySourceBinding(span.text, span.phraseIndex, {
+      tokenIndex: span.startTokenIndex,
+      charStart: span.charStart,
+      charEnd: span.charEnd,
+      originalToken: span.text,
+    });
+  }
+
   function selectPhraseSpan(draft) {
     const phrase = state.phrases[draft.phraseIndex];
     if (!phrase) return false;
@@ -4172,9 +4290,28 @@
     }
 
     const actions = appendElement(card, "div", "af-span-actions");
+    if (span.status === "ready") {
+      const save = appendButton(actions, selectedSpanSaveLabel(span), "afSpanSave");
+      save.className = "af-primary-button af-span-save-button";
+      save.disabled = span.saveStatus === "saving" || span.saveStatus === "saved";
+      save.addEventListener("click", () => saveSelectedSpanCard(span));
+    }
     const clear = appendButton(actions, "Clear selection", "afSpanClear");
-    clear.className = "af-secondary-button af-span-clear-button";
+    clear.className = "af-secondary-inline-button af-span-clear-button";
     clear.addEventListener("click", clearSelectedSpan);
+    if (span.saveError) {
+      const error = appendElement(card, "p", "af-source-option-error af-span-save-feedback");
+      error.textContent = span.saveError;
+    } else if (span.saveStatus === "saved") {
+      const status = appendElement(card, "p", "af-dictionary-copy af-span-save-feedback");
+      status.textContent = "Started learning.";
+    }
+  }
+
+  function selectedSpanSaveLabel(span) {
+    if (span?.saveStatus === "saving") return "Saving...";
+    if (span?.saveStatus === "saved") return "Saved";
+    return "Start Learning";
   }
 
   function renderSelectedSpanTitle(parent, span) {
@@ -4313,7 +4450,7 @@
       row.tabIndex = isExpanded ? -1 : 0;
       if (!isExpanded) {
         row.setAttribute("role", "button");
-        row.setAttribute("aria-label", `${dictionarySearchOpenLabel(item)}: ${dictionarySearchItemTitle(item)}`);
+        row.setAttribute("aria-label", `Open card: ${dictionarySearchItemTitle(item)}`);
       }
       if (isExpanded) {
         renderDictionarySearchExpanded(row, loadedState, () => toggleDictionarySearchItem(selectedWord, group, item, itemKey));
@@ -4328,13 +4465,6 @@
           const copy = appendElement(body, "p", "af-dictionary-search-item-text");
           renderHighlightedText(copy, text, item?.match?.matchedText);
         }
-      }
-      if (!isExpanded) {
-        const affordance = appendElement(row, "button", "af-dictionary-search-open");
-        affordance.type = "button";
-        affordance.textContent = dictionarySearchOpenLabel(item);
-        affordance.setAttribute("aria-expanded", "false");
-        affordance.addEventListener("click", () => toggleDictionarySearchItem(selectedWord, group, item, itemKey));
       }
       if (!isExpanded) {
         row.addEventListener("click", (event) => {
@@ -4408,10 +4538,6 @@
 
   function dictionarySearchItemText(item) {
     return item?.field?.text || item?.entry?.summaryDefinition || item?.match?.matchedText || "";
-  }
-
-  function dictionarySearchOpenLabel(item) {
-    return item?.kind === "generated" || item?.entry?.draft ? "Expand draft" : "Expand full card";
   }
 
   function renderDictionarySearchExpanded(parent, loadedState, onCollapse) {
@@ -4903,7 +5029,7 @@
   function renderCardActionMenu(parent, card) {
     const menu = appendElement(parent, "div", "af-card-action-menu");
     menu.setAttribute("role", "menu");
-    const wrongTranslation = appendButton(menu, "Report wrong translation", "afCardReportWrongTranslation");
+    const wrongTranslation = appendButton(menu, "Inaccurate translation", "afCardReportWrongTranslation");
     wrongTranslation.setAttribute("role", "menuitem");
     wrongTranslation.addEventListener("click", () => reportCardTranslationIssue(card));
     const translationOk = appendButton(menu, "Translation looks right", "afCardTranslationOk");
@@ -4921,12 +5047,80 @@
 
   function reportCardTranslationIssue(card) {
     state.cardMenuOpenId = "";
+    const issue = dictionaryCardTranslationIssueSnapshot(card);
     openIssueReportDialog({
       source: "dictionary-card-menu",
       category: "translation",
-      description: `Dictionary card translation looks wrong.\n\nCard: ${card?.headword || card?.clickedForm || ""}\nEntry: ${card?.entryId || card?.id || ""}\nClicked form: ${card?.clickedForm || ""}`,
+      description: `Dictionary card translation is inaccurate.\n\nCard: ${card?.headword || card?.clickedForm || ""}\nEntry: ${card?.entryId || card?.id || ""}\nClicked form: ${card?.clickedForm || ""}`,
       expectedBehavior: "Translation should match the selected dictionary sense and examples.",
+      reportOptions: {
+        extraDiagnostics: {
+          dictionaryCardTranslationIssue: issue,
+        },
+      },
     });
+  }
+
+  function dictionaryCardTranslationIssueSnapshot(card) {
+    const selectedWord = state.selectedWord || {};
+    const currentPhrase = describePhraseAtIndex(state.currentIndex);
+    const loadedTranslation = card?.id ? selectedWord.translationsByCardId?.[card.id] : null;
+    return {
+      kind: "dictionary-card-translation-issue",
+      schemaVersion: 1,
+      card: compactDictionaryCardForIssue(card),
+      loadedTranslation: compactTranslationForIssue(loadedTranslation),
+      lookup: {
+        selectedWord: selectedWord.word || "",
+        clickedForm: card?.clickedForm || selectedWord.word || "",
+        phraseIndex: selectedWord.phraseIndex ?? state.currentIndex,
+        sourceLanguageCode: selectedWord.language || "",
+        contextText: selectedWord.contextText || currentPhrase?.text || "",
+      },
+    };
+  }
+
+  function compactDictionaryCardForIssue(card) {
+    if (!card) return null;
+    return {
+      id: card.id || "",
+      entryId: card.entryId || "",
+      headword: card.headword || "",
+      clickedForm: card.clickedForm || "",
+      language: card.language || "",
+      meaningId: card.meaningId ?? null,
+      partOfSpeech: card.partOfSpeech || "",
+      headwordTranslation: cleanTranslationText(card.headwordTranslation),
+      summary: {
+        definition: card.summary?.definition || "",
+        definitionTranslation: cleanTranslationText(card.summary?.definitionTranslation),
+        example: card.summary?.example || "",
+        exampleTranslation: cleanTranslationText(card.summary?.exampleTranslation),
+      },
+      sections: Array.isArray(card.sections)
+        ? card.sections.map((section, index) => ({
+            id: section?.id || `section-${index + 1}`,
+            kind: section?.kind || "",
+            text: section?.text || "",
+            translation: cleanTranslationText(section?.translation),
+            sourcePath: section?.sourcePath || "",
+          }))
+        : [],
+      translation: card.translation || null,
+    };
+  }
+
+  function compactTranslationForIssue(translation) {
+    if (!translation) return null;
+    return {
+      status: translation.status || "",
+      targetLanguageCode: translation.targetLanguageCode || translation.targetLang || "",
+      translationId: translation.translationId || "",
+      translationPolicyVersion: translation.translationPolicyVersion || "",
+      overlay: translation.overlay || null,
+      note: translation.note || "",
+      error: translation.error || null,
+    };
   }
 
   function reportCardDictionaryIssue(card) {
@@ -6356,7 +6550,7 @@
           },
           phase: "encountered",
           progressActions: [
-            progressDisplayAction("learn", "Learn", "start-learning"),
+            progressDisplayAction("learn", "Start Learning", "start-learning"),
           ],
         }),
         mockDictionaryCard({
