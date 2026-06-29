@@ -132,12 +132,15 @@ describe('dictionary overlay V2 projection', () => {
     );
 
     expect(card.audio).toEqual({
+      state: 'ready',
+      kind: 'curated',
       primaryUrl: 'https://2000.dilum.io/audio/nl/l/lopen.mp3',
       variants: {
         nl: 'https://2000.dilum.io/audio/nl/l/lopen.mp3',
         be: 'https://cdn.example/audio/be/lopen.mp3',
       },
       source: '2000nl',
+      format: 'audio/mpeg',
     });
   });
 

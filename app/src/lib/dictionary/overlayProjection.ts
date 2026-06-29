@@ -207,9 +207,12 @@ function normalizedAudio(value: unknown, audioBaseUrl?: string): OverlayAudio | 
   const primaryUrl = variants.nl || Object.values(variants)[0];
   if (!primaryUrl) return undefined;
   return {
+    state: 'ready',
+    kind: 'curated',
     primaryUrl,
     ...(Object.keys(variants).length ? { variants } : {}),
     source: '2000nl',
+    format: 'audio/mpeg',
   };
 }
 

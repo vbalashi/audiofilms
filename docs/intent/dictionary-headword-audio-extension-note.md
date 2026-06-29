@@ -39,9 +39,12 @@ Prefer a resolved, display-oriented audio object in the AudioFilms overlay card:
 
 ```ts
 type DictionaryOverlayCardAudio = {
+  state: "ready";
+  kind: "curated";
   primaryUrl: string;
   variants?: Record<string, string>;
   source: "2000nl";
+  format?: "audio/mpeg";
 };
 ```
 
@@ -66,12 +69,44 @@ First implementation decision:
 
 - 2000NL platform lookup remains the dictionary/audio authority.
 - AudioFilms projects `entry.content.audioLinks` into `card.audio`.
+- Current curated 2000NL audio is represented as
+  `card.audio.state = "ready"` and `card.audio.kind = "curated"`.
 - AudioFilms resolves relative `/audio/...` links with
   `DICTIONARY_2000NL_AUDIO_BASE_URL` when configured, otherwise with the
   `DICTIONARY_2000NL_API_BASE` origin.
 - The YouTube extension plays `card.audio.primaryUrl` directly.
 - No AudioFilms `/api/dict/audio` proxy is added unless a concrete CORS,
   authorization, analytics, transformation, or URL-hiding requirement appears.
+
+## Generated / Missing Audio Follow-Up
+
+The first slice covers only curated 2000NL pronunciation assets that already
+exist. It does not cover manual or generated dictionary cards where audio has
+not been materialized yet.
+
+For missing/generated audio, treat audio as an asset lifecycle rather than only
+a URL:
+
+- `ready`: audio already exists and the card includes a playable URL.
+- `resolvable`: audio does not exist yet, but the backend can create or fetch
+  it after explicit user intent.
+- `unavailable`: audio cannot be provided for this card or language.
+
+Plain `/api/dict/lookup` must remain read-only and must not trigger paid TTS or
+storage side effects. For a future `resolvable` card, lookup should expose an
+opaque, short-lived resolve token. On speaker click, the client should call a
+backend-owned resolver such as `POST /api/audio/resolve`; the backend validates
+the token, checks the asset cache, generates and stores audio only if missing,
+and returns either a ready URL or a generating status with retry metadata.
+
+Generated/private audio should normally be delivered from object storage or CDN
+through a public URL for public dictionary assets or a short-lived signed URL
+for private/user assets. Binary streaming through AudioFilms should remain a
+fallback only, and would need Range-request support.
+
+This follow-up should be tracked separately from the curated-audio slice because
+it needs backend/storage/rate-limit decisions and likely 2000NL platform
+ownership for dictionary-card audio generation.
 
 ## Endpoint Decision
 

@@ -61,9 +61,12 @@ export type DictionaryOverlayCardV2Translation = {
 };
 
 export type DictionaryOverlayCardAudio = {
+  state: 'ready';
+  kind: 'curated';
   primaryUrl: string;
   variants?: Record<string, string>;
   source: '2000nl';
+  format?: 'audio/mpeg';
 };
 
 export type DictionaryOverlayCardV2 = {

@@ -6016,11 +6016,14 @@
           exampleTranslation: "После пожара дом снова отстроили.",
           partOfSpeech: "ww",
           audio: {
+            state: "ready",
+            kind: "curated",
             primaryUrl: "https://2000.dilum.io/audio/nl/o/opbouwen.mp3",
             variants: {
               nl: "https://2000.dilum.io/audio/nl/o/opbouwen.mp3",
             },
             source: "2000nl",
+            format: "audio/mpeg",
           },
           phase: "encountered",
           progressActions: [
