@@ -191,6 +191,11 @@ function runAsrPipeline(job) {
 
 function buildSubtitleResult({ preview, language, engine, model, textSource, refresh }) {
   const practicePhrases = (preview.practicePhrases || []).map((phrase, index) => ({ ...phrase, id: index }));
+  const sourcePhrases = textSource === "asr"
+    ? practicePhrases
+    : Array.isArray(preview.sourcePhrases) && preview.sourcePhrases.length
+      ? preview.sourcePhrases.map((phrase, index) => ({ ...phrase, id: index }))
+      : practicePhrases;
   const suspiciousLeadingWordGapCount = Number(preview.summary?.suspiciousLeadingWordGapCount || 0);
   const qualityFlags = [
     ...(textSource !== "asr" && practicePhrases.some((phrase) => phrase.timingEvidence !== "asr-word-alignment")
@@ -207,7 +212,7 @@ function buildSubtitleResult({ preview, language, engine, model, textSource, ref
       : []),
   ];
   return {
-    phrases: practicePhrases,
+    phrases: sourcePhrases,
     practicePhrases,
     language,
     meta: {

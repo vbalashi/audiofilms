@@ -176,6 +176,9 @@ function formatDuration(seconds) {
 
 function fetchSourceCaptions(sourceKind) {
   const sourceLabel = sourceKind === "auto" ? "automatic" : "manual";
+  const backendCaptions = fetchBackendPracticeCaptions(sourceKind);
+  if (backendCaptions) return backendCaptions;
+
   console.log(`[local-asr] Fetching ${sourceLabel} captions with yt-dlp metadata`);
   const infoText = execFileSync(ytDlpPath, [
     "--skip-download",
@@ -217,6 +220,61 @@ function fetchSourceCaptions(sourceKind) {
     durationSec: info.duration || null,
     cues,
   };
+}
+
+function fetchBackendPracticeCaptions(sourceKind) {
+  const apiBase = String(process.env.AUDIOFILMS_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_AUDIOFILMS_API_BASE || "").replace(/\/+$/, "");
+  if (!apiBase) return null;
+
+  const url = new URL("/api/get-subs", `${apiBase}/`);
+  url.searchParams.set("videoId", videoId);
+  url.searchParams.set("lang", language);
+  url.searchParams.set("sourceKind", sourceKind);
+
+  try {
+    console.log(`[local-asr] Fetching ${sourceKind} captions from ${url.origin}`);
+    const payload = JSON.parse(fetchText(url.toString()));
+    const sourcePhrases = Array.isArray(payload.phrases) ? payload.phrases : [];
+    const practicePhrases = Array.isArray(payload.practicePhrases) ? payload.practicePhrases : [];
+    const cues = sourcePhrases
+      .map((phrase, index) => ({
+        id: Number.isFinite(Number(phrase.id)) ? Number(phrase.id) : index,
+        start: Number(phrase.startSec),
+        end: Number(phrase.endSec),
+        text: String(phrase.text || ""),
+      }))
+      .filter((cue) => cue.text && Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.end > cue.start);
+    if (!cues.length) return null;
+
+    return {
+      videoId,
+      language: payload.language || language,
+      sourceKind,
+      trackKey: payload.meta?.selectedTrackId || payload.meta?.actualTrackId || `${sourceKind}:${payload.meta?.retrievalPath || "backend"}`,
+      title: payload.title || "",
+      durationSec: payload.durationSec || null,
+      cues,
+      sourcePhrases: cues.map((cue, index) => ({
+        id: index,
+        startSec: cue.start,
+        endSec: cue.end,
+        text: cue.text,
+      })),
+      practicePhrases: practicePhrases
+        .map((phrase, index) => ({
+          ...phrase,
+          id: Number.isFinite(Number(phrase.id)) ? Number(phrase.id) : index,
+          startSec: Number(phrase.startSec),
+          endSec: Number(phrase.endSec),
+          text: String(phrase.text || ""),
+        }))
+        .filter((phrase) => phrase.text && Number.isFinite(phrase.startSec) && Number.isFinite(phrase.endSec) && phrase.endSec > phrase.startSec),
+      meta: payload.meta || {},
+    };
+  } catch (error) {
+    console.warn(`[local-asr] Backend captions unavailable; falling back to yt-dlp (${error instanceof Error ? error.message : String(error)})`);
+    return null;
+  }
 }
 
 function chooseTrackKey(sourceMap, lang, preferOriginalAuto = false) {

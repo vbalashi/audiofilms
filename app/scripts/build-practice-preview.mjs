@@ -64,7 +64,9 @@ function buildPreview(manual, asr) {
     match.manualIndex,
     { ...asrTokens[match.asrIndex], asrIndex: match.asrIndex },
   ]));
-  const sentenceUnits = buildSentenceUnits(manual.cues || [], manualTokens);
+  const sentenceUnits = Array.isArray(manual.practicePhrases) && manual.practicePhrases.length
+    ? buildPracticeUnitsFromPracticePhrases(manual.practicePhrases, manualTokens)
+    : buildSentenceUnits(manual.cues || [], manualTokens);
   const practicePhrases = sentenceUnits.map((unit, index) => {
     const timing = timingForUnit(unit, manualTokens, asrByManual);
     return {
@@ -77,6 +79,13 @@ function buildPreview(manual, asr) {
       localAsrDensity: timing.localAsrDensity,
       asrSpanSec: timing.asrSpanSec,
       sourceCueIds: unit.sourceCueIds,
+      ...(unit.displayText ? { displayText: unit.displayText } : {}),
+      ...(Number.isFinite(unit.displayStartChar) ? { displayStartChar: unit.displayStartChar } : {}),
+      ...(Number.isFinite(unit.displayEndChar) ? { displayEndChar: unit.displayEndChar } : {}),
+      ...(unit.translationText ? { translationText: unit.translationText } : {}),
+      ...(unit.displaySegmentId ? { displaySegmentId: unit.displaySegmentId } : {}),
+      ...(unit.segmentRole ? { segmentRole: unit.segmentRole } : {}),
+      ...(Array.isArray(unit.timingFlags) && unit.timingFlags.length ? { timingFlags: unit.timingFlags } : {}),
     };
   });
 
@@ -90,6 +99,14 @@ function buildPreview(manual, asr) {
     model: asr.model || model,
     manualTrackKey: manual.trackKey,
     title: manual.title,
+    sourcePhrases: Array.isArray(manual.sourcePhrases) && manual.sourcePhrases.length
+      ? manual.sourcePhrases
+      : (manual.cues || []).map((cue, index) => ({
+        id: index,
+        startSec: cue.start,
+        endSec: cue.end,
+        text: cue.text,
+      })),
     summary: {
       sourceCueCount: manual.cues?.length || 0,
       practicePhraseCount: practicePhrases.length,
@@ -103,6 +120,52 @@ function buildPreview(manual, asr) {
     },
     practicePhrases,
   };
+}
+
+function buildPracticeUnitsFromPracticePhrases(practicePhrases, manualTokens) {
+  const units = [];
+  let cursor = 0;
+  for (const phrase of practicePhrases) {
+    const words = splitWords(phrase.text).map((word) => normalizeToken(word.raw)).filter(keepToken);
+    const span = findTokenSpan(words, manualTokens, cursor);
+    if (span) cursor = span.end + 1;
+    units.push({
+      text: cleanupSentence(phrase.text),
+      tokenStart: span?.start ?? null,
+      tokenEnd: span?.end ?? null,
+      sourceCueIds: span
+        ? Array.from(new Set(manualTokens.slice(span.start, span.end + 1).map((token) => token.cueId)))
+        : [],
+      startSec: Number(phrase.startSec),
+      endSec: Number(phrase.endSec),
+      displayText: phrase.displayText,
+      displayStartChar: phrase.displayStartChar,
+      displayEndChar: phrase.displayEndChar,
+      translationText: phrase.translationText,
+      displaySegmentId: phrase.displaySegmentId,
+      segmentRole: phrase.segmentRole,
+      timingFlags: phrase.timingFlags,
+    });
+  }
+  return units;
+}
+
+function findTokenSpan(words, manualTokens, cursor) {
+  if (!words.length) return null;
+  for (let start = Math.max(0, cursor); start < manualTokens.length; start += 1) {
+    let offset = 0;
+    while (
+      offset < words.length &&
+      manualTokens[start + offset] &&
+      manualTokens[start + offset].normalized === words[offset]
+    ) {
+      offset += 1;
+    }
+    if (offset === words.length) {
+      return { start, end: start + words.length - 1 };
+    }
+  }
+  return null;
 }
 
 function tokenizeManualCues(cues) {
@@ -345,8 +408,8 @@ function timingForUnit(unit, manualTokens, asrByManual) {
   const coverage = ratio(alignedWords.length, tokens.length);
   const first = alignedWords[0];
   const last = alignedWords[alignedWords.length - 1];
-  const fallbackStart = tokens[0]?.cueStart ?? 0;
-  const fallbackEnd = tokens[tokens.length - 1]?.cueEnd ?? fallbackStart;
+  const fallbackStart = tokens[0]?.cueStart ?? unit.startSec ?? 0;
+  const fallbackEnd = tokens[tokens.length - 1]?.cueEnd ?? unit.endSec ?? fallbackStart;
   const fallbackDuration = fallbackEnd - fallbackStart;
   const asrSpanSec = first && last ? last.end - first.start : 0;
   const asrSpanTokenCount = first && last ? last.asrIndex - first.asrIndex + 1 : 0;
