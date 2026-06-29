@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 
 const EXTENSION_ID = "hhdkchoccmikoefhenobdjipgdppdpoc";
 const SMOKE_ARTIFACT_DIR = "extensions/youtube-shadowing/.smoke-artifacts";
+const DICTIONARY_MOCK_STORAGE_KEY = "afShadowingDictionaryMock";
 
 const FIXTURES = [
   {
@@ -280,6 +281,9 @@ if (!shouldReloadOnly && !shouldRunFullSuite && !fixtureFilter) {
   console.log("Use --only-dictionary-behavior for focused dictionary interaction regression checks.");
 }
 
+installDictionaryMockCleanupHandlers();
+clearDictionaryMockState();
+
 if (shouldRunLocalBackendCheck) {
   checkBackend();
 }
@@ -287,6 +291,7 @@ if (shouldRunLocalBackendCheck) {
 if (shouldReloadExtension) {
   reloadExtension();
   if (shouldReloadOnly) {
+    clearDictionaryMockState();
     console.log(`Reloaded extension ${EXTENSION_ID}.`);
     process.exit(0);
   }
@@ -364,17 +369,19 @@ if ((shouldRunFullSuite && !fixtureFilter && !shouldOnlyBackendOff && !shouldOnl
 
 const failed = results.filter((result) => !result.ok);
 if (failed.length) {
+  clearDictionaryMockState();
   console.error(`\n${failed.length} fixture(s) failed.`);
   process.exit(1);
 }
 
+clearDictionaryMockState();
 console.log(`\nAll ${results.length} YouTube extension ${shouldRunFullSuite ? "regression" : "smoke"} fixture(s) passed.`);
 
 function runFixture(fixture) {
   const url = `https://www.youtube.com/watch?v=${fixture.videoId}`;
   navigate(url);
   removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
-  removeLocalStorageItem("afShadowingDictionaryMock");
+  removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
   reloadTab();
 
   const snapshot = waitForSnapshot(fixture.videoId, waitMs);
@@ -554,15 +561,11 @@ function runAsrEdgeScenario() {
 function runDictionarySourceBindingScenario() {
   const fixture = DICTIONARY_SOURCE_BINDING_FIXTURE;
   const assertions = [];
-  let previousDictionaryMock = null;
-  let hadPreviousDictionaryMock = false;
 
   try {
     navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
-    previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
-    hadPreviousDictionaryMock = previousDictionaryMock !== null;
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
-    setLocalStorageItem("afShadowingDictionaryMock", "cards");
+    setLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY, "cards");
     reloadTab();
     clearDictionaryMockCommands();
     const initial = waitForSnapshot(fixture.videoId, waitMs);
@@ -614,11 +617,7 @@ function runDictionarySourceBindingScenario() {
     };
   } finally {
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
-    if (hadPreviousDictionaryMock) {
-      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
-    } else {
-      removeLocalStorageItem("afShadowingDictionaryMock");
-    }
+    removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
   }
 }
 
@@ -629,19 +628,15 @@ function runDictionaryUiScenario() {
     expect: {},
   };
   const assertions = [];
-  let previousDictionaryMock = null;
-  let hadPreviousDictionaryMock = false;
 
   try {
     resizeChrome(900, 900);
     navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
-    previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
-    hadPreviousDictionaryMock = previousDictionaryMock !== null;
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
     if (dictionaryUiMock && dictionaryUiMock !== "off") {
-      setLocalStorageItem("afShadowingDictionaryMock", dictionaryUiMock);
+      setLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY, dictionaryUiMock);
     } else {
-      removeLocalStorageItem("afShadowingDictionaryMock");
+      removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
     }
     reloadTab();
     const initial = waitForSnapshot(fixture.videoId, waitMs);
@@ -711,11 +706,7 @@ function runDictionaryUiScenario() {
     };
   } finally {
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
-    if (hadPreviousDictionaryMock) {
-      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
-    } else {
-      removeLocalStorageItem("afShadowingDictionaryMock");
-    }
+    removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
   }
 }
 
@@ -727,16 +718,12 @@ function runDictionaryBehaviorScenario() {
   };
   const assertions = [];
   const evidencePaths = [];
-  let previousDictionaryMock = null;
-  let hadPreviousDictionaryMock = false;
 
   try {
     resizeChrome(900, 900);
     navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
-    previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
-    hadPreviousDictionaryMock = previousDictionaryMock !== null;
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
-    removeLocalStorageItem("afShadowingDictionaryMock");
+    removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
     reloadTab();
     const initial = waitForSnapshot(fixture.videoId, waitMs);
     pauseVideo();
@@ -835,11 +822,7 @@ function runDictionaryBehaviorScenario() {
     };
   } finally {
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
-    if (hadPreviousDictionaryMock) {
-      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
-    } else {
-      removeLocalStorageItem("afShadowingDictionaryMock");
-    }
+    removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
   }
 }
 
@@ -876,9 +859,7 @@ function runGeometryScenario() {
   resizeChrome(1344, 900);
   navigate("https://www.youtube.com/watch?v=4EE7m94mJpk");
   waitForSnapshot("4EE7m94mJpk", waitMs);
-  const previousDictionaryMock = getLocalStorageItem("afShadowingDictionaryMock");
-  const hadPreviousDictionaryMock = previousDictionaryMock !== null;
-  setLocalStorageItem("afShadowingDictionaryMock", "cards");
+  setLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY, "cards");
   try {
     reloadTab();
     waitForSnapshot("4EE7m94mJpk", waitMs);
@@ -957,11 +938,7 @@ function runGeometryScenario() {
       },
     };
   } finally {
-    if (hadPreviousDictionaryMock) {
-      setLocalStorageItem("afShadowingDictionaryMock", previousDictionaryMock);
-    } else {
-      removeLocalStorageItem("afShadowingDictionaryMock");
-    }
+    removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
   }
 }
 
@@ -1279,13 +1256,15 @@ function assertControlHierarchyUi() {
 }
 
 function assertSpanSelectionUi() {
+  const phraseForSpan = ensureCurrentPhraseHasSpanWords();
   const escapeCancel = previewThenEscapeFirstPhraseSpan();
   const outsideCancel = previewThenReleaseOutsideFirstPhraseSpan();
   const drag = dragFirstPhraseSpan();
   sleep(900);
   const spanGeometry = readGeometrySnapshot();
-  clickShadowButton(".af-span-word");
-  const spanWordLookupGeometry = waitForGeometryDictionaryCards(5000);
+  removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
+  const clickedSpanWord = clickShadowButton(".af-span-word");
+  const spanWordLookupGeometry = waitForGeometryDictionaryLookup(clickedSpanWord.lookupWord, 5000);
   clickShadowButton("[data-af-span-clear]");
   sleep(650);
   const clearedGeometry = readGeometrySnapshot();
@@ -1293,6 +1272,7 @@ function assertSpanSelectionUi() {
   waitForDictionary(5000);
 
   return [
+    assertion("span selection has phrase with at least two words", phraseForSpan.ok === true, JSON.stringify(phraseForSpan)),
     assertion("span draft clears on Escape", escapeCancel.draftWordsBefore >= 2 && escapeCancel.draftWordsAfter === 0, JSON.stringify(escapeCancel)),
     assertion("span draft clears on outside pointerup", outsideCancel.draftWordsBefore >= 2 && outsideCancel.draftWordsAfter === 0, JSON.stringify(outsideCancel)),
     assertion("span drag selected consecutive words", drag.selected === true, JSON.stringify(drag)),
@@ -1301,10 +1281,23 @@ function assertSpanSelectionUi() {
     assertion("span translation keeps original words clickable", spanGeometry.dictionaryUi?.spanWordCount >= 2, JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span card omits redundant context line", spanGeometry.dictionaryUi?.hasSpanContext === false, JSON.stringify(spanGeometry.dictionaryUi)),
     assertion("span word lookup keeps selected phrase pinned", spanWordLookupGeometry.dictionaryUi?.spanTranslationPresent === true, JSON.stringify(spanWordLookupGeometry.dictionaryUi)),
-    assertion("span word lookup renders dictionary cards below pinned phrase", spanWordLookupGeometry.dictionaryUi?.overlayCardCount > 0, JSON.stringify(spanWordLookupGeometry.dictionaryUi)),
+    assertion("span word lookup switches to clicked word", spanWordLookupGeometry.dictionaryUi?.lookupWord === clickedSpanWord.lookupWord, JSON.stringify({ clickedSpanWord, dictionaryUi: spanWordLookupGeometry.dictionaryUi })),
+    assertion("span word lookup does not keep unrelated previous cards", spanWordLookupGeometry.dictionaryUi?.staleCardVisible === false, JSON.stringify({ clickedSpanWord, dictionaryUi: spanWordLookupGeometry.dictionaryUi })),
     assertion("span selection highlights phrase words", spanGeometry.primaryUi?.spanSelectedWords >= 2, JSON.stringify(spanGeometry.primaryUi)),
     assertion("clear span selection removes pinned phrase", clearedGeometry.dictionaryUi?.spanTranslationPresent === false, JSON.stringify(clearedGeometry.dictionaryUi)),
   ];
+}
+
+function ensureCurrentPhraseHasSpanWords() {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const words = currentPhraseLookupWords();
+    if (words.filter((word) => String(word.lookupWord || "").length > 1).length >= 2) {
+      return { ok: true, attempt, words };
+    }
+    clickShadowButton("[data-af-next]");
+    sleep(600);
+  }
+  return { ok: false, words: currentPhraseLookupWords() };
 }
 
 function assertImproveTimingUi() {
@@ -1384,7 +1377,7 @@ function assertDictionaryCardUi() {
 }
 
 function assertGeneratedDraftCardUi() {
-  setLocalStorageItem("afShadowingDictionaryMock", "generated");
+  setLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY, "generated");
   reloadTab();
   waitForSnapshot("4EE7m94mJpk", waitMs);
   pauseVideo();
@@ -2024,13 +2017,15 @@ function waitForDictionarySelection(word, timeoutMs) {
   return last || readSnapshot();
 }
 
-function waitForGeometryDictionaryCards(timeoutMs) {
+function waitForGeometryDictionaryLookup(expectedWord, timeoutMs) {
   const started = Date.now();
   let last = null;
+  const expected = String(expectedWord || "").toLocaleLowerCase();
 
   while (Date.now() - started < timeoutMs) {
     last = readGeometrySnapshot();
-    if (last.dictionaryUi?.spanTranslationPresent && last.dictionaryUi?.overlayCardCount > 0) {
+    const actual = String(last.dictionaryUi?.lookupWord || "").toLocaleLowerCase();
+    if (last.dictionaryUi?.spanTranslationPresent && actual === expected) {
       return last;
     }
     sleep(500);
@@ -2381,6 +2376,8 @@ function readGeometrySnapshot() {
     dictionaryUi: (() => {
       if (!dictionary) return { present: false };
       const text = dictionary.textContent || "";
+      const body = dictionary.querySelector("[data-af-dictionary-body]");
+      const lookupWord = body?.dataset.afLookupWord || "";
       return {
         present: true,
         accountPresent: Boolean(dictionary.querySelector("[data-af-account]")),
@@ -2444,6 +2441,21 @@ function readGeometrySnapshot() {
         spanTranslationPresent: Boolean(dictionary.querySelector(".af-span-translation-card")),
         hasSpanContext: Boolean(dictionary.querySelector(".af-span-source")?.textContent?.trim()),
         spanWordCount: dictionary.querySelectorAll(".af-span-word").length,
+        spanWords: Array.from(dictionary.querySelectorAll(".af-span-word")).map((word) => ({
+          text: word.textContent || "",
+          lookupWord: word.dataset.afLookupWord || "",
+        })),
+        lookupWord,
+        staleCardVisible: Boolean(
+          lookupWord &&
+            dictionary.querySelector(".af-overlay-card") &&
+            !Array.from(dictionary.querySelectorAll(".af-overlay-card")).some((card) => {
+              const title = (card.querySelector(".af-overlay-card-headword")?.textContent ||
+                card.querySelector(".af-overlay-card-title")?.textContent ||
+                "").trim().toLocaleLowerCase();
+              return title === lookupWord.toLocaleLowerCase();
+            })
+        ),
         spanTitle: dictionary.querySelector(".af-span-translation-card .af-dictionary-card-title")?.textContent || "",
         spanText: dictionary.querySelector(".af-span-translation-text")?.textContent || "",
         hasRawHtml: /<!doctype|<html/i.test(text),
@@ -2459,18 +2471,22 @@ function readGeometrySnapshot() {
 }
 
 function clickShadowButton(selector) {
-  const result = chromeEval(`
+  const raw = chromeEval(`
 (() => {
   const root = document.querySelector("#audiofilms-root")?.shadowRoot;
   const button = root?.querySelector(${JSON.stringify(selector)});
-  if (!button) return "not-found";
+  if (!button) return JSON.stringify({ result: "not-found" });
+  const lookupWord = button.dataset.afLookupWord || "";
+  const text = button.textContent || "";
   button.click();
-  return "clicked";
+  return JSON.stringify({ result: "clicked", lookupWord, text });
 })()
   `);
-  if (result !== "clicked") {
-    fail(`Could not click shadow button ${selector}: ${result}`);
+  const result = JSON.parse(raw);
+  if (result.result !== "clicked") {
+    fail(`Could not click shadow button ${selector}: ${result.result}`);
   }
+  return result;
 }
 
 function setVideoPlaybackRate(rate) {
@@ -2710,6 +2726,20 @@ function clickLookupWord(preferredWord, options = {}) {
     detail: word.textContent || value,
     modifiers: options,
   });
+})()
+  `);
+  return JSON.parse(raw);
+}
+
+function currentPhraseLookupWords() {
+  const raw = chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const words = Array.from(root?.querySelectorAll(".af-ribbon-row.is-current .af-ribbon-word") || []);
+  return JSON.stringify(words.map((word) => ({
+    text: word.textContent || "",
+    lookupWord: word.dataset.afLookupWord || "",
+  })));
 })()
   `);
   return JSON.parse(raw);
@@ -3110,6 +3140,31 @@ function clickPageToggle() {
   if (result !== "clicked") {
     fail(`Could not click AudioFilms toggle: ${result}`);
   }
+}
+
+function installDictionaryMockCleanupHandlers() {
+  const cleanupAndExit = (code) => {
+    try {
+      clearDictionaryMockState();
+    } catch (error) {
+      console.warn(`Could not clear dictionary mock state during shutdown: ${error?.message || error}`);
+    } finally {
+      process.exit(code);
+    }
+  };
+
+  process.once("SIGINT", () => cleanupAndExit(130));
+  process.once("SIGTERM", () => cleanupAndExit(143));
+}
+
+function clearDictionaryMockState() {
+  const href = String(chromeEval("(() => location.href)()") || "");
+  if (!/^https:\/\/(?:www\.)?youtube\.com\//i.test(href)) {
+    chromeOpen("https://www.youtube.com/");
+    sleep(800);
+  }
+  removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
+  clearDictionaryMockCommands();
 }
 
 function getLocalStorageItem(key) {

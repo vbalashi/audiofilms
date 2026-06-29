@@ -4031,8 +4031,10 @@
     const body = panel.querySelector("[data-af-dictionary-body]");
 
     const headerCopy = dictionaryHeaderCopy();
+    panel.classList.toggle("is-span-selected", Boolean(state.selectedSpan));
     title.textContent = headerCopy.title;
     subtitle.textContent = headerCopy.subtitle;
+    subtitle.hidden = !headerCopy.subtitle;
     const canToggleExamples = Boolean(state.selectedWord?.lookupResult?.cards?.length);
     examplesToggle.hidden = !canToggleExamples;
     if (canToggleExamples) {
@@ -4044,6 +4046,7 @@
     }
 
     clearElement(body);
+    body.dataset.afLookupWord = state.selectedWord?.word || "";
     if (state.selectedSpan) {
       renderSelectedSpanCard(body);
       if (state.selectedWord) {
@@ -4081,12 +4084,12 @@
     const selectedSpan = state.selectedSpan;
     if (selectedSpan) {
       if (selectedSpan.status === "loading") {
-        return { title: "Selected phrase", subtitle: "Translating selected span..." };
+        return { title: "Selected phrase", subtitle: "Translating..." };
       }
       if (selectedSpan.status === "failed") {
         return { title: "Selected phrase", subtitle: "Translation failed" };
       }
-      return { title: "Selected phrase", subtitle: "Span translation" };
+      return { title: "Selected phrase", subtitle: "" };
     }
     const selectedWord = state.selectedWord;
     if (!selectedWord) {
@@ -4155,10 +4158,9 @@
     if (!span) return;
 
     const card = appendElement(parent, "div", "af-dictionary-card af-span-translation-card");
-    const eyebrow = appendElement(card, "div", "af-dictionary-eyebrow");
-    eyebrow.textContent = "Selected span";
-    const title = appendElement(card, "div", "af-dictionary-card-title");
-    title.textContent = span.text;
+    const eyebrow = appendElement(card, "div", "af-dictionary-eyebrow af-span-eyebrow");
+    eyebrow.textContent = "Selected phrase";
+    renderSelectedSpanTitle(card, span);
 
     if (span.status === "loading") {
       const loading = appendElement(card, "p", "af-dictionary-copy");
@@ -4168,14 +4170,27 @@
       const error = appendElement(card, "p", "af-source-option-error");
       error.textContent = span.error || "Selected span translation failed.";
     } else {
-      const translation = appendElement(card, "p", "af-span-translation-text");
-      translation.textContent = span.translatedText || "No translation returned.";
+      renderSpanTranslationResult(card, span);
     }
 
-    const words = appendElement(card, "div", "af-span-word-row");
+    const actions = appendElement(card, "div", "af-span-actions");
+    const clear = appendButton(actions, "Clear selection", "afSpanClear");
+    clear.className = "af-secondary-button af-span-clear-button";
+    clear.addEventListener("click", clearSelectedSpan);
+  }
+
+  function renderSelectedSpanTitle(parent, span) {
+    const tokens = Array.isArray(span.tokens) ? span.tokens : [];
+    const title = appendElement(parent, "div", "af-span-title");
+    if (!tokens.length) {
+      title.textContent = span.text || "";
+      return;
+    }
     for (const token of span.tokens || []) {
-      const word = appendButton(words, token.text, `afSpanWord-${token.tokenIndex}`);
-      word.className = "af-span-word";
+      const word = appendButton(title, token.text, `afSpanTitleWord-${token.tokenIndex}`);
+      word.className = "af-span-title-word af-span-word";
+      word.dataset.afLookupWord = token.lookupWord || "";
+      word.dataset.afTokenIndex = String(token.tokenIndex);
       word.addEventListener("click", () => {
         selectLookupWord(token.lookupWord, span.phraseIndex, {
           tokenIndex: token.tokenIndex,
@@ -4187,11 +4202,32 @@
         });
       });
     }
+  }
 
-    const actions = appendElement(card, "div", "af-span-actions");
-    const clear = appendButton(actions, "Clear selection", "afSpanClear");
-    clear.className = "af-secondary-button";
-    clear.addEventListener("click", clearSelectedSpan);
+  function renderSpanTranslationResult(parent, span) {
+    const contextual = span.translatedText || "";
+    const literal = span.literalTranslatedText || "";
+    const comment = span.translatorComment || "";
+
+    renderTranslationField(parent, "Context translation", contextual || "No translation returned.", "af-span-translation-text", "is-context");
+    if (literal && literal !== contextual) {
+      renderTranslationField(parent, "Without context", literal, "af-span-literal-text", "is-literal");
+    }
+    if (comment) {
+      renderTranslationField(parent, "Translator note", comment, "af-span-comment-text", "is-note");
+    }
+  }
+
+  function renderTranslationField(parent, label, value, className, tone = "") {
+    const field = appendElement(parent, "div", "af-translation-field");
+    if (tone) field.classList.add(tone);
+    const caption = appendElement(field, "div", "af-translation-label");
+    appendElement(caption, "span", "af-translation-dot");
+    const labelText = appendElement(caption, "span", "af-translation-label-text");
+    labelText.textContent = label;
+    const text = appendElement(field, "p", className);
+    text.textContent = value;
+    return field;
   }
 
   function renderSelectedSpanLookupPrompt(parent) {

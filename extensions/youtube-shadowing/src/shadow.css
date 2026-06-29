@@ -397,11 +397,24 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   white-space: nowrap;
 }
 
+#af-shadowing-dictionary-panel.is-span-selected .af-dictionary-title {
+  color: var(--af-muted);
+  font-family: var(--af-mono);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .af-dictionary-subtitle {
   margin-top: 2px;
   color: var(--af-muted);
   font-size: 12px;
   font-weight: 650;
+}
+
+.af-dictionary-subtitle[hidden] {
+  display: none;
 }
 
 .af-account-wrap {
@@ -2784,27 +2797,143 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-span-translation-card {
-  border-color: var(--af-accent);
+  border-color: var(--af-border);
+  background: var(--af-panel);
+}
+
+.af-span-eyebrow {
+  margin-bottom: 6px;
 }
 
 .af-span-source {
   color: var(--af-muted);
 }
 
-.af-span-translation-text {
-  margin: 8px 0 0;
+.af-span-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: baseline;
   color: var(--af-text);
-  font-size: 14px;
-  font-weight: 750;
-  line-height: 1.45;
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.08;
 }
 
-.af-span-word-row,
+.af-span-title-word {
+  padding: 0;
+  color: var(--af-text);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.08;
+}
+
+.af-span-title-word:hover,
+.af-span-title-word:focus-visible {
+  color: var(--af-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  outline: none;
+}
+
+.af-translation-field {
+  margin-top: 10px;
+  padding: 9px 0 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--af-border);
+  border-radius: 0;
+}
+
+.af-translation-field.is-context {
+  background: transparent;
+  border-color: var(--af-border);
+}
+
+.af-translation-field.is-note {
+  padding: 9px 0 0 10px;
+  background: transparent;
+  border-top-color: var(--af-border);
+  border-left: 3px solid rgba(214, 187, 126, 0.56);
+}
+
+.af-translation-label {
+  display: flex;
+  align-items: center;
+  color: var(--af-muted);
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--af-mono);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.af-translation-dot {
+  display: none;
+}
+
+.af-translation-field.is-context .af-translation-label {
+  color: var(--af-green);
+}
+
+.af-translation-field.is-context .af-translation-dot {
+  background: var(--af-green);
+}
+
+.af-translation-field.is-literal .af-translation-label {
+  color: var(--af-blue);
+}
+
+.af-translation-field.is-literal .af-translation-dot {
+  background: var(--af-blue);
+}
+
+.af-translation-field.is-note .af-translation-label {
+  color: var(--af-yellow);
+}
+
+.af-translation-field.is-note .af-translation-dot {
+  background: var(--af-yellow);
+}
+
+.af-translation-label-text {
+  background: transparent;
+}
+
+.af-span-translation-text {
+  margin: 6px 0 0;
+  color: var(--af-text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.af-span-literal-text,
+.af-span-comment-text {
+  margin: 5px 0 0;
+  color: var(--af-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.af-span-comment-text {
+  color: var(--af-muted);
+  font-style: italic;
+  font-weight: 600;
+}
+
 .af-span-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .af-span-word {
@@ -2817,6 +2946,20 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font: inherit;
   font-size: 12px;
   font-weight: 750;
+}
+
+.af-span-title-word.af-span-word {
+  padding: 0;
+  color: var(--af-text);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: 20px;
+  font-weight: 850;
+}
+
+.af-span-clear-button {
+  margin-top: 0;
 }
 
 .af-ribbon-controls button:hover:not(:disabled) {

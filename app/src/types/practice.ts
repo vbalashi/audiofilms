@@ -194,6 +194,8 @@ export type PlatformTextTranslationResponse = {
   sourceLanguageCode?: string;
   targetLanguageCode?: string;
   translatedText?: string;
+  literalTranslatedText?: string;
+  translatorComment?: string;
   translationPolicyVersion?: string;
   cached?: boolean;
   error?: string | null;
@@ -211,6 +213,8 @@ export type PhraseTranslation = {
   sourceLanguageCode: string;
   targetLanguageCode?: string;
   translatedText?: string;
+  literalTranslatedText?: string;
+  translatorComment?: string;
   translationPolicyVersion?: string;
   cached?: boolean;
   error?: {
