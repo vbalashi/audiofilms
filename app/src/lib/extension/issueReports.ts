@@ -30,6 +30,7 @@ export type IssueReportRecord = {
   videoId?: string;
   sourceLabel?: string;
   currentPhraseText?: string;
+  phraseBoundaryCase?: Record<string, unknown>;
   reporterSubject: string;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +104,7 @@ function extractDiagnosticsSummary(diagnostics: Record<string, unknown> | undefi
     videoId: cleanOptionalString(diagnostics?.videoId, 80),
     sourceLabel: cleanOptionalString(selectedSource?.label || selectedSource?.name || selectedSource?.kind, 240),
     currentPhraseText: cleanOptionalString(currentPhrase?.text, 500),
+    phraseBoundaryCase: cleanRecord(diagnostics?.phraseBoundaryCase),
   };
 }
 
@@ -141,6 +143,7 @@ export function normalizeIssueReport(input: NormalizeInput): IssueReportRecord {
     videoId: summary.videoId,
     sourceLabel: summary.sourceLabel,
     currentPhraseText: summary.currentPhraseText,
+    phraseBoundaryCase: category === 'phrase-boundary' ? summary.phraseBoundaryCase : undefined,
     reporterSubject: input.reporterSubject,
     createdAt,
     updatedAt: createdAt,

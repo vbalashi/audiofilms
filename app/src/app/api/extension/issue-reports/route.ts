@@ -33,6 +33,7 @@ export async function GET(request: Request) {
       videoId: report.videoId,
       sourceLabel: report.sourceLabel,
       currentPhraseText: report.currentPhraseText,
+      phraseBoundaryCase: report.phraseBoundaryCase,
       pageUrl: report.pageUrl,
       createdAt: report.createdAt,
       updatedAt: report.updatedAt,
@@ -114,4 +115,3 @@ function reportSubject(request: Request): string {
   const raw = `${forwardedFor || realIp || 'unknown'}:${userAgent.slice(0, 120)}`;
   return `public:${crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16)}`;
 }
-

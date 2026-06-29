@@ -926,6 +926,7 @@
     appendButton(layoutControls, "Reset", "afLayoutReset");
     const debugSection = appendElement(utilityMenu, "div", "af-settings-section af-debug-actions");
     appendButton(debugSection, "Mark Issue", "afMarkIssue");
+    appendButton(debugSection, "Bad Split", "afMarkPhraseBoundary");
     appendButton(debugSection, "Debug", "afDebugToggle");
     appendButton(debugSection, "Copy Debug", "afDebugCopy");
     appendButton(debugSection, "Clear Diagnostics", "afDiagnosticsClear");
@@ -1022,6 +1023,7 @@
     panel.querySelector("[data-af-diagnostics-clear]").addEventListener("click", clearDiagnostics);
     panel.querySelector("[data-af-refresh-cache]").addEventListener("click", refreshSelectedSourceCache);
     panel.querySelector("[data-af-mark-issue]").addEventListener("click", openIssueReportDialog);
+    panel.querySelector("[data-af-mark-phrase-boundary]").addEventListener("click", submitPhraseBoundaryIssue);
     return panel;
   }
 
@@ -2876,20 +2878,12 @@
     render();
 
     try {
-      const diagnostics = state.issueIncludeDiagnostics ? JSON.parse(report) : undefined;
-      const result = await postBackendJson("issue-report-submit", {
-        payload: {
-          reportVersion: 1,
-          category: state.issueCategory,
-          description,
-          expectedBehavior: state.issueExpectedBehavior.trim(),
-          includeDiagnostics: state.issueIncludeDiagnostics,
-          diagnostics,
-          extensionVersion: extensionVersion(),
-          extensionBuildInfo: extensionBuildInfo(),
-          backendBuildInfo: state.backendBuildInfo,
-          browserUserAgent: navigator.userAgent,
-        },
+      const result = await sendIssueReportPayload({
+        report,
+        category: state.issueCategory,
+        description,
+        expectedBehavior: state.issueExpectedBehavior.trim(),
+        includeDiagnostics: state.issueIncludeDiagnostics,
       });
       state.issueSubmittedId = result?.id || "";
       state.issueSubmitStatus = result?.id ? `Submitted: ${result.id}` : "Submitted.";
@@ -2911,6 +2905,72 @@
       state.issueSubmitting = false;
       render();
     }
+  }
+
+  async function submitPhraseBoundaryIssue() {
+    if (!state.phrases.length || state.loading) return;
+
+    const report = formatIssueReport({ boundaryCaseReason: "quick-bad-split" });
+    state.lastIssueReport = report;
+    state.issueCategory = "phrase-boundary";
+    state.issueDescription = "Incorrect phrase split or merged sentence boundary.";
+    state.issueExpectedBehavior = "Sentence parts should be grouped into the correct full display sentence while replay remains on the current short segment.";
+    state.issueIncludeDiagnostics = true;
+    state.issueSubmitStatus = "Submitting boundary case...";
+    state.issueSubmitError = "";
+    state.issueSubmitting = true;
+    state.issueDialogOpen = false;
+    render();
+
+    try {
+      const result = await sendIssueReportPayload({
+        report,
+        category: "phrase-boundary",
+        description: state.issueDescription,
+        expectedBehavior: state.issueExpectedBehavior,
+        includeDiagnostics: true,
+      });
+      state.issueSubmittedId = result?.id || "";
+      state.issueSubmitStatus = result?.id ? `Boundary case saved: ${result.id}` : "Boundary case saved.";
+      recordDebugEvent("phrase-boundary-case-submitted", {
+        reportId: result?.id || null,
+        currentIndex: state.currentIndex,
+      });
+    } catch (error) {
+      state.issueSubmitStatus = "";
+      state.issueSubmitError = readableIssueSubmitError(error);
+      recordDebugEvent("phrase-boundary-case-submit-failed", {
+        error: state.issueSubmitError,
+        currentIndex: state.currentIndex,
+      });
+    } finally {
+      state.issueSubmitting = false;
+      render();
+    }
+  }
+
+  async function sendIssueReportPayload({
+    report,
+    category,
+    description,
+    expectedBehavior,
+    includeDiagnostics,
+  }) {
+    const diagnostics = includeDiagnostics ? JSON.parse(report) : undefined;
+    return postBackendJson("issue-report-submit", {
+      payload: {
+        reportVersion: 1,
+        category,
+        description,
+        expectedBehavior,
+        includeDiagnostics,
+        diagnostics,
+        extensionVersion: extensionVersion(),
+        extensionBuildInfo: extensionBuildInfo(),
+        backendBuildInfo: state.backendBuildInfo,
+        browserUserAgent: navigator.userAgent,
+      },
+    });
   }
 
   function readableIssueSubmitError(error) {
@@ -3101,7 +3161,7 @@
     document.documentElement.dataset.afShadowingDiagnosticsState = JSON.stringify(snapshot);
   }
 
-  function formatIssueReport() {
+  function formatIssueReport(options = {}) {
     const selectedSource = getSelectedPracticeSource();
     return JSON.stringify(diagnosticsReportApi.issueReport({
       url: window.location.href,
@@ -3114,6 +3174,7 @@
       currentPhrase: describePhraseAtIndex(state.currentIndex),
       currentIndex: state.currentIndex,
       phrases: state.phrases,
+      phraseBoundaryCase: buildPhraseBoundaryCase(selectedSource, options),
       lastWordReplay: state.lastWordReplay,
       visibleError: state.error,
       navigationEvents: state.navigationEvents,
@@ -3122,6 +3183,37 @@
       backendBuildInfo: state.backendBuildInfo,
       backendBuildError: state.backendBuildError,
     }), null, 2);
+  }
+
+  function buildPhraseBoundaryCase(selectedSource, options = {}) {
+    const current = describePhraseAtIndex(state.currentIndex);
+    const windowStart = Math.max(0, state.currentIndex - 2);
+    const windowEnd = Math.min(state.phrases.length - 1, state.currentIndex + 2);
+    const phraseWindow = [];
+    for (let index = windowStart; index <= windowEnd; index += 1) {
+      phraseWindow.push(describePhraseAtIndex(index));
+    }
+
+    return {
+      kind: "audiofilms-phrase-boundary-raw-case",
+      schemaVersion: 1,
+      status: "raw",
+      reason: options.boundaryCaseReason || "manual-report",
+      capturedAt: new Date().toISOString(),
+      video: {
+        id: state.videoId || "",
+        url: window.location.href,
+      },
+      source: selectedSource ? captionTrackApi.formatSourceDebug(selectedSource) : null,
+      transcriptResult: state.transcriptResult ? summarizeTranscriptResult(state.transcriptResult) : null,
+      currentIndex: state.currentIndex,
+      currentPhrase: current,
+      phraseWindow,
+      expectedReview: {
+        task: "Decide whether neighboring caption phrases should be merged into one display sentence, split into replay segments, or left separate.",
+        output: "Curated fixture for normalizePracticePhrases regression tests.",
+      },
+    };
   }
 
   function practiceReadiness() {

@@ -34,6 +34,7 @@
       },
       playback: input.playback || { videoPresent: false },
       currentPhrase: input.currentPhrase || describePhraseAtIndex(phrases, input.currentIndex),
+      phraseBoundaryCase: input.phraseBoundaryCase || null,
       lastWordReplay: input.lastWordReplay || null,
       visibleState: {
         count: phrases.length ? `${input.currentIndex + 1} / ${phrases.length}` : "0 / 0",
