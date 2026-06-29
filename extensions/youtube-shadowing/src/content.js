@@ -6746,13 +6746,24 @@
         refreshCache: Boolean(options.refreshCache),
       });
       const cues = transcriptResult.cues;
-      const phrases = transcriptResult.practicePhraseSource === "backend"
+      const usesBackendPhraseContract =
+        transcriptResult.practicePhraseSource === "backend" ||
+        transcriptResult.retrievalPath === "backend-provider" ||
+        transcriptResult.retrievalPath === "local-asr-backend";
+      const phrases = usesBackendPhraseContract
         ? cues.map((cue, index) => ({
           id: cue.phraseId ?? index,
           startMs: cue.startMs,
           endMs: cue.endMs,
           playbackStartMs: cue.playbackStartMs,
           text: phraseApi.cleanPhraseText(cue.text),
+          displayText: phraseApi.cleanPhraseText(cue.displayText || ""),
+          translationText: phraseApi.cleanPhraseText(cue.translationText || ""),
+          displayStartChar: finiteInteger(cue.displayStartChar),
+          displayEndChar: finiteInteger(cue.displayEndChar),
+          displaySegmentId: cue.displaySegmentId || "",
+          segmentRole: cue.segmentRole || "",
+          timingFlags: Array.isArray(cue.timingFlags) ? cue.timingFlags : [],
           cues: [cue],
           index,
         }))
