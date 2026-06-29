@@ -1,10 +1,14 @@
 (function audioFilmsExtensionBuildInfo(root) {
   const STATIC_BUILD_INFO = {
-    schemaVersion: 1,
-    channel: "unpacked-dev",
-    buildId: "unstamped-source",
-    sourceCommit: "",
-    builtAt: "",
+      "schemaVersion": 1,
+      "channel": "unpacked-dev",
+      "buildId": "audiofilms-extension-v0.1.6-20260629124936-8adf91f-dirty",
+      "sourceCommit": "8adf91f191623eb87c04bf6e99917d3a627df1db",
+      "builtAt": "2026-06-29T12:49:36.437Z",
+      "buildComment": "ASR strict stale cache guard",
+      "manifestVersion": "0.1.6",
+      "manifestVersionName": "v0.1.6 · 2026-06-29 12:49:36Z · 8adf91f · dirty · ASR strict stale cache guard",
+      "dirty": true
   };
   const loadedAt = new Date().toISOString();
 
@@ -44,6 +48,7 @@
       builtAt,
       loadedAt,
       manifestVersion: manifest.version || "",
+      manifestVersionName: manifest.version_name || "",
       manifestName: manifest.name || "",
       extensionId: runtimeId(),
     };

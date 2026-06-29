@@ -2,6 +2,7 @@
   const bootDiagnosticsApi = window.__afShadowingBootDiagnostics || createBootDiagnosticsFallback();
   const phraseApi = window.__afShadowingPhrases || createPhraseFallback();
   const captionTrackApi = window.__afShadowingCaptionTracks || createCaptionTracksFallback();
+  const sourceLabelsApi = window.__afShadowingSourceLabels || createSourceLabelsFallback();
   const youtubeAdapterApi = window.__afShadowingYouTubeAdapter || createYouTubeAdapterFallback();
   const transcriptRetrievalApi = window.__afShadowingTranscriptRetrieval;
   const sourceBindingApi = window.__afShadowingSourceBinding;
@@ -10,6 +11,7 @@
   const diagnosticsReportApi = window.__afShadowingDiagnosticsReport;
   const displayPreferencesApi = window.__afShadowingDisplayPreferences;
   const buildInfoApi = window.__afShadowingBuildInfo;
+  const CONTENT_SCRIPT_REVISION = "source-labels-asr-fingerprint-2026-06-29";
 
   try {
     bootAudioFilmsYouTubeShadowing();
@@ -107,6 +109,7 @@
     timingOperationError: "",
     timingOperationApiBase: "",
     timingOperationPollTimer: null,
+    timingOperationAppliedAt: "",
     utilityMenuOpen: false,
     settingsMenuOpen: false,
     shortcutHelpOpen: false,
@@ -149,6 +152,7 @@
     loadToken: 0,
     error: "",
     bootDiagnostics,
+    contentScriptRevision: CONTENT_SCRIPT_REVISION,
   };
   window.__afShadowingDebug = state;
   initializeDisplayPreferences();
@@ -2723,8 +2727,8 @@
     }
   }
 
-  function buildPracticeTimingPayload(source, textSourceOverride = "") {
-    const result = source?.loadedTranscriptResult || state.transcriptResult || {};
+  function buildPracticeTimingPayload(source, textSourceOverride = "", resultOverride = null) {
+    const result = resultOverride || source?.loadedTranscriptResult || state.transcriptResult || {};
     const sourceKind = timingPayloadSourceKind(source, result);
     const artifact = result.practiceArtifact || practiceArtifactFromSnapshot(result.practiceSnapshot);
     const textSource = textSourceOverride || (sourceKind === "manual" ? "manual" : "auto");
@@ -2763,8 +2767,69 @@
       scheduleTimingOperationPoll(operation);
     } else {
       clearTimingOperationPoll();
+      operation.appliedToActiveSource = applyTimingOperationResultToActiveSource(operation);
       registerTimingOperationResultSources(operation);
     }
+  }
+
+  function applyTimingOperationResultToActiveSource(operation) {
+    const source = getSelectedPracticeSource();
+    const transcriptResult = transcriptResultFromPracticeTimingOperation(operation, {
+      currentResult: source?.loadedTranscriptResult || state.transcriptResult,
+    });
+    if (!source || !transcriptResult) return false;
+
+    const phrases = phrasesFromTranscriptResult(transcriptResult);
+    if (!phrases.length) return false;
+
+    const video = getVideoElement();
+    const currentPhrase = state.phrases[state.currentIndex] || null;
+    const currentMs = video
+      ? video.currentTime * 1000
+      : Number.isFinite(currentPhrase?.startMs)
+      ? currentPhrase.startMs
+      : 0;
+    const nextIndex = findPhraseIndexForTime(phrases, currentMs);
+
+    state.selectedSourceId = source.id;
+    state.selectedTrack = source.track;
+    state.cues = transcriptResult.cues;
+    state.transcriptResult = transcriptResult;
+    state.phrases = phrases;
+    state.currentIndex = Math.max(0, Math.min(nextIndex, phrases.length - 1));
+    state.selectedWord = null;
+    state.selectedSpan = null;
+    state.phraseTranslations = {};
+    state.timingOperationError = "";
+    state.timingOperationAppliedAt = new Date().toISOString();
+    state.guidedMode = state.autoPause;
+    state.passivePausedKey = "";
+    state.error = "";
+
+    source.loadedCueSource = transcriptResult.retrievalPath;
+    source.loadedTranscriptResult = summarizeTranscriptResult(transcriptResult);
+    source.lastRetrievalAttempts = transcriptResult.retrievalAttempts || [];
+    source.error = "";
+    source.lastError = "";
+
+    updateBootDiagnostics({
+      selectedRetrievalPath: transcriptResult.retrievalPath,
+      lastError: "",
+    });
+    ensurePassivePlaybackWatcher();
+    if (video && state.autoPause) {
+      syncPassivePlayback(video);
+    }
+    schedulePhraseProgressSave("timing-improve-applied");
+    recordDebugEvent("timing-improve-applied", {
+      operationId: operation.id || "",
+      source: captionTrackApi.sourceDisplayName(source),
+      timingExactness: transcriptResult.timingExactness,
+      phrases: phrases.length,
+      currentIndex: state.currentIndex,
+      appliedAt: state.timingOperationAppliedAt,
+    });
+    return true;
   }
 
   function scheduleTimingOperationPoll(operation) {
@@ -2994,6 +3059,7 @@
       : {};
     return {
       manifestVersion: extensionVersion(),
+      contentScriptRevision: CONTENT_SCRIPT_REVISION,
       manifestName: info.manifestName || "",
       extensionId: info.extensionId || "",
       channel: info.channel || "",
@@ -3150,6 +3216,7 @@
       diagnosticsClearedAt: state.diagnosticsClearedAt || "",
       videoId: state.videoId || "",
       selectedSourceId: state.selectedSourceId || "",
+      contentScriptRevision: state.contentScriptRevision || "",
       phraseProgressRestore: state.lastPhraseProgressRestore,
       loading: Boolean(state.loading),
       visibleError: state.error || "",
@@ -3252,10 +3319,17 @@
       return { active: false, status: "", copy: "" };
     }
     if (operation?.state === "succeeded") {
+      if (operation.appliedToActiveSource) {
+        return {
+          active: false,
+          status: "succeeded",
+          copy: "Timing improvement applied to current captions.",
+        };
+      }
       return {
         active: false,
         status: "succeeded",
-        copy: "Timing improvement finished. Reload captions when you want to apply the latest timing.",
+        copy: "Timing improvement finished. Reload captions or reopen the video to use the latest timing.",
       };
     }
     if (state.timingOperationError) {
@@ -3278,11 +3352,7 @@
   function userFacingSourceLabel(source) {
     if (!source) return state.tracks.length ? "Captions" : "No captions";
     const result = source.loadedTranscriptResult || state.transcriptResult;
-    const language = captionTrackApi.languageLabelFromSource?.(source) || source.name || source.languageCode || "Dutch";
-    if (result?.sourceKind === "asr") return "ASR transcript";
-    if (source.track?.kind === "asr" || result?.sourceKind === "auto") return `${language} auto-captions`;
-    if (result?.sourceKind === "transcript-panel") return `${language} captions`;
-    return `${language} captions`;
+    return sourceLabelsApi.closedSourceLabel(source, result);
   }
 
   function getPlaybackSnapshot() {
@@ -3336,7 +3406,7 @@
     const selectedSource = getSelectedPracticeSource();
     const readiness = practiceReadiness();
     const label = selectedSource
-      ? `${userFacingSourceLabel(selectedSource)} · ${readiness.label}`
+      ? userFacingSourceLabel(selectedSource)
       : state.tracks.length ? "Captions: -" : "No captions";
     clearElement(sourceToggle);
     const dot = appendElement(sourceToggle, "span", "af-source-status-dot");
@@ -3401,15 +3471,39 @@
     }
 
     const diagnostics = appendElement(sourceMenu, "details", "af-readiness-details");
+    diagnostics.open = shouldOpenReadinessDetails(selectedSource, readiness, timingState);
     const diagnosticsSummary = appendElement(diagnostics, "summary", "af-readiness-details-summary");
     diagnosticsSummary.textContent = "Details";
     const details = appendElement(diagnostics, "div", "af-readiness-detail-grid");
     appendReadinessDetail(details, "Source", selectedSource ? userFacingSourceLabel(selectedSource) : "No captions");
+    const provider = sourceLabelsApi.sourceProviderLabel(selectedSource, selectedSource?.loadedTranscriptResult || state.transcriptResult);
+    if (provider) appendReadinessDetail(details, "Provider", provider);
+    const enrichment = sourceLabelsApi.timingEnrichmentLabel(selectedSource?.loadedTranscriptResult || state.transcriptResult);
+    if (enrichment) appendReadinessDetail(details, "Timing enrichment", enrichment);
     appendReadinessDetail(details, "Readiness", readiness.label);
     appendReadinessDetail(details, "Phrases", state.phrases.length ? String(state.phrases.length) : "0");
+    const result = selectedSource?.loadedTranscriptResult || state.transcriptResult;
+    if (result?.retrievalPath) appendReadinessDetail(details, "Retrieval", result.retrievalPath);
     if (timingState.status) {
       appendReadinessDetail(details, "Timing", timingState.status);
     }
+    const staleReason = state.timingOperation?.result?.applicability?.staleReason;
+    if (staleReason && !state.timingOperation?.appliedToActiveSource) {
+      appendReadinessDetail(details, "Timing apply", staleReason);
+    }
+  }
+
+  function shouldOpenReadinessDetails(selectedSource, readiness, timingState) {
+    if (!selectedSource) return readiness.state === "no-captions";
+    const result = selectedSource.loadedTranscriptResult || state.transcriptResult;
+    return Boolean(
+      timingState?.status ||
+      result?.warnings?.length ||
+      result?.retrievalPath ||
+      result?.cacheStatus ||
+      result?.fallbackUsed ||
+      sourceLabelsApi.timingEnrichmentLabel(result),
+    );
   }
 
   function renderSourceOptions(sourceMenu) {
@@ -3423,7 +3517,7 @@
         option.type = "button";
         option.dataset.afSourceId = source.id;
         option.classList.toggle("is-selected", source.id === state.selectedSourceId);
-        option.textContent = captionTrackApi.sourceDisplayName(source);
+        option.textContent = userFacingSourceLabel(source);
         option.addEventListener("click", () => selectPracticeSource(source.id));
 
         if (source.error) {
@@ -6857,37 +6951,15 @@
         ? transcriptResultFromLoadedSource(source)
         : await fetchReusableTimingTranscriptResult(source);
       const cachedTimingResult = options.refreshCache ? null : reusableTimingResult;
-      const transcriptResult = cachedTimingResult || await fetchBestAvailableCues(source.track, {
+      let transcriptResult = cachedTimingResult || await fetchBestAvailableCues(source.track, {
         refreshCache: Boolean(options.refreshCache),
+        preferBackendProvider: true,
       });
+      if (!cachedTimingResult && transcriptResult?.timingExactness !== "word-level" && transcriptResult?.practiceArtifact) {
+        transcriptResult = await fetchReusableTimingTranscriptResult(source, transcriptResult) || transcriptResult;
+      }
       const cues = transcriptResult.cues;
-      const usesBackendPhraseContract =
-        transcriptResult.practicePhraseSource === "backend" ||
-        transcriptResult.retrievalPath === "backend-provider" ||
-        transcriptResult.retrievalPath === "local-asr-backend";
-      const phrases = usesBackendPhraseContract
-        ? cues.map((cue, index) => ({
-          id: cue.phraseId ?? index,
-          startMs: cue.startMs,
-          endMs: cue.endMs,
-          playbackStartMs: cue.playbackStartMs,
-          text: phraseApi.cleanPhraseText(cue.text),
-          displayText: phraseApi.cleanPhraseText(cue.displayText || ""),
-          translationText: phraseApi.cleanPhraseText(cue.translationText || ""),
-          displayStartChar: finiteInteger(cue.displayStartChar),
-          displayEndChar: finiteInteger(cue.displayEndChar),
-          displaySegmentId: cue.displaySegmentId || "",
-          segmentRole: cue.segmentRole || "",
-          timingFlags: Array.isArray(cue.timingFlags) ? cue.timingFlags : [],
-          cues: [cue],
-          index,
-        }))
-        : phraseApi.buildPhrases(cues, {
-          maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
-          longPauseMs: LONG_PAUSE_MS,
-          maxWords: 18,
-          maxCharacters: 140,
-        });
+      const phrases = phrasesFromTranscriptResult(transcriptResult);
       if (loadToken !== state.loadToken) return;
       if (!phrases.length) {
         throw new Error("Caption track loaded, but no timed phrases were parsed.");
@@ -6994,6 +7066,38 @@
     }
   }
 
+  function phrasesFromTranscriptResult(transcriptResult) {
+    const cues = transcriptResult?.cues || [];
+    const usesBackendPhraseContract =
+      transcriptResult?.practicePhraseSource === "backend" ||
+      transcriptResult?.retrievalPath === "backend-provider" ||
+      transcriptResult?.retrievalPath === "local-asr-backend" ||
+      transcriptResult?.retrievalPath === "practice-timing-cache";
+    return usesBackendPhraseContract
+      ? cues.map((cue, index) => ({
+        id: cue.phraseId ?? index,
+        startMs: cue.startMs,
+        endMs: cue.endMs,
+        playbackStartMs: cue.playbackStartMs,
+        text: phraseApi.cleanPhraseText(cue.text),
+        displayText: phraseApi.cleanPhraseText(cue.displayText || ""),
+        translationText: phraseApi.cleanPhraseText(cue.translationText || ""),
+        displayStartChar: finiteInteger(cue.displayStartChar),
+        displayEndChar: finiteInteger(cue.displayEndChar),
+        displaySegmentId: cue.displaySegmentId || "",
+        segmentRole: cue.segmentRole || "",
+        timingFlags: Array.isArray(cue.timingFlags) ? cue.timingFlags : [],
+        cues: [cue],
+        index,
+      }))
+      : phraseApi.buildPhrases(cues, {
+        maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
+        longPauseMs: LONG_PAUSE_MS,
+        maxWords: 18,
+        maxCharacters: 140,
+      });
+  }
+
   async function maybeSwitchToPreferredSource(options = {}) {
     const loadToken = options.loadToken ?? state.loadToken;
     if (loadToken !== state.loadToken || state.loading || !state.practiceSources.length) return false;
@@ -7092,18 +7196,20 @@
     });
   }
 
-  async function fetchReusableTimingTranscriptResult(source) {
+  async function fetchReusableTimingTranscriptResult(source, resultOverride = null) {
     if (!state.videoId) return null;
 
     try {
       const operation = await postBackendJson("practice-timing-create", {
         apiBase: apiBaseForBackendCommands(),
         payload: {
-          ...buildPracticeTimingPayload(source),
+          ...buildPracticeTimingPayload(source, "", resultOverride),
           reuseOnly: true,
         },
       });
-      const transcriptResult = transcriptResultFromPracticeTimingOperation(operation);
+      const transcriptResult = transcriptResultFromPracticeTimingOperation(operation, {
+        currentResult: resultOverride || source?.loadedTranscriptResult || state.transcriptResult,
+      });
       const registeredSources = registerTimingOperationResultSources(operation, {
         mainResult: transcriptResult,
       });
@@ -7130,7 +7236,9 @@
     const selectedSource = getSelectedPracticeSource();
     const mainResult = Object.prototype.hasOwnProperty.call(options, "mainResult")
       ? options.mainResult
-      : transcriptResultFromPracticeTimingOperation(operation);
+      : transcriptResultFromPracticeTimingOperation(operation, {
+        currentResult: selectedSource?.loadedTranscriptResult || state.transcriptResult,
+      });
     if (selectedSource && mainResult) {
       selectedSource.loadedTranscriptResult = summarizeTranscriptResult(mainResult);
       selectedSource.loadedCueSource = mainResult.retrievalPath;
@@ -7188,14 +7296,16 @@
     return true;
   }
 
-  function transcriptResultFromPracticeTimingOperation(operation) {
+  function transcriptResultFromPracticeTimingOperation(operation, options = {}) {
     const snapshot = operation?.result?.snapshot;
     if (operation?.kind !== "improve-timing" || operation.state !== "succeeded") {
       return null;
     }
 
     const applicability = operation.result?.applicability;
-    if (!applicability?.appliesToCurrentSnapshot) {
+    const fingerprintDetails = timingFingerprintCompatibilityDetails(operation, options.currentResult);
+    const fingerprintCompatible = fingerprintDetails.compatible;
+    if (!applicability?.appliesToCurrentSnapshot && !fingerprintCompatible) {
       recordDebugEvent("timing-cache-skipped", {
         operationId: operation.id || "",
         staleReason: applicability?.staleReason || "missing-applicability",
@@ -7203,11 +7313,60 @@
         resultSnapshotRevisionId: applicability?.resultSnapshotRevisionId || operation.result?.snapshotRevisionId || "",
         requestedTextSourceRevisionId: applicability?.requestedTextSourceRevisionId || "",
         resultTextSourceRevisionId: applicability?.resultTextSourceRevisionId || operation.result?.textSourceRevisionId || "",
+        currentTextContentFingerprint: fingerprintDetails.currentFingerprint,
+        resultTextContentFingerprint: fingerprintDetails.resultFingerprint,
+        currentLanguage: fingerprintDetails.currentLanguage,
+        resultLanguage: fingerprintDetails.resultLanguage,
+        fingerprintSource: fingerprintDetails.currentFingerprintSource,
       });
       return null;
     }
+    if (!applicability?.appliesToCurrentSnapshot && fingerprintCompatible) {
+      recordDebugEvent("timing-cache-fingerprint-match", {
+        operationId: operation.id || "",
+        staleReason: applicability?.staleReason || "",
+        textContentFingerprint: fingerprintDetails.resultFingerprint,
+        fingerprintSource: fingerprintDetails.currentFingerprintSource,
+      });
+    }
 
     return transcriptResultFromPracticeSnapshot(snapshot, operation);
+  }
+
+  function timingResultMatchesCurrentTextFingerprint(operation, currentResult = null) {
+    return timingFingerprintCompatibilityDetails(operation, currentResult).compatible;
+  }
+
+  function timingFingerprintCompatibilityDetails(operation, currentResult = null) {
+    const staleReason = operation?.result?.applicability?.staleReason || "";
+    if (staleReason !== "text-source-revision-mismatch") {
+      return {
+        compatible: false,
+        currentFingerprint: "",
+        resultFingerprint: "",
+        currentLanguage: "",
+        resultLanguage: "",
+        currentFingerprintSource: "",
+      };
+    }
+    const resultFingerprint = operation?.result?.snapshot?.textSource?.contentFingerprint || "";
+    const artifactFingerprint = currentResult?.practiceArtifact?.textContentFingerprint || "";
+    const snapshotFingerprint = currentResult?.practiceSnapshot?.textSource?.contentFingerprint || "";
+    const currentFingerprint = artifactFingerprint || snapshotFingerprint || "";
+    const currentFingerprintSource = artifactFingerprint
+      ? "practiceArtifact.textContentFingerprint"
+      : snapshotFingerprint ? "practiceSnapshot.textSource.contentFingerprint" : "";
+    const resultLanguage = operation?.result?.snapshot?.textSource?.languageCode || "";
+    const currentLanguage = currentResult?.languageCode || currentResult?.practiceSnapshot?.textSource?.languageCode || "";
+    const languageCompatible = !resultLanguage || !currentLanguage || resultLanguage === currentLanguage;
+    return {
+      compatible: Boolean(resultFingerprint && currentFingerprint && resultFingerprint === currentFingerprint && languageCompatible),
+      currentFingerprint,
+      resultFingerprint,
+      currentLanguage,
+      resultLanguage,
+      currentFingerprintSource,
+    };
   }
 
   function transcriptResultFromPracticeSnapshot(snapshot, operation, options = {}) {
@@ -8557,6 +8716,44 @@
           lastError: source.lastError,
         };
       },
+    };
+  }
+
+  function createSourceLabelsFallback() {
+    const normalizeText = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const stripAutoGeneratedSuffix = (value) => {
+      const label = normalizeText(value);
+      return label
+        .replace(/\s*\([^)]*(auto-generated|automatisch gegenereerd|automatic|auto)[^)]*\)\s*/i, "")
+        .trim() || label;
+    };
+    const youtubeTextSourceLabel = (source, result = null) => {
+      if (!source) return "";
+      if (result?.sourceKind === "asr") return "ASR transcript";
+      const rawName = normalizeText(source.name) || normalizeText(source.track?.name?.simpleText) || normalizeText(source.languageCode) || "Captions";
+      const baseName = stripAutoGeneratedSuffix(rawName);
+      const isAuto = source.track?.kind === "asr" || result?.sourceKind === "auto";
+      return isAuto ? `${baseName} (auto-generated)` : baseName;
+    };
+    const timingEnrichmentLabel = (result = null) => {
+      if (!result || result.sourceKind === "asr") return "";
+      if (result.timingExactness === "word-level") return "ASR timing";
+      if (result.timingExactness === "aligned") return "Aligned timing";
+      return "";
+    };
+    return {
+      closedSourceLabel(source, result = null) {
+        return [youtubeTextSourceLabel(source, result), timingEnrichmentLabel(result)].filter(Boolean).join(" · ") || "Captions";
+      },
+      sourceProviderLabel(source, result = null) {
+        if (result?.sourceKind === "asr") return "ASR";
+        if (source?.track || result?.fetchOrigin?.startsWith("youtube")) return "YouTube";
+        if (result?.provider === "audiofilms-practice-timing") return "AudioFilms";
+        return result?.provider || "";
+      },
+      stripAutoGeneratedSuffix,
+      timingEnrichmentLabel,
+      youtubeTextSourceLabel,
     };
   }
 

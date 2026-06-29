@@ -526,12 +526,23 @@ Before sending or loading a tester package where build identity matters, stamp
 the extension source identity from the repo root:
 
 ```bash
-node extensions/youtube-shadowing/scripts/stamp-build-info.mjs
+node extensions/youtube-shadowing/scripts/stamp-build-info.mjs --comment "short change note"
 ```
 
-The stamped `src/buildInfo.js` value is shown in Copy Debug and submitted issue
+The stamp script increments `extensions/youtube-shadowing/manifest.json`
+`version` by one patch number, writes a human-readable `version_name` with
+timestamp, commit, dirty/clean state, and optional comment, and regenerates
+`src/buildInfo.js`. Chrome still requires a manual unpacked-extension reload,
+but after reload the stamped values are shown in Copy Debug and submitted issue
 reports together with the configured backend API base and `/api/health`
 version/date/commit.
+
+Useful variants:
+
+```bash
+node extensions/youtube-shadowing/scripts/stamp-build-info.mjs --no-bump
+node extensions/youtube-shadowing/scripts/stamp-build-info.mjs --version 0.2.0 --comment "new tester slice"
+```
 
 For page injection failures, check:
 

@@ -4,6 +4,7 @@
   async function fetchBestAvailableCues(track, options = {}) {
     const attempts = [];
     const errors = [];
+    let backendProviderAttempted = false;
 
     if (localAsrBackendEnabled()) {
       try {
@@ -42,6 +43,43 @@
       }
     }
 
+    if (options.preferBackendProvider) {
+      try {
+        backendProviderAttempted = true;
+        options.updateRetrievalPath?.("backend-provider");
+        const backendResult = await fetchBackendProviderCues(track, options);
+        attempts.push(successfulAttempt("backend-provider", backendResult.cues));
+        const backendAttempts = Array.isArray(backendResult.retrievalAttempts)
+          ? backendResult.retrievalAttempts
+          : [];
+        return buildTranscriptResult(backendResult.cues, {
+          sourceKind: backendResult.sourceKind || "provider",
+          retrievalPath: "backend-provider",
+          fetchOrigin: "backend",
+          provider: backendResult.provider || "audiofilms-backend",
+          selectedTrackId: trackId(track),
+          actualTrackId: backendResult.provider || "",
+          languageCode: backendResult.languageCode || track?.languageCode || "",
+          timingExactness: backendResult.timingExactness || "exact",
+          qualityFlags: backendResult.qualityFlags,
+          warnings: backendResult.warnings,
+          retrievalAttempts: [...attempts, ...backendAttempts],
+          cacheStatus: backendResult.cacheStatus,
+          fallbackUsed: backendResult.fallbackUsed,
+          primaryProvider: backendResult.primaryProvider,
+          failedProvider: backendResult.failedProvider,
+          fallbackReason: backendResult.fallbackReason,
+          practicePhraseSource: backendResult.practicePhraseSource,
+          practiceSnapshot: backendResult.practiceSnapshot,
+          practiceArtifact: backendResult.practiceArtifact,
+        });
+      } catch (error) {
+        const message = errorMessage(error);
+        attempts.push(failedAttempt("backend-provider", message));
+        errors.push(message);
+      }
+    }
+
     try {
       options.updateRetrievalPath?.("timedtext-json3");
       const captionResult = await fetchCaptionCues(track);
@@ -63,7 +101,7 @@
       errors.push(message);
     }
 
-    try {
+    if (!backendProviderAttempted) try {
       options.updateRetrievalPath?.("backend-provider");
       const backendResult = await fetchBackendProviderCues(track, options);
       attempts.push(successfulAttempt("backend-provider", backendResult.cues));
@@ -87,6 +125,9 @@
         primaryProvider: backendResult.primaryProvider,
         failedProvider: backendResult.failedProvider,
         fallbackReason: backendResult.fallbackReason,
+        practicePhraseSource: backendResult.practicePhraseSource,
+        practiceSnapshot: backendResult.practiceSnapshot,
+        practiceArtifact: backendResult.practiceArtifact,
       });
     } catch (error) {
       const message = errorMessage(error);
@@ -667,6 +708,8 @@
       failedProvider: metadata.failedProvider || "",
       fallbackReason: metadata.fallbackReason || "",
       practicePhraseSource: metadata.practicePhraseSource || "",
+      practiceSnapshot: metadata.practiceSnapshot || null,
+      practiceArtifact: metadata.practiceArtifact || null,
     };
   }
 

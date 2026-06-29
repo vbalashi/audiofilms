@@ -40,7 +40,23 @@ export async function POST(request: Request) {
 
   try {
     const jobRequest = normalizeAsrJobRequest(record, config);
-    const reusableJob = await getReusableAsrJob(jobRequest, config);
+    let reusableJob = await getReusableAsrJob(jobRequest, config);
+    let staleReusableJob = false;
+    if (reusableJob) {
+      const reusableOperation = await upsertPracticeTimingOperation(
+        reusableJob,
+        practiceTimingInputFromBody(record, reusableJob),
+        config,
+      );
+      const publicReusableOperation = await publicPracticeTimingOperation(reusableOperation, request, config);
+      if (
+        publicReusableOperation?.state === 'succeeded' &&
+        publicReusableOperation.result?.applicability.appliesToCurrentSnapshot === false
+      ) {
+        staleReusableJob = true;
+        reusableJob = null;
+      }
+    }
     if (!reusableJob && parseBoolean(record.reuseOnly)) {
       return jsonResponse(
         request,
@@ -50,7 +66,11 @@ export async function POST(request: Request) {
     }
     const outcome = reusableJob
       ? { job: reusableJob, created: false }
-      : await createRateLimitedAsrJob(jobRequest, auth.subject, config);
+      : await createRateLimitedAsrJob(
+        staleReusableJob ? { ...jobRequest, refresh: true } : jobRequest,
+        auth.subject,
+        config,
+      );
     const operation = await upsertPracticeTimingOperation(
       outcome.job,
       practiceTimingInputFromBody(record, outcome.job),

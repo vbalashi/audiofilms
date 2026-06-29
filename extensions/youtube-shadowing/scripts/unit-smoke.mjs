@@ -16,6 +16,7 @@ function loadBrowserModule(relativePath, exportName) {
 
 const phraseTokens = loadBrowserModule("src/phraseTokens.js", "__afShadowingPhraseTokens");
 const phrases = loadBrowserModule("src/phrases.js", "__afShadowingPhrases");
+const sourceLabels = loadBrowserModule("src/sourceLabels.js", "__afShadowingSourceLabels");
 const sourceBinding = loadBrowserModule("src/sourceBinding.js", "__afShadowingSourceBinding");
 
 assert.equal(phraseTokens.normalizeLookupWord("'m"), "'m");
@@ -34,6 +35,35 @@ const phraseSet = phrases.buildPhrases([
 ]);
 assert.equal(phraseSet.length, 1);
 assert.equal(phraseSet[0].text, "Goed... 20 minuten later");
+
+assert.equal(
+  sourceLabels.closedSourceLabel(
+    { name: "Dutch", languageCode: "nl", track: { kind: "manual" } },
+    { sourceKind: "manual", timingExactness: "exact" },
+  ),
+  "Dutch",
+);
+assert.equal(
+  sourceLabels.closedSourceLabel(
+    { name: "Dutch", languageCode: "nl", track: { kind: "manual" } },
+    { sourceKind: "manual", timingExactness: "word-level" },
+  ),
+  "Dutch · ASR timing",
+);
+assert.equal(
+  sourceLabels.closedSourceLabel(
+    { name: "Dutch (auto-generated)", languageCode: "nl", track: { kind: "asr" } },
+    { sourceKind: "auto", timingExactness: "exact" },
+  ),
+  "Dutch (auto-generated)",
+);
+assert.equal(
+  sourceLabels.closedSourceLabel(
+    { name: "ASR transcript", languageCode: "nl", track: { kind: "asr", afPracticeSnapshotSource: true } },
+    { sourceKind: "asr", timingExactness: "word-level" },
+  ),
+  "ASR transcript",
+);
 
 const segmentedBinding = sourceBinding.createDictionarySourceBinding({
   word: "rode",

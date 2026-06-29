@@ -30,7 +30,7 @@ The canonical TypeScript definitions live in `app/src/types/subtitles.ts`. The e
 
 The redesign target adds a product-facing layer above these technical fields:
 
-- `Text Source`: user-visible labels such as `Dutch captions`, `Dutch auto-captions`, and `ASR transcript`.
+- `Text Source`: user-visible labels such as `Dutch`, `Dutch (auto-generated)`, and `ASR transcript`.
 - `Timing Evidence`: cue timing, approximate split timing, auto-caption timing, ASR word timing, or aligned timing.
 - `Practice Readiness`: `No captions`, `Rough`, `Ready`, `Precise`, or `Improving...`.
 - User-initiated actions: `Get Captions` and `Improve Timing`.
@@ -67,7 +67,10 @@ The extension mirrors these defaults in `extensions/youtube-shadowing/src/phrase
 - Subtitle retrieval and provider orchestration stay in the app/backend path.
 - The extension may use browser-visible YouTube caption tracks first, but backend-orchestrated fallback should use the same metadata vocabulary as the app.
 - Dictionary lookup, saved words, and memory review belong to app/backend providers. The extension should send word, phrase context, language, and subtitle metadata rather than embedding provider logic in YouTube page code.
-- The extension should not render `manual`, `exact`, `yt-dlp`, `timedtext`, or `provider` as default learner-facing labels. Those belong in details/debug.
+- The extension should not render `manual`, `exact`, `cached`, `yt-dlp`,
+  `timedtext`, or `provider` as default learner-facing labels. Those belong in
+  details/debug. If a non-ASR text source uses ASR/aligned timing, the closed
+  selector may add only the compact enrichment, for example `Dutch · ASR timing`.
 
 ## Current Gaps
 

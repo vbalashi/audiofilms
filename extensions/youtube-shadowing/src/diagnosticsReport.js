@@ -5,6 +5,7 @@
       diagnosticsClearedAt: input.diagnosticsClearedAt || "",
       videoId: input.videoId || "",
       selectedSourceId: input.selectedSourceId || "",
+      contentScriptRevision: input.contentScriptRevision || "",
       phraseProgressRestore: input.phraseProgressRestore || null,
       loading: Boolean(input.loading),
       visibleError: input.visibleError || "",

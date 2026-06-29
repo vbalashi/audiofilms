@@ -123,6 +123,19 @@ The manifest grants the specific remote host `https://audiofilms-api.dilum.io/*`
 
 ## Load Locally
 
+Before reloading the unpacked extension after code changes, stamp a visible
+build identity from the repo root:
+
+```bash
+node extensions/youtube-shadowing/scripts/stamp-build-info.mjs --comment "ASR timing label fix"
+```
+
+This increments `manifest.json` `version` by one patch number, updates
+`version_name` with timestamp, commit, dirty/clean state, and the optional
+comment, and regenerates `src/buildInfo.js`. Chrome still needs a manual reload
+of the unpacked extension, but after reload the extension details/debug report
+show which build actually ran.
+
 1. Open Chrome extensions.
 2. Enable Developer mode.
 3. Choose Load unpacked.
@@ -143,7 +156,7 @@ https://www.youtube.com/watch?v=ZNQWWW-vvfM
 Use this before deeper debugging or UI work:
 
 1. Load this folder as an unpacked extension.
-2. After code changes, click the reload/refresh button for this unpacked extension on `chrome://extensions`. Reloading only the YouTube tab can leave an older content script active.
+2. After code changes, run `node extensions/youtube-shadowing/scripts/stamp-build-info.mjs --comment "<short note>"`, then click the reload/refresh button for this unpacked extension on `chrome://extensions`. Reloading only the YouTube tab can leave an older content script active.
    - On this local Chrome profile the current unpacked extension id is `hhdkchoccmikoefhenobdjipgdppdpoc`, so this direct page can be useful:
      `chrome://extensions/?id=hhdkchoccmikoefhenobdjipgdppdpoc`.
 3. Open a fresh YouTube watch page and reload it after the extension is loaded.
@@ -389,6 +402,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - `src/bootDiagnostics.js`: boot sentinel, page-readable diagnostics, and visible boot failure badge.
 - `src/phrases.js`: cue-to-phrase builder used by the content script.
 - `src/captionTracks.js`: YouTube caption track extraction, source labels, source grouping, and source debug formatting.
+- `src/sourceLabels.js`: learner-facing text source labels and timing enrichment labels for the source selector.
 - `src/youtubeAdapter.js`: watch-page URL helpers, player metadata extraction, balanced JSON extraction, and video element lookup.
 - `src/transcriptRetrieval.js`: timedtext, transcript API, transcript panel fallback/state diagnostics, cue parsers, and transcript quality metadata.
 - `src/content.js`: YouTube page integration, retrieval orchestration, playback controls, dictionary panel rendering, and temporary UI state.
