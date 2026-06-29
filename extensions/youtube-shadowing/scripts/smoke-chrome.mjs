@@ -248,6 +248,7 @@ const dictionaryUiVideoId = getArgValue("--dictionary-video") || "4EE7m94mJpk";
 const dictionaryUiWord = getArgValue("--dictionary-word") || "";
 const dictionaryUiMock = getArgValue("--dictionary-mock") || "";
 const waitMs = Number(getArgValue("--wait-ms") || 18000);
+const shouldReloadOnly = shouldReloadExtension && !args.has("--full") && !fixtureFilter && !shouldOnlyFocusedScenario;
 
 if (!["smoke", "full"].includes(profile)) {
   fail(`Unknown --profile=${profile}. Use --profile=smoke or --profile=full.`);
@@ -270,8 +271,8 @@ if (!fixtures.length && !shouldOnlyFocusedScenario) {
   fail(`No fixtures matched --only=${fixtureFilter}`);
 }
 
-console.log(`AudioFilms YouTube extension ${shouldRunFullSuite ? "full regression" : "smoke"} profile`);
-if (!shouldRunFullSuite && !fixtureFilter) {
+console.log(`AudioFilms YouTube extension ${shouldReloadOnly ? "reload helper" : shouldRunFullSuite ? "full regression" : "smoke"} profile`);
+if (!shouldReloadOnly && !shouldRunFullSuite && !fixtureFilter) {
   console.log("Use --full for SPA, backend-degraded, source-switch, multilingual-switch, and geometry regression scenarios.");
   console.log("Use --only-asr-edge for the focused ASR playback edge-case check.");
   console.log("Use --only-dictionary-source-binding for focused dictionary provenance checks.");
@@ -285,6 +286,10 @@ if (shouldRunLocalBackendCheck) {
 
 if (shouldReloadExtension) {
   reloadExtension();
+  if (shouldReloadOnly) {
+    console.log(`Reloaded extension ${EXTENSION_ID}.`);
+    process.exit(0);
+  }
 }
 
 const results = [];
