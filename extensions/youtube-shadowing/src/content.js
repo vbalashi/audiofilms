@@ -7369,6 +7369,23 @@
     }
     enterGuidedMode();
     render();
+    if (shouldHoldRecallPhraseEntry(command, fromIndex, targetIndex)) {
+      const holdResult = holdPhraseAtStart(targetIndex, {
+        command,
+        navigationEventId: navigationEvent.id,
+      });
+      recordNavigationEvent("command-dispatched", {
+        command,
+        navigationEventId: navigationEvent.id,
+        fromIndex,
+        targetIndex,
+        playResult: holdResult,
+        playbackAfterDispatch: getPlaybackSnapshot(),
+      });
+      scheduleNavigationObservation(navigationEvent.id, command, targetIndex, 250);
+      scheduleNavigationObservation(navigationEvent.id, command, targetIndex, 750);
+      return;
+    }
     const playResult = playPhrase(state.currentIndex, {
       command,
       navigationEventId: navigationEvent.id,
@@ -7384,6 +7401,49 @@
     });
     scheduleNavigationObservation(navigationEvent.id, command, targetIndex, 250);
     scheduleNavigationObservation(navigationEvent.id, command, targetIndex, 750);
+  }
+
+  function shouldHoldRecallPhraseEntry(command, fromIndex, targetIndex) {
+    return state.practiceMode === "recall"
+      && (command === "next" || command === "previous")
+      && fromIndex !== targetIndex;
+  }
+
+  function holdPhraseAtStart(index, options = {}) {
+    const phrase = state.phrases[index];
+    const video = getVideoElement();
+    if (!phrase || !video) {
+      return { ok: false, reason: !phrase ? "missing-phrase" : "missing-video" };
+    }
+
+    stopPlaybackTimer();
+    const holdSeconds = Math.max(0, phrase.startMs / 1000);
+    video.pause();
+    video.currentTime = holdSeconds;
+    state.currentIndex = index;
+    state.guidedMode = true;
+    state.guidedHold = {
+      index,
+      holdSeconds,
+      createdAt: Date.now(),
+    };
+    state.passivePausedKey = `${state.videoId || ""}:${state.selectedSourceId}:recall-entry:${index}`;
+    markCurrentTranscriptSegment(phrase);
+    recordNavigationEvent("recall-entry-hold", {
+      command: options.command || "unknown",
+      navigationEventId: options.navigationEventId || null,
+      targetPhrase: describePhraseAtIndex(index),
+      holdSeconds: roundTime(holdSeconds),
+      playback: getPlaybackSnapshot(),
+    });
+    render();
+    return {
+      ok: true,
+      seekToSec: roundTime(holdSeconds),
+      expectedPauseAtSec: roundTime(holdSeconds),
+      autoPause: true,
+      heldForRecall: true,
+    };
   }
 
   function toggleText(event) {
@@ -7826,6 +7886,10 @@
       schedulePhraseProgressSave("passive-sync");
       markCurrentTranscriptSegment(phrase);
       render();
+      if (state.practiceMode === "recall" && state.guidedMode && state.autoPause && !video.paused) {
+        holdPhraseAtStart(index, { command: "passive-recall-entry" });
+        return;
+      }
     }
 
     if (!state.guidedMode || !state.autoPause || state.activePlayback || video.paused) return;

@@ -8,5 +8,9 @@ app/.subtitle-source-shootout-cache/
 # Local smoke screenshots and diagnostics are generated evidence, not source.
 extensions/youtube-shadowing/.smoke-artifacts/
 
+# Local dictionary-card mock/iteration artifacts are generated design evidence.
+docs/intent/dictionary-card-browser-mock/
+docs/intent/dictionary-card-pencil-iterations/
+
 # Expert-review archives are generated on demand from tracked docs/source/screenshots.
 docs/design-handoff/youtube-extension-expert-review/*.zip
