@@ -149,6 +149,7 @@ export async function POST(request: Request) {
     {
       allowProgressActions: lookupMode.allowProgressActions,
       translationFallbackReason,
+      audioBaseUrl: platformAudioBase(),
     },
   );
   projectionDurationMs = Date.now() - projectionStartedAt;
@@ -260,6 +261,17 @@ function platformApiBase() {
     /\/+$/,
     '',
   );
+}
+
+function platformAudioBase() {
+  const configured = process.env.DICTIONARY_2000NL_AUDIO_BASE_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  try {
+    const url = new URL(platformApiBase());
+    return url.origin;
+  } catch {
+    return '';
+  }
 }
 
 function getLocalDogfoodGuestLookupToken() {

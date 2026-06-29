@@ -1003,6 +1003,30 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   line-height: 1.25;
 }
 
+.af-headword-audio {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin-left: 3px;
+  place-items: center;
+  padding: 0;
+  color: var(--af-muted);
+  vertical-align: middle;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.af-headword-audio:hover,
+.af-headword-audio:focus-visible {
+  color: var(--af-accent);
+  background: var(--af-control);
+  border-color: var(--af-border);
+}
+
 .af-card-translate,
 .af-card-menu-button {
   display: grid;

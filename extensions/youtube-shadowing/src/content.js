@@ -1280,6 +1280,11 @@
         '<path d="m22 22-5-10-5 10"/>',
         '<path d="M14 18h6"/>',
       ],
+      audio: [
+        '<path d="M11 5 6 9H3v6h3l5 4V5z"/>',
+        '<path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+        '<path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+      ],
       more: [
         '<circle cx="12" cy="12" r="1"/>',
         '<circle cx="19" cy="12" r="1"/>',
@@ -4445,6 +4450,43 @@
     }
     const headword = appendElement(titleLine, "span", "af-overlay-card-headword");
     headword.textContent = overlayTitle(card);
+    if (card?.audio?.primaryUrl) {
+      const audioButton = appendButton(titleLine, "", `afHeadwordAudio-${card.id || "card"}`);
+      audioButton.className = "af-headword-audio";
+      audioButton.innerHTML = `${iconSvg("audio")}<span class="af-sr-only">Play headword audio</span>`;
+      audioButton.title = "Play headword audio";
+      audioButton.setAttribute("aria-label", `Play pronunciation for ${overlayTitle(card)}`);
+      audioButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        playHeadwordAudio(card);
+      });
+    }
+  }
+
+  function playHeadwordAudio(card) {
+    const url = card?.audio?.primaryUrl || "";
+    if (!url || typeof Audio === "undefined") return;
+    try {
+      const audio = new Audio(url);
+      audio.play().catch((error) => {
+        recordDebugEvent("headword-audio-failed", {
+          cardId: card?.id || "",
+          headword: overlayTitle(card),
+          error: error instanceof Error ? error.message : String(error || ""),
+        });
+      });
+      recordDebugEvent("headword-audio-play", {
+        cardId: card?.id || "",
+        headword: overlayTitle(card),
+        source: card?.audio?.source || "",
+      });
+    } catch (error) {
+      recordDebugEvent("headword-audio-failed", {
+        cardId: card?.id || "",
+        headword: overlayTitle(card),
+        error: error instanceof Error ? error.message : String(error || ""),
+      });
+    }
   }
 
   function overlayChips(card) {
@@ -5973,6 +6015,13 @@
           example: "Na de brand is het huis weer opnieuw opgebouwd.",
           exampleTranslation: "После пожара дом снова отстроили.",
           partOfSpeech: "ww",
+          audio: {
+            primaryUrl: "https://2000.dilum.io/audio/nl/o/opbouwen.mp3",
+            variants: {
+              nl: "https://2000.dilum.io/audio/nl/o/opbouwen.mp3",
+            },
+            source: "2000nl",
+          },
           phase: "encountered",
           progressActions: [
             progressDisplayAction("learn", "Learn", "start-learning"),
@@ -6139,6 +6188,7 @@
     exampleTranslation = "яблоко от яблони недалеко падает",
     meaningId = 1,
     partOfSpeech = "noun",
+    audio,
     phase,
     progressActions,
   }) {
@@ -6151,6 +6201,7 @@
       language: "Dutch",
       meaningId,
       partOfSpeech,
+      ...(audio ? { audio } : {}),
       match: { relation: "exact", confidence: 1 },
       summary: {
         definition,

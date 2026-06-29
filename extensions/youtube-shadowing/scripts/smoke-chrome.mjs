@@ -1364,6 +1364,7 @@ function assertDictionaryCardUi() {
     assertion("dictionary mock card count", before.dictionaryUi?.overlayCardCount === 3, JSON.stringify(before.dictionaryUi)),
     assertion("dictionary card anatomy has title and chips", before.dictionaryUi?.cards?.every((card) => card.title && card.chips > 0), JSON.stringify(before.dictionaryUi?.cards || [])),
     assertion("dictionary card anatomy includes definition number chip", before.dictionaryUi?.cards?.every((card) => card.chipLabels?.some((label) => /^#\d+$/.test(label))), JSON.stringify(before.dictionaryUi?.cards || [])),
+    assertion("dictionary audio button appears only for card audio", before.dictionaryUi?.cards?.[0]?.audioButtons === 1 && before.dictionaryUi?.cards?.slice(1).every((card) => card.audioButtons === 0), JSON.stringify(before.dictionaryUi?.cards || [])),
     assertion("dictionary not-started actions show Learn only", firstCardActions.length === 1 && firstCardActions[0] === "Learn", firstCardActions.join("|")),
     assertion("dictionary progress actions do not show Known", !allProgressActions.includes("Known"), allProgressActions.join("|")),
     assertion("dictionary review actions show four grades", ["Again", "Hard", "Good", "Easy"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),
@@ -2384,10 +2385,12 @@ function readGeometrySnapshot() {
         overlayCardCount: dictionary.querySelectorAll(".af-overlay-card").length,
         generatedFallbackCardCount: dictionary.querySelectorAll(".af-generated-fallback-card").length,
         cards: Array.from(dictionary.querySelectorAll(".af-overlay-card")).map((card) => ({
-          title: card.querySelector(".af-overlay-card-title")?.textContent || "",
+          title: card.querySelector(".af-overlay-card-headword")?.textContent ||
+            card.querySelector(".af-overlay-card-title")?.textContent || "",
           chips: card.querySelectorAll(".af-chip").length,
           chipLabels: Array.from(card.querySelectorAll(".af-chip")).map((chip) => chip.textContent.trim()),
           progressActions: Array.from(card.querySelectorAll(".af-review-actions button")).map((button) => button.textContent.trim()),
+          audioButtons: card.querySelectorAll(".af-headword-audio").length,
           translateActions: Array.from(card.querySelectorAll(".af-card-translate")).map((button) => button.textContent.trim()),
           menuActions: Array.from(card.querySelectorAll(".af-card-action-menu button")).map((button) => button.textContent.trim()),
           collapseActions: Array.from(card.querySelectorAll(".af-card-collapse")).map((button) => button.getAttribute("aria-label") || button.textContent.trim()),

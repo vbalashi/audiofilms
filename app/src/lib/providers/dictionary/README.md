@@ -18,6 +18,7 @@ This is the preferred provider for AudioFilms Dutch shadowing because it returns
 ```bash
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
+DICTIONARY_2000NL_AUDIO_BASE_URL=https://2000.dilum.io # optional, defaults to API origin
 DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=your_2000nl_catalog_lookup_token_here
 DICTIONARY_2000NL_ACCESS_TOKEN=your_short_lived_local_dogfood_token_here
 DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=false

@@ -108,6 +108,61 @@ describe('dictionary overlay V2 projection', () => {
     ]);
   });
 
+  it('projects 2000NL audio links into a resolved overlay audio object', () => {
+    const card = projectOverlayCard(
+      baseItem({
+        entry: {
+          ...baseItem().entry,
+          content: {
+            ...baseItem().entry?.content,
+            audioLinks: {
+              nl: '/audio/nl/l/lopen.mp3',
+              be: 'https://cdn.example/audio/be/lopen.mp3',
+            },
+          },
+        },
+      }),
+      'loopt',
+      'nl',
+      0,
+      {
+        allowProgressActions: true,
+        audioBaseUrl: 'https://2000.dilum.io',
+      },
+    );
+
+    expect(card.audio).toEqual({
+      primaryUrl: 'https://2000.dilum.io/audio/nl/l/lopen.mp3',
+      variants: {
+        nl: 'https://2000.dilum.io/audio/nl/l/lopen.mp3',
+        be: 'https://cdn.example/audio/be/lopen.mp3',
+      },
+      source: '2000nl',
+    });
+  });
+
+  it('omits audio when relative links cannot be resolved', () => {
+    const card = projectOverlayCard(
+      baseItem({
+        entry: {
+          ...baseItem().entry,
+          content: {
+            ...baseItem().entry?.content,
+            audioLinks: {
+              nl: '/audio/nl/l/lopen.mp3',
+            },
+          },
+        },
+      }),
+      'loopt',
+      'nl',
+      0,
+      { allowProgressActions: true },
+    );
+
+    expect(card.audio).toBeUndefined();
+  });
+
   it('projects noun articles from platform raw gender into the overlay contract', () => {
     const card = projectOverlayCard(
       baseItem({

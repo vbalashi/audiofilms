@@ -60,6 +60,12 @@ export type DictionaryOverlayCardV2Translation = {
   };
 };
 
+export type DictionaryOverlayCardAudio = {
+  primaryUrl: string;
+  variants?: Record<string, string>;
+  source: '2000nl';
+};
+
 export type DictionaryOverlayCardV2 = {
   id: string;
   entryId?: string;
@@ -69,6 +75,7 @@ export type DictionaryOverlayCardV2 = {
   headwordTranslation?: string;
   language: string;
   meaningId?: number;
+  audio?: DictionaryOverlayCardAudio;
   partOfSpeech?: string;
   article?: string;
   match?: {

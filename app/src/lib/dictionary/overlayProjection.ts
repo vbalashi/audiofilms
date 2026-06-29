@@ -14,6 +14,7 @@ type OverlayProgressPhase = NonNullable<DictionaryOverlayCardV2['progress']>['ph
 type OverlaySectionKind = DictionaryOverlayCardV2Section['kind'];
 type OverlayTranslation = NonNullable<DictionaryOverlayCardV2['translation']>;
 type OverlayTranslationStatus = OverlayTranslation['status'];
+type OverlayAudio = NonNullable<DictionaryOverlayCardV2['audio']>;
 
 export type PlatformCardCapabilities = {
   phase?: string;
@@ -66,15 +67,18 @@ export type PlatformLookupResponse = {
   detail?: string;
 };
 
+export type ProjectOverlayOptions = {
+  allowProgressActions: boolean;
+  audioBaseUrl?: string;
+  translationFallbackReason?: string;
+};
+
 export function projectDictionaryLookupV2Response(
   platformBody: PlatformLookupResponse | null,
   clickedForm: string,
   sourceLanguageCode: string,
   contextText: string | undefined,
-  options: {
-    allowProgressActions: boolean;
-    translationFallbackReason?: string;
-  },
+  options: ProjectOverlayOptions,
 ): DictionaryLookupV2SuccessResponse | DictionaryLookupV2NoMatchResponse {
   const cards: DictionaryOverlayCardV2[] = (platformBody?.items || []).map((item, index) =>
     projectOverlayCard(item, clickedForm, sourceLanguageCode, index, options),
@@ -124,7 +128,7 @@ export function projectOverlayCard(
   clickedForm: string,
   sourceLanguageCode: string,
   index: number,
-  options: { allowProgressActions: boolean },
+  options: ProjectOverlayOptions,
 ): DictionaryOverlayCardV2 {
   const content = item.entry?.content || {};
   const headword =
@@ -163,6 +167,7 @@ export function projectOverlayCard(
     headwordTranslation: stringValue(content.headwordTranslation) || undefined,
     language: item.entry?.languageCode || sourceLanguageCode,
     meaningId: meaningId ?? undefined,
+    audio: normalizedAudio(content.audioLinks, options.audioBaseUrl),
     partOfSpeech: partOfSpeech || undefined,
     article: article || undefined,
     match: {
@@ -190,6 +195,31 @@ export function projectOverlayCard(
         }
       : undefined,
   };
+}
+
+function normalizedAudio(value: unknown, audioBaseUrl?: string): OverlayAudio | undefined {
+  const links = recordValue(value);
+  const variants: Record<string, string> = {};
+  for (const [key, link] of Object.entries(links)) {
+    const url = playableAudioUrl(link, audioBaseUrl);
+    if (url) variants[key] = url;
+  }
+  const primaryUrl = variants.nl || Object.values(variants)[0];
+  if (!primaryUrl) return undefined;
+  return {
+    primaryUrl,
+    ...(Object.keys(variants).length ? { variants } : {}),
+    source: '2000nl',
+  };
+}
+
+function playableAudioUrl(value: unknown, audioBaseUrl?: string): string {
+  const link = stringValue(value);
+  if (!link) return '';
+  if (/^https?:\/\//i.test(link)) return link;
+  const base = stringValue(audioBaseUrl).replace(/\/+$/, '');
+  if (!base) return '';
+  return link.startsWith('/') ? `${base}${link}` : `${base}/${link}`;
 }
 
 function normalizedSections(content: Record<string, unknown>) {

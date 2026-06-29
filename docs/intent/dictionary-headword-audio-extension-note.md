@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft for architecture review.
+Accepted for the first AudioFilms implementation slice.
 
 ## Context
 
@@ -61,6 +61,17 @@ The extension should:
 2. Play that URL with the browser audio API on click.
 3. Keep the button visually lightweight and separate from dictionary actions.
 4. Avoid making extra lookup calls for audio.
+
+First implementation decision:
+
+- 2000NL platform lookup remains the dictionary/audio authority.
+- AudioFilms projects `entry.content.audioLinks` into `card.audio`.
+- AudioFilms resolves relative `/audio/...` links with
+  `DICTIONARY_2000NL_AUDIO_BASE_URL` when configured, otherwise with the
+  `DICTIONARY_2000NL_API_BASE` origin.
+- The YouTube extension plays `card.audio.primaryUrl` directly.
+- No AudioFilms `/api/dict/audio` proxy is added unless a concrete CORS,
+  authorization, analytics, transformation, or URL-hiding requirement appears.
 
 ## Endpoint Decision
 

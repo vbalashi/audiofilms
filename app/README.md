@@ -88,6 +88,7 @@ For 2000NL-backed Dutch lookup and progress-aware cards:
 ```bash
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
+DICTIONARY_2000NL_AUDIO_BASE_URL=https://2000.dilum.io # optional, defaults to API origin
 DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=... # guest read-only catalog lookup
 ```
 
