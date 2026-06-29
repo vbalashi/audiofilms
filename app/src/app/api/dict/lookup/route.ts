@@ -3,6 +3,7 @@ import {
   projectDictionaryLookupV2Response,
   type PlatformLookupResponse,
 } from '@/lib/dictionary/overlayProjection';
+import { createAudioResolveToken } from '@/lib/audio/resolveToken';
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import { getBearerToken } from '@/lib/twoThousandNlPlatform';
 
@@ -150,6 +151,14 @@ export async function POST(request: Request) {
       allowProgressActions: lookupMode.allowProgressActions,
       translationFallbackReason,
       audioBaseUrl: platformAudioBase(),
+      audioResolveTokenForCard: lookupMode.includeUserState
+        ? (card) =>
+            createAudioResolveToken({
+              text: card.text,
+              languageCode: card.languageCode,
+              purpose: 'dictionary-headword',
+            })
+        : undefined,
     },
   );
   projectionDurationMs = Date.now() - projectionStartedAt;

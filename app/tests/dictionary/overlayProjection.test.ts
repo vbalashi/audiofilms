@@ -166,6 +166,35 @@ describe('dictionary overlay V2 projection', () => {
     expect(card.audio).toBeUndefined();
   });
 
+  it('projects missing audio as resolvable when a resolve token is available', () => {
+    const card = projectOverlayCard(
+      baseItem({
+        entry: {
+          ...baseItem().entry,
+          content: {
+            ...baseItem().entry?.content,
+            audioLinks: {},
+          },
+        },
+      }),
+      'loopt',
+      'nl',
+      0,
+      {
+        allowProgressActions: true,
+        audioResolveTokenForCard: ({ text, languageCode }) => `token:${languageCode}:${text}`,
+      },
+    );
+
+    expect(card.audio).toEqual({
+      state: 'resolvable',
+      kind: 'generated',
+      source: '2000nl-tts',
+      resolveToken: 'token:nl:lopen',
+      format: 'audio/mpeg',
+    });
+  });
+
   it('projects noun articles from platform raw gender into the overlay contract', () => {
     const card = projectOverlayCard(
       baseItem({

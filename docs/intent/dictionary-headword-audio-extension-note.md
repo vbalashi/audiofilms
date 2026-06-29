@@ -99,6 +99,16 @@ backend-owned resolver such as `POST /api/audio/resolve`; the backend validates
 the token, checks the asset cache, generates and stores audio only if missing,
 and returns either a ready URL or a generating status with retry metadata.
 
+Implementation update:
+
+- AudioFilms emits `resolvable` audio only for authenticated user-state lookup,
+  not for guest catalog lookup.
+- `POST /api/audio/resolve` accepts only the short-lived AudioFilms
+  `resolveToken`, requires the forwarded 2000NL user Bearer token, then proxies
+  generation to 2000NL `/api/platform/v1/audio/resolve`.
+- 2000NL owns the actual TTS provider/cache and returns the materialized audio
+  asset URL.
+
 Generated/private audio should normally be delivered from object storage or CDN
 through a public URL for public dictionary assets or a short-lived signed URL
 for private/user assets. Binary streaming through AudioFilms should remain a

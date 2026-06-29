@@ -124,6 +124,7 @@
     exampleExpansionOverrides: {},
     visibleTranslationsByCardId: {},
     translationPendingByCardId: {},
+    audioPendingByCardId: {},
     cardActionFeedbackByCardId: {},
     cardMenuOpenId: "",
     cardMenuFeedbackByCardId: {},
@@ -4450,12 +4451,19 @@
     }
     const headword = appendElement(titleLine, "span", "af-overlay-card-headword");
     headword.textContent = overlayTitle(card);
-    if (card?.audio?.primaryUrl) {
+    if (cardAudioPlayable(card)) {
       const audioButton = appendButton(titleLine, "", `afHeadwordAudio-${card.id || "card"}`);
       audioButton.className = "af-headword-audio";
+      audioButton.classList.toggle("is-pending", Boolean(state.audioPendingByCardId[card.id]));
       audioButton.innerHTML = `${iconSvg("audio")}<span class="af-sr-only">Play headword audio</span>`;
-      audioButton.title = "Play headword audio";
-      audioButton.setAttribute("aria-label", `Play pronunciation for ${overlayTitle(card)}`);
+      audioButton.disabled = Boolean(state.audioPendingByCardId[card.id]);
+      audioButton.title = state.audioPendingByCardId[card.id] ? "Preparing pronunciation" : "Play headword audio";
+      audioButton.setAttribute(
+        "aria-label",
+        state.audioPendingByCardId[card.id]
+          ? `Preparing pronunciation for ${overlayTitle(card)}`
+          : `Play pronunciation for ${overlayTitle(card)}`,
+      );
       audioButton.addEventListener("click", (event) => {
         event.stopPropagation();
         playHeadwordAudio(card);
@@ -4463,11 +4471,16 @@
     }
   }
 
-  function playHeadwordAudio(card) {
-    const url = card?.audio?.primaryUrl || "";
+  function cardAudioPlayable(card) {
+    return Boolean(card?.audio?.primaryUrl || card?.audio?.resolveToken);
+  }
+
+  async function playHeadwordAudio(card) {
+    const url = await resolveHeadwordAudioUrl(card);
     if (!url || typeof Audio === "undefined") return;
     try {
       const audio = new Audio(url);
+      audio.preload = "none";
       audio.play().catch((error) => {
         recordDebugEvent("headword-audio-failed", {
           cardId: card?.id || "",
@@ -4487,6 +4500,48 @@
         error: error instanceof Error ? error.message : String(error || ""),
       });
     }
+  }
+
+  async function resolveHeadwordAudioUrl(card) {
+    if (card?.audio?.primaryUrl) return card.audio.primaryUrl;
+    if (!card?.audio?.resolveToken || !card?.id) return "";
+    setCardAudioPending(card.id, true);
+    try {
+      const result = await postDictionaryCommand("audio-resolve", {
+        resolveToken: card.audio.resolveToken,
+      });
+      const url = result?.asset?.url || "";
+      if (!url || result?.status !== "ready") {
+        throw new Error(result?.error?.message || result?.error?.code || "Audio is not ready.");
+      }
+      recordDebugEvent("headword-audio-resolved", {
+        cardId: card.id,
+        headword: overlayTitle(card),
+        cache: result?.asset?.cache || "",
+      });
+      return url;
+    } catch (error) {
+      recordDebugEvent("headword-audio-failed", {
+        cardId: card?.id || "",
+        headword: overlayTitle(card),
+        error: error instanceof Error ? error.message : String(error || ""),
+      });
+      return "";
+    } finally {
+      setCardAudioPending(card.id, false);
+    }
+  }
+
+  function setCardAudioPending(cardId, pending) {
+    if (!cardId) return;
+    const next = { ...state.audioPendingByCardId };
+    if (pending) {
+      next[cardId] = true;
+    } else {
+      delete next[cardId];
+    }
+    state.audioPendingByCardId = next;
+    render();
   }
 
   function overlayChips(card) {
@@ -6041,6 +6096,13 @@
           example: "Na weken wachten kreeg het project eindelijk groen licht.",
           exampleTranslation: "После недель ожидания проект наконец получил разрешение.",
           partOfSpeech: "idiom",
+          audio: {
+            state: "resolvable",
+            kind: "generated",
+            source: "2000nl-tts",
+            resolveToken: "mock-resolve-token",
+            format: "audio/mpeg",
+          },
           phase: "reviewing",
           progressActions: [
             progressDisplayAction("again", "Again", "review-card", "fail", true),

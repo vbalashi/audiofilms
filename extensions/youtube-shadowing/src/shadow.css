@@ -1027,6 +1027,11 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border-color: var(--af-border);
 }
 
+.af-headword-audio.is-pending {
+  opacity: 0.7;
+  cursor: progress;
+}
+
 .af-card-translate,
 .af-card-menu-button {
   display: grid;

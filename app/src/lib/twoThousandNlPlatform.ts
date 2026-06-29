@@ -21,6 +21,7 @@ export async function postTwoThousandNlPlatformJson(
     | 'translation'
     | 'lookup'
     | 'text-translation'
+    | 'audio/resolve'
     | 'user-dictionary/generated-entry'
     | 'user-dictionary/generated-entry/draft',
   body: unknown,

@@ -19,6 +19,7 @@ This is the preferred provider for AudioFilms Dutch shadowing because it returns
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
 DICTIONARY_2000NL_AUDIO_BASE_URL=https://2000.dilum.io # optional, defaults to API origin
+AUDIO_RESOLVE_TOKEN_SECRET=replace-with-random-server-secret # optional explicit signer
 DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=your_2000nl_catalog_lookup_token_here
 DICTIONARY_2000NL_ACCESS_TOKEN=your_short_lived_local_dogfood_token_here
 DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=false
@@ -222,6 +223,9 @@ Explicit per-card mutations go through the AudioFilms backend:
   `/api/platform/v1/actions` with `cardTypeId: "word-to-definition"`.
 - `POST /api/dict/translation` proxies provider-backed translation requests to
   2000NL `/api/platform/v1/translation`.
+- `POST /api/audio/resolve` validates a short-lived AudioFilms resolve token
+  and proxies generated audio materialization to 2000NL
+  `/api/platform/v1/audio/resolve`.
 
 **Error Response:**
 ```json

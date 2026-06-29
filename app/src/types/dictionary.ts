@@ -60,14 +60,28 @@ export type DictionaryOverlayCardV2Translation = {
   };
 };
 
-export type DictionaryOverlayCardAudio = {
-  state: 'ready';
-  kind: 'curated';
-  primaryUrl: string;
-  variants?: Record<string, string>;
-  source: '2000nl';
-  format?: 'audio/mpeg';
-};
+export type DictionaryOverlayCardAudio =
+  | {
+      state: 'ready';
+      kind: 'curated' | 'generated';
+      primaryUrl: string;
+      variants?: Record<string, string>;
+      source: '2000nl' | '2000nl-tts';
+      format?: 'audio/mpeg';
+      assetId?: string;
+      expiresAt?: string;
+    }
+  | {
+      state: 'resolvable';
+      kind: 'generated';
+      source: '2000nl-tts';
+      resolveToken: string;
+      format?: 'audio/mpeg';
+    }
+  | {
+      state: 'unavailable';
+      reason: 'no-text' | 'unsupported-language' | 'not-authorized' | 'generation-disabled';
+    };
 
 export type DictionaryOverlayCardV2 = {
   id: string;

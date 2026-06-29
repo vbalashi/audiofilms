@@ -89,6 +89,7 @@ For 2000NL-backed Dutch lookup and progress-aware cards:
 DICTIONARY_PROVIDER=2000nl
 DICTIONARY_2000NL_API_BASE=https://2000.dilum.io/api/platform/v1
 DICTIONARY_2000NL_AUDIO_BASE_URL=https://2000.dilum.io # optional, defaults to API origin
+AUDIO_RESOLVE_TOKEN_SECRET=... # optional explicit signer for generated-audio resolve tokens
 DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN=... # guest read-only catalog lookup
 ```
 
@@ -100,7 +101,7 @@ runbook for direct 2000NL and AudioFilms proxy timing checks. AudioFilms
 
 The YouTube extension obtains a 2000NL Connect session and forwards its current
 Bearer token to the AudioFilms `/api/dict*` backend routes for user-state lookup,
-actions, and translation. Do not configure a shared end-user token as production
+actions, translation, and generated-audio resolution. Do not configure a shared end-user token as production
 guest lookup identity; `DICTIONARY_2000NL_ACCESS_TOKEN` is only a local dogfood
 fallback when `DICTIONARY_2000NL_LOCAL_DOGFOOD_GUEST_LOOKUP=true` outside
 production.

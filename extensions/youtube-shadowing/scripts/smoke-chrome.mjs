@@ -1364,7 +1364,7 @@ function assertDictionaryCardUi() {
     assertion("dictionary mock card count", before.dictionaryUi?.overlayCardCount === 3, JSON.stringify(before.dictionaryUi)),
     assertion("dictionary card anatomy has title and chips", before.dictionaryUi?.cards?.every((card) => card.title && card.chips > 0), JSON.stringify(before.dictionaryUi?.cards || [])),
     assertion("dictionary card anatomy includes definition number chip", before.dictionaryUi?.cards?.every((card) => card.chipLabels?.some((label) => /^#\d+$/.test(label))), JSON.stringify(before.dictionaryUi?.cards || [])),
-    assertion("dictionary audio button appears only for card audio", before.dictionaryUi?.cards?.[0]?.audioButtons === 1 && before.dictionaryUi?.cards?.slice(1).every((card) => card.audioButtons === 0), JSON.stringify(before.dictionaryUi?.cards || [])),
+    assertion("dictionary audio button appears for ready and resolvable card audio", before.dictionaryUi?.cards?.[0]?.audioButtons === 1 && before.dictionaryUi?.cards?.[1]?.audioButtons === 1 && before.dictionaryUi?.cards?.[2]?.audioButtons === 0, JSON.stringify(before.dictionaryUi?.cards || [])),
     assertion("dictionary not-started actions show Learn only", firstCardActions.length === 1 && firstCardActions[0] === "Learn", firstCardActions.join("|")),
     assertion("dictionary progress actions do not show Known", !allProgressActions.includes("Known"), allProgressActions.join("|")),
     assertion("dictionary review actions show four grades", ["Again", "Hard", "Good", "Easy"].every((label) => allProgressActions.includes(label)), allProgressActions.join("|")),

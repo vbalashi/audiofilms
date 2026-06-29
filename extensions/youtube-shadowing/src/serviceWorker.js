@@ -411,6 +411,7 @@ function dictionaryCommand(operation) {
     "dict-generated-draft": { method: "POST", path: "/api/dict/generated-entry/draft" },
     "dict-generated-save": { method: "POST", path: "/api/dict/generated-entry" },
     "dict-session": { method: "GET", path: "/api/dict/session" },
+    "audio-resolve": { method: "POST", path: "/api/audio/resolve" },
     "phrase-translation": { method: "POST", path: "/api/practice/phrase-translations" },
   };
   const route = routes[operation];
@@ -775,7 +776,7 @@ function isTerminalConnectRefreshError(error) {
 function shouldAttachDictionaryBearer(url) {
   try {
     const parsed = new URL(url);
-    if (!/\/api\/(?:dict|practice\/phrase-translations)(?:\/|$)/.test(parsed.pathname)) {
+    if (!/\/api\/(?:dict|audio|practice\/phrase-translations)(?:\/|$)/.test(parsed.pathname)) {
       return false;
     }
     const allowedOrigins = new Set([

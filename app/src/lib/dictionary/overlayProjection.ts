@@ -70,6 +70,11 @@ export type PlatformLookupResponse = {
 export type ProjectOverlayOptions = {
   allowProgressActions: boolean;
   audioBaseUrl?: string;
+  audioResolveTokenForCard?: (card: {
+    text: string;
+    languageCode: string;
+    entryId?: string;
+  }) => string;
   translationFallbackReason?: string;
 };
 
@@ -167,7 +172,12 @@ export function projectOverlayCard(
     headwordTranslation: stringValue(content.headwordTranslation) || undefined,
     language: item.entry?.languageCode || sourceLanguageCode,
     meaningId: meaningId ?? undefined,
-    audio: normalizedAudio(content.audioLinks, options.audioBaseUrl),
+    audio: normalizedAudio(content.audioLinks, options.audioBaseUrl) ||
+      resolvableAudio({
+        text: headword,
+        languageCode: item.entry?.languageCode || sourceLanguageCode,
+        entryId: item.entry?.id,
+      }, options),
     partOfSpeech: partOfSpeech || undefined,
     article: article || undefined,
     match: {
@@ -212,6 +222,21 @@ function normalizedAudio(value: unknown, audioBaseUrl?: string): OverlayAudio | 
     primaryUrl,
     ...(Object.keys(variants).length ? { variants } : {}),
     source: '2000nl',
+    format: 'audio/mpeg',
+  };
+}
+
+function resolvableAudio(
+  card: { text: string; languageCode: string; entryId?: string },
+  options: ProjectOverlayOptions,
+): OverlayAudio | undefined {
+  const resolveToken = options.audioResolveTokenForCard?.(card);
+  if (!resolveToken) return undefined;
+  return {
+    state: 'resolvable',
+    kind: 'generated',
+    source: '2000nl-tts',
+    resolveToken,
     format: 'audio/mpeg',
   };
 }
