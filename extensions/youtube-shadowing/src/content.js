@@ -3415,10 +3415,12 @@
     }
 
     const text = appendElement(row, "div", "af-ribbon-text");
+    const replayRange = phraseDisplaySegmentRange(phrase);
+    text.classList.toggle("has-replay-segment", Boolean(replayRange));
     if (!shouldShowOriginalText(index)) {
       appendElement(text, "span", "af-ribbon-mask");
     } else {
-      renderClickablePhraseText(text, phraseDisplayText(phrase), index, phraseDisplaySegmentRange(phrase));
+      renderClickablePhraseText(text, phraseDisplayText(phrase), index, replayRange);
     }
 
     const translation = appendElement(row, "div", "af-phrase-translation");

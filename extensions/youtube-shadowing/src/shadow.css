@@ -2309,13 +2309,20 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   background: var(--af-accent-soft);
 }
 
+.af-ribbon-text.has-replay-segment .af-ribbon-word {
+  color: color-mix(in srgb, var(--af-text) 58%, transparent);
+}
+
+.af-ribbon-text.has-replay-segment .af-ribbon-word.is-replay-segment,
 .af-ribbon-word.is-replay-segment {
-  background: color-mix(in srgb, var(--af-accent-soft) 58%, transparent);
-  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--af-accent) 68%, transparent);
+  color: var(--af-text);
+  background: transparent;
+  box-shadow: none;
 }
 
 .af-ribbon-word.is-replay-segment:hover,
 .af-ribbon-word.is-replay-segment.is-selected {
+  color: var(--af-text);
   background: var(--af-accent-soft);
 }
 
