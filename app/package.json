@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:dictionary": "vitest run tests/dictionary/lookupRoute.test.ts tests/dictionary/generatedEntryRoutes.test.ts tests/dictionary/overlayProjection.test.ts tests/practice/phraseTranslations.test.ts tests/practice/operations.test.ts tests/practice/sourceInventory.test.ts tests/practice/captionsOperations.test.ts tests/practice/pairwiseAlignment.test.ts tests/practice/phrases.test.ts tests/practice/subtitleService.test.ts tests/practice/asrJobs.test.ts",
+    "issue-reports": "node scripts/issue-report-cases.mjs",
     "subtitle:shootout": "node scripts/subtitle-source-shootout.mjs",
     "subtitle:shootout:supadata": "node scripts/subtitle-source-shootout.mjs --include-supadata",
     "asr:align:smoke": "node scripts/local-asr-alignment-smoke.mjs",
