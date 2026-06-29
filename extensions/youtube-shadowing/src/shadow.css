@@ -2199,6 +2199,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-ribbon-row {
+  position: relative;
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -2216,12 +2217,33 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-ribbon-row.is-current {
   min-height: 76px;
-  padding: 7px 9px 7px 0;
+  padding: 7px 9px 7px 3px;
   color: var(--af-text);
   background: var(--af-panel);
-  border-left: 3px solid var(--af-accent);
   border-radius: 4px;
   opacity: 1;
+}
+
+.af-ribbon-row.is-current::before,
+.af-ribbon-row.is-current::after {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  border-radius: 4px;
+  content: "";
+}
+
+.af-ribbon-row.is-current::before {
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--af-accent) 30%, transparent);
+}
+
+.af-ribbon-row.is-current::after {
+  top: calc((100% / var(--af-segment-count, 1)) * var(--af-segment-index, 0));
+  height: calc(100% / var(--af-segment-count, 1));
+  background: var(--af-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--af-accent) 45%, transparent);
 }
 
 .af-ribbon-row.is-shadow-mode.is-current {

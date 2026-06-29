@@ -3397,6 +3397,10 @@
     row.dataset.afPhraseStartMs = String(Math.round(phrase.startMs));
     row.dataset.afPhraseEndMs = String(Math.round(phrase.endMs));
     row.dataset.afPhrasePlaybackEndMs = String(Math.round(playbackEndMsForPhrase(state.phrases, index)));
+    const segmentIndicator = phraseSegmentIndicator(phrase, index);
+    row.style.setProperty("--af-segment-count", String(segmentIndicator.count));
+    row.style.setProperty("--af-segment-index", String(segmentIndicator.index));
+    row.classList.toggle("has-segmented-rail", segmentIndicator.count > 1);
     row.classList.toggle("is-current", index === state.currentIndex);
     row.classList.toggle("is-past", index < state.currentIndex);
     row.classList.toggle("is-future", index > state.currentIndex);
@@ -3433,6 +3437,23 @@
       translation.textContent = phraseTranslationText(phrase, index) || "";
       translation.setAttribute("aria-hidden", "true");
     }
+  }
+
+  function phraseSegmentIndicator(phrase, index) {
+    const segmentId = String(phrase?.displaySegmentId || "");
+    if (!segmentId || phrase?.segmentRole !== "sentence-segment") {
+      return { count: 1, index: 0 };
+    }
+
+    const segments = state.phrases
+      .map((candidate, candidateIndex) => ({ candidate, candidateIndex }))
+      .filter(({ candidate }) => (
+        candidate?.segmentRole === "sentence-segment" &&
+        candidate?.displaySegmentId === segmentId
+      ));
+    const count = Math.max(1, segments.length);
+    const segmentIndex = Math.max(0, segments.findIndex((segment) => segment.candidateIndex === index));
+    return { count, index: segmentIndex >= 0 ? segmentIndex : 0 };
   }
 
   function phraseTranslationText(phrase, index = state.currentIndex) {
