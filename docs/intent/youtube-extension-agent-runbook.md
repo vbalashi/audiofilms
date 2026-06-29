@@ -491,6 +491,8 @@ Use `Mark Issue` while manually testing phrase navigation. Press it immediately
 after a wrong Replay/Previous/Next/Space behavior. It opens a compact report
 dialog with category, description, expected behavior, and explicit diagnostics
 consent. `Submit` sends the report to `POST /api/extension/issue-reports`.
+Use `docs/intent/issue-report-taxonomy.md` as the source of intent for report
+categories, required diagnostics, helper filters, and downstream review paths.
 Reports are stored under `AUDIOFILMS_DATA_DIR/issue-reports` when
 `AUDIOFILMS_DATA_DIR` is configured, or `.issue-reports` in the app working
 directory for local runs.

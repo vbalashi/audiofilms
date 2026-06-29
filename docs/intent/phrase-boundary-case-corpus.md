@@ -6,6 +6,9 @@ Phrase-boundary reports capture cases where captions are split, merged, or group
 incorrectly for learner practice. The goal is to turn real dogfood failures into
 repeatable backend tests for `normalizePracticePhrases`.
 
+This is the category-specific pipeline for `phrase-boundary`. The cross-category
+report registry lives in `docs/intent/issue-report-taxonomy.md`.
+
 ## Pipeline
 
 1. Raw capture
