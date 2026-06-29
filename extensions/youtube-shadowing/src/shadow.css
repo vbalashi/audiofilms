@@ -2263,13 +2263,13 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   grid-column: 2;
   grid-row: 1;
   min-height: 22px;
-  color: var(--af-accent);
+  color: var(--af-translation);
   font-size: calc(14px * var(--af-learner-text-scale, 1));
   font-weight: 750;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .af-recall-prompt[aria-hidden="true"] {
