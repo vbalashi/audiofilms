@@ -2,12 +2,12 @@
   const STATIC_BUILD_INFO = {
       "schemaVersion": 1,
       "channel": "unpacked-dev",
-      "buildId": "audiofilms-extension-v0.1.7-20260629191050-da75c23-dirty",
-      "sourceCommit": "da75c23635c6052a6f204f40162c8e570ff70ac9",
-      "builtAt": "2026-06-29T19:10:50.104Z",
-      "buildComment": "selected phrase start learning and compact card previews",
+      "buildId": "audiofilms-extension-v0.1.7-20260630114517-db02cbd-dirty",
+      "sourceCommit": "db02cbdfde3834996fd25c5458f6673a37da50dc",
+      "builtAt": "2026-06-30T11:45:17.517Z",
+      "buildComment": "content module refactor",
       "manifestVersion": "0.1.7",
-      "manifestVersionName": "v0.1.7 · 2026-06-29 19:10:50Z · da75c23 · dirty · selected phrase start learning and compact card previews",
+      "manifestVersionName": "v0.1.7 · 2026-06-30 11:45:17Z · db02cbd · dirty · content module refactor",
       "dirty": true
   };
   const loadedAt = new Date().toISOString();

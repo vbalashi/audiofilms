@@ -157,6 +157,22 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "af-clear-phrase-progress") {
+    clearPhraseProgress(message.keyPrefix || message.key || "")
+      .then((removed) => {
+        sendResponse({ ok: true, removed });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          removed: 0,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+
+    return true;
+  }
+
   if (message?.type === "af-connect-2000nl") {
     connectTwoThousandNl()
       .then(sendResponse)
@@ -617,6 +633,28 @@ async function storePhraseProgress(key, progress) {
   };
   await chromeStorageSet({ [PHRASE_PROGRESS_STORAGE_KEY]: next });
   return normalized;
+}
+
+async function clearPhraseProgress(keyPrefix = "") {
+  const prefix = normalizePhraseProgressKey(keyPrefix);
+  const values = await chromeStorageGet(PHRASE_PROGRESS_STORAGE_KEY);
+  const progressByKey = values?.[PHRASE_PROGRESS_STORAGE_KEY] || {};
+  if (!prefix) {
+    const removed = Object.keys(progressByKey).length;
+    await chromeStorageSet({ [PHRASE_PROGRESS_STORAGE_KEY]: {} });
+    return removed;
+  }
+  const next = {};
+  let removed = 0;
+  for (const [key, progress] of Object.entries(progressByKey)) {
+    if (key === prefix || key.startsWith(prefix)) {
+      removed += 1;
+    } else {
+      next[key] = progress;
+    }
+  }
+  await chromeStorageSet({ [PHRASE_PROGRESS_STORAGE_KEY]: next });
+  return removed;
 }
 
 function normalizePhraseProgressKey(value) {

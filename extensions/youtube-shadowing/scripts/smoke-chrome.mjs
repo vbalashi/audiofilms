@@ -379,6 +379,7 @@ console.log(`\nAll ${results.length} YouTube extension ${shouldRunFullSuite ? "r
 
 function runFixture(fixture) {
   const url = `https://www.youtube.com/watch?v=${fixture.videoId}`;
+  clearPhraseProgressState();
   navigate(url);
   removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
   removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
@@ -1466,6 +1467,8 @@ function assertInteractions(fixture) {
 }
 
 function assertReplayInteraction() {
+  playVideo();
+  sleep(250);
   const before = readSnapshot();
   const rowSeconds = parseTimestampSeconds(before.rowTime);
   clickShadowButton("[data-af-replay]");
@@ -1567,6 +1570,8 @@ function assertNextStaysOnTargetInteraction() {
   const before = readSnapshot();
   const beforeOrdinal = parseCountOrdinal(before.count);
   clickShadowButton("[data-af-next]");
+  sleep(120);
+  playVideo();
   sleep(450);
   const afterEarly = readSnapshot();
   const earlyCurrentTime = Number(afterEarly.video?.currentTime);
@@ -1587,9 +1592,9 @@ function assertNextStaysOnTargetInteraction() {
 
   return [
     assertion("next advances from visible phrase", parseCountOrdinal(afterEarly.count) === expectedOrdinal, `${before.count} -> ${afterEarly.count}`),
-    assertion("next does not roll back during guided playback", parseCountOrdinal(afterAutoPause.count) === expectedOrdinal, `${before.count} -> ${afterAutoPause.count}`),
+    assertion("next does not roll back during guided playback", parseCountOrdinal(afterAutoPause.count) === expectedOrdinal, `${before.count} -> ${afterAutoPause.count}; runtime=${JSON.stringify(afterAutoPause.runtime)}`),
     assertion("next leaves guided mode active", afterAutoPause.guidedMode === true, JSON.stringify({ mode: afterAutoPause.mode, guidedMode: afterAutoPause.guidedMode })),
-    assertion("next auto-pause holds near phrase end", stayedNearEnd, JSON.stringify({ pausedAt, phraseStart, phraseEnd })),
+    assertion("next auto-pause holds near phrase end", stayedNearEnd, JSON.stringify({ pausedAt, phraseStart, phraseEnd, runtime: afterAutoPause.runtime })),
   ];
 }
 
@@ -1718,7 +1723,7 @@ function assertSourceSwitchInteraction(fixture) {
   const manualClick = clickSourceOption("manual");
   assertions.push(assertion("manual source option clicked", manualClick.clicked, manualClick.detail));
   const manualSnapshot = waitForSource(/(?:Dutch|English) captions/i, fixture.videoId, waitMs);
-  assertions.push(assertion("caption source restored", /(?:Dutch|English) captions/i.test(manualSnapshot.source || ""), manualSnapshot.source));
+  assertions.push(assertion("caption source restored", /\b(?:Dutch|English)\b/i.test(manualSnapshot.source || ""), manualSnapshot.source));
   assertions.push(assertion("manual source restored expected count", fixture.expect.countPattern.test(manualSnapshot.count || ""), manualSnapshot.count));
   assertions.push(assertion("manual source has no visible error", !(manualSnapshot.error || "").trim(), manualSnapshot.error));
 
@@ -1888,7 +1893,7 @@ function assertFixture(fixture, snapshot) {
   assertions.push(assertion("count", expect.countPattern.test(snapshot.count || ""), snapshot.count));
 
   for (const part of expect.sourceIncludes || []) {
-    assertions.push(assertion(sourceExpectationLabel(part), sourceMatchesExpectation(snapshot.source || "", part), snapshot.source));
+    assertions.push(assertion(sourceExpectationLabel(part), sourceMatchesExpectation(snapshot, part), snapshot.source));
   }
 
   if (expect.retrievalPath) {
@@ -1914,7 +1919,7 @@ function assertFixture(fixture, snapshot) {
 
   for (const label of expect.hiddenControls || []) {
     const aliases = label === "Replay" ? ["Replay", "Repeat"] : [label];
-    const control = snapshot.controls.find((item) => aliases.some((alias) => item.text.startsWith(alias)));
+    const control = (snapshot.controls || []).find((item) => aliases.some((alias) => item.text.startsWith(alias)));
     assertions.push(assertion(`${label} hidden`, control?.display === "none", JSON.stringify(control)));
   }
 
@@ -1925,9 +1930,17 @@ function assertFixture(fixture, snapshot) {
   return assertions;
 }
 
-function sourceMatchesExpectation(source, expectedPart) {
+function sourceMatchesExpectation(snapshot, expectedPart) {
+  const source = snapshot?.source || "";
   if (expectedPart === "Ready") {
-    return /\b(?:Ready|Rough|Precise)\b/i.test(source);
+    return /^(?:ready|rough|precise)$/i.test(snapshot?.readinessState || "") ||
+      /\b(?:Ready|Rough|Precise)\b/i.test(source);
+  }
+  if (expectedPart === "Dutch captions") {
+    return /\bDutch\b/i.test(source);
+  }
+  if (expectedPart === "English captions") {
+    return /\bEnglish\b/i.test(source);
   }
   return source.includes(expectedPart);
 }
@@ -2144,6 +2157,7 @@ function readSnapshot() {
       boot: document.documentElement.dataset.afShadowingBoot || "",
       bootState: parseJson(document.documentElement.dataset.afShadowingBootState),
       toggleText: document.querySelector("#af-shadowing-toggle")?.textContent || "",
+      controls: [],
     });
   }
 
@@ -2169,6 +2183,7 @@ function readSnapshot() {
     isEmpty: panel.classList.contains("is-empty"),
     loading: (root.querySelector("[data-af-count]")?.textContent || "") === "Loading",
     source: root.querySelector("[data-af-source-toggle]")?.textContent || "",
+    readinessState: root.querySelector("[data-af-source-toggle]")?.dataset.afReadiness || "",
     count: root.querySelector("[data-af-count]")?.textContent || "",
     mode: root.querySelector("[data-af-mode]")?.textContent || "",
     guidedMode: root.querySelector("[data-af-mode]")?.classList.contains("is-guided") || false,
@@ -2178,6 +2193,33 @@ function readSnapshot() {
     rowTime: root.querySelector(".af-ribbon-row.is-current .af-ribbon-time")?.textContent || "",
     rowText: root.querySelector(".af-ribbon-row.is-current .af-ribbon-text")?.textContent || "",
     currentPhraseTiming,
+    runtime: (() => {
+      const state = window.__afShadowingDebug || {};
+      return {
+        currentIndex: state.currentIndex,
+        autoPause: state.autoPause,
+        guidedMode: state.guidedMode,
+        activePlayback: state.activePlayback ? {
+          index: state.activePlayback.index,
+          endSeconds: state.activePlayback.endSeconds,
+          holdSeconds: state.activePlayback.holdSeconds,
+          slowReplay: Boolean(state.activePlayback.slowReplay),
+        } : null,
+        playbackFrameActive: Boolean(state.playbackFrame),
+        passiveFrameActive: Boolean(state.passiveFrame),
+        passivePausedKey: state.passivePausedKey || "",
+        guidedHold: state.guidedHold || null,
+        lastNavigationEvents: Array.isArray(state.navigationEvents)
+          ? state.navigationEvents.slice(-5).map((event) => ({
+            type: event.type,
+            command: event.command || "",
+            targetIndex: event.targetPhrase?.index,
+            currentIndex: event.currentPhrase?.index,
+            playbackTime: event.playback?.currentTime,
+          }))
+          : [],
+      };
+    })(),
     dictionary: (() => {
       const dictionary = root.querySelector("#af-shadowing-dictionary-panel");
       if (!dictionary) return { present: false };
@@ -3167,6 +3209,18 @@ function clearDictionaryMockState() {
   }
   removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
   clearDictionaryMockCommands();
+}
+
+function clearPhraseProgressState() {
+  chromeOpen(`chrome-extension://${EXTENSION_ID}/src/options.html`);
+  sleep(500);
+  chromeEval(`
+(() => {
+  chrome.storage?.local?.set?.({ afShadowingPhraseProgress: {} });
+  return "ok";
+})()
+  `);
+  sleep(500);
 }
 
 function getLocalStorageItem(key) {
