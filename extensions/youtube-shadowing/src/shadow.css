@@ -34,13 +34,17 @@ html.af-shadowing-workspace {
 }
 
 html.af-shadowing-workspace[data-af-theme="dark"],
-:host([data-af-theme="dark"]) {
+:host([data-af-theme="dark"]),
+:host([data-af-theme="system"]) {
   --af-bg: #16181d;
   --af-bg-rgb: 22, 24, 29;
   --af-panel: #22252c;
   --af-panel-rgb: 34, 37, 44;
   --af-panel-soft: #181b21;
   --af-panel-soft-rgb: 24, 27, 33;
+  --af-panel-alpha-bg: rgba(var(--af-panel-rgb), var(--af-panel-background-alpha, 1));
+  --af-bg-alpha: rgba(var(--af-bg-rgb), var(--af-panel-background-alpha, 1));
+  --af-panel-soft-alpha-bg: rgba(var(--af-panel-soft-rgb), var(--af-panel-background-alpha, 1));
   --af-panel-strong: #2d313a;
   --af-control: #191c22;
   --af-control-hover: #30343d;
@@ -103,6 +107,9 @@ html.af-shadowing-workspace[data-af-theme="light"] {
   --af-panel-rgb: 245, 247, 250;
   --af-panel-soft: #e1e6ee;
   --af-panel-soft-rgb: 225, 230, 238;
+  --af-panel-alpha-bg: rgba(var(--af-panel-rgb), var(--af-panel-background-alpha, 1));
+  --af-bg-alpha: rgba(var(--af-bg-rgb), var(--af-panel-background-alpha, 1));
+  --af-panel-soft-alpha-bg: rgba(var(--af-panel-soft-rgb), var(--af-panel-background-alpha, 1));
   --af-panel-strong: #d3dae5;
   --af-control: #fbfcfe;
   --af-control-hover: #e8edf4;
@@ -166,6 +173,9 @@ html.af-shadowing-workspace[data-af-theme="light"] {
     --af-panel-rgb: 245, 247, 250;
     --af-panel-soft: #e1e6ee;
     --af-panel-soft-rgb: 225, 230, 238;
+    --af-panel-alpha-bg: rgba(var(--af-panel-rgb), var(--af-panel-background-alpha, 1));
+    --af-bg-alpha: rgba(var(--af-bg-rgb), var(--af-panel-background-alpha, 1));
+    --af-panel-soft-alpha-bg: rgba(var(--af-panel-soft-rgb), var(--af-panel-background-alpha, 1));
     --af-panel-strong: #d3dae5;
     --af-control: #fbfcfe;
     --af-control-hover: #e8edf4;
@@ -272,6 +282,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 #af-shadowing-ribbon-panel.is-empty:not(.is-floating) {
   max-width: min(520px, calc(100vw - 32px));
+}
+
+#af-shadowing-ribbon-panel.is-empty {
+  background: rgba(var(--af-bg-rgb), 0.94);
 }
 
 #af-shadowing-dictionary-panel *,

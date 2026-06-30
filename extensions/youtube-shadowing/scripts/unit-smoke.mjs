@@ -504,6 +504,10 @@ assertManifestOrderRegistersContentNamespaces();
 assertSourceContentFacadeComposesSourceBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
+const shadowCssSource = fs.readFileSync(path.join(extensionRoot, "src/shadow.css"), "utf8");
+assert.match(shadowCssSource, /:host\(\[data-af-theme="dark"\]\)[\s\S]*--af-bg-alpha:/);
+assert.match(shadowCssSource, /:host\(\[data-af-theme="system"\]\)[\s\S]*--af-bg-alpha:/);
+assert.match(shadowCssSource, /:host\(\[data-af-theme="light"\]\)[\s\S]*--af-bg-alpha:/);
 
 const phraseTokens = loadBrowserModule("src/phraseTokens.js", "__afShadowingPhraseTokens");
 const bootState = loadBrowserModule("src/bootState.js", "__afShadowingBootState");

@@ -1893,6 +1893,7 @@ function assertFixture(fixture, snapshot) {
   assertions.push(assertion("count", expect.countPattern.test(snapshot.count || ""), snapshot.count));
   assertions.push(assertion("shadow stylesheet loaded", snapshot.styleHealth?.stylesheetLoaded === true, JSON.stringify(snapshot.styleHealth)));
   assertions.push(assertion("control icons styled", Number(snapshot.styleHealth?.iconWidth || 0) > 0 && Number(snapshot.styleHealth?.iconWidth || 0) <= 32, JSON.stringify(snapshot.styleHealth)));
+  assertions.push(assertion("panel background visible", isVisibleBackground(snapshot.styleHealth?.panelBackground, expect.empty ? 0.85 : 0.4), JSON.stringify(snapshot.styleHealth)));
 
   for (const part of expect.sourceIncludes || []) {
     assertions.push(assertion(sourceExpectationLabel(part), sourceMatchesExpectation(snapshot, part), snapshot.source));
@@ -1945,6 +1946,13 @@ function sourceMatchesExpectation(snapshot, expectedPart) {
     return /\bEnglish\b/i.test(source);
   }
   return source.includes(expectedPart);
+}
+
+function isVisibleBackground(value, minAlpha = 0.4) {
+  const background = String(value || "");
+  if (!background || background === "transparent") return false;
+  const rgba = background.match(/^rgba\\([^,]+,[^,]+,[^,]+,\\s*([\\d.]+)\\)$/);
+  return !rgba || Number(rgba[1]) > minAlpha;
 }
 
 function sourceExpectationLabel(expectedPart) {
@@ -2207,6 +2215,7 @@ function readSnapshot() {
       iconHeight: controlIconStyle ? Number.parseFloat(controlIconStyle.height) : 0,
       panelPosition: ribbonStyle?.position || "",
       panelBorderRadius: ribbonStyle?.borderRadius || "",
+      panelBackground: ribbonStyle?.backgroundColor || "",
     },
     currentPhraseTiming,
     runtime: (() => {
