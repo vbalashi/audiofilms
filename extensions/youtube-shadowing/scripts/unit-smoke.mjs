@@ -74,6 +74,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingDictionaryCommandTransport",
     "__afShadowingDictionaryLookupWorkflow",
     "__afShadowingDictionaryContentWorkflow",
+    "__afShadowingDictionaryRuntimeContentFacade",
     "__afShadowingAccountSession",
     "__afShadowingAccountSessionWorkflow",
     "__afShadowingAccountSessionDom",
@@ -847,6 +848,65 @@ async function assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary() {
   assert.ok(events.some((event) => event[0] === "post" && event[1] === "dict-action"));
 }
 
+async function assertDictionaryRuntimeContentFacadeOwnsControllerBindings() {
+  const dictionaryRuntimeFacade = loadBrowserModule(
+    "src/dictionaryRuntimeContentFacade.js",
+    "__afShadowingDictionaryRuntimeContentFacade",
+  );
+  const runtime = dictionaryRuntimeFacade.createDictionaryRuntimeController();
+  assert.throws(() => runtime.renderDictionary("panel"), /used before binding/);
+
+  const calls = [];
+  const controller = {};
+  const methodNames = [
+    "toggleCardTranslation",
+    "setCardTranslationPending",
+    "renderDictionary",
+    "renderAccountControl",
+    "dictionaryHeaderCopy",
+    "renderAccountCard",
+    "renderSelectedWordCard",
+    "renderSelectedSpanCard",
+    "renderSelectedSpanTitle",
+    "renderSelectedSpanLookupPrompt",
+    "renderGeneratedFallback",
+    "renderOverlayCard",
+    "renderOverlayCardTitle",
+    "renderOverlaySections",
+    "renderReviewActions",
+    "renderConnectPrompt",
+    "selectLookupWord",
+    "lookupSelectedWord",
+    "loadGroupedDictionarySearch",
+    "toggleDictionarySearchItem",
+    "loadDictionarySearchItemCard",
+    "requestDictionaryCardTranslation",
+  ];
+  for (const name of methodNames) {
+    controller[name] = (...args) => {
+      calls.push([name, args]);
+      return `${name}:ok`;
+    };
+  }
+
+  assert.equal(runtime.bindController(controller), runtime);
+  assert.equal(runtime.renderDictionary("panel"), "renderDictionary:ok");
+  assert.equal(runtime.renderAccountControl("account", "menu", "copy", "action"), "renderAccountControl:ok");
+  assert.equal(runtime.selectLookupWord("klein", 3, { tokenIndex: 1 }, { reason: "unit" }), "selectLookupWord:ok");
+  assert.equal(await runtime.lookupSelectedWord({ word: "klein" }), "lookupSelectedWord:ok");
+  assert.equal(await runtime.loadDictionarySearchItemCard({ word: "klein" }, { entryId: "entry-1" }, "key-1"), "loadDictionarySearchItemCard:ok");
+  assert.equal(await runtime.requestDictionaryCardTranslation({ entryId: "entry-1" }), "requestDictionaryCardTranslation:ok");
+  assert.deepEqual(calls.map((call) => call[0]), [
+    "renderDictionary",
+    "renderAccountControl",
+    "selectLookupWord",
+    "lookupSelectedWord",
+    "loadDictionarySearchItemCard",
+    "requestDictionaryCardTranslation",
+  ]);
+  assert.deepEqual(calls[2][1], ["klein", 3, { tokenIndex: 1 }, { reason: "unit" }]);
+}
+
 async function assertPhraseTranslationContentFacadeOwnsTranslationBoundary() {
   const phraseTranslationFacade = loadBrowserModule(
     "src/phraseTranslationContentFacade.js",
@@ -1181,6 +1241,7 @@ assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
 await assertBackendRuntimeContentFacadeOwnsBackendPorts();
 await assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary();
+await assertDictionaryRuntimeContentFacadeOwnsControllerBindings();
 await assertPhraseTranslationContentFacadeOwnsTranslationBoundary();
 assertSurfaceContentFacadeComposesTypedCommands();
 assertLearningBoundaryTermsStayOutOfContentScript();

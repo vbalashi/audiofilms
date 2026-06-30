@@ -82,6 +82,7 @@
       dictionaryCommandTransportApi: requiredModule(target, "__afShadowingDictionaryCommandTransport"),
       dictionaryLookupWorkflowApi: requiredModule(target, "__afShadowingDictionaryLookupWorkflow"),
       dictionaryContentWorkflowApi: requiredModule(target, "__afShadowingDictionaryContentWorkflow"),
+      dictionaryRuntimeContentFacadeApi: requiredModule(target, "__afShadowingDictionaryRuntimeContentFacade"),
       accountSessionApi: requiredModule(target, "__afShadowingAccountSession"),
       accountSessionWorkflowApi: requiredModule(target, "__afShadowingAccountSessionWorkflow"),
       accountSessionDomApi: requiredModule(target, "__afShadowingAccountSessionDom"),

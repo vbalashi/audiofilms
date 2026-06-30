@@ -80,6 +80,7 @@
         "src/dictionaryCommandTransport.js",
         "src/dictionaryLookupWorkflow.js",
         "src/dictionaryContentWorkflow.js",
+        "src/dictionaryRuntimeContentFacade.js",
         "src/accountSession.js",
         "src/accountSessionWorkflow.js",
         "src/accountSessionDom.js",
@@ -177,5 +178,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 20:11:53Z · 160f8d2 · dirty · playback runtime facade refactor"
+  "version_name": "v0.1.7 · 2026-06-30 20:57:08Z · 7800b68 · dirty · dictionary runtime facade refactor"
 }

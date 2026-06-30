@@ -49,6 +49,7 @@
     dictionaryCommandApi,
     dictionaryLookupWorkflowApi,
     dictionaryContentWorkflowApi,
+    dictionaryRuntimeContentFacadeApi,
     accountSessionApi,
     accountSessionWorkflowApi,
     accountSessionDomApi,
@@ -177,6 +178,31 @@
     state,
     recordDebugEvent,
   });
+  const dictionaryRuntimeController = dictionaryRuntimeContentFacadeApi.createDictionaryRuntimeController();
+  const {
+    toggleCardTranslation,
+    setCardTranslationPending,
+    renderDictionary,
+    renderAccountControl,
+    dictionaryHeaderCopy,
+    renderAccountCard,
+    renderSelectedWordCard,
+    renderSelectedSpanCard,
+    renderSelectedSpanTitle,
+    renderSelectedSpanLookupPrompt,
+    renderGeneratedFallback,
+    renderOverlayCard,
+    renderOverlayCardTitle,
+    renderOverlaySections,
+    renderReviewActions,
+    renderConnectPrompt,
+    selectLookupWord,
+    lookupSelectedWord,
+    loadGroupedDictionarySearch,
+    toggleDictionarySearchItem,
+    loadDictionarySearchItemCard,
+    requestDictionaryCardTranslation,
+  } = dictionaryRuntimeController;
   let playbackRuntimeController = null;
   const backendRuntimeController = backendRuntimeContentFacadeApi.createBackendRuntimeController({
     environment: {
@@ -385,6 +411,7 @@
     generatedDraftItemFromOverlayCard,
     recordDebugEvent,
   });
+  dictionaryRuntimeController.bindController(dictionaryController);
   playbackRuntimeController = playbackContentFacadeApi.createPlaybackRuntimeController({
     getState: () => state,
     playbackContentWorkflow: playbackContentWorkflowApi,
@@ -1073,14 +1100,6 @@
     return displayStateController.cardExpanded(cardId);
   }
 
-  function toggleCardTranslation(card) {
-    return dictionaryController.toggleCardTranslation(card);
-  }
-
-  function setCardTranslationPending(cardId, pending) {
-    return dictionaryController.setCardTranslationPending(cardId, pending);
-  }
-
   function closeOpenMenus() {
     return displayStateController.closeOpenMenus();
   }
@@ -1345,86 +1364,6 @@
 
   function handleWordReplayGesture(event, word, phraseIndex, selection) {
     return handleWordReplayGestureFromPlayback(event, word, phraseIndex, selection);
-  }
-
-  function renderDictionary(panel) {
-    return dictionaryController.renderDictionary(panel);
-  }
-
-  function renderAccountControl(account, accountMenu, accountCopy, accountAction) {
-    return dictionaryController.renderAccountControl(account, accountMenu, accountCopy, accountAction);
-  }
-
-  function dictionaryHeaderCopy() {
-    return dictionaryController.dictionaryHeaderCopy();
-  }
-
-  function renderAccountCard(parent) {
-    return dictionaryController.renderAccountCard(parent);
-  }
-
-  function renderSelectedWordCard(parent) {
-    return dictionaryController.renderSelectedWordCard(parent);
-  }
-
-  function renderSelectedSpanCard(parent) {
-    return dictionaryController.renderSelectedSpanCard(parent);
-  }
-
-  function renderSelectedSpanTitle(parent, span) {
-    return dictionaryController.renderSelectedSpanTitle(parent, span);
-  }
-
-  function renderSelectedSpanLookupPrompt(parent) {
-    return dictionaryController.renderSelectedSpanLookupPrompt(parent);
-  }
-
-  function renderGeneratedFallback(parent, selectedWord) {
-    return dictionaryController.renderGeneratedFallback(parent, selectedWord);
-  }
-
-  function renderOverlayCard(parent, card, options = {}) {
-    return dictionaryController.renderOverlayCard(parent, card, options);
-  }
-
-  function renderOverlayCardTitle(parent, card) {
-    return dictionaryController.renderOverlayCardTitle(parent, card);
-  }
-
-  function renderOverlaySections(parent, sections, card, translation = null) {
-    return dictionaryController.renderOverlaySections(parent, sections, card, translation);
-  }
-
-  function renderReviewActions(parent, card = null) {
-    return dictionaryController.renderReviewActions(parent, card);
-  }
-
-  function renderConnectPrompt(parent) {
-    return dictionaryController.renderConnectPrompt(parent);
-  }
-
-  function selectLookupWord(word, phraseIndex, selection = {}, options = {}) {
-    return dictionaryController.selectLookupWord(word, phraseIndex, selection, options);
-  }
-
-  async function lookupSelectedWord(selectedWord) {
-    return dictionaryController.lookupSelectedWord(selectedWord);
-  }
-
-  async function loadGroupedDictionarySearch(selectedWord, contextText, options = {}) {
-    return dictionaryController.loadGroupedDictionarySearch(selectedWord, contextText, options);
-  }
-
-  function toggleDictionarySearchItem(selectedWord, group, item, itemKey) {
-    return dictionaryController.toggleDictionarySearchItem(selectedWord, group, item, itemKey);
-  }
-
-  async function loadDictionarySearchItemCard(selectedWord, item, itemKey) {
-    return dictionaryController.loadDictionarySearchItemCard(selectedWord, item, itemKey);
-  }
-
-  async function requestDictionaryCardTranslation(card) {
-    return dictionaryController.requestDictionaryCardTranslation(card);
   }
 
   async function initializeForCurrentVideo() {
