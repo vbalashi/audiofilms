@@ -60,6 +60,7 @@
     phraseProgressStorageApi,
     phraseTranslationApi,
     phraseTranslationWorkflowApi,
+    phraseTranslationContentFacadeApi,
     phraseRowsApi,
     phraseRowsDomApi,
     phraseRowsWorkflowApi,
@@ -264,6 +265,25 @@
     fetchDictionarySearchResult,
     postDictionaryCommand,
   } = dictionaryOperationsController;
+  const phraseTranslationController = phraseTranslationContentFacadeApi.createPhraseTranslationController({
+    getState: () => state,
+    modules,
+    commands: {
+      getSelectedPracticeSource,
+      postDictionaryCommand,
+      recordDebugEvent,
+      render,
+    },
+  });
+  const {
+    setPracticeMode,
+    togglePhraseTranslation,
+    phraseTranslationState,
+    ensureCurrentPhraseTranslation,
+    requestSelectedSpanTranslation,
+    phraseDisplaySegmentRange,
+    applyPhraseEntryDisplayState,
+  } = phraseTranslationController;
   const dictionaryController = dictionaryContentWorkflowApi.createDictionaryController({
     getState: () => state,
     dictionaryPanelWorkflow: dictionaryPanelWorkflowApi,
@@ -748,22 +768,6 @@
       clearElement: domUtilsApi.clearElement,
       appendRibbonMessage,
       appendPhraseRow,
-    });
-  }
-
-  function setPracticeMode(mode) {
-    return phraseTranslationWorkflowApi.setPracticeMode(state, mode, {
-      phraseTranslations: phraseTranslationApi,
-      ensureCurrentPhraseTranslation,
-      render,
-    });
-  }
-
-  function togglePhraseTranslation(event) {
-    return phraseTranslationWorkflowApi.togglePhraseTranslation(state, event, {
-      phraseTranslations: phraseTranslationApi,
-      ensureCurrentPhraseTranslation,
-      render,
     });
   }
 
@@ -1260,64 +1264,6 @@
     return ribbonContentController.appendPhraseRow(parent, phrase, index);
   }
 
-  function phraseTranslationState(phrase, index = state.currentIndex) {
-    const key = phraseTranslationKey(phrase, index);
-    return key ? state.phraseTranslations[key] || null : null;
-  }
-
-  function phraseTranslationKey(phrase, index = state.currentIndex) {
-    return phraseTranslationApi.phraseTranslationKey({
-      phrase,
-      index,
-      videoId: state.videoId,
-      sourceId: state.selectedSourceId,
-    });
-  }
-
-  function phraseTranslationId(phrase, index = state.currentIndex) {
-    return phraseTranslationApi.phraseTranslationId({
-      phrase,
-      index,
-      videoId: state.videoId,
-      sourceId: state.selectedSourceId,
-    });
-  }
-
-  function ensureCurrentPhraseTranslation() {
-    phraseTranslationWorkflowApi.ensureCurrentPhraseTranslation(state, {
-      phraseTranslationKey,
-      requestPhraseTranslation,
-    });
-  }
-
-  async function requestPhraseTranslation(phrase, index, key) {
-    return phraseTranslationWorkflowApi.requestPhraseTranslation(state, {
-      phrase,
-      index,
-      key,
-      options: phraseTranslationWorkflowOptions(),
-    });
-  }
-
-  async function requestSelectedSpanTranslation(span) {
-    return phraseTranslationWorkflowApi.requestSelectedSpanTranslation(state, span, phraseTranslationWorkflowOptions());
-  }
-
-  function phraseTranslationWorkflowOptions() {
-    return {
-      phraseTranslations: phraseTranslationApi,
-      getSelectedPracticeSource,
-      postDictionaryCommand,
-      phraseTranslationId,
-      recordDebugEvent,
-      render,
-    };
-  }
-
-  function phraseDisplaySegmentRange(phrase) {
-    return phraseTranslationApi.phraseDisplaySegmentRange(phrase);
-  }
-
   function isTokenInSelectedSpan(phraseIndex, tokenIndex) {
     return phraseRowsApi.tokenInSpan(state.selectedSpan, phraseIndex, tokenIndex);
   }
@@ -1638,13 +1584,6 @@
   function showText() {
     state.textVisible = true;
     render();
-  }
-
-  function applyPhraseEntryDisplayState() {
-    return phraseTranslationWorkflowApi.applyPhraseEntryDisplayState(state, {
-      phraseTranslations: phraseTranslationApi,
-      ensureCurrentPhraseTranslation,
-    });
   }
 
   function syncIndexToCurrentTime(options = {}) {

@@ -94,6 +94,7 @@
       phraseProgressStorageApi: requiredModule(target, "__afShadowingPhraseProgressStorage"),
       phraseTranslationApi: requiredModule(target, "__afShadowingPhraseTranslations"),
       phraseTranslationWorkflowApi: requiredModule(target, "__afShadowingPhraseTranslationWorkflow"),
+      phraseTranslationContentFacadeApi: requiredModule(target, "__afShadowingPhraseTranslationContentFacade"),
       phraseRowsApi: requiredModule(target, "__afShadowingPhraseRows"),
       phraseRowsDomApi: requiredModule(target, "__afShadowingPhraseRowsDom"),
       phraseRowsWorkflowApi: requiredModule(target, "__afShadowingPhraseRowsWorkflow"),

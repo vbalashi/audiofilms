@@ -86,6 +86,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingPhraseProgressStorage",
     "__afShadowingPhraseTranslations",
     "__afShadowingPhraseTranslationWorkflow",
+    "__afShadowingPhraseTranslationContentFacade",
     "__afShadowingPhraseRows",
     "__afShadowingPhraseRowsDom",
     "__afShadowingPhraseRowsWorkflow",
@@ -643,6 +644,113 @@ async function assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary() {
   assert.ok(events.some((event) => event[0] === "post" && event[1] === "dict-action"));
 }
 
+async function assertPhraseTranslationContentFacadeOwnsTranslationBoundary() {
+  const phraseTranslationFacade = loadBrowserModule(
+    "src/phraseTranslationContentFacade.js",
+    "__afShadowingPhraseTranslationContentFacade",
+  );
+  const events = [];
+  const state = {
+    videoId: "video-1",
+    selectedSourceId: "source-1",
+    currentIndex: 0,
+    phrases: [{ text: "een kleine rode ster" }],
+    phraseTranslations: {},
+    phraseTranslationSeq: 0,
+    transcriptResult: { language: "nl" },
+    accountStatus: "signed-in",
+    accountPreferences: { translationTargetLanguageCode: "ru" },
+    selectedSpan: { phraseIndex: 0, text: "kleine rode ster" },
+    practiceMode: "shadow",
+    shadowTextVisible: true,
+    phraseTranslationStickyVisible: false,
+  };
+  const modules = {
+    phraseTranslationApi: {
+      phraseTranslationKey: ({ phrase, index, videoId, sourceId }) => `${videoId}:${sourceId}:${index}:${phrase.text}`,
+      phraseTranslationId: ({ index, videoId, sourceId }) => `${videoId}:${sourceId}:${index}`,
+      sourceLanguageCode: () => "nl",
+      phraseTranslationPayload: (payload) => payload,
+      phraseTranslationResultState: (translation) => ({ status: "ready", text: translation.text }),
+      spanTranslationPayload: (payload) => payload,
+      spanTranslationResultState: (span, translation) => ({ ...span, status: "ready", translation: translation.text }),
+      phraseDisplaySegmentRange: () => ({ start: 0, end: 3 }),
+      normalizePracticeMode: (mode) => mode,
+      phraseEntryDisplayState: () => ({
+        practiceMode: "recall",
+        textVisible: false,
+        phraseTranslationVisible: true,
+        shouldEnsureTranslation: true,
+      }),
+      phraseTranslationToggleState: () => ({
+        phraseTranslationStickyVisible: true,
+        phraseTranslationVisible: true,
+        shouldEnsureTranslation: true,
+      }),
+    },
+    phraseTranslationWorkflowApi: {
+      ensureCurrentPhraseTranslation: (nextState, options) => {
+        const phrase = nextState.phrases[nextState.currentIndex];
+        const key = options.phraseTranslationKey(phrase, nextState.currentIndex);
+        events.push(["ensure", key]);
+        options.requestPhraseTranslation(phrase, nextState.currentIndex, key);
+        return true;
+      },
+      requestPhraseTranslation: async (nextState, { phrase, index, key, options }) => {
+        events.push(["request", options.phraseTranslationId(phrase, index)]);
+        nextState.phraseTranslations[key] = { status: "ready", text: "translation" };
+      },
+      requestSelectedSpanTranslation: async (nextState, span, options) => {
+        events.push(["span", options.phraseTranslationId(nextState.phrases[span.phraseIndex], span.phraseIndex)]);
+        nextState.selectedSpan = { ...span, status: "ready" };
+        return true;
+      },
+      applyPhraseEntryDisplayState: (nextState, options) => {
+        const displayState = options.phraseTranslations.phraseEntryDisplayState({});
+        nextState.practiceMode = displayState.practiceMode;
+        options.ensureCurrentPhraseTranslation();
+        return displayState;
+      },
+      setPracticeMode: (nextState, mode, options) => {
+        nextState.practiceMode = mode;
+        options.ensureCurrentPhraseTranslation();
+        options.render();
+        return { practiceMode: mode };
+      },
+      togglePhraseTranslation: (nextState, _event, options) => {
+        nextState.phraseTranslationVisible = true;
+        options.ensureCurrentPhraseTranslation();
+        options.render();
+        return { phraseTranslationVisible: true };
+      },
+    },
+  };
+  const controller = phraseTranslationFacade.createPhraseTranslationController({
+    getState: () => state,
+    modules,
+    commands: {
+      getSelectedPracticeSource: () => ({ id: "source-1" }),
+      postDictionaryCommand: async (operation) => {
+        events.push(["post", operation]);
+        return { text: "translation" };
+      },
+      recordDebugEvent: (type) => events.push(["debug", type]),
+      render: () => events.push(["render"]),
+    },
+  });
+
+  assert.equal(controller.phraseTranslationState(state.phrases[0], 0), null);
+  assert.deepEqual(controller.phraseDisplaySegmentRange(state.phrases[0]), { start: 0, end: 3 });
+  controller.setPracticeMode("recall");
+  controller.togglePhraseTranslation({ shiftKey: true });
+  controller.applyPhraseEntryDisplayState();
+  await controller.requestSelectedSpanTranslation(state.selectedSpan);
+  assert.equal(state.phraseTranslations["video-1:source-1:0:een kleine rode ster"].status, "ready");
+  assert.equal(state.selectedSpan.status, "ready");
+  assert.ok(events.some((event) => event[0] === "ensure"));
+  assert.ok(events.some((event) => event[0] === "span" && event[1] === "video-1:source-1:0"));
+}
+
 function assertSurfaceContentFacadeComposesTypedCommands() {
   const surfaceContentFacade = loadBrowserModule("src/surfaceContentFacade.js", "__afShadowingSurfaceContentFacade");
   const captured = {};
@@ -850,6 +958,7 @@ assertSourceContentFacadeComposesSourceBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
 await assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary();
+await assertPhraseTranslationContentFacadeOwnsTranslationBoundary();
 assertSurfaceContentFacadeComposesTypedCommands();
 assertLearningBoundaryTermsStayOutOfContentScript();
 const shadowCssSource = fs.readFileSync(path.join(extensionRoot, "src/shadow.css"), "utf8");

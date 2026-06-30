@@ -90,6 +90,7 @@
         "src/phraseTokens.js",
         "src/phraseTranslations.js",
         "src/phraseTranslationWorkflow.js",
+        "src/phraseTranslationContentFacade.js",
         "src/phraseRows.js",
         "src/phraseRowsDom.js",
         "src/phraseRowsWorkflow.js",
@@ -175,5 +176,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 19:32:29Z · 449ea08 · dirty · dictionary operations facade refactor"
+  "version_name": "v0.1.7 · 2026-06-30 19:40:44Z · 95400f0 · dirty · phrase translation facade refactor"
 }
