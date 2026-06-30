@@ -62,6 +62,7 @@
       sourceLoadWorkflowApi: requiredModule(target, "__afShadowingSourceLoadWorkflow"),
       sourceLoadContentWorkflowApi: requiredModule(target, "__afShadowingSourceLoadContentWorkflow"),
       sourceContentFacadeApi: requiredModule(target, "__afShadowingSourceContentFacade"),
+      youtubeRuntimeContentFacadeApi: requiredModule(target, "__afShadowingYoutubeRuntimeContentFacade"),
       videoInitWorkflowApi: requiredModule(target, "__afShadowingVideoInitWorkflow"),
       videoInitContentWorkflowApi: requiredModule(target, "__afShadowingVideoInitContentWorkflow"),
       sourceBindingApi: requiredModule(target, "__afShadowingSourceBinding"),

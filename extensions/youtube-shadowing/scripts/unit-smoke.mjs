@@ -54,6 +54,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingSourceLoadWorkflow",
     "__afShadowingSourceLoadContentWorkflow",
     "__afShadowingSourceContentFacade",
+    "__afShadowingYoutubeRuntimeContentFacade",
     "__afShadowingVideoInitWorkflow",
     "__afShadowingVideoInitContentWorkflow",
     "__afShadowingSourceBinding",
@@ -400,6 +401,63 @@ function assertSourceContentFacadeComposesSourceBoundary() {
     track: "track-1",
     options: { refresh: true },
   });
+}
+
+async function assertYoutubeRuntimeContentFacadeOwnsYoutubeBoundary() {
+  const youtubeRuntimeContentFacade = loadBrowserModule(
+    "src/youtubeRuntimeContentFacade.js",
+    "__afShadowingYoutubeRuntimeContentFacade",
+  );
+  const calls = [];
+  const state = { videoId: "video-1" };
+  const controller = youtubeRuntimeContentFacade.createYoutubeRuntimeController({
+    getState: () => state,
+    playerMetadataWorkflow: {
+      waitForPlayerResponse: async (deps) => {
+        calls.push(["wait", deps.getVideoId(), await deps.extractPlayerResponse(), await deps.fetchFreshPlayerResponse()]);
+        await deps.delay(7);
+        return "player-response";
+      },
+      fetchFreshPlayerResponse: async (deps) => {
+        calls.push(["fresh", deps.videoId, deps.youtubeAdapter.getCaptionTracks("raw").length]);
+        return "fresh-response";
+      },
+    },
+    youtubeAdapter: {
+      getVideoIdFromUrl: () => "video-1",
+      extractPlayerResponseFromDocument: (document, videoId) => `extracted:${document.title}:${videoId}`,
+      extractPlayerResponseFromText: (text) => `text:${text}`,
+    },
+    captionTracks: {
+      getCaptionTracks: () => ["track-1"],
+    },
+    transcriptPanelDom: {
+      resetTranscriptPanelState: (deps) => {
+        calls.push(["reset", deps.previousVideoId, deps.currentVideoId, deps.closeOpenTranscriptPanels()]);
+      },
+      closeOpenTranscriptPanels: (deps) => {
+        calls.push(["close", deps.document.title, typeof deps.domUtils.clearElement]);
+        return "closed";
+      },
+    },
+    domUtils: { clearElement: () => {} },
+    recordDebugEvent: (type) => calls.push(["debug", type]),
+    delay: async (ms) => calls.push(["delay", ms]),
+    environment: {
+      document: { title: "YouTube" },
+      fetch: () => {},
+    },
+  });
+
+  assert.equal(await controller.waitForPlayerResponse(), "player-response");
+  controller.resetTranscriptPanelState("old-video");
+  assert.deepEqual(calls, [
+    ["fresh", "video-1", 1],
+    ["wait", "video-1", "extracted:YouTube:video-1", "fresh-response"],
+    ["delay", 7],
+    ["close", "YouTube", "function"],
+    ["reset", "old-video", "video-1", "closed"],
+  ]);
 }
 
 function assertPlaybackContentFacadeComposesPlaybackBoundary() {
@@ -1293,6 +1351,7 @@ function assertLearningBoundaryTermsStayOutOfContentScript() {
 assertManifestOrderRegistersContentNamespaces();
 assertDictionaryMocksStayRuntimeGated();
 assertSourceContentFacadeComposesSourceBoundary();
+await assertYoutubeRuntimeContentFacadeOwnsYoutubeBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
 await assertBackendRuntimeContentFacadeOwnsBackendPorts();

@@ -60,6 +60,7 @@
         "src/sourceLoadWorkflow.js",
         "src/sourceLoadContentWorkflow.js",
         "src/sourceContentFacade.js",
+        "src/youtubeRuntimeContentFacade.js",
         "src/videoInitWorkflow.js",
         "src/videoInitContentWorkflow.js",
         "src/sourceBinding.js",
@@ -179,5 +180,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 21:44:36Z · 307e2d0 · dirty · playback runtime binding cleanup"
+  "version_name": "v0.1.7 · 2026-06-30 21:53:35Z · fb8f5b1 · dirty · youtube runtime facade cleanup"
 }

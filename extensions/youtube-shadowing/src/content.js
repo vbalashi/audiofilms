@@ -35,6 +35,7 @@
     sourceLoadWorkflowApi,
     sourceLoadContentWorkflowApi,
     sourceContentFacadeApi,
+    youtubeRuntimeContentFacadeApi,
     videoInitWorkflowApi,
     videoInitContentWorkflowApi,
     dictionaryStateApi,
@@ -414,6 +415,24 @@
     fetchBestAvailableCues,
     normalizeTranscriptResult,
   } = sourceController;
+  const youtubeRuntimeController = youtubeRuntimeContentFacadeApi.createYoutubeRuntimeController({
+    getState: () => state,
+    playerMetadataWorkflow: playerMetadataWorkflowApi,
+    youtubeAdapter: youtubeAdapterApi,
+    captionTracks: captionTrackApi,
+    transcriptPanelDom: transcriptPanelDomApi,
+    domUtils: domUtilsApi,
+    recordDebugEvent,
+    delay,
+    environment: {
+      document,
+      fetch,
+    },
+  });
+  const {
+    waitForPlayerResponse,
+    resetTranscriptPanelState,
+  } = youtubeRuntimeController;
   const dictionaryOperationsController = dictionaryOperationsContentFacadeApi.createDictionaryOperationsController({
     getState: () => state,
     modules,
@@ -1144,48 +1163,6 @@
 
   async function initializeForCurrentVideo() {
     return videoInitController.initializeForCurrentVideo();
-  }
-
-  async function waitForPlayerResponse() {
-    return playerMetadataWorkflowApi.waitForPlayerResponse({
-      extractPlayerResponse,
-      fetchFreshPlayerResponse,
-      getVideoId: () => youtubeAdapterApi.getVideoIdFromUrl(),
-      recordDebugEvent,
-      delay,
-    });
-  }
-
-  function extractPlayerResponse() {
-    return youtubeAdapterApi.extractPlayerResponseFromDocument(document, youtubeAdapterApi.getVideoIdFromUrl());
-  }
-
-  async function fetchFreshPlayerResponse() {
-    return playerMetadataWorkflowApi.fetchFreshPlayerResponse({
-      videoId: youtubeAdapterApi.getVideoIdFromUrl(),
-      youtubeAdapter: {
-        extractPlayerResponseFromText: youtubeAdapterApi.extractPlayerResponseFromText,
-        getCaptionTracks: captionTrackApi.getCaptionTracks,
-      },
-      fetch,
-      recordDebugEvent,
-    });
-  }
-
-  function resetTranscriptPanelState(previousVideoId) {
-    transcriptPanelDomApi.resetTranscriptPanelState({
-      document,
-      previousVideoId,
-      currentVideoId: state.videoId,
-      closeOpenTranscriptPanels,
-    });
-  }
-
-  function closeOpenTranscriptPanels() {
-    return transcriptPanelDomApi.closeOpenTranscriptPanels({
-      document,
-      domUtils: domUtilsApi,
-    });
   }
 
   function onKeyboardEvent(event) {
