@@ -14,6 +14,183 @@ function loadBrowserModule(relativePath, exportName, globals = {}) {
   return sandbox.window[exportName];
 }
 
+function assertManifestOrderRegistersContentNamespaces() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(extensionRoot, "manifest.json"), "utf8"));
+  const contentScripts = manifest.content_scripts
+    .find((entry) => (entry.js || []).includes("src/content.js"))?.js || [];
+  assert.ok(contentScripts.length, "manifest includes the extension content script list");
+
+  const sandbox = createManifestOrderSandbox();
+  for (const scriptPath of contentScripts) {
+    if (scriptPath === "src/content.js") break;
+    const source = fs.readFileSync(path.join(extensionRoot, scriptPath), "utf8");
+    vm.runInNewContext(source, sandbox, { filename: scriptPath });
+  }
+
+  const requiredNamespaces = [
+    "__afShadowingFallbacks",
+    "__afShadowingBootDiagnostics",
+    "__afShadowingBootState",
+    "__afShadowingFormatUtils",
+    "__afShadowingPhrases",
+    "__afShadowingCaptionTracks",
+    "__afShadowingSourceLabels",
+    "__afShadowingSourceSelection",
+    "__afShadowingSourceSelectionStorage",
+    "__afShadowingSourceReadiness",
+    "__afShadowingVideoLoadState",
+    "__afShadowingSourceSelector",
+    "__afShadowingSourceSelectorDom",
+    "__afShadowingSourceSelectorWorkflow",
+    "__afShadowingYouTubeAdapter",
+    "__afShadowingPlayerMetadataWorkflow",
+    "__afShadowingTranscriptRetrieval",
+    "__afShadowingTranscriptMetadata",
+    "__afShadowingSourceTranscriptWorkflow",
+    "__afShadowingSourceTranscriptContentWorkflow",
+    "__afShadowingTranscriptPanelDom",
+    "__afShadowingSourceTimingWorkflow",
+    "__afShadowingSourceTimingContentWorkflow",
+    "__afShadowingSourceLoadWorkflow",
+    "__afShadowingSourceLoadContentWorkflow",
+    "__afShadowingVideoInitWorkflow",
+    "__afShadowingVideoInitContentWorkflow",
+    "__afShadowingSourceBinding",
+    "__afShadowingDictionaryActions",
+    "__afShadowingDictionaryActionWorkflow",
+    "__afShadowingDictionaryState",
+    "__afShadowingDictionaryAudio",
+    "__afShadowingDictionaryAudioWorkflow",
+    "__afShadowingDictionaryMocks",
+    "__afShadowingDictionaryPresentation",
+    "__afShadowingDictionaryDom",
+    "__afShadowingDictionaryOverlayWorkflow",
+    "__afShadowingDictionaryPanelWorkflow",
+    "__afShadowingDictionarySearchDom",
+    "__afShadowingDictionarySearchWorkflow",
+    "__afShadowingDictionaryRenderWorkflow",
+    "__afShadowingDictionaryCommands",
+    "__afShadowingDictionaryCommandTransport",
+    "__afShadowingDictionaryLookupWorkflow",
+    "__afShadowingDictionaryContentWorkflow",
+    "__afShadowingAccountSession",
+    "__afShadowingAccountSessionWorkflow",
+    "__afShadowingAccountSessionDom",
+    "__afShadowingBackendCommands",
+    "__afShadowingBackendBuildWorkflow",
+    "__afShadowingExtensionCommandClient",
+    "__afShadowingGeneratedEntries",
+    "__afShadowingGeneratedEntryWorkflow",
+    "__afShadowingPhraseProgress",
+    "__afShadowingPhraseProgressStorage",
+    "__afShadowingPhraseTranslations",
+    "__afShadowingPhraseTranslationWorkflow",
+    "__afShadowingPhraseRows",
+    "__afShadowingPhraseRowsDom",
+    "__afShadowingPhraseRowsWorkflow",
+    "__afShadowingSelectedSpans",
+    "__afShadowingSelectedSpanWorkflow",
+    "__afShadowingSelectedSpansDom",
+    "__afShadowingPlaybackSession",
+    "__afShadowingPlaybackTiming",
+    "__afShadowingPlaybackWorkflow",
+    "__afShadowingPlaybackContentWorkflow",
+    "__afShadowingPassivePlaybackWatcher",
+    "__afShadowingPassivePlaybackContentWorkflow",
+    "__afShadowingPanelLayout",
+    "__afShadowingPanelLayoutDom",
+    "__afShadowingPanelLayoutWorkflow",
+    "__afShadowingPanelLayoutContentWorkflow",
+    "__afShadowingIssueReports",
+    "__afShadowingIssueReportWorkflow",
+    "__afShadowingIssueReportsDom",
+    "__afShadowingDiagnosticsReport",
+    "__afShadowingDiagnosticsState",
+    "__afShadowingDiagnosticsFormatWorkflow",
+    "__afShadowingDiagnosticsDom",
+    "__afShadowingDiagnosticsWorkflow",
+    "__afShadowingDiagnosticsContentWorkflow",
+    "__afShadowingDisplayPreferences",
+    "__afShadowingDisplayPreferenceStorage",
+    "__afShadowingDisplayPreferenceWorkflow",
+    "__afShadowingStorageState",
+    "__afShadowingMenuState",
+    "__afShadowingKeyboardShortcuts",
+    "__afShadowingKeyboardWorkflow",
+    "__afShadowingKeyboardContentWorkflow",
+    "__afShadowingScrollContainment",
+    "__afShadowingDomUtils",
+    "__afShadowingUiIcons",
+    "__afShadowingUiStateWorkflow",
+    "__afShadowingDisplayStateContentWorkflow",
+    "__afShadowingRibbonControls",
+    "__afShadowingWorkspaceDom",
+    "__afShadowingWorkspaceWorkflow",
+    "__afShadowingWorkspaceContentWorkflow",
+    "__afShadowingPhraseJumpWorkflow",
+    "__afShadowingRibbonDom",
+    "__afShadowingRibbonPanelDom",
+    "__afShadowingRibbonPanelFactory",
+    "__afShadowingRibbonPanelContentWorkflow",
+    "__afShadowingRibbonWorkflow",
+    "__afShadowingRibbonContentWorkflow",
+    "__afShadowingModuleRegistry",
+    "__afShadowingBuildInfo",
+  ];
+  for (const namespace of requiredNamespaces) {
+    assert.ok(sandbox[namespace], `manifest order registers ${namespace}`);
+  }
+}
+
+function createManifestOrderSandbox() {
+  const sandbox = {
+    URL,
+    console,
+    Date,
+    setTimeout,
+    clearTimeout,
+    setInterval: () => 0,
+    clearInterval: () => {},
+    localStorage: {
+      getItem: () => "",
+      setItem: () => {},
+      removeItem: () => {},
+    },
+    chrome: {
+      runtime: {
+        id: "unit-extension",
+        getManifest: () => ({ name: "AudioFilms YouTube Shadowing", version: "0.0.0" }),
+        getURL: (value) => `chrome-extension://unit-extension/${value}`,
+      },
+    },
+    document: {
+      documentElement: { dataset: {}, appendChild: () => {}, setAttribute: () => {} },
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      createElement: () => ({
+        dataset: {},
+        style: {},
+        setAttribute: () => {},
+        appendChild: () => {},
+        addEventListener: () => {},
+      }),
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    },
+    navigator: {},
+    location: { href: "https://www.youtube.com/watch?v=unit" },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    getComputedStyle: () => ({ display: "block", visibility: "visible", opacity: "1" }),
+    HTMLElement: class HTMLElement {},
+    Element: class Element {},
+    MouseEvent: class MouseEvent {},
+  };
+  sandbox.window = sandbox;
+  return sandbox;
+}
+
 function createTestElement(tagName) {
   const classValues = new Set();
   const element = {
@@ -135,6 +312,8 @@ const testDocument = {
   createElement: createTestElement,
   createTextNode: (text) => ({ nodeType: 3, textContent: text }),
 };
+
+assertManifestOrderRegistersContentNamespaces();
 
 const phraseTokens = loadBrowserModule("src/phraseTokens.js", "__afShadowingPhraseTokens");
 const bootState = loadBrowserModule("src/bootState.js", "__afShadowingBootState");

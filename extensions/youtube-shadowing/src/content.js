@@ -1,123 +1,127 @@
 (function audioFilmsYouTubeShadowing() {
-  const fallbackApi = window.__afShadowingFallbacks;
-  const bootDiagnosticsApi = window.__afShadowingBootDiagnostics || fallbackApi.createBootDiagnosticsFallback();
-  const bootStateApi = window.__afShadowingBootState;
-  const formatUtilsApi = window.__afShadowingFormatUtils;
-  const phraseApi = window.__afShadowingPhrases || fallbackApi.createPhraseFallback();
-  const captionTrackApi = window.__afShadowingCaptionTracks || fallbackApi.createCaptionTracksFallback();
-  const sourceLabelsApi = window.__afShadowingSourceLabels || fallbackApi.createSourceLabelsFallback();
-  const sourceSelectionApi = window.__afShadowingSourceSelection;
-  const sourceSelectionStorageApi = window.__afShadowingSourceSelectionStorage;
-  const sourceReadinessApi = window.__afShadowingSourceReadiness;
-  const videoLoadStateApi = window.__afShadowingVideoLoadState;
-  const sourceSelectorApi = window.__afShadowingSourceSelector;
-  const sourceSelectorDomApi = window.__afShadowingSourceSelectorDom;
-  const sourceSelectorWorkflowApi = window.__afShadowingSourceSelectorWorkflow;
-  const youtubeAdapterApi = window.__afShadowingYouTubeAdapter || fallbackApi.createYouTubeAdapterFallback();
-  const playerMetadataWorkflowApi = window.__afShadowingPlayerMetadataWorkflow;
-  const transcriptRetrievalApi = window.__afShadowingTranscriptRetrieval;
-  const transcriptMetadataApi = window.__afShadowingTranscriptMetadata;
-  const sourceTranscriptWorkflowApi = window.__afShadowingSourceTranscriptWorkflow;
-  const sourceTranscriptContentWorkflowApi = window.__afShadowingSourceTranscriptContentWorkflow;
-  const transcriptPanelDomApi = window.__afShadowingTranscriptPanelDom;
-  const sourceTimingWorkflowApi = window.__afShadowingSourceTimingWorkflow;
-  const sourceTimingContentWorkflowApi = window.__afShadowingSourceTimingContentWorkflow;
-  const sourceLoadWorkflowApi = window.__afShadowingSourceLoadWorkflow;
-  const sourceLoadContentWorkflowApi = window.__afShadowingSourceLoadContentWorkflow;
-  const videoInitWorkflowApi = window.__afShadowingVideoInitWorkflow;
-  const videoInitContentWorkflowApi = window.__afShadowingVideoInitContentWorkflow;
-  const sourceBindingApi = window.__afShadowingSourceBinding;
-  const dictionaryActionApi = window.__afShadowingDictionaryActions;
-  const dictionaryActionWorkflowApi = window.__afShadowingDictionaryActionWorkflow;
-  const dictionaryStateApi = window.__afShadowingDictionaryState;
-  const dictionaryAudioApi = window.__afShadowingDictionaryAudio;
-  const dictionaryAudioWorkflowApi = window.__afShadowingDictionaryAudioWorkflow;
-  const dictionaryMockApi = window.__afShadowingDictionaryMocks;
-  const dictionaryPresentationApi = window.__afShadowingDictionaryPresentation;
-  const dictionaryDomApi = window.__afShadowingDictionaryDom;
-  const dictionaryOverlayWorkflowApi = window.__afShadowingDictionaryOverlayWorkflow;
-  const dictionaryPanelWorkflowApi = window.__afShadowingDictionaryPanelWorkflow;
-  const dictionarySearchDomApi = window.__afShadowingDictionarySearchDom;
-  const dictionarySearchWorkflowApi = window.__afShadowingDictionarySearchWorkflow;
-  const dictionaryRenderWorkflowApi = window.__afShadowingDictionaryRenderWorkflow;
-  const dictionaryCommandApi = window.__afShadowingDictionaryCommands;
-  const dictionaryCommandTransportApi = window.__afShadowingDictionaryCommandTransport;
-  const dictionaryLookupWorkflowApi = window.__afShadowingDictionaryLookupWorkflow;
-  const dictionaryContentWorkflowApi = window.__afShadowingDictionaryContentWorkflow;
-  const accountSessionApi = window.__afShadowingAccountSession;
-  const accountSessionWorkflowApi = window.__afShadowingAccountSessionWorkflow;
-  const accountSessionDomApi = window.__afShadowingAccountSessionDom;
-  const backendCommandApi = window.__afShadowingBackendCommands;
-  const backendBuildWorkflowApi = window.__afShadowingBackendBuildWorkflow;
-  const extensionCommandClientApi = window.__afShadowingExtensionCommandClient;
-  const generatedEntryApi = window.__afShadowingGeneratedEntries;
-  const generatedEntryWorkflowApi = window.__afShadowingGeneratedEntryWorkflow;
-  const phraseProgressApi = window.__afShadowingPhraseProgress;
-  const phraseProgressStorageApi = window.__afShadowingPhraseProgressStorage;
-  const phraseTranslationApi = window.__afShadowingPhraseTranslations;
-  const phraseTranslationWorkflowApi = window.__afShadowingPhraseTranslationWorkflow;
-  const phraseRowsApi = window.__afShadowingPhraseRows;
-  const phraseRowsDomApi = window.__afShadowingPhraseRowsDom;
-  const phraseRowsWorkflowApi = window.__afShadowingPhraseRowsWorkflow;
-  const selectedSpanApi = window.__afShadowingSelectedSpans;
-  const selectedSpanWorkflowApi = window.__afShadowingSelectedSpanWorkflow;
-  const selectedSpanDomApi = window.__afShadowingSelectedSpansDom;
-  const playbackSessionApi = window.__afShadowingPlaybackSession;
-  const playbackTimingApi = window.__afShadowingPlaybackTiming;
-  const playbackWorkflowApi = window.__afShadowingPlaybackWorkflow;
-  const playbackContentWorkflowApi = window.__afShadowingPlaybackContentWorkflow;
-  const passivePlaybackWatcherApi = window.__afShadowingPassivePlaybackWatcher;
-  const passivePlaybackContentWorkflowApi = window.__afShadowingPassivePlaybackContentWorkflow;
-  const panelLayoutApi = window.__afShadowingPanelLayout;
-  const panelLayoutDomApi = window.__afShadowingPanelLayoutDom;
-  const panelLayoutWorkflowApi = window.__afShadowingPanelLayoutWorkflow;
-  const panelLayoutContentWorkflowApi = window.__afShadowingPanelLayoutContentWorkflow;
-  const issueReportsApi = window.__afShadowingIssueReports;
-  const issueReportWorkflowApi = window.__afShadowingIssueReportWorkflow;
-  const issueReportsDomApi = window.__afShadowingIssueReportsDom;
-  const diagnosticsReportApi = window.__afShadowingDiagnosticsReport;
-  const diagnosticsStateApi = window.__afShadowingDiagnosticsState;
-  const diagnosticsFormatWorkflowApi = window.__afShadowingDiagnosticsFormatWorkflow;
-  const diagnosticsDomApi = window.__afShadowingDiagnosticsDom;
-  const diagnosticsWorkflowApi = window.__afShadowingDiagnosticsWorkflow;
-  const diagnosticsContentWorkflowApi = window.__afShadowingDiagnosticsContentWorkflow;
-  const displayPreferencesApi = window.__afShadowingDisplayPreferences;
-  const displayPreferenceStorageApi = window.__afShadowingDisplayPreferenceStorage;
-  const displayPreferenceWorkflowApi = window.__afShadowingDisplayPreferenceWorkflow;
-  const storageStateApi = window.__afShadowingStorageState;
-  const menuStateApi = window.__afShadowingMenuState;
-  const keyboardShortcutApi = window.__afShadowingKeyboardShortcuts;
-  const keyboardWorkflowApi = window.__afShadowingKeyboardWorkflow;
-  const keyboardContentWorkflowApi = window.__afShadowingKeyboardContentWorkflow;
-  const scrollContainmentApi = window.__afShadowingScrollContainment;
-  const domUtilsApi = window.__afShadowingDomUtils;
-  const uiIconsApi = window.__afShadowingUiIcons;
-  const uiStateWorkflowApi = window.__afShadowingUiStateWorkflow;
-  const displayStateContentWorkflowApi = window.__afShadowingDisplayStateContentWorkflow;
-  const ribbonControlsApi = window.__afShadowingRibbonControls;
-  const workspaceDomApi = window.__afShadowingWorkspaceDom;
-  const workspaceWorkflowApi = window.__afShadowingWorkspaceWorkflow;
-  const workspaceContentWorkflowApi = window.__afShadowingWorkspaceContentWorkflow;
-  const phraseJumpWorkflowApi = window.__afShadowingPhraseJumpWorkflow;
-  const ribbonDomApi = window.__afShadowingRibbonDom;
-  const ribbonPanelDomApi = window.__afShadowingRibbonPanelDom;
-  const ribbonPanelFactoryApi = window.__afShadowingRibbonPanelFactory;
-  const ribbonPanelContentWorkflowApi = window.__afShadowingRibbonPanelContentWorkflow;
-  const ribbonWorkflowApi = window.__afShadowingRibbonWorkflow;
-  const ribbonContentWorkflowApi = window.__afShadowingRibbonContentWorkflow;
-  const buildInfoApi = window.__afShadowingBuildInfo;
-  const iconSvg = uiIconsApi.iconSvg;
-  const bugIconSvg = uiIconsApi.bugIconSvg;
-  const CONTENT_SCRIPT_REVISION = "source-labels-asr-fingerprint-2026-06-29";
+  const CONTENT_SCRIPT_REVISION = "content-module-refactor-2026-06-30";
 
   try {
     bootAudioFilmsYouTubeShadowing();
   } catch (error) {
+    const bootDiagnosticsApi = window.__afShadowingModuleRegistry?.resolveBootDiagnostics(window) ||
+      createBootDiagnosticsFallback();
     bootDiagnosticsApi.recordBootFailure(error);
     bootDiagnosticsApi.renderBootFailureBadge(error);
   }
 
   function bootAudioFilmsYouTubeShadowing() {
+  const modules = window.__afShadowingModuleRegistry.resolveContentModules(window);
+  const {
+    bootDiagnosticsApi,
+    bootStateApi,
+    formatUtilsApi,
+    phraseApi,
+    captionTrackApi,
+    sourceLabelsApi,
+    sourceSelectionApi,
+    sourceSelectionStorageApi,
+    sourceReadinessApi,
+    videoLoadStateApi,
+    sourceSelectorApi,
+    sourceSelectorDomApi,
+    sourceSelectorWorkflowApi,
+    youtubeAdapterApi,
+    playerMetadataWorkflowApi,
+    transcriptRetrievalApi,
+    transcriptMetadataApi,
+    sourceTranscriptWorkflowApi,
+    sourceTranscriptContentWorkflowApi,
+    transcriptPanelDomApi,
+    sourceTimingWorkflowApi,
+    sourceTimingContentWorkflowApi,
+    sourceLoadWorkflowApi,
+    sourceLoadContentWorkflowApi,
+    videoInitWorkflowApi,
+    videoInitContentWorkflowApi,
+    sourceBindingApi,
+    dictionaryActionApi,
+    dictionaryActionWorkflowApi,
+    dictionaryStateApi,
+    dictionaryAudioApi,
+    dictionaryAudioWorkflowApi,
+    dictionaryMockApi,
+    dictionaryPresentationApi,
+    dictionaryDomApi,
+    dictionaryOverlayWorkflowApi,
+    dictionaryPanelWorkflowApi,
+    dictionarySearchDomApi,
+    dictionarySearchWorkflowApi,
+    dictionaryRenderWorkflowApi,
+    dictionaryCommandApi,
+    dictionaryCommandTransportApi,
+    dictionaryLookupWorkflowApi,
+    dictionaryContentWorkflowApi,
+    accountSessionApi,
+    accountSessionWorkflowApi,
+    accountSessionDomApi,
+    backendCommandApi,
+    backendBuildWorkflowApi,
+    extensionCommandClientApi,
+    generatedEntryApi,
+    generatedEntryWorkflowApi,
+    phraseProgressApi,
+    phraseProgressStorageApi,
+    phraseTranslationApi,
+    phraseTranslationWorkflowApi,
+    phraseRowsApi,
+    phraseRowsDomApi,
+    phraseRowsWorkflowApi,
+    selectedSpanApi,
+    selectedSpanWorkflowApi,
+    selectedSpanDomApi,
+    playbackSessionApi,
+    playbackTimingApi,
+    playbackWorkflowApi,
+    playbackContentWorkflowApi,
+    passivePlaybackWatcherApi,
+    passivePlaybackContentWorkflowApi,
+    panelLayoutApi,
+    panelLayoutDomApi,
+    panelLayoutWorkflowApi,
+    panelLayoutContentWorkflowApi,
+    issueReportsApi,
+    issueReportWorkflowApi,
+    issueReportsDomApi,
+    diagnosticsReportApi,
+    diagnosticsStateApi,
+    diagnosticsFormatWorkflowApi,
+    diagnosticsDomApi,
+    diagnosticsWorkflowApi,
+    diagnosticsContentWorkflowApi,
+    displayPreferencesApi,
+    displayPreferenceStorageApi,
+    displayPreferenceWorkflowApi,
+    storageStateApi,
+    menuStateApi,
+    keyboardShortcutApi,
+    keyboardWorkflowApi,
+    keyboardContentWorkflowApi,
+    scrollContainmentApi,
+    domUtilsApi,
+    uiIconsApi,
+    uiStateWorkflowApi,
+    displayStateContentWorkflowApi,
+    ribbonControlsApi,
+    workspaceDomApi,
+    workspaceWorkflowApi,
+    workspaceContentWorkflowApi,
+    phraseJumpWorkflowApi,
+    ribbonDomApi,
+    ribbonPanelDomApi,
+    ribbonPanelFactoryApi,
+    ribbonPanelContentWorkflowApi,
+    ribbonWorkflowApi,
+    ribbonContentWorkflowApi,
+    buildInfoApi,
+  } = modules;
+  const iconSvg = uiIconsApi.iconSvg;
+  const bugIconSvg = uiIconsApi.bugIconSvg;
   const bootDiagnostics = bootDiagnosticsApi.markBootStarted();
   const bootConfig = bootStateApi.createBootConfig({ issueReports: issueReportsApi });
   const {
@@ -448,9 +452,15 @@
     handleShadowLayerFocus,
     installPanelGestureFallback,
     createRibbonPanel,
-    createDictionaryPanel,
     createDebugPanel,
-    loadShadowStyles,
+    workspaceDom: workspaceDomApi,
+    iconSvg,
+    fetch,
+    chrome,
+    recordDebugEvent,
+    onBringDictionaryPanelBehind: bringDebugPanelBehindFromPanel,
+    onToggleExamples: toggleAllExamples,
+    render,
   });
   const videoInitController = videoInitContentWorkflowApi.createVideoInitController({
     getState: () => state,
@@ -677,40 +687,6 @@
 
   function ensureShadowStyles(root) {
     return workspaceController.ensureShadowStyles(root);
-  }
-
-  async function loadShadowStyles(root, style) {
-    if (style.dataset.afLoaded === "1") return;
-    style.dataset.afLoaded = "1";
-
-    try {
-      const response = await fetch(chrome.runtime.getURL("src/shadow.css"));
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const css = await response.text();
-      style.textContent = css
-        .replace(/html\.af-shadowing-workspace/g, ":host")
-        .replace(/#audiofilms-root/g, ":host");
-    } catch (error) {
-      recordDebugEvent("shadow-style-load-failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  function createDictionaryPanel() {
-    return workspaceDomApi.createDictionaryPanel({
-      panelId: DICTIONARY_PANEL_ID,
-      iconSvg,
-      onBringPanelBehind: bringDebugPanelBehindFromPanel,
-      onToggleExamples: toggleAllExamples,
-      onClose: () => {
-        state.selectedWord = null;
-        state.selectedSpan = null;
-        render();
-      },
-    });
   }
 
   function createRibbonPanel() {
@@ -2212,6 +2188,33 @@
   watchYouTubeNavigation();
   watchWorkspaceMount();
   handleCurrentLocation();
+  }
+
+  function createBootDiagnosticsFallback() {
+    return {
+      recordBootFailure(error) {
+        document.documentElement.dataset.afShadowingBoot = "1";
+        document.documentElement.dataset.afShadowingBootError =
+          (error instanceof Error ? error.message : String(error)).slice(0, 180);
+      },
+      renderBootFailureBadge(error) {
+        const badge = document.createElement("div");
+        badge.id = "af-shadowing-boot-failure";
+        badge.textContent = `AudioFilms failed to start: ${error instanceof Error ? error.message : String(error)}`;
+        badge.style.cssText = [
+          "position:fixed",
+          "right:12px",
+          "bottom:12px",
+          "z-index:2147483647",
+          "padding:8px 10px",
+          "background:#7f1d1d",
+          "color:#fff",
+          "font:12px system-ui,sans-serif",
+          "border-radius:6px",
+        ].join(";");
+        document.documentElement.appendChild(badge);
+      },
+    };
   }
 
 })();

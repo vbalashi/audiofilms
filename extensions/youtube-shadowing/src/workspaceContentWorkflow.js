@@ -25,9 +25,9 @@
         handleShadowLayerFocus: deps.handleShadowLayerFocus,
         installPanelGestureFallback: deps.installPanelGestureFallback,
         createRibbonPanel: deps.createRibbonPanel,
-        createDictionaryPanel: deps.createDictionaryPanel,
+        createDictionaryPanel,
         createDebugPanel: deps.createDebugPanel,
-        loadShadowStyles: deps.loadShadowStyles,
+        loadShadowStyles,
       };
     }
 
@@ -73,6 +73,41 @@
 
     function removeWorkspace() {
       return deps.workspaceWorkflow.removeWorkspace(workspaceWorkflowOptions());
+    }
+
+    async function loadShadowStyles(_root, style) {
+      if (style.dataset.afLoaded === "1") return;
+      style.dataset.afLoaded = "1";
+
+      try {
+        const response = await deps.fetch(deps.chrome.runtime.getURL("src/shadow.css"));
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const css = await response.text();
+        style.textContent = css
+          .replace(/html\.af-shadowing-workspace/g, ":host")
+          .replace(/#audiofilms-root/g, ":host");
+      } catch (error) {
+        deps.recordDebugEvent?.("shadow-style-load-failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    function createDictionaryPanel() {
+      return deps.workspaceDom.createDictionaryPanel({
+        panelId: deps.dictionaryPanelId,
+        iconSvg: deps.iconSvg,
+        onBringPanelBehind: deps.onBringDictionaryPanelBehind,
+        onToggleExamples: deps.onToggleExamples,
+        onClose: () => {
+          const state = deps.getState();
+          state.selectedWord = null;
+          state.selectedSpan = null;
+          deps.render?.();
+        },
+      });
     }
 
     return {
