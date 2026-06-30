@@ -177,6 +177,7 @@
     state,
     recordDebugEvent,
   });
+  let playbackRuntimeController = null;
   const backendRuntimeController = backendRuntimeContentFacadeApi.createBackendRuntimeController({
     environment: {
       config: window.__afShadowingConfig,
@@ -384,10 +385,7 @@
     generatedDraftItemFromOverlayCard,
     recordDebugEvent,
   });
-  const {
-    playbackController,
-    passivePlaybackController,
-  } = playbackContentFacadeApi.createPlaybackControllers({
+  playbackRuntimeController = playbackContentFacadeApi.createPlaybackRuntimeController({
     getState: () => state,
     playbackContentWorkflow: playbackContentWorkflowApi,
     playbackWorkflow: playbackWorkflowApi,
@@ -395,33 +393,67 @@
     passivePlaybackWatcher: passivePlaybackWatcherApi,
     playbackSession: playbackSessionApi,
     playbackTiming: playbackTimingApi,
+    transcriptPanelDom: transcriptPanelDomApi,
+    youtubeAdapter: youtubeAdapterApi,
     playbackRateOptions,
-    getVideoElement,
-    stopPlaybackTimer,
-    playbackEndMsForPhrase,
-    findPlaybackPhraseIndex,
     syncPlaybackRateFromVideo,
     slowReplayPlaybackRate,
-    markCurrentTranscriptSegment,
     recordNavigationEvent,
     describePhraseAtIndex,
     getPlaybackSnapshot,
     updateDisplayPreferences,
-    isCurrentPhraseStillSelected,
     phraseProgressStore,
     applyPhraseEntryDisplayState,
-    enterGuidedMode,
-    resolveWordTiming,
     phraseDisplaySegmentRange,
-    playbackTimingConfig,
-    restorePlaybackRateAfterOverride,
-    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
-    cancelAnimationFrame: (frame) => window.cancelAnimationFrame(frame),
-    setTimeout: (callback, ms) => window.setTimeout(callback, ms),
     roundTime,
-    preRollMs: PRE_ROLL_MS,
     render,
+    updateBootDiagnostics,
+    constants: {
+      preRollMs: PRE_ROLL_MS,
+      postRollMs: POST_ROLL_MS,
+      minAudibleEndTailMs: MIN_AUDIBLE_END_TAIL_MS,
+      contiguousBoundaryGuardMs: CONTIGUOUS_BOUNDARY_GUARD_MS,
+    },
+    environment: {
+      document,
+      window,
+    },
   });
+  const {
+    jumpToPhrase: jumpToPhraseFromPlayback,
+    handleWordReplayGesture: handleWordReplayGestureFromPlayback,
+    replayCurrentPhrase,
+    pauseCurrentPlayback,
+    nextPhrase,
+    previousPhrase,
+    navigateToPhrase,
+    holdPhraseAtStart,
+    toggleText,
+    toggleAutoPause,
+    enterGuidedMode,
+    showText,
+    syncIndexToCurrentTime,
+    isCurrentPhraseStillSelected,
+    playbackEndMsForPhrase,
+    playWordReplay,
+    resolveWordTiming,
+    estimateWordStartMs,
+    playPhrase,
+    phrasePlaybackStartMs,
+    playbackTimingConfig,
+    scheduleNavigationObservation,
+    stopPlaybackTimer,
+    restorePlaybackRateAfterOverride,
+    detachPassivePlaybackWatcher,
+    onPassiveVideoTimeUpdate,
+    onPassiveVideoPlay,
+    onPassiveVideoPause,
+    onPassiveVideoRateChange,
+    startPassivePlaybackFrame,
+    enforcePhraseEnd,
+    shouldPreserveGuidedHold,
+    toggleContinuousPlayback,
+  } = playbackRuntimeController;
   const {
     ribbonPanelController,
     panelLayoutController,
@@ -1088,7 +1120,7 @@
   }
 
   function jumpToPhrase(targetIndex, reason) {
-    return playbackController.jumpToPhrase(targetIndex, reason);
+    return jumpToPhraseFromPlayback(targetIndex, reason);
   }
 
   function phraseJumpWorkflowOptions() {
@@ -1312,7 +1344,7 @@
   }
 
   function handleWordReplayGesture(event, word, phraseIndex, selection) {
-    return playbackController.handleWordReplayGesture(event, word, phraseIndex, selection);
+    return handleWordReplayGestureFromPlayback(event, word, phraseIndex, selection);
   }
 
   function renderDictionary(panel) {
@@ -1478,7 +1510,7 @@
   }
 
   function findPlaybackPhraseIndex(phrases, currentMs) {
-    return playbackTimingApi.findPlaybackPhraseIndex(phrases, currentMs, playbackTimingConfig());
+    return playbackRuntimeController.findPlaybackPhraseIndex(phrases, currentMs);
   }
 
   async function fetchBestAvailableCues(track, options = {}) {
@@ -1490,185 +1522,23 @@
   }
 
   function getVideoElement() {
-    const video = youtubeAdapterApi.getVideoElement(document);
-    updateBootDiagnostics({ videoElementDetected: Boolean(video) });
-    return video;
-  }
-
-  function replayCurrentPhrase(options = {}) {
-    return playbackController.replayCurrentPhrase(options);
-  }
-
-  function pauseCurrentPlayback(command = "pause") {
-    return playbackController.pauseCurrentPlayback(command);
-  }
-
-  function nextPhrase() {
-    return playbackController.nextPhrase();
-  }
-
-  function previousPhrase() {
-    return playbackController.previousPhrase();
-  }
-
-  function navigateToPhrase(command, targetIndex, options = {}) {
-    return playbackController.navigateToPhrase(command, targetIndex, options);
-  }
-
-  function holdPhraseAtStart(index, options = {}) {
-    return playbackController.holdPhraseAtStart(index, options);
-  }
-
-  function toggleText(event) {
-    if (event?.shiftKey) {
-      state.shadowTextVisible = !state.shadowTextVisible;
-      if (state.practiceMode === "shadow") {
-        state.textVisible = state.shadowTextVisible;
-      }
-    } else {
-      state.textVisible = !state.textVisible;
-    }
-    render();
-  }
-
-  function toggleAutoPause() {
-    return playbackController.toggleAutoPause();
-  }
-
-  function enterGuidedMode() {
-    state.guidedMode = true;
-  }
-
-  function showText() {
-    state.textVisible = true;
-    render();
-  }
-
-  function syncIndexToCurrentTime(options = {}) {
-    return playbackController.syncIndexToCurrentTime(options);
-  }
-
-  function isCurrentPhraseStillSelected(currentMs) {
-    return playbackSessionApi.isCurrentPhraseStillSelected({
-      phrases: state.phrases,
-      currentIndex: state.currentIndex,
-      currentMs,
-      replayGraceMs: POST_ROLL_MS + 900,
-    });
-  }
-
-  function playbackEndMsForPhrase(phrases, index) {
-    return playbackTimingApi.playbackEndMsForPhrase(phrases, index, playbackTimingConfig());
-  }
-
-  function playWordReplay(index, selection, options = {}) {
-    return playbackController.playWordReplay(index, selection, options);
-  }
-
-  function resolveWordTiming(phrase, selection = {}) {
-    return playbackTimingApi.resolveWordTiming({
-      phrase,
-      phrases: state.phrases,
-      selection,
-      transcriptTimingExactness: state.transcriptResult?.timingExactness || "",
-    });
-  }
-
-  function estimateWordStartMs(phrase, selection = {}) {
-    return playbackTimingApi.estimateWordStartMs({
-      phrase,
-      selection,
-      displaySegmentRange: phraseDisplaySegmentRange(phrase),
-    });
-  }
-
-  function playPhrase(index, options = {}) {
-    return playbackController.playPhrase(index, options);
-  }
-
-  function phrasePlaybackStartMs(phrase) {
-    return playbackTimingApi.phrasePlaybackStartMs(phrase);
-  }
-
-  function playbackTimingConfig() {
-    return {
-      preRollMs: PRE_ROLL_MS,
-      postRollMs: POST_ROLL_MS,
-      minAudibleEndTailMs: MIN_AUDIBLE_END_TAIL_MS,
-      contiguousBoundaryGuardMs: CONTIGUOUS_BOUNDARY_GUARD_MS,
-    };
-  }
-
-  function scheduleNavigationObservation(navigationEventId, command, targetIndex, delayMs) {
-    return playbackController.scheduleNavigationObservation(navigationEventId, command, targetIndex, delayMs);
-  }
-
-  function stopPlaybackTimer() {
-    restorePlaybackRateAfterOverride();
-    if (state.playbackFrame) {
-      window.cancelAnimationFrame(state.playbackFrame);
-      state.playbackFrame = null;
-    }
-    state.activePlayback = null;
-  }
-
-  function restorePlaybackRateAfterOverride(video = getVideoElement()) {
-    playbackSessionApi.restorePlaybackRateAfterOverride(state, video, playbackRateOptions());
+    return playbackRuntimeController.getVideoElement();
   }
 
   function ensurePassivePlaybackWatcher() {
-    return passivePlaybackController.ensurePassivePlaybackWatcher();
-  }
-
-  function detachPassivePlaybackWatcher() {
-    return passivePlaybackController.detachPassivePlaybackWatcher();
-  }
-
-  function onPassiveVideoTimeUpdate(event) {
-    return passivePlaybackController.onPassiveVideoTimeUpdate(event);
-  }
-
-  function onPassiveVideoPlay(event) {
-    return passivePlaybackController.onPassiveVideoPlay(event);
-  }
-
-  function onPassiveVideoPause() {
-    return passivePlaybackController.onPassiveVideoPause();
-  }
-
-  function onPassiveVideoRateChange(event) {
-    return passivePlaybackController.onPassiveVideoRateChange(event);
-  }
-
-  function startPassivePlaybackFrame(video) {
-    return playbackController.startPassivePlaybackFrame(video);
+    return playbackRuntimeController.ensurePassivePlaybackWatcher();
   }
 
   function syncPassivePlayback(video) {
-    return playbackController.syncPassivePlayback(video);
-  }
-
-  function enforcePhraseEnd(video) {
-    return playbackController.enforcePhraseEnd(video);
-  }
-
-  function shouldPreserveGuidedHold(currentMs) {
-    return playbackController.preserveGuidedHold(currentMs);
+    return playbackRuntimeController.syncPassivePlayback(video);
   }
 
   function markCurrentTranscriptSegment(phrase) {
-    transcriptPanelDomApi.markCurrentTranscriptSegment({
-      document,
-      phrase,
-    });
+    return playbackRuntimeController.markCurrentTranscriptSegment(phrase);
   }
 
   function onKeyboardEvent(event) {
     return keyboardController.onKeyboardEvent(event);
-  }
-
-  function toggleContinuousPlayback() {
-    return playbackController.toggleContinuousPlayback();
   }
 
   function delay(ms) {

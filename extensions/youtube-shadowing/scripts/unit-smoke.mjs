@@ -439,6 +439,123 @@ function assertPlaybackContentFacadeComposesPlaybackBoundary() {
   assert.equal(controllers.playbackController.jumpToPhrase(), "jumped");
   assert.equal(controllers.passivePlaybackController.ensurePassivePlaybackWatcher(), "ensured");
   assert.equal(controllers.passivePlaybackController.detachPassivePlaybackWatcher(), "detached");
+
+  const runtimeEvents = [];
+  const runtimeState = {
+    phrases: [{ startMs: 1000, endMs: 2000 }],
+    currentIndex: 0,
+    transcriptResult: { timingExactness: "word" },
+    practiceMode: "shadow",
+    shadowTextVisible: false,
+    textVisible: true,
+    playbackFrame: 42,
+    activePlayback: { phraseIndex: 0 },
+  };
+  const video = { playbackRate: 1.25 };
+  const runtime = playbackContentFacade.createPlaybackRuntimeController({
+    getState: () => runtimeState,
+    playbackContentWorkflow: {
+      createPlaybackController: (deps) => ({
+        jumpToPhrase: (targetIndex, reason) => ["jump", targetIndex, reason, deps.playbackTimingConfig().postRollMs],
+        handleWordReplayGesture: () => "word-replay",
+        replayCurrentPhrase: () => "replay",
+        pauseCurrentPlayback: () => "pause",
+        nextPhrase: () => "next",
+        previousPhrase: () => "previous",
+        navigateToPhrase: () => "navigate",
+        holdPhraseAtStart: () => "hold",
+        toggleAutoPause: () => "auto-pause",
+        syncIndexToCurrentTime: () => "sync-index",
+        playWordReplay: () => "play-word",
+        playPhrase: () => "play-phrase",
+        scheduleNavigationObservation: () => "schedule",
+        startPassivePlaybackFrame: () => "frame",
+        syncPassivePlayback: () => "sync-passive",
+        enforcePhraseEnd: () => "enforce",
+        preserveGuidedHold: () => "preserve",
+        toggleContinuousPlayback: () => "continuous",
+      }),
+    },
+    passivePlaybackContentWorkflow: {
+      createPassivePlaybackController: () => ({
+        ensurePassivePlaybackWatcher: () => "ensure-passive",
+        detachPassivePlaybackWatcher: () => "detach-passive",
+        onPassiveVideoTimeUpdate: () => "time-update",
+        onPassiveVideoPlay: () => "play-event",
+        onPassiveVideoPause: () => "pause-event",
+        onPassiveVideoRateChange: () => "rate-event",
+      }),
+    },
+    playbackWorkflow: {},
+    passivePlaybackWatcher: {},
+    playbackSession: {
+      isCurrentPhraseStillSelected: (options) => options.replayGraceMs === 1200,
+      restorePlaybackRateAfterOverride: (state, restoredVideo, rates) => runtimeEvents.push(["restore", state.currentIndex, restoredVideo.playbackRate, rates.length]),
+    },
+    playbackTiming: {
+      findPlaybackPhraseIndex: (_phrases, currentMs, config) => ({ currentMs, preRollMs: config.preRollMs }),
+      playbackEndMsForPhrase: (_phrases, index, config) => index + config.postRollMs,
+      resolveWordTiming: (options) => ({ exactness: options.transcriptTimingExactness }),
+      estimateWordStartMs: (options) => options.displaySegmentRange.start,
+      phrasePlaybackStartMs: (phrase) => phrase.startMs,
+    },
+    transcriptPanelDom: {
+      markCurrentTranscriptSegment: (options) => runtimeEvents.push(["mark", options.phrase.text]),
+    },
+    youtubeAdapter: {
+      getVideoElement: () => video,
+    },
+    playbackRateOptions: () => [0.75, 1, 1.25],
+    syncPlaybackRateFromVideo: () => {},
+    slowReplayPlaybackRate: () => 0.75,
+    recordNavigationEvent: () => {},
+    describePhraseAtIndex: () => "phrase",
+    getPlaybackSnapshot: () => ({}),
+    updateDisplayPreferences: () => {},
+    phraseProgressStore: {},
+    applyPhraseEntryDisplayState: () => {},
+    phraseDisplaySegmentRange: () => ({ start: 3, end: 4 }),
+    roundTime: (value) => value,
+    render: () => runtimeEvents.push(["render"]),
+    updateBootDiagnostics: (patch) => runtimeEvents.push(["boot", patch.videoElementDetected]),
+    constants: {
+      preRollMs: 250,
+      postRollMs: 300,
+      minAudibleEndTailMs: 100,
+      contiguousBoundaryGuardMs: 50,
+    },
+    environment: {
+      document: {},
+      window: {
+        requestAnimationFrame: () => 1,
+        cancelAnimationFrame: (frame) => runtimeEvents.push(["cancel", frame]),
+        setTimeout: () => 1,
+      },
+    },
+  });
+  assert.equal(runtime.getVideoElement(), video);
+  assert.deepEqual(runtime.findPlaybackPhraseIndex([], 1234), { currentMs: 1234, preRollMs: 250 });
+  assert.equal(runtime.playbackEndMsForPhrase([], 2), 302);
+  assert.equal(runtime.isCurrentPhraseStillSelected(1500), true);
+  assert.deepEqual(runtime.resolveWordTiming({}), { exactness: "word" });
+  assert.equal(runtime.estimateWordStartMs({}, {}), 3);
+  assert.equal(runtime.phrasePlaybackStartMs({ startMs: 4321 }), 4321);
+  assert.deepEqual(runtime.jumpToPhrase(3, "unit"), ["jump", 3, "unit", 300]);
+  assert.equal(runtime.handleWordReplayGesture(), "word-replay");
+  runtime.toggleText({ shiftKey: true });
+  assert.equal(runtimeState.textVisible, true);
+  runtime.showText();
+  assert.equal(runtimeState.textVisible, true);
+  runtime.stopPlaybackTimer();
+  assert.equal(runtimeState.playbackFrame, null);
+  assert.equal(runtimeState.activePlayback, null);
+  runtime.markCurrentTranscriptSegment({ text: "Goed" });
+  assert.equal(runtime.ensurePassivePlaybackWatcher(), "ensure-passive");
+  assert.equal(runtime.detachPassivePlaybackWatcher(), "detach-passive");
+  assert.equal(runtime.syncPassivePlayback(video), "sync-passive");
+  assert.equal(runtime.toggleContinuousPlayback(), "continuous");
+  assert.ok(runtimeEvents.some((event) => event[0] === "boot" && event[1] === true));
+  assert.ok(runtimeEvents.some((event) => event[0] === "mark" && event[1] === "Goed"));
 }
 
 function assertSupportContentFacadeComposesSupportBoundary() {
