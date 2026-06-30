@@ -145,6 +145,7 @@
         "src/ribbonPanelContentWorkflow.js",
         "src/ribbonWorkflow.js",
         "src/ribbonContentWorkflow.js",
+        "src/surfaceContentFacade.js",
         "src/moduleRegistry.js",
         "src/content.js"
       ],
@@ -173,5 +174,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 17:48:16Z · 854ac73 · dirty · fix dictionary grouped search dataset"
+  "version_name": "v0.1.7 · 2026-06-30 19:07:32Z · 574108c · dirty · surface content facade refactor"
 }

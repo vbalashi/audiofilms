@@ -137,6 +137,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingRibbonPanelContentWorkflow",
     "__afShadowingRibbonWorkflow",
     "__afShadowingRibbonContentWorkflow",
+    "__afShadowingSurfaceContentFacade",
     "__afShadowingModuleRegistry",
     "__afShadowingBuildInfo",
   ];
@@ -500,10 +501,214 @@ function assertSupportContentFacadeComposesSupportBoundary() {
   assert.equal(supportControllers.issueReportWorkflow.open(), "opened");
 }
 
+function assertSurfaceContentFacadeComposesTypedCommands() {
+  const surfaceContentFacade = loadBrowserModule("src/surfaceContentFacade.js", "__afShadowingSurfaceContentFacade");
+  const captured = {};
+  const modules = {
+    ribbonPanelContentWorkflowApi: {
+      createRibbonPanelController: (options) => {
+        captured.ribbonPanel = options;
+        return { createRibbonPanel: () => "ribbon" };
+      },
+    },
+    panelLayoutContentWorkflowApi: {
+      createPanelLayoutController: (options) => {
+        captured.panelLayout = options;
+        return { mount: () => "layout" };
+      },
+    },
+    diagnosticsContentWorkflowApi: {
+      createDiagnosticsController: (options) => {
+        captured.diagnostics = options;
+        return { copyDebug: () => "diagnostics" };
+      },
+    },
+    keyboardContentWorkflowApi: {
+      createKeyboardController: (options) => {
+        captured.keyboard = options;
+        return { attach: () => "keyboard" };
+      },
+    },
+    displayStateContentWorkflowApi: {
+      createDisplayStateController: (options) => {
+        captured.displayState = options;
+        return { update: () => "display" };
+      },
+    },
+    ribbonContentWorkflowApi: {
+      createRibbonContentController: (options) => {
+        captured.ribbonContent = options;
+        return { appendPhraseRow: () => "row" };
+      },
+    },
+    workspaceDomApi: {},
+    ribbonControlsApi: {},
+    ribbonPanelFactoryApi: {},
+    panelLayoutWorkflowApi: {},
+    panelLayoutApi: {},
+    panelLayoutDomApi: {},
+    displayPreferencesApi: {},
+    diagnosticsWorkflowApi: {},
+    diagnosticsFormatWorkflowApi: {},
+    diagnosticsReportApi: {},
+    issueReportsApi: {},
+    captionTrackApi: {},
+    transcriptMetadataApi: {},
+    keyboardWorkflowApi: {},
+    youtubeAdapterApi: { isWatchPage: () => true },
+    keyboardShortcutApi: {},
+    displayPreferenceWorkflowApi: {},
+    uiStateWorkflowApi: {},
+    menuStateApi: {},
+    playbackSessionApi: {},
+    sourceSelectorWorkflowApi: {},
+    sourceSelectorApi: {},
+    sourceSelectorDomApi: {},
+    sourceReadinessApi: {},
+    sourceLabelsApi: {},
+    phraseRowsWorkflowApi: {},
+    phraseRowsApi: {},
+    phraseRowsDomApi: {},
+    selectedSpanWorkflowApi: {},
+    selectedSpanApi: {},
+    domUtilsApi: { clearElement: () => "cleared" },
+  };
+  const action = (name) => () => name;
+  const controllers = surfaceContentFacade.createSurfaceControllers({
+    getState: () => ({}),
+    modules,
+    iconSvg: "<svg>",
+    bugIconSvg: "<bug>",
+    issueReportWorkflow: {},
+    extensionBuildInfo: { revision: "unit" },
+    playbackRateOptions: [1],
+    constants: { issueReportCategories: [], playbackRateStep: 0.25 },
+    ids: { rootId: "root", ribbonPanelId: "ribbon", dictionaryPanelId: "dictionary" },
+    environment: { document: {}, window: {}, navigator: {}, HTMLElement: class {}, Element: class {}, requestAnimationFrame: () => 0 },
+    getPanelGestureFallbackInstalled: () => false,
+    setPanelGestureFallbackInstalled: () => {},
+    getViewportLayoutFrame: () => 0,
+    setViewportLayoutFrame: () => {},
+    commands: {
+      render: action("render"),
+      account: {
+        toggleAccountMenu: action("toggle-account"),
+        connectAccount: action("connect-account"),
+        disconnectAccount: action("disconnect-account"),
+      },
+      diagnostics: {
+        toggleDebug: action("toggle-debug"),
+        copyDebug: action("copy-debug"),
+        clearDiagnostics: action("clear-diagnostics"),
+        publishDiagnosticsSnapshot: action("publish-diagnostics"),
+        copyTextWithFallback: action("copy-text"),
+        recordDebugEvent: action("record-debug"),
+      },
+      dictionary: {
+        applySpanSelectionDraftPreview: action("apply-preview"),
+        clearSpanSelectionDraft: action("clear-span"),
+        selectLookupWord: action("select-word"),
+        handleWordReplayGesture: action("replay-word"),
+      },
+      display: {
+        updateDisplayPreferences: action("update-display"),
+        cycleThemePreference: action("cycle-theme"),
+        toggleSettingsMenu: action("toggle-settings"),
+        toggleShortcutHelp: action("toggle-shortcuts"),
+        toggleUtilityMenu: action("toggle-utility"),
+        adjustLearnerTextScale: action("text-scale"),
+        resetLearnerTextScale: action("reset-text-scale"),
+        adjustPanelBackgroundAlpha: action("alpha"),
+        resetPanelBackgroundAlpha: action("reset-alpha"),
+        closeOpenMenus: action("close-menus"),
+      },
+      issue: {
+        openIssueReportDialog: action("open-issue"),
+        submitPhraseBoundaryIssue: action("submit-boundary"),
+        closeIssueReportDialog: action("close-issue"),
+        submitIssueReport: action("submit-issue"),
+        copyCurrentIssueReport: action("copy-issue"),
+      },
+      layout: {
+        bringDebugPanelBehindFromPanel: action("behind"),
+        toggleLayoutLock: action("lock"),
+        resetPanelLayout: action("reset-layout"),
+        beginPanelDrag: action("drag"),
+        beginPanelResize: action("resize"),
+      },
+      navigation: {
+        togglePhraseJumpMenu: action("jump-menu"),
+        jumpToPhrase: action("jump"),
+        submitPhraseJump: action("submit-jump"),
+      },
+      playback: {
+        getVideoElement: action("video"),
+        describePhraseAtIndex: action("describe"),
+        roundTime: action("round"),
+        previousPhrase: action("previous"),
+        replayCurrentPhrase: action("replay"),
+        toggleText: action("text"),
+        nextPhrase: action("next"),
+        setPracticeMode: action("mode"),
+        toggleAutoPause: action("auto-pause"),
+        adjustSlowReplaySpeed: action("slow"),
+        adjustVideoPlaybackRate: action("rate"),
+        toggleContinuousPlayback: action("continuous"),
+        playbackEndMsForPhrase: action("end"),
+      },
+      source: {
+        getSelectedPracticeSource: action("selected-source"),
+        practiceReadiness: action("readiness"),
+        timingOperationState: action("timing"),
+        userFacingSourceLabel: action("label"),
+        refreshSelectedSourceCache: action("refresh-source"),
+        startImproveTiming: action("improve"),
+        selectPracticeSource: action("select-source"),
+        toggleSourceMenu: action("source-menu"),
+      },
+      translation: {
+        phraseTranslationState: action("translation-state"),
+        togglePhraseTranslation: action("toggle-translation"),
+        requestSelectedSpanTranslation: action("span-translation"),
+      },
+    },
+  });
+
+  assert.equal(controllers.ribbonPanelController.createRibbonPanel(), "ribbon");
+  assert.equal(captured.ribbonPanel.nextPhrase(), "next");
+  assert.equal(captured.ribbonPanel.connectAccount(), "connect-account");
+  assert.equal(captured.keyboard.clearSpanSelectionDraft(), "clear-span");
+  assert.equal(captured.displayState.updateDisplayPreferences(), "update-display");
+  assert.equal(captured.ribbonContent.requestSelectedSpanTranslation(), "span-translation");
+  assert.equal(captured.ribbonContent.clearElement(), "cleared");
+}
+
+function assertLearningBoundaryTermsStayOutOfContentScript() {
+  const contentSource = fs.readFileSync(path.join(extensionRoot, "src/content.js"), "utf8");
+  const boundaryTerms = [
+    "af-connect-2000nl",
+    "af-disconnect-2000nl",
+    "af-get-2000nl-session",
+    "start-learning",
+    "mark-known",
+    "mark-unknown",
+    "review-card",
+    "record-view",
+    "save-and-start-learning",
+    "includeUserState",
+    "Bearer",
+  ];
+  for (const term of boundaryTerms) {
+    assert.equal(contentSource.includes(term), false, `content.js must not own 2000NL boundary term ${term}`);
+  }
+}
+
 assertManifestOrderRegistersContentNamespaces();
 assertSourceContentFacadeComposesSourceBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
+assertSurfaceContentFacadeComposesTypedCommands();
+assertLearningBoundaryTermsStayOutOfContentScript();
 const shadowCssSource = fs.readFileSync(path.join(extensionRoot, "src/shadow.css"), "utf8");
 assert.match(shadowCssSource, /:host\(\[data-af-theme="dark"\]\)[\s\S]*--af-bg-alpha:/);
 assert.match(shadowCssSource, /:host\(\[data-af-theme="system"\]\)[\s\S]*--af-bg-alpha:/);
