@@ -149,6 +149,21 @@ function assertManifestOrderRegistersContentNamespaces() {
   }
 }
 
+function assertDictionaryMocksStayRuntimeGated() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(extensionRoot, "manifest.json"), "utf8"));
+  const contentScripts = manifest.content_scripts
+    .find((entry) => (entry.js || []).includes("src/content.js"))?.js || [];
+  const mocksIndex = contentScripts.indexOf("src/dictionaryMocks.js");
+  const commandClientIndex = contentScripts.indexOf("src/extensionCommandClient.js");
+  assert.ok(mocksIndex > -1, "manifest includes dictionaryMocks for smoke fixtures");
+  assert.ok(commandClientIndex > mocksIndex, "dictionaryMocks load before the command client gate");
+
+  const commandClientSource = fs.readFileSync(path.join(extensionRoot, "src/extensionCommandClient.js"), "utf8");
+  assert.match(commandClientSource, /storage\?\.getItem\("afShadowingDictionaryMock"\)/);
+  assert.match(commandClientSource, /mockMode !== "cards" && mockMode !== "generated"/);
+  assert.match(commandClientSource, /if \(mockResponse\) return Promise\.resolve\(mockResponse\)/);
+}
+
 function createManifestOrderSandbox() {
   const sandbox = {
     URL,
@@ -1043,6 +1058,7 @@ function assertLearningBoundaryTermsStayOutOfContentScript() {
 }
 
 assertManifestOrderRegistersContentNamespaces();
+assertDictionaryMocksStayRuntimeGated();
 assertSourceContentFacadeComposesSourceBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
@@ -5747,6 +5763,7 @@ const commandClient = extensionCommandClient.createExtensionCommandClient({
 const commandClientLookup = await commandClient.postDictionaryCommand("dict-lookup", { clickedForm: "oog" });
 assert.equal(commandClientLookup.cards[0].id, "card-1");
 assert.equal(commandClientFetches[0].init.method, "POST");
+assert.equal(commandClientDocument.documentElement.dataset.afShadowingDictionaryMockCommands, undefined);
 const commandClientSession = await commandClient.fetchDictionarySession();
 assert.equal(commandClientSession.authenticated, true);
 const commandClientBackend = await commandClient.postBackendJson("practice-timing-create", { payload: { videoId: "video-1" } });
