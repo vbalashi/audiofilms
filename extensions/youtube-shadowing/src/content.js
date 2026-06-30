@@ -554,9 +554,7 @@
     playbackTiming: playbackTimingApi,
     transcriptPanelDom: transcriptPanelDomApi,
     youtubeAdapter: youtubeAdapterApi,
-    playbackRateOptions,
-    syncPlaybackRateFromVideo,
-    slowReplayPlaybackRate,
+    formatUtils: formatUtilsApi,
     recordNavigationEvent,
     describePhraseAtIndex,
     getPlaybackSnapshot,
@@ -572,6 +570,9 @@
       postRollMs: POST_ROLL_MS,
       minAudibleEndTailMs: MIN_AUDIBLE_END_TAIL_MS,
       contiguousBoundaryGuardMs: CONTIGUOUS_BOUNDARY_GUARD_MS,
+      playbackRateMin: PLAYBACK_RATE_MIN,
+      playbackRateMax: PLAYBACK_RATE_MAX,
+      defaultSlowReplaySpeed: DEFAULT_SLOW_REPLAY_SPEED,
     },
     environment: {
       document,
@@ -590,6 +591,10 @@
     holdPhraseAtStart,
     toggleText,
     toggleAutoPause,
+    playbackRateOptions,
+    syncPlaybackRateFromVideo,
+    slowReplayPlaybackRate,
+    formatPlaybackRate,
     enterGuidedMode,
     showText,
     syncIndexToCurrentTime,
@@ -928,29 +933,6 @@
     });
     applyDebugPanelGeometry(debugPanel);
     applyDebugPanelLayer(debugPanel);
-  }
-
-  function syncPlaybackRateFromVideo(video = getVideoElement()) {
-    return playbackSessionApi.syncPlaybackRateFromVideo(state, video, playbackRateOptions());
-  }
-
-  function slowReplayPlaybackRate() {
-    return playbackSessionApi.slowReplayPlaybackRate(state, playbackRateOptions());
-  }
-
-  function formatPlaybackRate(value) {
-    return playbackSessionApi.formatPlaybackRate(value, playbackRateOptions());
-  }
-
-  function playbackRateOptions() {
-    return {
-      clampNumber: formatUtilsApi.clampNumber,
-      formatPlaybackRate: formatUtilsApi.formatPlaybackRate,
-      min: PLAYBACK_RATE_MIN,
-      max: PLAYBACK_RATE_MAX,
-      fallback: 1,
-      slowReplayFallback: DEFAULT_SLOW_REPLAY_SPEED,
-    };
   }
 
   function toggleCardExamples(cardId) {

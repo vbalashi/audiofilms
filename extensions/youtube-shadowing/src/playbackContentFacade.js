@@ -125,6 +125,38 @@
       };
     }
 
+    function playbackRateOptions() {
+      if (typeof deps.playbackRateOptions === "function") {
+        return deps.playbackRateOptions();
+      }
+      return {
+        clampNumber: deps.formatUtils.clampNumber,
+        formatPlaybackRate: deps.formatUtils.formatPlaybackRate,
+        min: constants.playbackRateMin,
+        max: constants.playbackRateMax,
+        fallback: 1,
+        slowReplayFallback: constants.defaultSlowReplaySpeed,
+      };
+    }
+
+    function syncPlaybackRateFromVideo(video = getVideoElement()) {
+      if (typeof deps.syncPlaybackRateFromVideo === "function") {
+        return deps.syncPlaybackRateFromVideo(video);
+      }
+      return deps.playbackSession.syncPlaybackRateFromVideo(deps.getState(), video, playbackRateOptions());
+    }
+
+    function slowReplayPlaybackRate() {
+      if (typeof deps.slowReplayPlaybackRate === "function") {
+        return deps.slowReplayPlaybackRate();
+      }
+      return deps.playbackSession.slowReplayPlaybackRate(deps.getState(), playbackRateOptions());
+    }
+
+    function formatPlaybackRate(value) {
+      return deps.playbackSession.formatPlaybackRate(value, playbackRateOptions());
+    }
+
     function stopPlaybackTimer() {
       const state = deps.getState();
       restorePlaybackRateAfterOverride();
@@ -136,7 +168,7 @@
     }
 
     function restorePlaybackRateAfterOverride(video = getVideoElement()) {
-      deps.playbackSession.restorePlaybackRateAfterOverride(deps.getState(), video, deps.playbackRateOptions());
+      deps.playbackSession.restorePlaybackRateAfterOverride(deps.getState(), video, playbackRateOptions());
     }
 
     function markCurrentTranscriptSegment(phrase) {
@@ -172,6 +204,9 @@
       ...deps,
       getVideoElement,
       stopPlaybackTimer,
+      playbackRateOptions,
+      syncPlaybackRateFromVideo,
+      slowReplayPlaybackRate,
       playbackEndMsForPhrase,
       findPlaybackPhraseIndex,
       markCurrentTranscriptSegment,
@@ -194,6 +229,10 @@
       jumpToPhrase: (targetIndex, reason) => playbackController.jumpToPhrase(targetIndex, reason),
       handleWordReplayGesture: (event, word, phraseIndex, selection) =>
         playbackController.handleWordReplayGesture(event, word, phraseIndex, selection),
+      playbackRateOptions,
+      syncPlaybackRateFromVideo,
+      slowReplayPlaybackRate,
+      formatPlaybackRate,
       findPlaybackPhraseIndex,
       getVideoElement,
       replayCurrentPhrase: (options = {}) => playbackController.replayCurrentPhrase(options),

@@ -552,6 +552,12 @@ function assertPlaybackContentFacadeComposesPlaybackBoundary() {
     playbackSession: {
       isCurrentPhraseStillSelected: (options) => options.replayGraceMs === 1200,
       restorePlaybackRateAfterOverride: (state, restoredVideo, rates) => runtimeEvents.push(["restore", state.currentIndex, restoredVideo.playbackRate, rates.length]),
+      syncPlaybackRateFromVideo: (state, rateVideo, rates) => {
+        runtimeEvents.push(["sync-rate", state.currentIndex, rateVideo.playbackRate, rates.min]);
+        return rateVideo.playbackRate;
+      },
+      slowReplayPlaybackRate: (_state, rates) => rates.slowReplayFallback,
+      formatPlaybackRate: (value, rates) => rates.formatPlaybackRate(value),
     },
     playbackTiming: {
       findPlaybackPhraseIndex: (_phrases, currentMs, config) => ({ currentMs, preRollMs: config.preRollMs }),
@@ -566,9 +572,10 @@ function assertPlaybackContentFacadeComposesPlaybackBoundary() {
     youtubeAdapter: {
       getVideoElement: () => video,
     },
-    playbackRateOptions: () => [0.75, 1, 1.25],
-    syncPlaybackRateFromVideo: () => {},
-    slowReplayPlaybackRate: () => 0.75,
+    formatUtils: {
+      clampNumber: (value) => value,
+      formatPlaybackRate: (value) => `${value}x`,
+    },
     recordNavigationEvent: () => {},
     describePhraseAtIndex: () => "phrase",
     getPlaybackSnapshot: () => ({}),
@@ -584,6 +591,9 @@ function assertPlaybackContentFacadeComposesPlaybackBoundary() {
       postRollMs: 300,
       minAudibleEndTailMs: 100,
       contiguousBoundaryGuardMs: 50,
+      playbackRateMin: 0.5,
+      playbackRateMax: 2,
+      defaultSlowReplaySpeed: 0.75,
     },
     environment: {
       document: {},
@@ -597,6 +607,9 @@ function assertPlaybackContentFacadeComposesPlaybackBoundary() {
   assert.equal(runtime.getVideoElement(), video);
   assert.deepEqual(runtime.findPlaybackPhraseIndex([], 1234), { currentMs: 1234, preRollMs: 250 });
   assert.equal(runtime.playbackEndMsForPhrase([], 2), 302);
+  assert.equal(runtime.syncPlaybackRateFromVideo(video), 1.25);
+  assert.equal(runtime.slowReplayPlaybackRate(), 0.75);
+  assert.equal(runtime.formatPlaybackRate(1.25), "1.25x");
   assert.equal(runtime.isCurrentPhraseStillSelected(1500), true);
   assert.deepEqual(runtime.resolveWordTiming({}), { exactness: "word" });
   assert.equal(runtime.estimateWordStartMs({}, {}), 3);
