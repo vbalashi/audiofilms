@@ -37,12 +37,7 @@
     sourceContentFacadeApi,
     videoInitWorkflowApi,
     videoInitContentWorkflowApi,
-    sourceBindingApi,
-    dictionaryActionApi,
-    dictionaryActionWorkflowApi,
     dictionaryStateApi,
-    dictionaryAudioApi,
-    dictionaryAudioWorkflowApi,
     dictionaryMockApi,
     dictionaryPresentationApi,
     dictionaryDomApi,
@@ -52,7 +47,6 @@
     dictionarySearchWorkflowApi,
     dictionaryRenderWorkflowApi,
     dictionaryCommandApi,
-    dictionaryCommandTransportApi,
     dictionaryLookupWorkflowApi,
     dictionaryContentWorkflowApi,
     accountSessionApi,
@@ -62,7 +56,6 @@
     backendBuildWorkflowApi,
     extensionCommandClientApi,
     generatedEntryApi,
-    generatedEntryWorkflowApi,
     phraseProgressApi,
     phraseProgressStorageApi,
     phraseTranslationApi,
@@ -73,6 +66,7 @@
     selectedSpanApi,
     selectedSpanWorkflowApi,
     selectedSpanDomApi,
+    dictionaryOperationsContentFacadeApi,
     playbackSessionApi,
     playbackTimingApi,
     playbackWorkflowApi,
@@ -222,6 +216,54 @@
     setTimeout: (callback, ms) => window.setTimeout(callback, ms),
     clearTimeout: (timer) => window.clearTimeout(timer),
   });
+  const dictionaryOperationsController = dictionaryOperationsContentFacadeApi.createDictionaryOperationsController({
+    getState: () => state,
+    modules,
+    environment: {
+      document,
+      config: window.__afShadowingConfig,
+      AudioConstructor: typeof Audio === "undefined" ? null : Audio,
+    },
+    commands: {
+      render,
+      getSelectedPracticeSource,
+      getVideoElement,
+      extensionVersion,
+      describePhraseAtIndex,
+      openIssueReportDialog,
+      recordDebugEvent,
+      createMutationTurnId,
+      requestDictionaryCommand,
+      lookupSelectedWord,
+      connectAccount: connectTwoThousandNlAccount,
+      disconnectAccount: disconnectTwoThousandNlAccount,
+      toggleCardTranslation,
+    },
+  });
+  const {
+    clearSelectedSpan,
+    saveSelectedSpanCard,
+    renderCardActionMenu,
+    cardAudioPlayable,
+    playHeadwordAudio,
+    toggleCardMenu,
+    visibleCardTranslation,
+    cardTranslationsVisible,
+    cardHasLookupTranslations,
+    cardCanRequestTranslation,
+    lookupOrOverlayHeadword,
+    lookupOrOverlayDefinition,
+    lookupOrOverlaySection,
+    handleAccountAction,
+    performDisplayAction,
+    generateDictionaryDraft,
+    createDictionarySourceBinding,
+    generatedDraftItemFromOverlayCard,
+    isCurrentLookup,
+    fetchDictionaryResult,
+    fetchDictionarySearchResult,
+    postDictionaryCommand,
+  } = dictionaryOperationsController;
   const dictionaryController = dictionaryContentWorkflowApi.createDictionaryController({
     getState: () => state,
     dictionaryPanelWorkflow: dictionaryPanelWorkflowApi,
@@ -1300,71 +1342,6 @@
     });
   }
 
-  function clearSelectedSpan() {
-    state.selectedSpan = null;
-    render();
-  }
-
-  async function saveSelectedSpanCard(span) {
-    return selectedSpanWorkflowApi.saveSelectedSpanCard(span, {
-      accountStatus: state.accountStatus,
-      getSelectedSpan: () => state.selectedSpan,
-      setSelectedSpan: (nextSpan) => {
-        state.selectedSpan = nextSpan;
-      },
-      buildPayload: selectedSpanGeneratedEntryPayload,
-      postDictionaryCommand,
-      createMutationTurnId,
-      sourceContext: selectedSpanSourceContext,
-      render,
-    });
-  }
-
-  function selectedSpanGeneratedEntryPayload(span, draft = null, action = "generated-entry-draft") {
-    const phrase = state.phrases[span.phraseIndex] || state.phrases[state.currentIndex];
-    const source = getSelectedPracticeSource();
-    return selectedSpanApi.selectedSpanGeneratedEntryPayload({
-      span,
-      phrase,
-      sourceLanguageCode: phraseTranslationApi.sourceLanguageCode({
-        source,
-        transcriptResult: state.transcriptResult,
-      }),
-      sourceContext: selectedSpanSourceContext(span, "", action),
-      draftPayload: generatedEntryApi.generatedDraftPayload(draft),
-    });
-  }
-
-  function selectedSpanSourceContext(span, entryId = "", action = "generated-entry-draft") {
-    return selectedSpanWorkflowApi.selectedSpanSourceContext(span, {
-      entryId,
-      action,
-      state,
-      selectedSpans: selectedSpanApi,
-      getSelectedPracticeSource,
-      getVideoElement,
-      youtubeVideoTitle,
-      extensionVersion,
-    });
-  }
-
-  function selectedSpanSourceBinding(span) {
-    return selectedSpanWorkflowApi.selectedSpanSourceBinding(span, {
-      state,
-      selectedSpans: selectedSpanApi,
-      getSelectedPracticeSource,
-    });
-  }
-
-  function selectPhraseSpan(draft) {
-    const phrase = state.phrases[draft.phraseIndex];
-    const span = selectedSpanApi.selectedSpanFromDraft(draft, phrase);
-    return selectedSpanWorkflowApi.completeSpanDraft(state, draft, span, {
-      render,
-      requestSelectedSpanTranslation,
-    });
-  }
-
   function handleWordReplayGesture(event, word, phraseIndex, selection) {
     return playbackController.handleWordReplayGesture(event, word, phraseIndex, selection);
   }
@@ -1413,97 +1390,8 @@
     return dictionaryController.renderOverlayCardTitle(parent, card);
   }
 
-  function cardAudioPlayable(card) {
-    return dictionaryAudioApi.cardAudioPlayable(card);
-  }
-
-  async function playHeadwordAudio(card) {
-    return dictionaryAudioWorkflowApi.playHeadwordAudio(card, dictionaryAudioWorkflowOptions());
-  }
-
-  async function resolveHeadwordAudioUrl(card) {
-    return dictionaryAudioWorkflowApi.resolveHeadwordAudioUrl(card, dictionaryAudioWorkflowOptions());
-  }
-
-  function dictionaryAudioWorkflowOptions() {
-    return {
-      AudioConstructor: typeof Audio === "undefined" ? null : Audio,
-      titleForCard: (card) => dictionaryPresentationApi.overlayTitle(card, state.selectedWord?.word),
-      postDictionaryCommand,
-      setPending: setCardAudioPending,
-      recordDebugEvent,
-    };
-  }
-
-  function setCardAudioPending(cardId, pending) {
-    if (!cardId) return;
-    state.audioPendingByCardId = dictionaryAudioApi.audioPendingState(state.audioPendingByCardId, cardId, pending);
-    render();
-  }
-
   function renderOverlaySections(parent, sections, card, translation = null) {
     return dictionaryController.renderOverlaySections(parent, sections, card, translation);
-  }
-
-  function toggleCardMenu(cardId) {
-    state.cardMenuOpenId = state.cardMenuOpenId === cardId ? "" : cardId;
-    render();
-  }
-
-  function renderCardActionMenu(parent, card) {
-    return dictionaryOverlayWorkflowApi.renderCardActionMenu(parent, card, {
-      state,
-      dictionaryDom: dictionaryDomApi,
-      issueReports: issueReportsApi,
-      describePhraseAtIndex,
-      openIssueReportDialog,
-      recordDebugEvent,
-      render,
-    });
-  }
-
-  function visibleCardTranslation(card) {
-    return dictionaryPresentationApi.visibleCardTranslation({
-      card,
-      visibleTranslationsByCardId: state.visibleTranslationsByCardId,
-      selectedWord: state.selectedWord,
-    });
-  }
-
-  function cardTranslationsVisible(card) {
-    return dictionaryPresentationApi.cardTranslationsVisible({
-      card,
-      visibleTranslationsByCardId: state.visibleTranslationsByCardId,
-    });
-  }
-
-  function cardHasLookupTranslations(card) {
-    return dictionaryPresentationApi.cardHasLookupTranslations(card);
-  }
-
-  function cardCanRequestTranslation(card) {
-    return dictionaryPresentationApi.cardCanRequestTranslation(card, generatedDraftItemFromOverlayCard(card));
-  }
-
-  function lookupOrOverlayHeadword(card, translation, options = {}) {
-    return dictionaryPresentationApi.lookupOrOverlayHeadword(card, translation, {
-      ...options,
-      translationVisible: cardTranslationsVisible(card),
-    });
-  }
-
-  function lookupOrOverlayDefinition(card, translation, meaningIndex = 0, options = {}) {
-    return dictionaryPresentationApi.lookupOrOverlayDefinition(card, translation, meaningIndex, {
-      ...options,
-      translationVisible: cardTranslationsVisible(card),
-    });
-  }
-
-  function lookupOrOverlaySection(card, section, allSections, translation, options = {}) {
-    return dictionaryPresentationApi.lookupOrOverlaySection(card, section, allSections, translation, {
-      ...options,
-      translationVisible: cardTranslationsVisible(card),
-    });
   }
 
   function renderReviewActions(parent, card = null) {
@@ -1512,23 +1400,6 @@
 
   function renderConnectPrompt(parent) {
     return dictionaryController.renderConnectPrompt(parent);
-  }
-
-  function handleAccountAction() {
-    if (state.accountStatus === "signed-in") {
-      disconnectTwoThousandNlAccount();
-    } else {
-      connectTwoThousandNlAccount();
-    }
-  }
-
-  function performDisplayAction(card, displayAction) {
-    return dictionaryOverlayWorkflowApi.performDisplayAction(card, displayAction, {
-      getSelectedWord: () => state.selectedWord,
-      toggleCardTranslation,
-      performDictionaryCardAction,
-      saveGeneratedDictionaryDraft,
-    });
   }
 
   function selectLookupWord(word, phraseIndex, selection = {}, options = {}) {
@@ -1551,156 +1422,8 @@
     return dictionaryController.loadDictionarySearchItemCard(selectedWord, item, itemKey);
   }
 
-  async function performDictionaryCardAction(card, displayAction, actionPayload) {
-    return dictionaryActionWorkflowApi.performDictionaryCardAction(card, displayAction, actionPayload, {
-      getSelectedWord: () => state.selectedWord,
-      setSelectedWord: (selectedWord) => {
-        state.selectedWord = selectedWord;
-      },
-      setCardFeedback: (cardId, feedback) => {
-        state.cardActionFeedbackByCardId = {
-          ...state.cardActionFeedbackByCardId,
-          [cardId]: feedback,
-        };
-      },
-      buildPayload: frozenDictionaryActionPayload,
-      postDictionaryCommand,
-      isCurrentLookup,
-      reloadLookup: lookupSelectedWord,
-      render,
-    });
-  }
-
-  async function generateDictionaryDraft(selectedWord) {
-    return generatedEntryWorkflowApi.generateDictionaryDraft(selectedWord, generatedEntryWorkflowOptions());
-  }
-
-  async function saveGeneratedDictionaryDraft(selectedWord, card = null) {
-    return generatedEntryWorkflowApi.saveGeneratedDictionaryDraft(selectedWord, card, generatedEntryWorkflowOptions());
-  }
-
-  function generatedEntryWorkflowOptions() {
-    return {
-      getSelectedWord: () => state.selectedWord,
-      setSelectedWord: (selectedWord) => {
-        state.selectedWord = selectedWord;
-      },
-      buildPayload: generatedEntryBasePayload,
-      postDictionaryCommand,
-      createMutationTurnId,
-      sourceContext: generatedEntrySourceContext,
-      isCurrentLookup,
-      reloadLookup: lookupSelectedWord,
-      render,
-    };
-  }
-
-  function generatedEntryBasePayload(selectedWord, draft = null, card = null) {
-    return generatedEntryApi.generatedEntryPayloadFromSelection({
-      selectedWord,
-      phrases: state.phrases,
-      currentIndex: state.currentIndex,
-      source: getSelectedPracticeSource(),
-      sourceContext: generatedEntrySourceContext(selectedWord),
-      draft,
-      card,
-    });
-  }
-
-  function generatedEntrySourceContext(selectedWord, entryId = "") {
-    return generatedEntryApi.generatedEntrySourceContext({
-      selectedWord,
-      entryId,
-      buildSourceContext: buildDictionaryActionSourceContext,
-    });
-  }
-
-  function createDictionarySourceBinding(word, phraseIndex, selection = {}) {
-    return sourceBindingApi.createDictionarySourceBinding({
-      word,
-      phraseIndex,
-      selection,
-      videoId: state.videoId,
-      selectedSourceId: state.selectedSourceId,
-      selectedTrack: state.selectedTrack,
-      phrases: state.phrases,
-      currentIndex: state.currentIndex,
-      transcriptResult: state.transcriptResult,
-      source: getSelectedPracticeSource(),
-    });
-  }
-
-  function frozenDictionaryActionPayload(selectedWord, card, actionPayload = {}) {
-    return dictionaryActionApi.frozenDictionaryActionPayload({
-      selectedWord,
-      card,
-      actionPayload,
-      currentVideoId: state.videoId,
-      createMutationTurnId,
-      isUuid,
-      buildSourceContext: buildDictionaryActionSourceContext,
-    });
-  }
-
-  function buildDictionaryActionSourceContext(binding, card, action) {
-    const video = getVideoElement();
-    return sourceBindingApi.buildDictionaryActionSourceContext({
-      binding,
-      card,
-      action,
-      observation: {
-        currentPlaybackTimeMs: video ? video.currentTime * 1000 : null,
-        title: youtubeVideoTitle(),
-        capturedAt: new Date().toISOString(),
-      },
-      clientVersion: extensionVersion(),
-    });
-  }
-
-  function youtubeVideoTitle() {
-    const title = document.title || "";
-    return title.replace(/\s*-\s*YouTube\s*$/i, "").trim();
-  }
-
-  function finiteInteger(value) {
-    return Number.isFinite(value) ? Math.round(value) : null;
-  }
-
-  function isUuid(value) {
-    return typeof value === "string" &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-  }
-
   async function requestDictionaryCardTranslation(card) {
     return dictionaryController.requestDictionaryCardTranslation(card);
-  }
-
-  function generatedDraftItemFromOverlayCard(card) {
-    return generatedEntryApi.generatedDraftItemFromOverlayCard(card);
-  }
-
-  function isCurrentLookup(selectedWord) {
-    return state.selectedWord?.lookupSeq === selectedWord.lookupSeq &&
-      state.selectedWord?.word === selectedWord.word;
-  }
-
-  function dictionaryTransportOptions() {
-    return {
-      requestDictionaryCommand,
-      endpoint: dictionaryCommandTransportApi.dictionaryLookupEndpoint(window.__afShadowingConfig),
-    };
-  }
-
-  async function fetchDictionaryResult(request) {
-    return dictionaryCommandTransportApi.fetchDictionaryResult(request, dictionaryTransportOptions());
-  }
-
-  async function fetchDictionarySearchResult(request) {
-    return dictionaryCommandTransportApi.fetchDictionarySearchResult(request, dictionaryTransportOptions());
-  }
-
-  async function postDictionaryCommand(operation, payload) {
-    return dictionaryCommandTransportApi.postDictionaryCommand(operation, payload, dictionaryTransportOptions());
   }
 
   async function syncTwoThousandNlAccount() {

@@ -92,6 +92,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingSelectedSpans",
     "__afShadowingSelectedSpanWorkflow",
     "__afShadowingSelectedSpansDom",
+    "__afShadowingDictionaryOperationsContentFacade",
     "__afShadowingPlaybackSession",
     "__afShadowingPlaybackTiming",
     "__afShadowingPlaybackWorkflow",
@@ -501,6 +502,147 @@ function assertSupportContentFacadeComposesSupportBoundary() {
   assert.equal(supportControllers.issueReportWorkflow.open(), "opened");
 }
 
+async function assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary() {
+  const dictionaryOperationsFacade = loadBrowserModule(
+    "src/dictionaryOperationsContentFacade.js",
+    "__afShadowingDictionaryOperationsContentFacade",
+  );
+  const events = [];
+  const state = {
+    accountStatus: "signed-in",
+    selectedSpan: { phraseIndex: 0, text: "kleine rode ster" },
+    selectedWord: { lookupSeq: 7, word: "klein" },
+    phrases: [{ text: "een kleine rode ster" }],
+    currentIndex: 0,
+    videoId: "video-1",
+    selectedSourceId: "source-1",
+    selectedTrack: { id: "track-1" },
+    transcriptResult: { language: "nl" },
+    visibleTranslationsByCardId: {},
+    audioPendingByCardId: {},
+    cardActionFeedbackByCardId: {},
+  };
+  const modules = {
+    selectedSpanWorkflowApi: {
+      saveSelectedSpanCard: async (span, options) => {
+        events.push(["span-save", options.accountStatus, options.buildPayload(span).ok]);
+        events.push(["span-context", options.sourceContext(span, "entry-1", "start-learning").action]);
+      },
+      selectedSpanSourceContext: (_span, options) => ({ action: options.action, entryId: options.entryId }),
+      selectedSpanSourceBinding: () => ({ binding: true }),
+    },
+    selectedSpanApi: {
+      selectedSpanGeneratedEntryPayload: (payload) => ({ ok: true, value: payload }),
+    },
+    phraseTranslationApi: {
+      sourceLanguageCode: () => "nl",
+    },
+    generatedEntryApi: {
+      generatedDraftPayload: () => ({ candidateId: "draft-1" }),
+      generatedEntryPayloadFromSelection: () => ({ ok: true, value: { draft: true } }),
+      generatedEntrySourceContext: ({ buildSourceContext }) => buildSourceContext({ binding: true }, { id: "card-1" }, "start-learning"),
+      generatedDraftItemFromOverlayCard: () => ({ draft: true }),
+    },
+    dictionaryOverlayWorkflowApi: {
+      renderCardActionMenu: () => "menu",
+      performDisplayAction: (_card, _displayAction, options) => options.performDictionaryCardAction({ entryId: "entry-1" }, {}, { action: "start-learning" }),
+    },
+    dictionaryDomApi: {},
+    issueReportsApi: {},
+    dictionaryAudioApi: {
+      cardAudioPlayable: () => true,
+      audioPendingState: (_current, cardId, pending) => ({ [cardId]: pending }),
+    },
+    dictionaryAudioWorkflowApi: {
+      playHeadwordAudio: async (_card, options) => {
+        events.push(["audio-title", options.titleForCard({ title: "kop" })]);
+        options.setPending("card-1", true);
+      },
+      resolveHeadwordAudioUrl: async () => "audio-url",
+    },
+    dictionaryPresentationApi: {
+      overlayTitle: (card) => card.title || "",
+      visibleCardTranslation: () => "visible",
+      cardTranslationsVisible: () => true,
+      cardHasLookupTranslations: () => true,
+      cardCanRequestTranslation: () => true,
+      lookupOrOverlayHeadword: () => "headword",
+      lookupOrOverlayDefinition: () => "definition",
+      lookupOrOverlaySection: () => "section",
+    },
+    dictionaryActionWorkflowApi: {
+      performDictionaryCardAction: async (_card, _displayAction, _actionPayload, options) => {
+        events.push(["action-payload", options.buildPayload(state.selectedWord, { entryId: "entry-1" }, { action: "start-learning" }).ok]);
+        options.setCardFeedback("card-1", { state: "pending" });
+      },
+    },
+    dictionaryActionApi: {
+      frozenDictionaryActionPayload: () => ({ ok: true, value: { action: "start-learning" } }),
+    },
+    generatedEntryWorkflowApi: {
+      generateDictionaryDraft: async (_selectedWord, options) => {
+        events.push(["generated-payload", options.buildPayload(state.selectedWord).ok]);
+      },
+      saveGeneratedDictionaryDraft: async () => {},
+    },
+    sourceBindingApi: {
+      createDictionarySourceBinding: (payload) => ({ phraseIndex: payload.phraseIndex, sourceId: payload.selectedSourceId }),
+      buildDictionaryActionSourceContext: ({ action, observation, clientVersion }) => ({ action, title: observation.title, clientVersion }),
+    },
+    dictionaryCommandTransportApi: {
+      dictionaryLookupEndpoint: () => "https://dict.test",
+      fetchDictionaryResult: async (_request, options) => {
+        events.push(["fetch-endpoint", options.endpoint]);
+        return { ok: true };
+      },
+      fetchDictionarySearchResult: async () => ({ ok: true }),
+      postDictionaryCommand: async (operation, _payload, options) => {
+        events.push(["post", operation, options.endpoint]);
+        return { ok: true };
+      },
+    },
+  };
+  const controller = dictionaryOperationsFacade.createDictionaryOperationsController({
+    getState: () => state,
+    modules,
+    environment: {
+      document: { title: "Unit Video - YouTube" },
+      config: {},
+      AudioConstructor: function AudioConstructor() {},
+    },
+    commands: {
+      render: () => events.push(["render"]),
+      getSelectedPracticeSource: () => ({ id: "source-1" }),
+      getVideoElement: () => ({ currentTime: 12.345 }),
+      extensionVersion: () => "0.1.7",
+      describePhraseAtIndex: () => "phrase",
+      openIssueReportDialog: () => {},
+      recordDebugEvent: () => {},
+      createMutationTurnId: () => "turn-1",
+      requestDictionaryCommand: () => ({ ok: true }),
+      lookupSelectedWord: () => {},
+      connectAccount: () => events.push(["connect"]),
+      disconnectAccount: () => events.push(["disconnect"]),
+      toggleCardTranslation: () => events.push(["toggle-translation"]),
+    },
+  });
+
+  await controller.saveSelectedSpanCard(state.selectedSpan);
+  await controller.generateDictionaryDraft(state.selectedWord);
+  await controller.playHeadwordAudio({ id: "card-1", title: "kop" });
+  await controller.performDisplayAction({ entryId: "entry-1" }, { command: { kind: "display-action" } });
+  await controller.fetchDictionaryResult({ word: "klein" });
+  await controller.postDictionaryCommand("dict-action", { action: "start-learning" });
+  assert.deepEqual(controller.createDictionarySourceBinding("klein", 0).sourceId, "source-1");
+  assert.equal(controller.cardAudioPlayable({}), true);
+  assert.equal(controller.cardTranslationsVisible({}), true);
+  assert.equal(JSON.stringify(state.audioPendingByCardId), JSON.stringify({ "card-1": true }));
+  assert.equal(JSON.stringify(state.cardActionFeedbackByCardId), JSON.stringify({ "card-1": { state: "pending" } }));
+  assert.ok(events.some((event) => event[0] === "span-context" && event[1] === "start-learning"));
+  assert.ok(events.some((event) => event[0] === "fetch-endpoint" && event[1] === "https://dict.test"));
+  assert.ok(events.some((event) => event[0] === "post" && event[1] === "dict-action"));
+}
+
 function assertSurfaceContentFacadeComposesTypedCommands() {
   const surfaceContentFacade = loadBrowserModule("src/surfaceContentFacade.js", "__afShadowingSurfaceContentFacade");
   const captured = {};
@@ -707,6 +849,7 @@ assertManifestOrderRegistersContentNamespaces();
 assertSourceContentFacadeComposesSourceBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
+await assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary();
 assertSurfaceContentFacadeComposesTypedCommands();
 assertLearningBoundaryTermsStayOutOfContentScript();
 const shadowCssSource = fs.readFileSync(path.join(extensionRoot, "src/shadow.css"), "utf8");

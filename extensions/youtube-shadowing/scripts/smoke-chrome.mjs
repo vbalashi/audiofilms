@@ -571,7 +571,7 @@ function runDictionarySourceBindingScenario() {
     clearDictionaryMockCommands();
     const initial = waitForSnapshot(fixture.videoId, waitMs);
     assertions.push(assertion("dictionary source binding panel loaded", initial.panel === true, JSON.stringify({ source: initial.source, count: initial.count, error: initial.error })));
-    assertions.push(assertion("dictionary source binding starts on captions", /captions/i.test(initial.source || ""), initial.source));
+    assertions.push(assertion("dictionary source binding starts with a loaded practice source", Boolean(initial.source) && Boolean(parseCountOrdinal(initial.count)), JSON.stringify({ source: initial.source, count: initial.count })));
 
     const clicked = clickFirstLookupWord();
     const lookupSnapshot = waitForDictionarySelection(clicked.word, waitMs);

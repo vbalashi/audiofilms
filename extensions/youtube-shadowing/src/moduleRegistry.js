@@ -100,6 +100,7 @@
       selectedSpanApi: requiredModule(target, "__afShadowingSelectedSpans"),
       selectedSpanWorkflowApi: requiredModule(target, "__afShadowingSelectedSpanWorkflow"),
       selectedSpanDomApi: requiredModule(target, "__afShadowingSelectedSpansDom"),
+      dictionaryOperationsContentFacadeApi: requiredModule(target, "__afShadowingDictionaryOperationsContentFacade"),
       playbackSessionApi: requiredModule(target, "__afShadowingPlaybackSession"),
       playbackTimingApi: requiredModule(target, "__afShadowingPlaybackTiming"),
       playbackWorkflowApi: requiredModule(target, "__afShadowingPlaybackWorkflow"),

@@ -96,6 +96,7 @@
         "src/selectedSpans.js",
         "src/selectedSpanWorkflow.js",
         "src/selectedSpansDom.js",
+        "src/dictionaryOperationsContentFacade.js",
         "src/phraseProgress.js",
         "src/phraseProgressStorage.js",
         "src/playbackSession.js",
@@ -174,5 +175,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 19:07:32Z · 574108c · dirty · surface content facade refactor"
+  "version_name": "v0.1.7 · 2026-06-30 19:32:29Z · 449ea08 · dirty · dictionary operations facade refactor"
 }
