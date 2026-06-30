@@ -234,10 +234,19 @@
       more: {
         visible: Boolean(group.page?.hasMore && group.page.nextCursor),
         label: "More results",
-        datasetKey: `afSearchMore-${group.id}`,
+        datasetKey: dictionarySearchMoreDatasetKey(group.id),
         cursor: group.page?.nextCursor || "",
       },
     };
+  }
+
+  function dictionarySearchMoreDatasetKey(groupId) {
+    const suffix = String(groupId || "")
+      .split(/[^a-z0-9]+/i)
+      .filter(Boolean)
+      .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
+      .join("");
+    return `afSearchMore${suffix || "Group"}`;
   }
 
   function groupedSearchPreviewState(selectedWord) {
@@ -625,6 +634,7 @@
     dictionarySearchItemChips,
     dictionarySearchItemText,
     dictionarySearchGroupState,
+    dictionarySearchMoreDatasetKey,
     focusedDictionarySearchCards,
     highlightedTextParts,
     groupedSearchPreviewState,

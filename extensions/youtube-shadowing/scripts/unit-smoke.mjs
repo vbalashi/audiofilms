@@ -4495,7 +4495,9 @@ assert.equal(dictionarySearchGroupState.rows[0].ariaLabel, "Open card: bouwen");
 assert.equal(dictionarySearchGroupState.rows[0].highlight, "gebouw");
 assert.equal(dictionarySearchGroupState.rows[1].expanded, true);
 assert.equal(dictionarySearchGroupState.rows[1].loadedState.status, "ready");
-assert.equal(dictionarySearchGroupState.more.datasetKey, "afSearchMore-examples");
+assert.equal(dictionarySearchGroupState.more.datasetKey, "afSearchMoreExamples");
+assert.equal(/^[A-Za-z_$][\w$]*$/.test(dictionarySearchGroupState.more.datasetKey), true);
+assert.equal(dictionarySearchGroupState.more.datasetKey.includes("-"), false);
 assert.equal(dictionarySearchGroupState.more.cursor, "cursor-2");
 const dictionarySearchLoadingHost = createTestElement("div");
 dictionarySearchDom.renderGroupedSearchPreviews(dictionarySearchLoadingHost, {
@@ -4544,8 +4546,9 @@ assert.equal(dictionarySearchRow.dataset.afSearchItemKey, "examples::entry-1::0"
 dictionarySearchRow.listeners.click[0].listener({ target: { closest: () => null } });
 assert.equal(toggledSearchItemKey, "examples::entry-1::0");
 dictionarySearchGroup.children[2].listeners.click[0].listener();
-assert.equal(dictionarySearchGroup.children[2].dataset["afSearchMore-examples"], "");
+assert.equal(dictionarySearchGroup.children[2].dataset.afSearchMoreExamples, "");
 assert.equal(loadMoreGroupId, "examples");
+assert.equal(dictionaryPresentation.dictionarySearchMoreDatasetKey("related-forms"), "afSearchMoreRelatedForms");
 const dictionarySearchWorkflowState = {
   selectedWord: { word: "bouw" },
   phrases: [{ text: "Fallback phrase." }],

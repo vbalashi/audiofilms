@@ -1743,6 +1743,7 @@ function assertLookupInteraction() {
     assertion("dictionary selected clicked word", selectedWordNormalized === clickedWordNormalized, `${selectedWord} vs ${clicked.word}`),
     assertion("dictionary lookup completed", after.dictionary?.loading === false, after.dictionary?.subtitle || ""),
     assertion("dictionary renders lookup surface", after.dictionary?.cardCount > 0 || Boolean(after.dictionary?.lookupTitle || after.dictionary?.lookupCopy), JSON.stringify(after.dictionary)),
+    assertion("dictionary renders grouped search", (after.dictionaryUi?.searchGroupTitles || []).length > 0 && after.dictionaryUi.searchItemCount > 0, JSON.stringify(after.dictionaryUi)),
     assertion("lookup leaves phrase row rendered", Boolean(after.rowText), after.rowText),
   ];
 }
