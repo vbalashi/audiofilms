@@ -140,6 +140,17 @@ For PR validation, a stamped unpacked-dev build may say `dirty` because the
 stamp is generated before committing the code it validates. Treat that as a
 local validation marker, not a production release claim.
 
+For tester/release packaging, generate a release manifest instead of shipping
+the unpacked-dev manifest directly:
+
+```bash
+node extensions/youtube-shadowing/scripts/write-release-manifest.mjs --out /tmp/audiofilms-release-manifest.json
+```
+
+The release manifest strips `localhost` / `127.0.0.1` host permissions and
+refuses a `dirty` `version_name` unless `--allow-dirty` is passed for local
+inspection only.
+
 1. Open Chrome extensions.
 2. Enable Developer mode.
 3. Choose Load unpacked.

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AudioFilms YouTube Shadowing",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Phrase-by-phrase shadowing controls for YouTube captions.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs2+Ygyoyc9iTrOG2Ybv9ioO2OTb+EsOUkTbhilVcVLLrLGEk7MUCto1LHZCitT6hPf6QnfLTHJWnskFbhk7GjIQsMgY2/kby3aCxr0qxibsU91pUGFteAf8n/eEmqr0og9vvknDGXWuGU+vaZUn90HDPv0/rRHgOw+mit5MnSBJtQfdp/UfWddsUWS5frzxaGJifcS71/Vux00gqEuxt0zDuMtOUzAxUJaZ6YDuirDoKfJ09GWF+9K117SaTEnpn8lbvuZsPczl6+dlvoVjcNJRJG7lupmERq6qrqzBbupZTMXe5sAEQr65qViSfI9yn7LomX2rjr2xuUoPZ5AhgoQIDAQAB",
   "action": {
@@ -153,6 +153,8 @@
         "src/surfaceContentFacade.js",
         "src/surfaceRuntimeContentFacade.js",
         "src/ribbonRuntimeContentFacade.js",
+        "src/interactionRuntimeContentFacade.js",
+        "src/renderSchedulerContentFacade.js",
         "src/moduleRegistry.js",
         "src/content.js"
       ],
@@ -181,5 +183,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 23:30:13Z · eaa7b21 · dirty · security gate and facade dependency cleanup"
+  "version_name": "v0.1.8 · 2026-06-30 23:50:47Z · 4a0199e · dirty · interaction messaging render scheduler cleanup"
 }

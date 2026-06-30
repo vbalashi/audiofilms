@@ -1,4 +1,46 @@
 (function audioFilmsExtensionCommandClient() {
+  function createRuntimeMessageClient({
+    chrome,
+    setTimeout = globalThis.setTimeout,
+    clearTimeout = globalThis.clearTimeout,
+    timeoutMs = 15000,
+  } = {}) {
+    function sendRuntimeMessage(message) {
+      if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+        return Promise.reject(new Error("Chrome runtime messaging is unavailable"));
+      }
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let timer = null;
+        timer = typeof setTimeout === "function"
+          ? setTimeout(() => {
+            settle(() => reject(new Error(`Chrome runtime message timed out after ${timeoutMs}ms`)));
+          }, timeoutMs)
+          : null;
+        chrome.runtime.sendMessage(message, (response) => {
+          settle(() => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            resolve(response);
+          });
+        });
+
+        function settle(callback) {
+          if (settled) return;
+          settled = true;
+          if (timer && typeof clearTimeout === "function") clearTimeout(timer);
+          callback();
+        }
+      });
+    }
+
+    return {
+      sendRuntimeMessage,
+    };
+  }
+
   function createExtensionCommandClient({
     chrome,
     fetch,
@@ -9,17 +51,8 @@
     apiBase,
     now = () => new Date().toISOString(),
   } = {}) {
-    function sendRuntimeMessage(message) {
-      return new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(message, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-            return;
-          }
-          resolve(response);
-        });
-      });
-    }
+    const runtimeMessageClient = createRuntimeMessageClient({ chrome });
+    const { sendRuntimeMessage } = runtimeMessageClient;
 
     function requestDictionaryCommand(operation, body = null) {
       if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
@@ -133,6 +166,7 @@
   }
 
   window.__afShadowingExtensionCommandClient = {
+    createRuntimeMessageClient,
     createExtensionCommandClient,
   };
 })();

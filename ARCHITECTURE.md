@@ -69,6 +69,10 @@ The extension boundary is split into explicit runtime surfaces:
   (`chrome.storage.local.afShadowingDevMocks`) set through the extension
   options context. YouTube page `localStorage` must not enable dictionary or
   issue-report mocks.
+- `manifest.json` is the unpacked-dev manifest and may keep localhost
+  permissions for local smoke testing. Tester/release packaging must go through
+  `scripts/write-release-manifest.mjs`, which strips localhost host permissions
+  and rejects dirty build stamps by default.
 - 2000NL-specific account/session/card semantics stay behind account/backend
   adapters and service-worker message types. The content boundary should use
   neutral names such as linked account, account, or platform action.

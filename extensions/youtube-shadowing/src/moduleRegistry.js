@@ -153,6 +153,8 @@
       surfaceContentFacadeApi: requiredModule(target, "__afShadowingSurfaceContentFacade"),
       surfaceRuntimeContentFacadeApi: requiredModule(target, "__afShadowingSurfaceRuntimeContentFacade"),
       ribbonRuntimeContentFacadeApi: requiredModule(target, "__afShadowingRibbonRuntimeContentFacade"),
+      interactionRuntimeContentFacadeApi: requiredModule(target, "__afShadowingInteractionRuntimeContentFacade"),
+      renderSchedulerContentFacadeApi: requiredModule(target, "__afShadowingRenderSchedulerContentFacade"),
       buildInfoApi: target.__afShadowingBuildInfo || {},
     };
   }

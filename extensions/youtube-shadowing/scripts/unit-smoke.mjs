@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import vm from "node:vm";
 import path from "node:path";
@@ -145,6 +146,8 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingSurfaceContentFacade",
     "__afShadowingSurfaceRuntimeContentFacade",
     "__afShadowingRibbonRuntimeContentFacade",
+    "__afShadowingInteractionRuntimeContentFacade",
+    "__afShadowingRenderSchedulerContentFacade",
     "__afShadowingModuleRegistry",
     "__afShadowingBuildInfo",
   ];
@@ -202,8 +205,91 @@ function assertPageBridgeCommandContract() {
   assert.match(transcriptSource, /delete document\.documentElement\.dataset\.afShadowingPageBridgeResult/);
 }
 
+function assertReleaseManifestStripsLocalhostPermissions() {
+  const manifest = JSON.parse(fs.readFileSync(path.join(extensionRoot, "manifest.json"), "utf8"));
+  assert.ok(
+    (manifest.host_permissions || []).some((pattern) => pattern.includes("localhost")),
+    "dev manifest keeps localhost for unpacked smoke tests",
+  );
+  const stdout = execFileSync(
+    process.execPath,
+    [
+      path.join(extensionRoot, "scripts/write-release-manifest.mjs"),
+      "--allow-dirty",
+    ],
+    { encoding: "utf8" },
+  );
+  const releaseManifest = JSON.parse(stdout);
+  assert.equal(
+    (releaseManifest.host_permissions || []).some((pattern) => /localhost|127\.0\.0\.1/.test(pattern)),
+    false,
+    "release manifest strips localhost host permissions",
+  );
+}
+
+async function assertRuntimeMessageClientNormalizesRuntimeMessaging() {
+  const extensionCommandClient = loadBrowserModule(
+    "src/extensionCommandClient.js",
+    "__afShadowingExtensionCommandClient",
+  );
+  const sent = [];
+  const successChrome = {
+    runtime: {
+      lastError: null,
+      sendMessage: (message, callback) => {
+        sent.push(message);
+        callback({ ok: true, echo: message.type });
+      },
+    },
+  };
+  const successClient = extensionCommandClient.createRuntimeMessageClient({
+    chrome: successChrome,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+  });
+  assert.deepEqual(await successClient.sendRuntimeMessage({ type: "ping" }), { ok: true, echo: "ping" });
+  assert.deepEqual(sent, [{ type: "ping" }]);
+
+  const errorChrome = {
+    runtime: {
+      lastError: { message: "service worker unavailable" },
+      sendMessage: (_message, callback) => callback(null),
+    },
+  };
+  const errorClient = extensionCommandClient.createRuntimeMessageClient({
+    chrome: errorChrome,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+  });
+  await assert.rejects(
+    () => errorClient.sendRuntimeMessage({ type: "ping" }),
+    /service worker unavailable/,
+  );
+
+  const timeoutClient = extensionCommandClient.createRuntimeMessageClient({
+    chrome: {
+      runtime: {
+        lastError: null,
+        sendMessage: () => {},
+      },
+    },
+    setTimeout: (callback) => {
+      callback();
+      return 1;
+    },
+    clearTimeout: () => {},
+    timeoutMs: 25,
+  });
+  await assert.rejects(
+    () => timeoutClient.sendRuntimeMessage({ type: "slow" }),
+    /timed out after 25ms/,
+  );
+}
+
 function assertContentFacadesReceiveScopedModuleBundles() {
   const source = fs.readFileSync(path.join(extensionRoot, "src/content.js"), "utf8");
+  assert.equal(source.includes("chrome.runtime.sendMessage"), false, "content.js must use the shared runtime message client");
+  assert.match(source, /createRuntimeMessageClient\(\{/);
   assert.equal(/createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
   assert.equal(/createPhraseTranslationController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
   assert.equal(/createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
@@ -1471,6 +1557,173 @@ function assertRibbonRuntimeContentFacadeOwnsRibbonRenderingBoundary() {
   ]);
 }
 
+function assertInteractionRuntimeContentFacadeOwnsInteractionBoundary() {
+  const interactionRuntimeFacade = loadBrowserModule(
+    "src/interactionRuntimeContentFacade.js",
+    "__afShadowingInteractionRuntimeContentFacade",
+  );
+  const calls = [];
+  const words = [
+    {
+      dataset: { afPhraseIndex: "0", afTokenIndex: "1" },
+      classList: {
+        toggle: (className, enabled) => calls.push(["toggleClass", className, enabled]),
+      },
+    },
+  ];
+  const state = {
+    spanSelectionDraft: { start: { phraseIndex: 0, tokenIndex: 1 }, end: { phraseIndex: 0, tokenIndex: 1 } },
+    selectedSpan: { start: { phraseIndex: 0, tokenIndex: 1 }, end: { phraseIndex: 0, tokenIndex: 1 } },
+  };
+  const document = {
+    documentElement: {
+      appended: [],
+      appendChild(element) {
+        this.appended.push(element);
+      },
+    },
+    createElement: () => ({
+      style: {},
+      setAttribute: (name, value) => calls.push(["setAttribute", name, value]),
+      select: () => calls.push(["select"]),
+      remove: () => calls.push(["remove"]),
+    }),
+    execCommand: (command) => calls.push(["execCommand", command]),
+    getElementById: () => ({
+      shadowRoot: {
+        querySelectorAll: () => words,
+      },
+    }),
+  };
+  const phraseRows = {
+    tokenInSpan: (span, phraseIndex, tokenIndex) => Boolean(span && phraseIndex === 0 && tokenIndex === 1),
+    tokenInSpanDraft: (draft, phraseIndex, tokenIndex) => Boolean(draft && phraseIndex === 0 && tokenIndex === 1),
+  };
+  const controller = interactionRuntimeFacade.createInteractionRuntimeController({
+    getState: () => state,
+    modules: {
+      phraseJumpWorkflow: {
+        togglePhraseJumpMenu: (currentState, event, options) => {
+          calls.push(["toggleJump", currentState === state, event.type, options.rootId]);
+          options.jumpToPhrase(4, "unit");
+          options.render();
+          return "menu";
+        },
+        submitPhraseJump: (currentState, options) => {
+          calls.push(["submitJump", currentState === state, options.rootId]);
+          return "submit";
+        },
+      },
+      menuState: { menu: true },
+      phraseRows,
+      selectedSpanWorkflow: {
+        cancelSpanDraft: (currentState, options) => {
+          calls.push(["cancelDraft", currentState === state]);
+          currentState.spanSelectionDraft = null;
+          options.applyPreview();
+        },
+      },
+    },
+    commands: {
+      jumpToPhrase: (index, reason) => calls.push(["jump", index, reason]),
+      render: () => calls.push(["render"]),
+    },
+    ids: { rootId: "af-root" },
+    environment: {
+      document,
+      navigator: { clipboard: { writeText: () => Promise.reject(new Error("no clipboard")) } },
+      Element: class Element {},
+      requestAnimationFrame: (callback) => callback(),
+    },
+  });
+
+  assert.equal(controller.togglePhraseJumpMenu({ type: "click" }), "menu");
+  assert.equal(controller.submitPhraseJump(), "submit");
+  assert.equal(controller.isTokenInSelectedSpan(0, 1), true);
+  assert.equal(controller.isTokenInSpanDraft(0, 1), true);
+  controller.applySpanSelectionDraftPreview();
+  controller.clearSpanSelectionDraft();
+  controller.copyTextWithFallback("diagnostics");
+  controller.copyIssueReport("report");
+
+  assert.deepEqual(calls.slice(0, 8), [
+    ["toggleJump", true, "click", "af-root"],
+    ["jump", 4, "unit"],
+    ["render"],
+    ["submitJump", true, "af-root"],
+    ["toggleClass", "is-span-draft", true],
+    ["cancelDraft", true],
+    ["toggleClass", "is-span-draft", false],
+    ["setAttribute", "readonly", ""],
+  ]);
+  assert.ok(calls.some((entry) => entry[0] === "execCommand" && entry[1] === "copy"));
+}
+
+function assertRenderSchedulerContentFacadeInvalidatesBuckets() {
+  const renderSchedulerFacade = loadBrowserModule(
+    "src/renderSchedulerContentFacade.js",
+    "__afShadowingRenderSchedulerContentFacade",
+  );
+  const calls = [];
+  const state = {
+    learningEnabled: true,
+    textVisible: false,
+  };
+  const scheduler = renderSchedulerFacade.createRenderScheduler({
+    getState: () => state,
+    renderers: {
+      renderToggle: () => calls.push(["toggle"]),
+      clearTimingOperationPoll: () => calls.push(["clearTiming"]),
+      removeWorkspace: () => calls.push(["removeWorkspace"]),
+      ensureWorkspace: () => {
+        calls.push(["workspace"]);
+        return {
+          dictionaryPanel: "dictionary",
+          ribbonPanel: "ribbon",
+          debugPanel: "debug",
+        };
+      },
+      applyPanelLayout: (ribbonPanel, dictionaryPanel) => calls.push(["layout", ribbonPanel, dictionaryPanel]),
+      renderRibbon: (panel) => calls.push(["ribbon", panel]),
+      renderDebugPanel: (panel) => calls.push(["debug", panel]),
+      renderDictionary: (panel) => calls.push(["dictionary", panel]),
+    },
+    environment: {
+      document: {
+        documentElement: {
+          classList: {
+            toggle: (className, enabled) => calls.push(["class", className, enabled]),
+          },
+        },
+      },
+      requestAnimationFrame: (callback) => {
+        calls.push(["schedule"]);
+        return callback();
+      },
+      cancelAnimationFrame: () => {},
+    },
+  });
+
+  scheduler.invalidate(["toggle", "ribbon", "transcript"]);
+  assert.deepEqual(calls, [
+    ["schedule"],
+    ["toggle"],
+    ["workspace"],
+    ["ribbon", "ribbon"],
+    ["class", "af-shadowing-hide-transcript", true],
+  ]);
+
+  calls.length = 0;
+  state.learningEnabled = false;
+  scheduler.invalidate("all");
+  assert.deepEqual(calls.slice(0, 4), [
+    ["schedule"],
+    ["toggle"],
+    ["clearTiming"],
+    ["removeWorkspace"],
+  ]);
+}
+
 function assertLearningBoundaryTermsStayOutOfContentScript() {
   const contentSource = fs.readFileSync(path.join(extensionRoot, "src/content.js"), "utf8");
   const boundaryTerms = [
@@ -1513,6 +1766,8 @@ assertManifestOrderRegistersContentNamespaces();
 assertDictionaryMocksStayRuntimeGated();
 assertServiceWorkerMessageSecurityBoundary();
 assertPageBridgeCommandContract();
+assertReleaseManifestStripsLocalhostPermissions();
+await assertRuntimeMessageClientNormalizesRuntimeMessaging();
 assertContentFacadesReceiveScopedModuleBundles();
 assertSourceContentFacadeComposesSourceBoundary();
 await assertYoutubeRuntimeContentFacadeOwnsYoutubeBoundary();
@@ -1525,6 +1780,8 @@ await assertPhraseTranslationContentFacadeOwnsTranslationBoundary();
 assertSurfaceContentFacadeComposesTypedCommands();
 assertSurfaceRuntimeContentFacadeOwnsControllerBindings();
 assertRibbonRuntimeContentFacadeOwnsRibbonRenderingBoundary();
+assertInteractionRuntimeContentFacadeOwnsInteractionBoundary();
+assertRenderSchedulerContentFacadeInvalidatesBuckets();
 assertLearningBoundaryTermsStayOutOfContentScript();
 const shadowCssSource = fs.readFileSync(path.join(extensionRoot, "src/shadow.css"), "utf8");
 assert.match(shadowCssSource, /:host\(\[data-af-theme="dark"\]\)[\s\S]*--af-bg-alpha:/);

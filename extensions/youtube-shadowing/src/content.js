@@ -129,6 +129,8 @@
     surfaceContentFacadeApi,
     surfaceRuntimeContentFacadeApi,
     ribbonRuntimeContentFacadeApi,
+    interactionRuntimeContentFacadeApi,
+    renderSchedulerContentFacadeApi,
     buildInfoApi,
   } = modules;
   const iconSvg = uiIconsApi.iconSvg;
@@ -183,13 +185,18 @@
     recordNavigationEvent,
     publishSnapshot: publishDiagnosticsSnapshot,
   } = diagnosticsStateController;
+  const runtimeMessageClient = extensionCommandClientApi.createRuntimeMessageClient({
+    chrome,
+    setTimeout: window.setTimeout.bind(window),
+    clearTimeout: window.clearTimeout.bind(window),
+  });
   const displayPreferenceController = displayPreferenceStorageApi.createDisplayPreferenceController({
     chrome,
     storage: window.localStorage,
     keys: displayPreferenceStorageKeys,
     state,
     normalizeDisplayPreferences: displayPreferencesApi.normalizeDisplayPreferences,
-    sendMessage: sendExtensionMessage,
+    sendMessage: runtimeMessageClient.sendRuntimeMessage,
     recordDebugEvent,
     render,
     onDisabled: handleDisplayPreferencesDisabled,
@@ -199,7 +206,7 @@
     window,
     phraseProgress: phraseProgressApi,
     state,
-    sendMessage: sendExtensionMessage,
+    sendMessage: runtimeMessageClient.sendRuntimeMessage,
     recordDebugEvent,
   });
   const sourceSelectionStore = sourceSelectionStorageApi.createSourceSelectionStore({
@@ -319,6 +326,39 @@
     appendPhraseRow,
   } = surfaceRuntimeController;
   let playbackRuntimeController = null;
+  const interactionRuntimeController = interactionRuntimeContentFacadeApi.createInteractionRuntimeController({
+    getState: () => state,
+    modules: {
+      phraseJumpWorkflow: phraseJumpWorkflowApi,
+      menuState: menuStateApi,
+      phraseRows: phraseRowsApi,
+      selectedSpanWorkflow: selectedSpanWorkflowApi,
+    },
+    commands: {
+      jumpToPhrase: (targetIndex, reason) => playbackRuntimeController?.jumpToPhrase(targetIndex, reason),
+      render,
+    },
+    ids: {
+      rootId: ROOT_ID,
+    },
+    environment: {
+      document,
+      navigator,
+      Element,
+      requestAnimationFrame,
+    },
+  });
+  const {
+    onDocumentPointerUp,
+    togglePhraseJumpMenu,
+    submitPhraseJump,
+    copyIssueReport,
+    copyTextWithFallback,
+    isTokenInSelectedSpan,
+    isTokenInSpanDraft,
+    applySpanSelectionDraftPreview,
+    clearSpanSelectionDraft,
+  } = interactionRuntimeController;
   const backendRuntimeController = backendRuntimeContentFacadeApi.createBackendRuntimeController({
     environment: {
       config: window.__afShadowingConfig,
@@ -795,7 +835,7 @@
       },
       navigation: {
         togglePhraseJumpMenu,
-        jumpToPhrase,
+        jumpToPhrase: jumpToPhraseFromPlayback,
         submitPhraseJump,
       },
       playback: {
@@ -926,6 +966,25 @@
   const {
     renderRibbon,
   } = ribbonRuntimeController;
+  const renderScheduler = renderSchedulerContentFacadeApi.createRenderScheduler({
+    getState: () => state,
+    renderers: {
+      renderToggle,
+      clearTimingOperationPoll,
+      removeWorkspace,
+      ensureWorkspace,
+      applyPanelLayout,
+      renderRibbon,
+      renderDebugPanel,
+      renderDictionary,
+    },
+    environment: {
+      document,
+      requestAnimationFrame: window.requestAnimationFrame.bind(window),
+      cancelAnimationFrame: window.cancelAnimationFrame.bind(window),
+      setTimeout: window.setTimeout.bind(window),
+    },
+  });
   const videoInitController = videoInitContentWorkflowApi.createVideoInitController({
     getState: () => state,
     videoInitWorkflow: videoInitWorkflowApi,
@@ -980,18 +1039,6 @@
     handleCurrentLocation();
   }
 
-  function sendExtensionMessage(message) {
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve(response);
-      });
-    });
-  }
-
   function createDebugPanel() {
     return workspaceDomApi.createDebugPanel({
       onBringToFront: bringDebugPanelToFrontFromEvent,
@@ -1002,22 +1049,8 @@
     });
   }
 
-  function render() {
-    renderToggle();
-    if (!state.learningEnabled) {
-      clearTimingOperationPoll();
-      removeWorkspace();
-      return;
-    }
-
-    const { dictionaryPanel, ribbonPanel, debugPanel } = ensureWorkspace();
-    applyPanelLayout(ribbonPanel, dictionaryPanel);
-    renderRibbon(ribbonPanel);
-    renderDebugPanel(debugPanel);
-    if (dictionaryPanel) {
-      renderDictionary(dictionaryPanel);
-    }
-    document.documentElement.classList.toggle("af-shadowing-hide-transcript", !state.textVisible);
+  function render(invalidation = "all") {
+    renderScheduler.invalidate(invalidation);
   }
 
   function renderDebugPanel(debugPanel) {
@@ -1027,59 +1060,6 @@
     });
     applyDebugPanelGeometry(debugPanel);
     applyDebugPanelLayer(debugPanel);
-  }
-
-  function toggleCardExamples(cardId) {
-    toggleCardExpanded(cardId);
-  }
-
-  function exampleSectionExpanded(cardId) {
-    return cardExpanded(cardId);
-  }
-
-  function onDocumentPointerUp(event) {
-    if (!state.spanSelectionDraft) return;
-    if (isSpanDraftWordEvent(event)) return;
-    clearSpanSelectionDraft();
-  }
-
-  function isSpanDraftWordEvent(event) {
-    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
-    return path.some((element) => (
-      element instanceof Element
-      && element.matches?.(".af-ribbon-word[data-af-phrase-index][data-af-token-index]")
-    ));
-  }
-
-  function togglePhraseJumpMenu(event) {
-    return phraseJumpWorkflowApi.togglePhraseJumpMenu(state, event, phraseJumpWorkflowOptions());
-  }
-
-  function submitPhraseJump() {
-    return phraseJumpWorkflowApi.submitPhraseJump(state, phraseJumpWorkflowOptions());
-  }
-
-  function jumpToPhrase(targetIndex, reason) {
-    return jumpToPhraseFromPlayback(targetIndex, reason);
-  }
-
-  function phraseJumpWorkflowOptions() {
-    return {
-      document,
-      rootId: ROOT_ID,
-      menuState: menuStateApi,
-      requestAnimationFrame,
-      jumpToPhrase,
-      render,
-    };
-  }
-
-  function copyIssueReport(report) {
-    Promise.resolve()
-      .then(() => navigator.clipboard.writeText(report))
-      .catch(() => {
-      copyTextWithFallback(report);
-    });
   }
 
   function extensionVersion() {
@@ -1101,18 +1081,6 @@
   function renderIssueReportDialog(dialog) {
     const dialogState = issueReportsApi.issueReportDialogState(state);
     issueReportsDomApi.renderIssueReportDialog(dialog, dialogState);
-  }
-
-  function copyTextWithFallback(text) {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "");
-    textarea.style.position = "fixed";
-    textarea.style.left = "-9999px";
-    document.documentElement.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    textarea.remove();
   }
 
   function practiceReadiness() {
@@ -1156,30 +1124,6 @@
     event.stopPropagation();
     menuStateApi.toggleExclusiveMenu(state, "source");
     render();
-  }
-
-  function isTokenInSelectedSpan(phraseIndex, tokenIndex) {
-    return phraseRowsApi.tokenInSpan(state.selectedSpan, phraseIndex, tokenIndex);
-  }
-
-  function isTokenInSpanDraft(phraseIndex, tokenIndex) {
-    return phraseRowsApi.tokenInSpanDraft(state.spanSelectionDraft, phraseIndex, tokenIndex);
-  }
-
-  function applySpanSelectionDraftPreview() {
-    const root = document.getElementById(ROOT_ID)?.shadowRoot;
-    const words = root?.querySelectorAll(".af-ribbon-word[data-af-phrase-index][data-af-token-index]") || [];
-    for (const word of words) {
-      const phraseIndex = Number(word.dataset.afPhraseIndex);
-      const tokenIndex = Number(word.dataset.afTokenIndex);
-      word.classList.toggle("is-span-draft", isTokenInSpanDraft(phraseIndex, tokenIndex));
-    }
-  }
-
-  function clearSpanSelectionDraft() {
-    selectedSpanWorkflowApi.cancelSpanDraft(state, {
-      applyPreview: applySpanSelectionDraftPreview,
-    });
   }
 
   function handleWordReplayGesture(event, word, phraseIndex, selection) {
