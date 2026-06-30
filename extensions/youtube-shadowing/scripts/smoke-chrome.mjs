@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 
 const EXTENSION_ID = "hhdkchoccmikoefhenobdjipgdppdpoc";
 const SMOKE_ARTIFACT_DIR = "extensions/youtube-shadowing/.smoke-artifacts";
@@ -682,6 +683,7 @@ function runDictionaryUiScenario() {
       assertion("dictionary ui search preview text keeps usable width", minPreviewWidth === null || minPreviewWidth >= 120, JSON.stringify({ widths: previewWidths, samples: beforeTranslate.dictionaryUi?.searchItemTextSamples || [] })),
       assertion("dictionary ui does not show translation loading copy", !/loading translation/i.test(beforeTranslate.dictionaryUi?.actionStatus || ""), beforeTranslate.dictionaryUi?.actionStatus || ""),
       assertion("dictionary ui screenshot evidence captured", evidencePaths.length === 4, evidencePaths.join(" | ")),
+      assertion("dictionary ui screenshot evidence is non-blank", screenshotEvidenceIsNonBlank(evidencePaths), JSON.stringify(screenshotEvidenceStats(evidencePaths))),
     );
 
     if (translateClick === "clicked" && translationStyles.length) {
@@ -919,6 +921,7 @@ function runGeometryScenario() {
       assertion("dictionary ready body starts at cards", wideWithDictionary.dictionaryUi?.hasSelectedCard === false && wideWithDictionary.dictionaryUi?.overlayCardCount > 0, JSON.stringify(wideWithDictionary.dictionaryUi)),
       assertion("dictionary does not expose raw html", wideWithDictionary.dictionaryUi?.hasRawHtml === false, JSON.stringify(wideWithDictionary.dictionaryUi)),
       assertion("geometry screenshot evidence captured", evidencePaths.length === 2, evidencePaths.join(" | ")),
+      assertion("geometry screenshot evidence is non-blank", screenshotEvidenceIsNonBlank(evidencePaths), JSON.stringify(screenshotEvidenceStats(evidencePaths))),
       ...accountPlacementAssertions,
       ...dictionaryCardAssertions,
       ...spanSelectionAssertions,
@@ -3376,6 +3379,122 @@ end tell
     stdio: ["ignore", "ignore", "pipe"],
   });
   return path;
+}
+
+function screenshotEvidenceIsNonBlank(paths) {
+  return paths.length > 0 && screenshotEvidenceStats(paths).every((stats) => stats.nonBlank);
+}
+
+function screenshotEvidenceStats(paths) {
+  return paths.map((path) => {
+    try {
+      return { path, ...pngLumaStats(path) };
+    } catch (error) {
+      return { path, nonBlank: false, error: error?.message || String(error) };
+    }
+  });
+}
+
+function pngLumaStats(path) {
+  const png = readPngRgba(path);
+  let lumaSum = 0;
+  let nonDark = 0;
+  const pixels = png.width * png.height;
+  for (let offset = 0; offset < png.rgba.length; offset += 4) {
+    const luma = (png.rgba[offset] * 0.2126) + (png.rgba[offset + 1] * 0.7152) + (png.rgba[offset + 2] * 0.0722);
+    lumaSum += luma;
+    if (luma > 16) nonDark += 1;
+  }
+  const meanLuma = pixels ? lumaSum / pixels : 0;
+  const nonDarkRatio = pixels ? nonDark / pixels : 0;
+  return {
+    width: png.width,
+    height: png.height,
+    meanLuma: Math.round(meanLuma * 100) / 100,
+    nonDarkRatio: Math.round(nonDarkRatio * 10000) / 10000,
+    nonBlank: meanLuma > 3 && nonDarkRatio > 0.005,
+  };
+}
+
+function readPngRgba(path) {
+  const buffer = readFileSync(path);
+  if (buffer.toString("hex", 0, 8) !== "89504e470d0a1a0a") {
+    throw new Error("Screenshot is not a PNG.");
+  }
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idat = [];
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString("ascii", offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (type === "IHDR") {
+      width = buffer.readUInt32BE(dataStart);
+      height = buffer.readUInt32BE(dataStart + 4);
+      bitDepth = buffer[dataStart + 8];
+      colorType = buffer[dataStart + 9];
+      if (buffer[dataStart + 12] !== 0) throw new Error("Interlaced screenshots are not supported.");
+    } else if (type === "IDAT") {
+      idat.push(buffer.subarray(dataStart, dataEnd));
+    } else if (type === "IEND") {
+      break;
+    }
+    offset = dataEnd + 4;
+  }
+  if (!width || !height || bitDepth !== 8 || (colorType !== 2 && colorType !== 6)) {
+    throw new Error(`Unsupported PNG format: ${width}x${height}, bitDepth=${bitDepth}, colorType=${colorType}`);
+  }
+  const channels = colorType === 6 ? 4 : 3;
+  const stride = width * channels;
+  const raw = inflateSync(Buffer.concat(idat));
+  const rgba = new Uint8Array(width * height * 4);
+  let rawOffset = 0;
+  let rgbaOffset = 0;
+  let previous = new Uint8Array(stride);
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[rawOffset];
+    rawOffset += 1;
+    const current = new Uint8Array(stride);
+    for (let x = 0; x < stride; x += 1) {
+      const left = x >= channels ? current[x - channels] : 0;
+      const up = previous[x] || 0;
+      const upLeft = x >= channels ? previous[x - channels] || 0 : 0;
+      const value = raw[rawOffset + x];
+      current[x] = unfilterPngByte(filter, value, left, up, upLeft);
+    }
+    rawOffset += stride;
+    for (let x = 0; x < width; x += 1) {
+      const pixel = x * channels;
+      rgba[rgbaOffset++] = current[pixel];
+      rgba[rgbaOffset++] = current[pixel + 1];
+      rgba[rgbaOffset++] = current[pixel + 2];
+      rgba[rgbaOffset++] = colorType === 6 ? current[pixel + 3] : 255;
+    }
+    previous = current;
+  }
+  return { width, height, rgba };
+}
+
+function unfilterPngByte(filter, value, left, up, upLeft) {
+  if (filter === 0) return value;
+  if (filter === 1) return (value + left) & 255;
+  if (filter === 2) return (value + up) & 255;
+  if (filter === 3) return (value + Math.floor((left + up) / 2)) & 255;
+  if (filter === 4) return (value + paethPredictor(left, up, upLeft)) & 255;
+  throw new Error(`Unsupported PNG filter: ${filter}`);
+}
+
+function paethPredictor(left, up, upLeft) {
+  const p = left + up - upLeft;
+  const pa = Math.abs(p - left);
+  const pb = Math.abs(p - up);
+  const pc = Math.abs(p - upLeft);
+  if (pa <= pb && pa <= pc) return left;
+  return pb <= pc ? up : upLeft;
 }
 
 function chromeEval(js) {

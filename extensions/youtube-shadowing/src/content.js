@@ -299,7 +299,7 @@
     commandClient,
     accountSessionWorkflow,
     issueReportWorkflow,
-    refreshBackendBuildInfo: refreshBackendBuildInfoFromSupport,
+    refreshBackendBuildInfo,
   } = supportContentFacadeApi.createSupportControllers({
     getState: () => state,
     extensionCommandClient: extensionCommandClientApi,
@@ -327,6 +327,13 @@
     copyIssueReport,
     setTimeout: window.setTimeout.bind(window),
   });
+  const {
+    open: openIssueReportDialog,
+    close: closeIssueReportDialog,
+    copyCurrent: copyCurrentIssueReport,
+    submit: submitIssueReport,
+    submitPhraseBoundary: submitPhraseBoundaryIssue,
+  } = issueReportWorkflow;
   const {
     syncTwoThousandNlAccount,
     connectTwoThousandNlAccount,
@@ -1009,32 +1016,12 @@
     };
   }
 
-  function openIssueReportDialog(options = {}) {
-    issueReportWorkflow.open(options);
-  }
-
-  function closeIssueReportDialog() {
-    issueReportWorkflow.close();
-  }
-
-  function copyCurrentIssueReport() {
-    issueReportWorkflow.copyCurrent();
-  }
-
   function copyIssueReport(report) {
     Promise.resolve()
       .then(() => navigator.clipboard.writeText(report))
       .catch(() => {
       copyTextWithFallback(report);
     });
-  }
-
-  async function submitIssueReport() {
-    await issueReportWorkflow.submit();
-  }
-
-  async function submitPhraseBoundaryIssue() {
-    await issueReportWorkflow.submitPhraseBoundary();
   }
 
   function extensionVersion() {
@@ -1051,10 +1038,6 @@
       buildInfo: info,
       apiBase: apiBaseForBackendCommands(),
     });
-  }
-
-  async function refreshBackendBuildInfo() {
-    return refreshBackendBuildInfoFromSupport();
   }
 
   function renderIssueReportDialog(dialog) {
