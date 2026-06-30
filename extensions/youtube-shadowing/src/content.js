@@ -151,6 +151,11 @@
     diagnosticsReport: diagnosticsReportApi,
     document,
   });
+  const {
+    recordDebugEvent,
+    recordNavigationEvent,
+    publishSnapshot: publishDiagnosticsSnapshot,
+  } = diagnosticsStateController;
   const displayPreferenceController = displayPreferenceStorageApi.createDisplayPreferenceController({
     chrome,
     storage: window.localStorage,
@@ -374,6 +379,26 @@
     setTimeout: (callback, ms) => window.setTimeout(callback, ms),
     clearTimeout: (timer) => window.clearTimeout(timer),
   });
+  const {
+    refreshSelectedSourceCache,
+    startImproveTiming,
+    applyTimingOperation,
+    applyTimingOperationResultToActiveSource,
+    scheduleTimingOperationPoll,
+    pollTimingOperation,
+    clearTimingOperationPoll,
+    getSelectedPracticeSource,
+    selectPracticeSource,
+    loadPracticeSource,
+    phrasesFromTranscriptResult,
+    maybeSwitchToPreferredSource,
+    holdInitialAutoPauseAfterSourceLoad,
+    transcriptResultFromLoadedSource,
+    fetchReusableTimingTranscriptResult,
+    registerTimingOperationResultSources,
+    fetchBestAvailableCues,
+    normalizeTranscriptResult,
+  } = sourceController;
   const dictionaryOperationsController = dictionaryOperationsContentFacadeApi.createDictionaryOperationsController({
     getState: () => state,
     modules,
@@ -984,34 +1009,6 @@
     };
   }
 
-  async function refreshSelectedSourceCache() {
-    return sourceController.refreshSelectedSourceCache();
-  }
-
-  async function startImproveTiming(textSourceOverride = "") {
-    return sourceController.startImproveTiming(textSourceOverride);
-  }
-
-  function applyTimingOperation(operation) {
-    return sourceController.applyTimingOperation(operation);
-  }
-
-  function applyTimingOperationResultToActiveSource(operation) {
-    return sourceController.applyTimingOperationResultToActiveSource(operation);
-  }
-
-  function scheduleTimingOperationPoll(operation) {
-    return sourceController.scheduleTimingOperationPoll(operation);
-  }
-
-  async function pollTimingOperation(operationId) {
-    return sourceController.pollTimingOperation(operationId);
-  }
-
-  function clearTimingOperationPoll() {
-    return sourceController.clearTimingOperationPoll();
-  }
-
   function openIssueReportDialog(options = {}) {
     issueReportWorkflow.open(options);
   }
@@ -1075,18 +1072,6 @@
     textarea.select();
     document.execCommand("copy");
     textarea.remove();
-  }
-
-  function recordDebugEvent(type, detail) {
-    diagnosticsStateController.recordDebugEvent(type, detail);
-  }
-
-  function recordNavigationEvent(type, detail = {}) {
-    return diagnosticsStateController.recordNavigationEvent(type, detail);
-  }
-
-  function publishDiagnosticsSnapshot() {
-    diagnosticsStateController.publishSnapshot();
   }
 
   function practiceReadiness() {
@@ -1211,52 +1196,8 @@
     });
   }
 
-  function getSelectedPracticeSource() {
-    return sourceController.getSelectedPracticeSource();
-  }
-
-  async function selectPracticeSource(sourceId) {
-    return sourceController.selectPracticeSource(sourceId);
-  }
-
-  async function loadPracticeSource(source, options) {
-    return sourceController.loadPracticeSource(source, options);
-  }
-
-  function phrasesFromTranscriptResult(transcriptResult) {
-    return sourceController.phrasesFromTranscriptResult(transcriptResult);
-  }
-
-  async function maybeSwitchToPreferredSource(options = {}) {
-    return sourceController.maybeSwitchToPreferredSource(options);
-  }
-
-  function holdInitialAutoPauseAfterSourceLoad() {
-    return sourceController.holdInitialAutoPauseAfterSourceLoad();
-  }
-
-  function transcriptResultFromLoadedSource(source) {
-    return sourceController.transcriptResultFromLoadedSource(source);
-  }
-
-  async function fetchReusableTimingTranscriptResult(source, resultOverride = null) {
-    return sourceController.fetchReusableTimingTranscriptResult(source, resultOverride);
-  }
-
-  function registerTimingOperationResultSources(operation, options = {}) {
-    return sourceController.registerTimingOperationResultSources(operation, options);
-  }
-
   function findPlaybackPhraseIndex(phrases, currentMs) {
     return playbackRuntimeController.findPlaybackPhraseIndex(phrases, currentMs);
-  }
-
-  async function fetchBestAvailableCues(track, options = {}) {
-    return sourceController.fetchBestAvailableCues(track, options);
-  }
-
-  function normalizeTranscriptResult(result, track) {
-    return sourceController.normalizeTranscriptResult(result, track);
   }
 
   function getVideoElement() {
