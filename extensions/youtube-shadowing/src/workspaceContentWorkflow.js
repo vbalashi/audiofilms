@@ -75,24 +75,42 @@
       return deps.workspaceWorkflow.removeWorkspace(workspaceWorkflowOptions());
     }
 
-    async function loadShadowStyles(_root, style) {
-      if (style.dataset.afLoaded === "1") return;
-      style.dataset.afLoaded = "1";
+    function loadShadowStyles(root, style) {
+      if (style.dataset.afLoaded === "1" || style.dataset.afLoading === "1") return;
 
-      try {
-        const response = await deps.fetch(deps.chrome.runtime.getURL("src/shadow.css"));
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const css = await response.text();
-        style.textContent = css
-          .replace(/html\.af-shadowing-workspace/g, ":host")
-          .replace(/#audiofilms-root/g, ":host");
-      } catch (error) {
+      const existingLink = root?.querySelector?.("link[data-af-shadow-style-link]");
+      if (existingLink?.dataset.afLoading === "1") return;
+      style.dataset.afLoading = "1";
+      existingLink?.remove?.();
+
+      const link = deps.document.createElement("link");
+      link.dataset.afShadowStyleLink = "";
+      link.dataset.afLoading = "1";
+      link.rel = "stylesheet";
+      link.href = deps.chrome.runtime.getURL("src/shadow.css");
+      link.onload = () => {
+        delete link.dataset.afLoading;
+        link.dataset.afLoaded = "1";
+        style.dataset.afLoaded = "1";
+        delete style.dataset.afLoading;
+        delete style.dataset.afLoadFailed;
+      };
+      link.onerror = () => {
+        delete link.dataset.afLoading;
+        delete style.dataset.afLoading;
+        style.dataset.afLoadFailed = "1";
         deps.recordDebugEvent?.("shadow-style-load-failed", {
-          error: error instanceof Error ? error.message : String(error),
+          error: `Unable to load ${link.href}`,
         });
-      }
+        if (style.dataset.afRetryScheduled !== "1") {
+          style.dataset.afRetryScheduled = "1";
+          deps.window?.setTimeout?.(() => {
+            delete style.dataset.afRetryScheduled;
+            loadShadowStyles(root, style);
+          }, 1000);
+        }
+      };
+      root?.appendChild?.(link);
     }
 
     function createDictionaryPanel() {

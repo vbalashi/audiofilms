@@ -1891,6 +1891,8 @@ function assertFixture(fixture, snapshot) {
   assertions.push(assertion("caption track count", Number(boot.captionTracksCount || 0) >= expect.minTracks));
   assertions.push(assertion("empty state", snapshot.isEmpty === expect.empty));
   assertions.push(assertion("count", expect.countPattern.test(snapshot.count || ""), snapshot.count));
+  assertions.push(assertion("shadow stylesheet loaded", snapshot.styleHealth?.stylesheetLoaded === true, JSON.stringify(snapshot.styleHealth)));
+  assertions.push(assertion("control icons styled", Number(snapshot.styleHealth?.iconWidth || 0) > 0 && Number(snapshot.styleHealth?.iconWidth || 0) <= 32, JSON.stringify(snapshot.styleHealth)));
 
   for (const part of expect.sourceIncludes || []) {
     assertions.push(assertion(sourceExpectationLabel(part), sourceMatchesExpectation(snapshot, part), snapshot.source));
@@ -2169,6 +2171,11 @@ function readSnapshot() {
 
   const debug = parseJson(debugPre && debugPre.textContent);
   const currentRow = root.querySelector(".af-ribbon-row.is-current");
+  const stylesheetLink = root.querySelector("link[data-af-shadow-style-link]");
+  const fallbackStyle = root.querySelector("style[data-af-shadow-style]");
+  const controlIcon = root.querySelector(".af-button-icon");
+  const controlIconStyle = controlIcon ? window.getComputedStyle(controlIcon) : null;
+  const ribbonStyle = panel ? window.getComputedStyle(panel) : null;
   const currentPhraseTiming = currentRow ? {
     startSeconds: Number((Number(currentRow.dataset.afPhraseStartMs) / 1000).toFixed(3)),
     endSeconds: Number((Number(currentRow.dataset.afPhraseEndMs) / 1000).toFixed(3)),
@@ -2192,6 +2199,15 @@ function readSnapshot() {
     error: root.querySelector("[data-af-error]")?.textContent || "",
     rowTime: root.querySelector(".af-ribbon-row.is-current .af-ribbon-time")?.textContent || "",
     rowText: root.querySelector(".af-ribbon-row.is-current .af-ribbon-text")?.textContent || "",
+    styleHealth: {
+      stylesheetLoaded: stylesheetLink?.dataset.afLoaded === "1",
+      stylesheetFailed: stylesheetLink?.dataset.afLoadFailed === "1" || fallbackStyle?.dataset.afLoadFailed === "1",
+      fallbackStyleLoaded: fallbackStyle?.dataset.afLoaded === "1",
+      iconWidth: controlIconStyle ? Number.parseFloat(controlIconStyle.width) : 0,
+      iconHeight: controlIconStyle ? Number.parseFloat(controlIconStyle.height) : 0,
+      panelPosition: ribbonStyle?.position || "",
+      panelBorderRadius: ribbonStyle?.borderRadius || "",
+    },
     currentPhraseTiming,
     runtime: (() => {
       const state = window.__afShadowingDebug || {};

@@ -127,7 +127,13 @@
   }
 
   function ensureShadowStyles(root, options = {}) {
-    if (root.querySelector("style[data-af-shadow-style]")) return false;
+    const existingStyle = root.querySelector("style[data-af-shadow-style]");
+    if (existingStyle) {
+      if (existingStyle.dataset.afLoaded !== "1" && existingStyle.dataset.afLoading !== "1") {
+        options.loadShadowStyles?.(root, existingStyle);
+      }
+      return false;
+    }
 
     const style = options.document.createElement("style");
     style.dataset.afShadowStyle = "";

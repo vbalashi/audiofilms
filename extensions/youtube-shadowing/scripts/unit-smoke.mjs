@@ -569,6 +569,7 @@ const workspaceDom = loadBrowserModule("src/workspaceDom.js", "__afShadowingWork
   document: testDocument,
 });
 const workspaceWorkflow = loadBrowserModule("src/workspaceWorkflow.js", "__afShadowingWorkspaceWorkflow");
+const workspaceContentWorkflow = loadBrowserModule("src/workspaceContentWorkflow.js", "__afShadowingWorkspaceContentWorkflow");
 const ribbonDom = loadBrowserModule("src/ribbonDom.js", "__afShadowingRibbonDom", {
   document: testDocument,
   HTMLElement: TestHTMLElement,
@@ -4148,6 +4149,96 @@ assert.equal(workspaceWorkflowRoot.children[0].dataset.afShadowStyle, "");
 assert.equal(workspaceWorkflowRoot.children[0].dataset.afLoaded, "1");
 assert.equal(workspaceWorkflowRoot.scrollGuardOptions.surfaceSelectors.includes("#af-ribbon"), true);
 assert.equal(workspaceWorkflowDocumentListeners.length, 2);
+const fallbackStyle = createTestElement("style");
+fallbackStyle.dataset.afShadowStyle = "";
+fallbackStyle.textContent = ":host{all:initial}";
+const styleRetryRoot = createTestElement("shadow-root");
+styleRetryRoot.querySelector = (selector) => (
+  selector === "style[data-af-shadow-style]" ? fallbackStyle : null
+);
+let styleRetryCalls = 0;
+assert.equal(workspaceWorkflow.ensureShadowStyles(styleRetryRoot, {
+  ...workspaceWorkflowOptions,
+  loadShadowStyles: (_root, style) => {
+    styleRetryCalls += 1;
+    style.dataset.afLoaded = "1";
+  },
+}), false);
+assert.equal(styleRetryCalls, 1);
+assert.equal(fallbackStyle.dataset.afLoaded, "1");
+let styleFetchAttempts = 0;
+const styleFetchEvents = [];
+const styleFetchTimers = [];
+const styleFetchRoot = createTestElement("shadow-root");
+styleFetchRoot.prepend = (child) => {
+  styleFetchRoot.children.unshift(child);
+  return child;
+};
+styleFetchRoot.querySelector = (selector) => (
+  selector === "style[data-af-shadow-style]"
+    ? styleFetchRoot.children.find((child) => !child.removed && Object.hasOwn(child.dataset || {}, "afShadowStyle")) || null
+    : selector === "link[data-af-shadow-style-link]"
+      ? styleFetchRoot.children.find((child) => !child.removed && Object.hasOwn(child.dataset || {}, "afShadowStyleLink")) || null
+      : null
+);
+const styleFetchDocument = {
+  ...testDocument,
+  createElement: (tagName) => {
+    const element = createTestElement(tagName);
+    element.remove = () => {
+      element.removed = true;
+    };
+    return element;
+  },
+};
+const workspaceControllerForStyles = workspaceContentWorkflow.createWorkspaceController({
+  getState: () => ({}),
+  workspaceWorkflow,
+  document: styleFetchDocument,
+  window: {
+    setTimeout: (callback, delay) => {
+      styleFetchTimers.push({ callback, delay });
+      return styleFetchTimers.length;
+    },
+  },
+  HTMLElement: TestHTMLElement,
+  rootId: "af-root",
+  toggleId: "af-toggle",
+  ribbonPanelId: "af-ribbon",
+  dictionaryPanelId: "af-dictionary",
+  shadowContainerId: "af-shadow",
+  displayPreferences,
+  scrollContainment: { installScrollGuard: () => {} },
+  getShadowLayerFocusInstalled: () => true,
+  setShadowLayerFocusInstalled: () => {},
+  getShadowScrollGuardInstalled: () => true,
+  setShadowScrollGuardInstalled: () => {},
+  fetch: () => {
+    styleFetchAttempts += 1;
+    throw new Error("shadow CSS should load through link, not fetch");
+  },
+  chrome: { runtime: { getURL: (value) => `chrome-extension://unit/${value}` } },
+  recordDebugEvent: (type, detail) => styleFetchEvents.push({ type, detail }),
+});
+workspaceControllerForStyles.ensureShadowStyles(styleFetchRoot);
+const styleAfterFailure = styleFetchRoot.children[0];
+const firstStyleLink = styleFetchRoot.children[1];
+assert.equal(firstStyleLink.rel, "stylesheet");
+assert.equal(firstStyleLink.href, "chrome-extension://unit/src/shadow.css");
+firstStyleLink.onerror();
+assert.equal(styleFetchAttempts, 0);
+assert.equal(styleAfterFailure.dataset.afLoaded, undefined);
+assert.equal(styleAfterFailure.dataset.afLoadFailed, "1");
+assert.equal(styleFetchEvents[0].type, "shadow-style-load-failed");
+assert.equal(styleFetchTimers[0].delay, 1000);
+styleFetchTimers[0].callback();
+const secondStyleLink = styleFetchRoot.children[2];
+assert.equal(firstStyleLink.removed, true);
+assert.equal(secondStyleLink.rel, "stylesheet");
+secondStyleLink.onload();
+assert.equal(styleAfterFailure.dataset.afLoaded, "1");
+assert.equal(styleAfterFailure.dataset.afLoadFailed, undefined);
+assert.equal(secondStyleLink.dataset.afLoaded, "1");
 const workspaceWorkflowContainer = workspaceWorkflow.ensureShadowContainer(workspaceWorkflowRoot, workspaceWorkflowOptions);
 const workspaceWorkflowRibbon = createTestElement("section");
 const workspaceWorkflowDebug = createTestElement("section");
