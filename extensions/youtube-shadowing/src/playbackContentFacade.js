@@ -234,8 +234,36 @@
     };
   }
 
+  function createPlaybackRuntimeBinding() {
+    let runtimeController = null;
+
+    function bindRuntimeController(nextRuntimeController) {
+      runtimeController = nextRuntimeController;
+      return api;
+    }
+
+    function runtime() {
+      if (!runtimeController) {
+        throw new Error("Playback runtime used before binding.");
+      }
+      return runtimeController;
+    }
+
+    const api = {
+      bindRuntimeController,
+      findPlaybackPhraseIndex: (phrases, currentMs) => runtime().findPlaybackPhraseIndex(phrases, currentMs),
+      getVideoElement: () => runtime().getVideoElement(),
+      ensurePassivePlaybackWatcher: () => runtime().ensurePassivePlaybackWatcher(),
+      syncPassivePlayback: (video) => runtime().syncPassivePlayback(video),
+      markCurrentTranscriptSegment: (phrase) => runtime().markCurrentTranscriptSegment(phrase),
+    };
+
+    return api;
+  }
+
   window.__afShadowingPlaybackContentFacade = {
     createPlaybackControllers,
     createPlaybackRuntimeController,
+    createPlaybackRuntimeBinding,
   };
 })();

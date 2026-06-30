@@ -210,6 +210,14 @@
     loadDictionarySearchItemCard,
     requestDictionaryCardTranslation,
   } = dictionaryRuntimeController;
+  const playbackRuntimeBinding = playbackContentFacadeApi.createPlaybackRuntimeBinding();
+  const {
+    findPlaybackPhraseIndex,
+    getVideoElement,
+    ensurePassivePlaybackWatcher,
+    syncPassivePlayback,
+    markCurrentTranscriptSegment,
+  } = playbackRuntimeBinding;
   const {
     ensureToggle,
     renderToggle,
@@ -553,6 +561,7 @@
       window,
     },
   });
+  playbackRuntimeBinding.bindRuntimeController(playbackRuntimeController);
   const {
     jumpToPhrase: jumpToPhraseFromPlayback,
     handleWordReplayGesture: handleWordReplayGestureFromPlayback,
@@ -1177,26 +1186,6 @@
       document,
       domUtils: domUtilsApi,
     });
-  }
-
-  function findPlaybackPhraseIndex(phrases, currentMs) {
-    return playbackRuntimeController.findPlaybackPhraseIndex(phrases, currentMs);
-  }
-
-  function getVideoElement() {
-    return playbackRuntimeController.getVideoElement();
-  }
-
-  function ensurePassivePlaybackWatcher() {
-    return playbackRuntimeController.ensurePassivePlaybackWatcher();
-  }
-
-  function syncPassivePlayback(video) {
-    return playbackRuntimeController.syncPassivePlayback(video);
-  }
-
-  function markCurrentTranscriptSegment(phrase) {
-    return playbackRuntimeController.markCurrentTranscriptSegment(phrase);
   }
 
   function onKeyboardEvent(event) {

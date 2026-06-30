@@ -558,6 +558,16 @@ function assertPlaybackContentFacadeComposesPlaybackBoundary() {
   assert.equal(runtime.toggleContinuousPlayback(), "continuous");
   assert.ok(runtimeEvents.some((event) => event[0] === "boot" && event[1] === true));
   assert.ok(runtimeEvents.some((event) => event[0] === "mark" && event[1] === "Goed"));
+
+  const binding = playbackContentFacade.createPlaybackRuntimeBinding();
+  assert.throws(() => binding.getVideoElement(), /before binding/);
+  binding.bindRuntimeController(runtime);
+  assert.equal(binding.getVideoElement(), video);
+  assert.deepEqual(binding.findPlaybackPhraseIndex([], 987), { currentMs: 987, preRollMs: 250 });
+  assert.equal(binding.ensurePassivePlaybackWatcher(), "ensure-passive");
+  assert.equal(binding.syncPassivePlayback(video), "sync-passive");
+  binding.markCurrentTranscriptSegment({ text: "Prima" });
+  assert.ok(runtimeEvents.some((event) => event[0] === "mark" && event[1] === "Prima"));
 }
 
 function assertSupportContentFacadeComposesSupportBoundary() {
