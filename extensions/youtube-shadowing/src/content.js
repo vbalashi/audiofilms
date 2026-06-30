@@ -93,16 +93,14 @@
     scrollContainmentApi,
     domUtilsApi,
     uiIconsApi,
-    ribbonControlsApi,
     workspaceDomApi,
     workspaceWorkflowApi,
     workspaceContentWorkflowApi,
     phraseJumpWorkflowApi,
     ribbonDomApi,
-    ribbonPanelDomApi,
-    ribbonWorkflowApi,
     surfaceContentFacadeApi,
     surfaceRuntimeContentFacadeApi,
+    ribbonRuntimeContentFacadeApi,
     buildInfoApi,
   } = modules;
   const iconSvg = uiIconsApi.iconSvg;
@@ -787,6 +785,48 @@
     displayStateController,
     ribbonContentController,
   });
+  const ribbonRuntimeController = ribbonRuntimeContentFacadeApi.createRibbonRuntimeController({
+    getState: () => state,
+    modules,
+    iconSvg,
+    constants: {
+      playbackRateMin: PLAYBACK_RATE_MIN,
+      playbackRateMax: PLAYBACK_RATE_MAX,
+    },
+    commands: {
+      source: {
+        practiceReadiness,
+        getSelectedPracticeSource,
+      },
+      translation: {
+        phraseTranslationState,
+      },
+      surface: {
+        renderSourceSelector,
+        appendPhraseRow,
+      },
+      dictionary: {
+        renderAccountControl,
+      },
+      issue: {
+        renderIssueReportDialog,
+      },
+      layout: {
+        hasCustomPanelLayout,
+      },
+      playback: {
+        syncPlaybackRateFromVideo,
+        formatPlaybackRate,
+      },
+    },
+    environment: {
+      document,
+      requestAnimationFrame: window.requestAnimationFrame,
+    },
+  });
+  const {
+    renderRibbon,
+  } = ribbonRuntimeController;
   const videoInitController = videoInitContentWorkflowApi.createVideoInitController({
     getState: () => state,
     videoInitWorkflow: videoInitWorkflowApi,
@@ -863,33 +903,6 @@
     });
   }
 
-  function appendElement(parent, tagName, className = "") {
-    const element = document.createElement(tagName);
-    if (className) element.className = className;
-    parent.appendChild(element);
-    return element;
-  }
-
-  function appendButton(parent, text, datasetKey) {
-    const button = appendElement(parent, "button");
-    button.type = "button";
-    button.textContent = text;
-    setDataFlag(button, datasetKey);
-    return button;
-  }
-
-  function setDataFlag(element, datasetKey) {
-    if (/^[a-z][a-zA-Z0-9]*$/.test(datasetKey)) {
-      element.dataset[datasetKey] = "";
-      return;
-    }
-    const attributeName = datasetKey
-      .replace(/([A-Z])/g, "-$1")
-      .replace(/^-/, "")
-      .toLowerCase();
-    element.setAttribute(`data-${attributeName}`, "");
-  }
-
   function render() {
     renderToggle();
     if (!state.learningEnabled) {
@@ -915,65 +928,6 @@
     });
     applyDebugPanelGeometry(debugPanel);
     applyDebugPanelLayer(debugPanel);
-  }
-
-  function renderRibbon(panel) {
-    return ribbonWorkflowApi.renderRibbon(panel, {
-      getState: () => state,
-      practiceReadiness,
-      phraseTranslationState,
-      getSelectedPracticeSource,
-      ribbonControls: ribbonControlsApi,
-      ribbonPanelDom: ribbonPanelDomApi,
-      iconSvg,
-      renderSourceSelector,
-      renderAccountControl,
-      renderDisplayToggleButton,
-      renderDisplayPreferenceControls,
-      renderPlaybackRateControls,
-      renderIssueReportDialog,
-      positionUtilityMenu,
-      positionIssueReportDialog,
-      clearElement: domUtilsApi.clearElement,
-      appendRibbonMessage,
-      appendPhraseRow,
-    });
-  }
-
-  function renderDisplayToggleButton(button, options) {
-    ribbonDomApi.renderDisplayToggleButton(button, {
-      html: ribbonControlsApi.displayToggleButtonHtml(options),
-    });
-  }
-
-  function renderDisplayPreferenceControls(controls) {
-    const controlState = displayPreferencesApi.displayPreferenceControlState({
-      preferences: state.displayPreferences,
-      autoPause: state.autoPause,
-      hasCustomPanelLayout: hasCustomPanelLayout(),
-    });
-    ribbonDomApi.renderDisplayPreferenceControls(controls, controlState, {
-      formatPlaybackRate,
-    });
-  }
-
-  function renderPlaybackRateControls(controls) {
-    const rate = syncPlaybackRateFromVideo();
-    const controlState = ribbonControlsApi.playbackRateControlState({
-      rate,
-      min: PLAYBACK_RATE_MIN,
-      max: PLAYBACK_RATE_MAX,
-      fallback: 1,
-    });
-    ribbonDomApi.renderPlaybackRateControls(controls, controlState);
-  }
-
-  function positionUtilityMenu(panel, utilityMenu, isOpen = state.utilityMenuOpen) {
-    ribbonDomApi.positionUtilityMenu(panel, utilityMenu, isOpen, window.requestAnimationFrame);
-  }
-
-  function positionIssueReportDialog(panel, issueDialog) {
-    ribbonDomApi.positionIssueReportDialog(panel, issueDialog, state.issueDialogOpen, window.requestAnimationFrame);
   }
 
   function syncPlaybackRateFromVideo(video = getVideoElement()) {
@@ -1126,11 +1080,6 @@
     event.stopPropagation();
     menuStateApi.toggleExclusiveMenu(state, "source");
     render();
-  }
-
-  function appendRibbonMessage(parent, text) {
-    const message = appendElement(parent, "div", "af-ribbon-message");
-    message.textContent = text;
   }
 
   function isTokenInSelectedSpan(phraseIndex, tokenIndex) {

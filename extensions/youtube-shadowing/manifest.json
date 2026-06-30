@@ -152,6 +152,7 @@
         "src/ribbonContentWorkflow.js",
         "src/surfaceContentFacade.js",
         "src/surfaceRuntimeContentFacade.js",
+        "src/ribbonRuntimeContentFacade.js",
         "src/moduleRegistry.js",
         "src/content.js"
       ],
@@ -180,5 +181,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 21:53:35Z · fb8f5b1 · dirty · youtube runtime facade cleanup"
+  "version_name": "v0.1.7 · 2026-06-30 22:07:04Z · d8d12d2 · dirty · ribbon runtime facade cleanup"
 }

@@ -144,6 +144,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingRibbonContentWorkflow",
     "__afShadowingSurfaceContentFacade",
     "__afShadowingSurfaceRuntimeContentFacade",
+    "__afShadowingRibbonRuntimeContentFacade",
     "__afShadowingModuleRegistry",
     "__afShadowingBuildInfo",
   ];
@@ -1310,6 +1311,109 @@ function assertSurfaceRuntimeContentFacadeOwnsControllerBindings() {
   assert.deepEqual(calls.at(-1), ["ribbonContent", "appendPhraseRow", ["parent", "phrase", 2]]);
 }
 
+function assertRibbonRuntimeContentFacadeOwnsRibbonRenderingBoundary() {
+  const ribbonRuntimeFacade = loadBrowserModule(
+    "src/ribbonRuntimeContentFacade.js",
+    "__afShadowingRibbonRuntimeContentFacade",
+  );
+  const calls = [];
+  const state = {
+    displayPreferences: { enabled: true },
+    autoPause: true,
+    utilityMenuOpen: true,
+    issueDialogOpen: true,
+  };
+  const controller = ribbonRuntimeFacade.createRibbonRuntimeController({
+    getState: () => state,
+    iconSvg: () => "<svg></svg>",
+    constants: {
+      playbackRateMin: 0.5,
+      playbackRateMax: 2,
+    },
+    modules: {
+      ribbonWorkflowApi: {
+        renderRibbon: (_panel, deps) => {
+          calls.push(["render", deps.practiceReadiness().state, deps.phraseTranslationState().status]);
+          deps.renderDisplayToggleButton("toggle", { label: "Show original" });
+          deps.renderDisplayPreferenceControls("preferences");
+          deps.renderPlaybackRateControls("playback");
+          deps.positionUtilityMenu("panel", "menu", true);
+          deps.positionIssueReportDialog("panel", "dialog");
+          deps.appendRibbonMessage(createTestElement("div"), "Ready");
+          return "phrase";
+        },
+      },
+      ribbonControlsApi: {
+        displayToggleButtonHtml: (options) => `html:${options.label}`,
+        playbackRateControlState: (input) => ({ label: `${input.rate}/${input.min}/${input.max}` }),
+      },
+      ribbonPanelDomApi: {},
+      ribbonDomApi: {
+        renderDisplayToggleButton: (_button, options) => calls.push(["toggle", options.html]),
+        renderDisplayPreferenceControls: (_controls, controlState, options) =>
+          calls.push(["preferences", controlState.hasCustomPanelLayout, options.formatPlaybackRate(1.25)]),
+        renderPlaybackRateControls: (_controls, controlState) => calls.push(["playback", controlState.label]),
+        positionUtilityMenu: (_panel, _menu, isOpen, requestAnimationFrame) => {
+          requestAnimationFrame(() => calls.push(["position-menu", isOpen]));
+        },
+        positionIssueReportDialog: (_panel, _dialog, isOpen, requestAnimationFrame) => {
+          requestAnimationFrame(() => calls.push(["position-dialog", isOpen]));
+        },
+      },
+      displayPreferencesApi: {
+        displayPreferenceControlState: (input) => ({
+          hasCustomPanelLayout: input.hasCustomPanelLayout,
+        }),
+      },
+      domUtilsApi: {
+        clearElement: () => {},
+      },
+    },
+    commands: {
+      source: {
+        practiceReadiness: () => ({ state: "ready" }),
+        getSelectedPracticeSource: () => ({ id: "source-1" }),
+      },
+      translation: {
+        phraseTranslationState: () => ({ status: "ready" }),
+      },
+      surface: {
+        renderSourceSelector: () => {},
+        appendPhraseRow: () => {},
+      },
+      dictionary: {
+        renderAccountControl: () => {},
+      },
+      issue: {
+        renderIssueReportDialog: () => {},
+      },
+      layout: {
+        hasCustomPanelLayout: () => true,
+      },
+      playback: {
+        syncPlaybackRateFromVideo: () => 1.5,
+        formatPlaybackRate: (rate) => `${rate}x`,
+      },
+    },
+    environment: {
+      document: {
+        createElement: (tagName) => createTestElement(tagName),
+      },
+      requestAnimationFrame: (callback) => callback(),
+    },
+  });
+
+  assert.equal(controller.renderRibbon("panel"), "phrase");
+  assert.deepEqual(calls, [
+    ["render", "ready", "ready"],
+    ["toggle", "html:Show original"],
+    ["preferences", true, "1.25x"],
+    ["playback", "1.5/0.5/2"],
+    ["position-menu", true],
+    ["position-dialog", true],
+  ]);
+}
+
 function assertLearningBoundaryTermsStayOutOfContentScript() {
   const contentSource = fs.readFileSync(path.join(extensionRoot, "src/content.js"), "utf8");
   const boundaryTerms = [
@@ -1360,6 +1464,7 @@ await assertDictionaryRuntimeContentFacadeOwnsControllerBindings();
 await assertPhraseTranslationContentFacadeOwnsTranslationBoundary();
 assertSurfaceContentFacadeComposesTypedCommands();
 assertSurfaceRuntimeContentFacadeOwnsControllerBindings();
+assertRibbonRuntimeContentFacadeOwnsRibbonRenderingBoundary();
 assertLearningBoundaryTermsStayOutOfContentScript();
 const shadowCssSource = fs.readFileSync(path.join(extensionRoot, "src/shadow.css"), "utf8");
 assert.match(shadowCssSource, /:host\(\[data-af-theme="dark"\]\)[\s\S]*--af-bg-alpha:/);
