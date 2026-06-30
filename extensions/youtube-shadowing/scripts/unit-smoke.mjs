@@ -107,6 +107,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingPanelLayoutContentWorkflow",
     "__afShadowingIssueReports",
     "__afShadowingIssueReportWorkflow",
+    "__afShadowingBackendRuntimeContentFacade",
     "__afShadowingSupportContentFacade",
     "__afShadowingIssueReportsDom",
     "__afShadowingDiagnosticsReport",
@@ -501,6 +502,76 @@ function assertSupportContentFacadeComposesSupportBoundary() {
   assert.equal(supportControllers.commandClient, commandClient);
   assert.equal(supportControllers.accountSessionWorkflow.sync(), "synced");
   assert.equal(supportControllers.issueReportWorkflow.open(), "opened");
+}
+
+async function assertBackendRuntimeContentFacadeOwnsBackendPorts() {
+  const backendRuntimeFacade = loadBrowserModule(
+    "src/backendRuntimeContentFacade.js",
+    "__afShadowingBackendRuntimeContentFacade",
+  );
+  const controller = backendRuntimeFacade.createBackendRuntimeController({
+    environment: {
+      config: {},
+      cryptoApi: { randomUUID: () => "turn-uuid" },
+    },
+  });
+  assert.equal(controller.apiBaseForBackendCommands(), "https://audiofilms-api.dilum.io");
+  assert.equal(controller.dictionaryEndpoint(), "https://audiofilms-api.dilum.io/api/dict");
+  assert.equal(controller.createMutationTurnId(), "turn-uuid");
+
+  const overrideController = backendRuntimeFacade.createBackendRuntimeController({
+    environment: {
+      config: {
+        apiBase: () => "https://api.test",
+        dictionaryEndpoint: () => "https://dict.test/custom",
+      },
+      dateNow: () => 123,
+      random: () => 0.5,
+    },
+  });
+  assert.equal(overrideController.apiBaseForBackendCommands(), "https://api.test");
+  assert.equal(overrideController.dictionaryEndpoint(), "https://dict.test/custom");
+  assert.match(overrideController.createMutationTurnId(), /^af-123-/);
+
+  const events = [];
+  const commandClient = {
+    fetchDictionarySession: () => Promise.resolve("session"),
+    sendRuntimeMessage: (message) => events.push(["runtime", message.type]),
+    requestDictionaryCommand: (operation, body) => events.push(["dictionary", operation, body]),
+    postBackendJson: (operation, body) => events.push(["post", operation, body]),
+    getBackendJson: (operation, body) => events.push(["get", operation, body]),
+    requestBackendCommand: (operation, body) => events.push(["backend", operation, body]),
+  };
+  const accountSessionWorkflow = {
+    sync: () => events.push(["sync"]),
+    connect: () => events.push(["connect"]),
+    disconnect: () => events.push(["disconnect"]),
+    getFreshSession: () => Promise.resolve({ status: "signed-in" }),
+    setSessionState: (session, error) => events.push(["set-session", session.status, error]),
+  };
+  const ports = controller.createSupportCommandPorts({ commandClient, accountSessionWorkflow });
+  await ports.syncTwoThousandNlAccount();
+  await ports.connectTwoThousandNlAccount();
+  await ports.disconnectTwoThousandNlAccount();
+  assert.deepEqual(await ports.getFreshTwoThousandNlSession(), { status: "signed-in" });
+  ports.setTwoThousandNlSessionState({ status: "guest" }, "");
+  assert.equal(await ports.fetchDictionarySession(), "session");
+  ports.sendRuntimeMessage({ type: "ping" });
+  ports.requestDictionaryCommand("dict-lookup", { word: "klein" });
+  ports.postBackendJson("practice-captions", { videoId: "video-1" });
+  ports.getBackendJson("backend-build-info", {});
+  ports.requestBackendCommand("issue-report-submit", {});
+  assert.deepEqual(events.map((event) => event[0]), [
+    "sync",
+    "connect",
+    "disconnect",
+    "set-session",
+    "runtime",
+    "dictionary",
+    "post",
+    "get",
+    "backend",
+  ]);
 }
 
 async function assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary() {
@@ -951,12 +1022,31 @@ function assertLearningBoundaryTermsStayOutOfContentScript() {
   for (const term of boundaryTerms) {
     assert.equal(contentSource.includes(term), false, `content.js must not own 2000NL boundary term ${term}`);
   }
+  const backendRuntimeImplementationFragments = [
+    "accountSessionWorkflow.sync(",
+    "accountSessionWorkflow.connect(",
+    "accountSessionWorkflow.disconnect(",
+    "accountSessionWorkflow.getFreshSession(",
+    "accountSessionWorkflow.setSessionState(",
+    "commandClient.fetchDictionarySession(",
+    "commandClient.sendRuntimeMessage(",
+    "commandClient.requestDictionaryCommand(",
+    "commandClient.postBackendJson(",
+    "commandClient.getBackendJson(",
+    "commandClient.requestBackendCommand(",
+    "window.__afShadowingConfig?.apiBase",
+    "window.__afShadowingConfig?.dictionaryEndpoint",
+  ];
+  for (const fragment of backendRuntimeImplementationFragments) {
+    assert.equal(contentSource.includes(fragment), false, `content.js must not own backend runtime fragment ${fragment}`);
+  }
 }
 
 assertManifestOrderRegistersContentNamespaces();
 assertSourceContentFacadeComposesSourceBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
 assertSupportContentFacadeComposesSupportBoundary();
+await assertBackendRuntimeContentFacadeOwnsBackendPorts();
 await assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary();
 await assertPhraseTranslationContentFacadeOwnsTranslationBoundary();
 assertSurfaceContentFacadeComposesTypedCommands();

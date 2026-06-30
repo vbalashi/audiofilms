@@ -77,6 +77,7 @@
     playbackContentFacadeApi,
     issueReportsApi,
     issueReportWorkflowApi,
+    backendRuntimeContentFacadeApi,
     supportContentFacadeApi,
     issueReportsDomApi,
     diagnosticsReportApi,
@@ -175,6 +176,60 @@
     storageKey: SOURCE_SELECTION_STORAGE_KEY,
     state,
     recordDebugEvent,
+  });
+  const backendRuntimeController = backendRuntimeContentFacadeApi.createBackendRuntimeController({
+    environment: {
+      config: window.__afShadowingConfig,
+      cryptoApi: typeof crypto === "undefined" ? null : crypto,
+    },
+  });
+  const {
+    apiBaseForBackendCommands,
+    dictionaryEndpoint,
+    createMutationTurnId,
+  } = backendRuntimeController;
+  const {
+    commandClient,
+    accountSessionWorkflow,
+    issueReportWorkflow,
+    refreshBackendBuildInfo: refreshBackendBuildInfoFromSupport,
+  } = supportContentFacadeApi.createSupportControllers({
+    getState: () => state,
+    extensionCommandClient: extensionCommandClientApi,
+    accountSessionWorkflow: accountSessionWorkflowApi,
+    accountSession: accountSessionApi,
+    issueReportWorkflow: issueReportWorkflowApi,
+    issueReports: issueReportsApi,
+    backendBuildWorkflow: backendBuildWorkflowApi,
+    chrome,
+    fetch,
+    storage: window.localStorage,
+    document,
+    dictionaryCommands: dictionaryCommandApi,
+    dictionaryMocks: dictionaryMockApi,
+    backendCommands: backendCommandApi,
+    dictionaryEndpoint,
+    apiBaseForBackendCommands,
+    selectLookupWord,
+    formatIssueReport,
+    extensionVersion,
+    extensionBuildInfo,
+    browserUserAgent: navigator.userAgent,
+    recordDebugEvent,
+    render,
+    copyIssueReport,
+    setTimeout: window.setTimeout.bind(window),
+  });
+  const {
+    syncTwoThousandNlAccount,
+    connectTwoThousandNlAccount,
+    disconnectTwoThousandNlAccount,
+    requestDictionaryCommand,
+    postBackendJson,
+    getBackendJson,
+  } = backendRuntimeController.createSupportCommandPorts({
+    commandClient,
+    accountSessionWorkflow,
   });
   const sourceController = sourceContentFacadeApi.createSourceController({
     getState: () => state,
@@ -550,38 +605,6 @@
     removeWorkspace,
     removeToggle: () => document.getElementById(TOGGLE_ID)?.remove(),
     ensureWorkspace,
-  });
-  const {
-    commandClient,
-    accountSessionWorkflow,
-    issueReportWorkflow,
-    refreshBackendBuildInfo: refreshBackendBuildInfoFromSupport,
-  } = supportContentFacadeApi.createSupportControllers({
-    getState: () => state,
-    extensionCommandClient: extensionCommandClientApi,
-    accountSessionWorkflow: accountSessionWorkflowApi,
-    accountSession: accountSessionApi,
-    issueReportWorkflow: issueReportWorkflowApi,
-    issueReports: issueReportsApi,
-    backendBuildWorkflow: backendBuildWorkflowApi,
-    chrome,
-    fetch,
-    storage: window.localStorage,
-    document,
-    dictionaryCommands: dictionaryCommandApi,
-    dictionaryMocks: dictionaryMockApi,
-    backendCommands: backendCommandApi,
-    dictionaryEndpoint,
-    apiBaseForBackendCommands,
-    selectLookupWord,
-    formatIssueReport,
-    extensionVersion,
-    extensionBuildInfo,
-    browserUserAgent: navigator.userAgent,
-    recordDebugEvent,
-    render,
-    copyIssueReport,
-    setTimeout: window.setTimeout.bind(window),
   });
   displayPreferenceController.initialize();
   displayPreferenceController.subscribe();
@@ -1370,71 +1393,6 @@
 
   async function requestDictionaryCardTranslation(card) {
     return dictionaryController.requestDictionaryCardTranslation(card);
-  }
-
-  async function syncTwoThousandNlAccount() {
-    await accountSessionWorkflow.sync();
-  }
-
-  async function connectTwoThousandNlAccount() {
-    await accountSessionWorkflow.connect();
-  }
-
-  async function disconnectTwoThousandNlAccount() {
-    await accountSessionWorkflow.disconnect();
-  }
-
-  async function getFreshTwoThousandNlSession() {
-    return accountSessionWorkflow.getFreshSession();
-  }
-
-  function setTwoThousandNlSessionState(session, error) {
-    accountSessionWorkflow.setSessionState(session, error);
-  }
-
-  function createMutationTurnId() {
-    if (typeof crypto !== "undefined" && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return `af-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
-
-  async function fetchDictionarySession() {
-    return commandClient.fetchDictionarySession();
-  }
-
-  function sendRuntimeMessage(message) {
-    return commandClient.sendRuntimeMessage(message);
-  }
-
-  function requestDictionaryCommand(operation, body = null) {
-    return commandClient.requestDictionaryCommand(operation, body);
-  }
-
-  async function postBackendJson(operation, body = {}) {
-    return commandClient.postBackendJson(operation, body);
-  }
-
-  async function getBackendJson(operation, body = {}) {
-    return commandClient.getBackendJson(operation, body);
-  }
-
-  function requestBackendCommand(operation, body = {}) {
-    return commandClient.requestBackendCommand(operation, body);
-  }
-
-  function apiBaseForBackendCommands() {
-    if (window.__afShadowingConfig?.apiBase) {
-      return window.__afShadowingConfig.apiBase();
-    }
-    return "https://audiofilms-api.dilum.io";
-  }
-
-  function dictionaryEndpoint() {
-    if (window.__afShadowingConfig?.dictionaryEndpoint) {
-      return window.__afShadowingConfig.dictionaryEndpoint();
-    }
-    return new URL("/api/dict", `${apiBaseForBackendCommands()}/`).toString();
   }
 
   async function initializeForCurrentVideo() {

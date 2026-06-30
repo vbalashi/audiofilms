@@ -115,6 +115,7 @@
       panelLayoutContentWorkflowApi: requiredModule(target, "__afShadowingPanelLayoutContentWorkflow"),
       issueReportsApi: requiredModule(target, "__afShadowingIssueReports"),
       issueReportWorkflowApi: requiredModule(target, "__afShadowingIssueReportWorkflow"),
+      backendRuntimeContentFacadeApi: requiredModule(target, "__afShadowingBackendRuntimeContentFacade"),
       supportContentFacadeApi: requiredModule(target, "__afShadowingSupportContentFacade"),
       issueReportsDomApi: requiredModule(target, "__afShadowingIssueReportsDom"),
       diagnosticsReportApi: requiredModule(target, "__afShadowingDiagnosticsReport"),

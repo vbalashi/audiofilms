@@ -113,6 +113,7 @@
         "src/panelLayoutContentWorkflow.js",
         "src/issueReports.js",
         "src/extensionCommandClient.js",
+        "src/backendRuntimeContentFacade.js",
         "src/issueReportWorkflow.js",
         "src/supportContentFacade.js",
         "src/issueReportsDom.js",
@@ -176,5 +177,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 19:40:44Z · 95400f0 · dirty · phrase translation facade refactor"
+  "version_name": "v0.1.7 · 2026-06-30 19:52:25Z · 577a54c · dirty · backend runtime facade refactor"
 }
