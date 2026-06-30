@@ -53,6 +53,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingSourceTimingContentWorkflow",
     "__afShadowingSourceLoadWorkflow",
     "__afShadowingSourceLoadContentWorkflow",
+    "__afShadowingSourceContentFacade",
     "__afShadowingVideoInitWorkflow",
     "__afShadowingVideoInitContentWorkflow",
     "__afShadowingSourceBinding",
@@ -97,12 +98,14 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingPlaybackContentWorkflow",
     "__afShadowingPassivePlaybackWatcher",
     "__afShadowingPassivePlaybackContentWorkflow",
+    "__afShadowingPlaybackContentFacade",
     "__afShadowingPanelLayout",
     "__afShadowingPanelLayoutDom",
     "__afShadowingPanelLayoutWorkflow",
     "__afShadowingPanelLayoutContentWorkflow",
     "__afShadowingIssueReports",
     "__afShadowingIssueReportWorkflow",
+    "__afShadowingSupportContentFacade",
     "__afShadowingIssueReportsDom",
     "__afShadowingDiagnosticsReport",
     "__afShadowingDiagnosticsState",
@@ -313,7 +316,194 @@ const testDocument = {
   createTextNode: (text) => ({ nodeType: 3, textContent: text }),
 };
 
+function assertSourceContentFacadeComposesSourceBoundary() {
+  const sourceContentFacade = loadBrowserModule("src/sourceContentFacade.js", "__afShadowingSourceContentFacade");
+  const calls = [];
+  const transcriptController = {
+    getSelectedPracticeSource: () => "selected-source",
+    phrasesFromTranscriptResult: (result) => ({ from: "transcript", result }),
+    fetchBestAvailableCues: (track, options) => ({ track, options }),
+    normalizeTranscriptResult: (result, track) => ({ result, track }),
+  };
+  const timingController = {
+    startImproveTiming: (text) => ({ action: "start", text }),
+    applyTimingOperation: (operation) => ({ action: "apply", operation }),
+    applyTimingOperationResultToActiveSource: (operation) => ({ action: "apply-active", operation }),
+    scheduleTimingOperationPoll: (operation) => ({ action: "schedule", operation }),
+    pollTimingOperation: (operationId) => ({ action: "poll", operationId }),
+    clearTimingOperationPoll: () => "cleared",
+    transcriptResultFromLoadedSource: (source) => ({ action: "loaded", source }),
+    fetchReusableTimingTranscriptResult: (source, resultOverride) => ({ action: "reusable", source, resultOverride }),
+    registerTimingOperationResultSources: (operation, options) => ({ action: "register", operation, options }),
+  };
+  const loadController = {
+    refreshSelectedSourceCache: () => "refreshed",
+    selectPracticeSource: (sourceId) => ({ action: "select", sourceId }),
+    loadPracticeSource: (source, options) => ({ action: "load", source, options }),
+    maybeSwitchToPreferredSource: (options) => ({ action: "switch", options }),
+    holdInitialAutoPauseAfterSourceLoad: () => "held",
+  };
+  const sourceController = sourceContentFacade.createSourceController({
+    getState: () => ({}),
+    sourceTranscriptContentWorkflow: {
+      createSourceTranscriptController: (deps) => {
+        calls.push(["transcript", deps.maxWords, deps.maxCharacters]);
+        return transcriptController;
+      },
+    },
+    sourceTimingContentWorkflow: {
+      createSourceTimingController: (deps) => {
+        calls.push(["timing", deps.getSelectedPracticeSource(), deps.phrasesFromTranscriptResult({ id: "r1" }).from]);
+        return timingController;
+      },
+    },
+    sourceLoadContentWorkflow: {
+      createSourceLoadController: (deps) => {
+        calls.push(["load", deps.getSelectedPracticeSource(), deps.transcriptResultFromLoadedSource({ id: "s1" }).action]);
+        return loadController;
+      },
+    },
+    maxWords: 18,
+    maxCharacters: 140,
+  });
+
+  assert.deepEqual(calls, [
+    ["transcript", 18, 140],
+    ["timing", "selected-source", "transcript"],
+    ["load", "selected-source", "loaded"],
+  ]);
+  assert.equal(sourceController.refreshSelectedSourceCache(), "refreshed");
+  assert.deepEqual(sourceController.startImproveTiming("manual"), { action: "start", text: "manual" });
+  assert.deepEqual(sourceController.selectPracticeSource("source-2"), { action: "select", sourceId: "source-2" });
+  assert.deepEqual(sourceController.fetchBestAvailableCues("track-1", { refresh: true }), {
+    track: "track-1",
+    options: { refresh: true },
+  });
+}
+
+function assertPlaybackContentFacadeComposesPlaybackBoundary() {
+  const playbackContentFacade = loadBrowserModule("src/playbackContentFacade.js", "__afShadowingPlaybackContentFacade");
+  const calls = [];
+  let playbackController;
+  let passivePlaybackController;
+  const controllers = playbackContentFacade.createPlaybackControllers({
+    getState: () => ({}),
+    playbackContentWorkflow: {
+      createPlaybackController: (deps) => {
+        calls.push(["playback", typeof deps.ensurePassivePlaybackWatcher]);
+        playbackController = {
+          jumpToPhrase: () => "jumped",
+          syncPassivePlayback: (video) => ({ action: "sync", video }),
+          startPassivePlaybackFrame: (video) => ({ action: "frame", video }),
+        };
+        passivePlaybackController = {
+          ensurePassivePlaybackWatcher: () => "ensured",
+        };
+        return playbackController;
+      },
+    },
+    passivePlaybackContentWorkflow: {
+      createPassivePlaybackController: (deps) => {
+        calls.push(["passive", deps.syncPassivePlayback("video-1").action, deps.startPassivePlaybackFrame("video-2").action]);
+        return {
+          ...passivePlaybackController,
+          detachPassivePlaybackWatcher: () => "detached",
+        };
+      },
+    },
+  });
+
+  assert.deepEqual(calls, [
+    ["playback", "function"],
+    ["passive", "sync", "frame"],
+  ]);
+  assert.equal(controllers.playbackController.jumpToPhrase(), "jumped");
+  assert.equal(controllers.passivePlaybackController.ensurePassivePlaybackWatcher(), "ensured");
+  assert.equal(controllers.passivePlaybackController.detachPassivePlaybackWatcher(), "detached");
+}
+
+function assertSupportContentFacadeComposesSupportBoundary() {
+  const supportContentFacade = loadBrowserModule("src/supportContentFacade.js", "__afShadowingSupportContentFacade");
+  const state = { issueCategory: "timing", backendBuildInfo: { commit: "backend-1" } };
+  const commandClient = {
+    sendRuntimeMessage: () => "runtime-message",
+    fetchDictionarySession: () => "dictionary-session",
+    postBackendJson: () => "backend-json",
+  };
+  const selectedWords = [];
+  let commandOptions = null;
+  let accountOptions = null;
+  let issueOptions = null;
+  let backendOptions = null;
+  const supportControllers = supportContentFacade.createSupportControllers({
+    getState: () => state,
+    extensionCommandClient: {
+      createExtensionCommandClient: (options) => {
+        commandOptions = options;
+        return commandClient;
+      },
+    },
+    accountSessionWorkflow: {
+      createAccountSessionWorkflow: (options) => {
+        accountOptions = options;
+        return { sync: () => "synced" };
+      },
+    },
+    issueReportWorkflow: {
+      createIssueReportWorkflow: (options) => {
+        issueOptions = options;
+        return { open: () => "opened" };
+      },
+      sendIssueReportPayload: (payload, options) => ({ payload, options }),
+    },
+    backendBuildWorkflow: {
+      refreshBackendBuildInfo: (options) => {
+        backendOptions = options;
+        return "refreshed";
+      },
+    },
+    chrome: {},
+    fetch: () => {},
+    storage: {},
+    document: {},
+    dictionaryCommands: {},
+    dictionaryMocks: {},
+    backendCommands: {},
+    issueReports: {},
+    accountSession: {},
+    dictionaryEndpoint: () => "https://dict.test",
+    apiBaseForBackendCommands: () => "https://api.test",
+    selectLookupWord: (word, phraseIndex) => selectedWords.push([word, phraseIndex]),
+    formatIssueReport: () => "report",
+    extensionVersion: () => "0.1.7",
+    extensionBuildInfo: () => ({ contentScriptRevision: "rev-1" }),
+    browserUserAgent: "UnitBrowser",
+    recordDebugEvent: () => {},
+    render: () => {},
+    copyIssueReport: () => {},
+    setTimeout: () => 0,
+  });
+
+  assert.equal(commandOptions.getIssueCategory(), "timing");
+  assert.equal(accountOptions.sendRuntimeMessage, commandClient.sendRuntimeMessage);
+  assert.equal(accountOptions.fetchDictionarySession, commandClient.fetchDictionarySession);
+  accountOptions.onLookupRefresh({ word: "bouwen", phraseIndex: 2 });
+  assert.deepEqual(selectedWords, [["bouwen", 2]]);
+  const issuePayloadResult = issueOptions.sendIssueReportPayload({ report: "unit" });
+  assert.equal(issuePayloadResult.options.postBackendJson, commandClient.postBackendJson);
+  assert.deepEqual(issuePayloadResult.options.backendBuildInfo, { commit: "backend-1" });
+  assert.equal(issuePayloadResult.options.browserUserAgent, "UnitBrowser");
+  assert.equal(supportControllers.refreshBackendBuildInfo(), "refreshed");
+  assert.equal(backendOptions.getState(), state);
+  assert.equal(supportControllers.commandClient, commandClient);
+  assert.equal(supportControllers.accountSessionWorkflow.sync(), "synced");
+  assert.equal(supportControllers.issueReportWorkflow.open(), "opened");
+}
+
 assertManifestOrderRegistersContentNamespaces();
+assertSourceContentFacadeComposesSourceBoundary();
+assertPlaybackContentFacadeComposesPlaybackBoundary();
+assertSupportContentFacadeComposesSupportBoundary();
 
 const phraseTokens = loadBrowserModule("src/phraseTokens.js", "__afShadowingPhraseTokens");
 const bootState = loadBrowserModule("src/bootState.js", "__afShadowingBootState");

@@ -59,6 +59,7 @@
         "src/sourceTimingContentWorkflow.js",
         "src/sourceLoadWorkflow.js",
         "src/sourceLoadContentWorkflow.js",
+        "src/sourceContentFacade.js",
         "src/videoInitWorkflow.js",
         "src/videoInitContentWorkflow.js",
         "src/sourceBinding.js",
@@ -103,6 +104,7 @@
         "src/playbackContentWorkflow.js",
         "src/passivePlaybackWatcher.js",
         "src/passivePlaybackContentWorkflow.js",
+        "src/playbackContentFacade.js",
         "src/panelLayout.js",
         "src/panelLayoutDom.js",
         "src/panelLayoutWorkflow.js",
@@ -110,6 +112,7 @@
         "src/issueReports.js",
         "src/extensionCommandClient.js",
         "src/issueReportWorkflow.js",
+        "src/supportContentFacade.js",
         "src/issueReportsDom.js",
         "src/diagnosticsReport.js",
         "src/diagnosticsState.js",
@@ -170,5 +173,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 13:10:41Z · 77ed239 · dirty · architect review follow-up"
+  "version_name": "v0.1.7 · 2026-06-30 13:55:06Z · 84f2e8c · dirty · composition facade follow-up"
 }

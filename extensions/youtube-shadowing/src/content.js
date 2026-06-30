@@ -37,6 +37,7 @@
     sourceTimingContentWorkflowApi,
     sourceLoadWorkflowApi,
     sourceLoadContentWorkflowApi,
+    sourceContentFacadeApi,
     videoInitWorkflowApi,
     videoInitContentWorkflowApi,
     sourceBindingApi,
@@ -81,12 +82,14 @@
     playbackContentWorkflowApi,
     passivePlaybackWatcherApi,
     passivePlaybackContentWorkflowApi,
+    playbackContentFacadeApi,
     panelLayoutApi,
     panelLayoutDomApi,
     panelLayoutWorkflowApi,
     panelLayoutContentWorkflowApi,
     issueReportsApi,
     issueReportWorkflowApi,
+    supportContentFacadeApi,
     issueReportsDomApi,
     diagnosticsReportApi,
     diagnosticsStateApi,
@@ -195,69 +198,46 @@
     state,
     recordDebugEvent,
   });
-  const sourceTranscriptController = sourceTranscriptContentWorkflowApi.createSourceTranscriptController({
+  const sourceController = sourceContentFacadeApi.createSourceController({
     getState: () => state,
+    sourceTranscriptContentWorkflow: sourceTranscriptContentWorkflowApi,
     sourceTranscriptWorkflow: sourceTranscriptWorkflowApi,
+    sourceTimingContentWorkflow: sourceTimingContentWorkflowApi,
+    sourceTimingWorkflow: sourceTimingWorkflowApi,
+    sourceLoadContentWorkflow: sourceLoadContentWorkflowApi,
+    sourceLoadWorkflow: sourceLoadWorkflowApi,
     transcriptRetrieval: transcriptRetrievalApi,
     transcriptMetadata: transcriptMetadataApi,
+    sourceReadiness: sourceReadinessApi,
+    sourceSelection: sourceSelectionApi,
+    videoLoadState: videoLoadStateApi,
+    playbackTiming: playbackTimingApi,
+    captionTracks: captionTrackApi,
+    phraseProgressStore,
+    sourceSelectionStore,
     updateBootDiagnostics,
     recordDebugEvent,
-    maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
-    longPauseMs: LONG_PAUSE_MS,
-    maxWords: 18,
-    maxCharacters: 140,
-  });
-  const sourceTimingController = sourceTimingContentWorkflowApi.createSourceTimingController({
-    getState: () => state,
-    getSelectedPracticeSource,
     practiceReadiness,
     timingOperationState,
     apiBaseForBackendCommands,
     postBackendJson,
     getBackendJson,
-    sourceReadiness: sourceReadinessApi,
-    sourceSelection: sourceSelectionApi,
-    sourceTimingWorkflow: sourceTimingWorkflowApi,
-    transcriptMetadata: transcriptMetadataApi,
-    phrasesFromTranscriptResult,
     findPhraseIndexForTime: playbackTimingApi.findPhraseIndexForTime,
     getVideoElement,
-    updateBootDiagnostics,
     ensurePassivePlaybackWatcher,
     syncPassivePlayback,
-    phraseProgressStore,
-    captionTracks: captionTrackApi,
-    recordDebugEvent,
     render,
-    setTimeout: (callback, ms) => window.setTimeout(callback, ms),
-    clearTimeout: (timer) => window.clearTimeout(timer),
-  });
-  const sourceLoadController = sourceLoadContentWorkflowApi.createSourceLoadController({
-    getState: () => state,
-    sourceLoadWorkflow: sourceLoadWorkflowApi,
-    getSelectedPracticeSource,
-    getVideoElement,
-    render,
-    videoLoadState: videoLoadStateApi,
-    sourceSelection: sourceSelectionApi,
-    transcriptMetadata: transcriptMetadataApi,
-    playbackTiming: playbackTimingApi,
-    captionTracks: captionTrackApi,
-    phraseProgressStore,
-    sourceSelectionStore,
-    transcriptResultFromLoadedSource,
-    fetchReusableTimingTranscriptResult,
-    fetchBestAvailableCues,
-    phrasesFromTranscriptResult,
-    updateBootDiagnostics,
-    ensurePassivePlaybackWatcher,
-    syncPassivePlayback,
     findPlaybackPhraseIndex,
     markCurrentTranscriptSegment,
     describePhraseAtIndex,
     getPlaybackSnapshot,
     recordNavigationEvent,
-    recordDebugEvent,
+    maxPhraseDurationMs: MAX_PHRASE_DURATION_MS,
+    longPauseMs: LONG_PAUSE_MS,
+    maxWords: 18,
+    maxCharacters: 140,
+    setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+    clearTimeout: (timer) => window.clearTimeout(timer),
   });
   const ribbonPanelController = ribbonPanelContentWorkflowApi.createRibbonPanelController({
     getState: () => state,
@@ -355,13 +335,20 @@
     generatedDraftItemFromOverlayCard,
     recordDebugEvent,
   });
-  const playbackController = playbackContentWorkflowApi.createPlaybackController({
+  const {
+    playbackController,
+    passivePlaybackController,
+  } = playbackContentFacadeApi.createPlaybackControllers({
     getState: () => state,
+    playbackContentWorkflow: playbackContentWorkflowApi,
     playbackWorkflow: playbackWorkflowApi,
-    getVideoElement,
-    stopPlaybackTimer,
+    passivePlaybackContentWorkflow: passivePlaybackContentWorkflowApi,
+    passivePlaybackWatcher: passivePlaybackWatcherApi,
     playbackSession: playbackSessionApi,
     playbackTiming: playbackTimingApi,
+    playbackRateOptions,
+    getVideoElement,
+    stopPlaybackTimer,
     playbackEndMsForPhrase,
     findPlaybackPhraseIndex,
     syncPlaybackRateFromVideo,
@@ -371,7 +358,6 @@
     describePhraseAtIndex,
     getPlaybackSnapshot,
     updateDisplayPreferences,
-    ensurePassivePlaybackWatcher,
     isCurrentPhraseStillSelected,
     phraseProgressStore,
     applyPhraseEntryDisplayState,
@@ -379,24 +365,12 @@
     resolveWordTiming,
     phraseDisplaySegmentRange,
     playbackTimingConfig,
+    restorePlaybackRateAfterOverride,
     requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
     cancelAnimationFrame: (frame) => window.cancelAnimationFrame(frame),
     setTimeout: (callback, ms) => window.setTimeout(callback, ms),
     roundTime,
     preRollMs: PRE_ROLL_MS,
-    render,
-  });
-  const passivePlaybackController = passivePlaybackContentWorkflowApi.createPassivePlaybackController({
-    getState: () => state,
-    passivePlaybackWatcher: passivePlaybackWatcherApi,
-    playbackSession: playbackSessionApi,
-    playbackRateOptions,
-    getVideoElement,
-    syncPlaybackRateFromVideo,
-    syncPassivePlayback,
-    startPassivePlaybackFrame,
-    restorePlaybackRateAfterOverride,
-    cancelAnimationFrame: (frame) => window.cancelAnimationFrame(frame),
     render,
   });
   const panelLayoutController = panelLayoutContentWorkflowApi.createPanelLayoutController({
@@ -568,7 +542,19 @@
     clearElement: domUtilsApi.clearElement,
     render,
   });
-  const commandClient = extensionCommandClientApi.createExtensionCommandClient({
+  const {
+    commandClient,
+    accountSessionWorkflow,
+    issueReportWorkflow,
+    refreshBackendBuildInfo: refreshBackendBuildInfoFromSupport,
+  } = supportContentFacadeApi.createSupportControllers({
+    getState: () => state,
+    extensionCommandClient: extensionCommandClientApi,
+    accountSessionWorkflow: accountSessionWorkflowApi,
+    accountSession: accountSessionApi,
+    issueReportWorkflow: issueReportWorkflowApi,
+    issueReports: issueReportsApi,
+    backendBuildWorkflow: backendBuildWorkflowApi,
     chrome,
     fetch,
     storage: window.localStorage,
@@ -576,33 +562,13 @@
     dictionaryCommands: dictionaryCommandApi,
     dictionaryMocks: dictionaryMockApi,
     backendCommands: backendCommandApi,
-    issueReports: issueReportsApi,
     dictionaryEndpoint,
-    apiBase: apiBaseForBackendCommands,
-    getIssueCategory: () => state.issueCategory,
-  });
-  const accountSessionWorkflow = accountSessionWorkflowApi.createAccountSessionWorkflow({
-    state,
-    chrome,
-    accountSession: accountSessionApi,
-    sendRuntimeMessage,
-    fetchDictionarySession,
-    recordDebugEvent,
-    render,
-    onLookupRefresh: (selectedWord) => selectLookupWord(selectedWord.word, selectedWord.phraseIndex),
-  });
-  const issueReportWorkflow = issueReportWorkflowApi.createIssueReportWorkflow({
-    state,
-    issueReports: issueReportsApi,
+    apiBaseForBackendCommands,
+    selectLookupWord,
     formatIssueReport,
-    sendIssueReportPayload: (payload) => issueReportWorkflowApi.sendIssueReportPayload(payload, {
-      issueReports: issueReportsApi,
-      postBackendJson,
-      extensionVersion,
-      extensionBuildInfo,
-      backendBuildInfo: state.backendBuildInfo,
-      browserUserAgent: navigator.userAgent,
-    }),
+    extensionVersion,
+    extensionBuildInfo,
+    browserUserAgent: navigator.userAgent,
     recordDebugEvent,
     render,
     copyIssueReport,
@@ -1133,31 +1099,31 @@
   }
 
   async function refreshSelectedSourceCache() {
-    return sourceLoadController.refreshSelectedSourceCache();
+    return sourceController.refreshSelectedSourceCache();
   }
 
   async function startImproveTiming(textSourceOverride = "") {
-    return sourceTimingController.startImproveTiming(textSourceOverride);
+    return sourceController.startImproveTiming(textSourceOverride);
   }
 
   function applyTimingOperation(operation) {
-    return sourceTimingController.applyTimingOperation(operation);
+    return sourceController.applyTimingOperation(operation);
   }
 
   function applyTimingOperationResultToActiveSource(operation) {
-    return sourceTimingController.applyTimingOperationResultToActiveSource(operation);
+    return sourceController.applyTimingOperationResultToActiveSource(operation);
   }
 
   function scheduleTimingOperationPoll(operation) {
-    return sourceTimingController.scheduleTimingOperationPoll(operation);
+    return sourceController.scheduleTimingOperationPoll(operation);
   }
 
   async function pollTimingOperation(operationId) {
-    return sourceTimingController.pollTimingOperation(operationId);
+    return sourceController.pollTimingOperation(operationId);
   }
 
   function clearTimingOperationPoll() {
-    return sourceTimingController.clearTimingOperationPoll();
+    return sourceController.clearTimingOperationPoll();
   }
 
   function openIssueReportDialog(options = {}) {
@@ -1205,13 +1171,7 @@
   }
 
   async function refreshBackendBuildInfo() {
-    return backendBuildWorkflowApi.refreshBackendBuildInfo({
-      getState: () => state,
-      apiBaseForBackendCommands,
-      fetch,
-      recordDebugEvent,
-      render,
-    });
+    return refreshBackendBuildInfoFromSupport();
   }
 
   function renderIssueReportDialog(dialog) {
@@ -1908,39 +1868,39 @@
   }
 
   function getSelectedPracticeSource() {
-    return sourceTranscriptController.getSelectedPracticeSource();
+    return sourceController.getSelectedPracticeSource();
   }
 
   async function selectPracticeSource(sourceId) {
-    return sourceLoadController.selectPracticeSource(sourceId);
+    return sourceController.selectPracticeSource(sourceId);
   }
 
   async function loadPracticeSource(source, options) {
-    return sourceLoadController.loadPracticeSource(source, options);
+    return sourceController.loadPracticeSource(source, options);
   }
 
   function phrasesFromTranscriptResult(transcriptResult) {
-    return sourceTranscriptController.phrasesFromTranscriptResult(transcriptResult);
+    return sourceController.phrasesFromTranscriptResult(transcriptResult);
   }
 
   async function maybeSwitchToPreferredSource(options = {}) {
-    return sourceLoadController.maybeSwitchToPreferredSource(options);
+    return sourceController.maybeSwitchToPreferredSource(options);
   }
 
   function holdInitialAutoPauseAfterSourceLoad() {
-    return sourceLoadController.holdInitialAutoPauseAfterSourceLoad();
+    return sourceController.holdInitialAutoPauseAfterSourceLoad();
   }
 
   function transcriptResultFromLoadedSource(source) {
-    return sourceTimingController.transcriptResultFromLoadedSource(source);
+    return sourceController.transcriptResultFromLoadedSource(source);
   }
 
   async function fetchReusableTimingTranscriptResult(source, resultOverride = null) {
-    return sourceTimingController.fetchReusableTimingTranscriptResult(source, resultOverride);
+    return sourceController.fetchReusableTimingTranscriptResult(source, resultOverride);
   }
 
   function registerTimingOperationResultSources(operation, options = {}) {
-    return sourceTimingController.registerTimingOperationResultSources(operation, options);
+    return sourceController.registerTimingOperationResultSources(operation, options);
   }
 
   function findPlaybackPhraseIndex(phrases, currentMs) {
@@ -1948,11 +1908,11 @@
   }
 
   async function fetchBestAvailableCues(track, options = {}) {
-    return sourceTranscriptController.fetchBestAvailableCues(track, options);
+    return sourceController.fetchBestAvailableCues(track, options);
   }
 
   function normalizeTranscriptResult(result, track) {
-    return sourceTranscriptController.normalizeTranscriptResult(result, track);
+    return sourceController.normalizeTranscriptResult(result, track);
   }
 
   function getVideoElement() {
