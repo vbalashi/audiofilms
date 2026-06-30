@@ -142,6 +142,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingRibbonWorkflow",
     "__afShadowingRibbonContentWorkflow",
     "__afShadowingSurfaceContentFacade",
+    "__afShadowingSurfaceRuntimeContentFacade",
     "__afShadowingModuleRegistry",
     "__afShadowingBuildInfo",
   ];
@@ -1196,6 +1197,51 @@ function assertSurfaceContentFacadeComposesTypedCommands() {
   assert.equal(captured.ribbonContent.clearElement(), "cleared");
 }
 
+function assertSurfaceRuntimeContentFacadeOwnsControllerBindings() {
+  const surfaceRuntimeFacade = loadBrowserModule(
+    "src/surfaceRuntimeContentFacade.js",
+    "__afShadowingSurfaceRuntimeContentFacade",
+  );
+  const runtime = surfaceRuntimeFacade.createSurfaceRuntimeController();
+  assert.throws(() => runtime.ensureWorkspace(), /workspaceController/);
+
+  const calls = [];
+  const controllerFor = (name, methods) => Object.fromEntries(methods.map((methodName) => [
+    methodName,
+    (...args) => {
+      calls.push([name, methodName, args]);
+      return `${name}.${methodName}`;
+    },
+  ]));
+  runtime.bindControllers({
+    workspaceController: controllerFor("workspace", ["ensureWorkspace", "renderToggle", "removeWorkspace"]),
+    ribbonPanelController: controllerFor("ribbonPanel", ["createRibbonPanel", "createAccountControl"]),
+    panelLayoutController: controllerFor("panelLayout", ["applyPanelLayout", "applyDebugPanelLayer", "debugPanelElement", "bringDebugPanelToFront"]),
+    displayStateController: controllerFor("displayState", ["toggleUtilityMenu", "adjustVideoPlaybackRate", "cardExpanded"]),
+    diagnosticsController: controllerFor("diagnostics", ["toggleDebug", "copyDebug", "formatDebugState", "getPlaybackSnapshot"]),
+    ribbonContentController: controllerFor("ribbonContent", ["renderSourceSelector", "appendPhraseRow"]),
+  });
+
+  assert.equal(runtime.ensureWorkspace(), "workspace.ensureWorkspace");
+  assert.equal(runtime.renderToggle(), "workspace.renderToggle");
+  assert.equal(runtime.createRibbonPanel(), "ribbonPanel.createRibbonPanel");
+  assert.equal(runtime.createAccountControl("parent"), "ribbonPanel.createAccountControl");
+  assert.equal(runtime.applyPanelLayout("ribbon", "dictionary"), "panelLayout.applyPanelLayout");
+  assert.equal(runtime.applyDebugPanelLayer(), "panelLayout.applyDebugPanelLayer");
+  assert.equal(runtime.bringDebugPanelToFront(), "panelLayout.bringDebugPanelToFront");
+  assert.equal(runtime.toggleUtilityMenu("event"), "displayState.toggleUtilityMenu");
+  assert.equal(runtime.adjustVideoPlaybackRate(0.25), "displayState.adjustVideoPlaybackRate");
+  assert.equal(runtime.cardExpanded("card-1"), "displayState.cardExpanded");
+  assert.equal(runtime.toggleDebug(), "diagnostics.toggleDebug");
+  assert.equal(runtime.copyDebug(), "diagnostics.copyDebug");
+  assert.equal(runtime.formatDebugState(), "diagnostics.formatDebugState");
+  assert.equal(runtime.getPlaybackSnapshot(), "diagnostics.getPlaybackSnapshot");
+  assert.equal(runtime.renderSourceSelector("track", "toggle", "menu"), "ribbonContent.renderSourceSelector");
+  assert.equal(runtime.appendPhraseRow("parent", "phrase", 2), "ribbonContent.appendPhraseRow");
+  assert.deepEqual(calls[0], ["workspace", "ensureWorkspace", []]);
+  assert.deepEqual(calls.at(-1), ["ribbonContent", "appendPhraseRow", ["parent", "phrase", 2]]);
+}
+
 function assertLearningBoundaryTermsStayOutOfContentScript() {
   const contentSource = fs.readFileSync(path.join(extensionRoot, "src/content.js"), "utf8");
   const boundaryTerms = [
@@ -1244,6 +1290,7 @@ await assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary();
 await assertDictionaryRuntimeContentFacadeOwnsControllerBindings();
 await assertPhraseTranslationContentFacadeOwnsTranslationBoundary();
 assertSurfaceContentFacadeComposesTypedCommands();
+assertSurfaceRuntimeContentFacadeOwnsControllerBindings();
 assertLearningBoundaryTermsStayOutOfContentScript();
 const shadowCssSource = fs.readFileSync(path.join(extensionRoot, "src/shadow.css"), "utf8");
 assert.match(shadowCssSource, /:host\(\[data-af-theme="dark"\]\)[\s\S]*--af-bg-alpha:/);

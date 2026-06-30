@@ -150,6 +150,7 @@
       ribbonWorkflowApi: requiredModule(target, "__afShadowingRibbonWorkflow"),
       ribbonContentWorkflowApi: requiredModule(target, "__afShadowingRibbonContentWorkflow"),
       surfaceContentFacadeApi: requiredModule(target, "__afShadowingSurfaceContentFacade"),
+      surfaceRuntimeContentFacadeApi: requiredModule(target, "__afShadowingSurfaceRuntimeContentFacade"),
       buildInfoApi: target.__afShadowingBuildInfo || {},
     };
   }

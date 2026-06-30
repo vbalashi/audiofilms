@@ -150,6 +150,7 @@
         "src/ribbonWorkflow.js",
         "src/ribbonContentWorkflow.js",
         "src/surfaceContentFacade.js",
+        "src/surfaceRuntimeContentFacade.js",
         "src/moduleRegistry.js",
         "src/content.js"
       ],
@@ -178,5 +179,5 @@
       ]
     }
   ],
-  "version_name": "v0.1.7 · 2026-06-30 20:57:08Z · 7800b68 · dirty · dictionary runtime facade refactor"
+  "version_name": "v0.1.7 · 2026-06-30 21:10:51Z · 59c9df8 · dirty · surface runtime facade refactor"
 }

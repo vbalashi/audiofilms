@@ -566,6 +566,7 @@ function runDictionarySourceBindingScenario() {
   try {
     navigate(`https://www.youtube.com/watch?v=${fixture.videoId}`);
     removeLocalStorageItem(`afShadowingSourceSelection:${fixture.videoId}`);
+    // Keep live lookup/search coverage while making card translation independent of current 2000NL auth state.
     setLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY, "cards");
     reloadTab();
     clearDictionaryMockCommands();
@@ -748,12 +749,14 @@ function runDictionaryBehaviorScenario() {
       ),
     );
 
+    setLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY, "cards");
     const translateOn = clickDictionaryTranslate(0);
     sleep(1200);
     const translated = readGeometrySnapshot();
     const translateOff = clickDictionaryTranslate(0);
     sleep(600);
     const translationHidden = readGeometrySnapshot();
+    removeLocalStorageItem(DICTIONARY_MOCK_STORAGE_KEY);
     assertions.push(
       assertion("behavior translate can be enabled", translateOn === "clicked" && translated.dictionaryUi?.inlineTranslations > 0, JSON.stringify({ translateOn, dictionary: translated.dictionaryUi })),
       assertion("behavior translate can be disabled", translateOff === "clicked" && translationHidden.dictionaryUi?.inlineTranslations === 0, JSON.stringify({ translateOff, dictionary: translationHidden.dictionaryUi })),

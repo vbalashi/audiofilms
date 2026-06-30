@@ -101,6 +101,7 @@
     ribbonPanelDomApi,
     ribbonWorkflowApi,
     surfaceContentFacadeApi,
+    surfaceRuntimeContentFacadeApi,
     buildInfoApi,
   } = modules;
   const iconSvg = uiIconsApi.iconSvg;
@@ -179,6 +180,7 @@
     recordDebugEvent,
   });
   const dictionaryRuntimeController = dictionaryRuntimeContentFacadeApi.createDictionaryRuntimeController();
+  const surfaceRuntimeController = surfaceRuntimeContentFacadeApi.createSurfaceRuntimeController();
   const {
     toggleCardTranslation,
     setCardTranslationPending,
@@ -203,6 +205,79 @@
     loadDictionarySearchItemCard,
     requestDictionaryCardTranslation,
   } = dictionaryRuntimeController;
+  const {
+    ensureToggle,
+    renderToggle,
+    toggleLearningMode,
+    ensureWorkspace,
+    ensureAudioFilmsRoot,
+    installShadowLayerFocus,
+    installShadowScrollGuard,
+    ensureShadowContainer,
+    ensureShadowStyles,
+    mountWorkspace,
+    removeWorkspace,
+    createRibbonPanel,
+    createIssueReportDialog,
+    createAccountControl,
+    hasCustomPanelLayout,
+    toggleLayoutLock,
+    resetPanelLayout,
+    applyPanelLayout,
+    scheduleViewportLayoutClamp,
+    applyPanelGeometry,
+    applyDebugPanelGeometry,
+    applyDebugPanelLayer,
+    bringDebugPanelToFrontFromEvent,
+    handleShadowLayerFocus,
+    bringDebugPanelBehindFromPanel,
+    bringDebugPanelToFront,
+    bringDebugPanelBehind,
+    beginDebugPanelDrag,
+    beginDebugPanelResize,
+    installPanelGestureFallback,
+    beginPanelGestureFromHost,
+    resolvePanelGestureAt,
+    beginPanelDrag,
+    isInteractiveDragTarget,
+    beginPanelResize,
+    clampPanelGeometry,
+    clampDebugPanelGeometry,
+    viewportBounds,
+    savePanelGeometry,
+    saveDebugPanelGeometry,
+    bringPanelToFront,
+    panelElement,
+    debugPanelElement,
+    toggleUtilityMenu,
+    toggleSettingsMenu,
+    toggleShortcutHelp,
+    toggleAccountMenu,
+    cycleThemePreference,
+    adjustLearnerTextScale,
+    resetLearnerTextScale,
+    adjustPanelBackgroundAlpha,
+    resetPanelBackgroundAlpha,
+    adjustSlowReplaySpeed,
+    adjustVideoPlaybackRate,
+    setVideoPlaybackRate,
+    applyThemeAttributes,
+    toggleAllExamples,
+    toggleCardExpanded,
+    cardExpanded,
+    closeOpenMenus,
+    focusMenuTrigger,
+    onDocumentPointerDown,
+    toggleDebug,
+    closeDebug,
+    copyDebug,
+    clearDiagnostics,
+    formatDebugState,
+    getPlaybackSnapshot,
+    formatIssueReport,
+    renderSourceSelector,
+    appendPhraseRow,
+  } = surfaceRuntimeController;
   let playbackRuntimeController = null;
   const backendRuntimeController = backendRuntimeContentFacadeApi.createBackendRuntimeController({
     environment: {
@@ -644,6 +719,14 @@
     onToggleExamples: toggleAllExamples,
     render,
   });
+  surfaceRuntimeController.bindControllers({
+    workspaceController,
+    ribbonPanelController,
+    panelLayoutController,
+    diagnosticsController,
+    displayStateController,
+    ribbonContentController,
+  });
   const videoInitController = videoInitContentWorkflowApi.createVideoInitController({
     getState: () => state,
     videoInitWorkflow: videoInitWorkflowApi,
@@ -710,50 +793,6 @@
     });
   }
 
-  function ensureToggle() {
-    return workspaceController.ensureToggle();
-  }
-
-  function renderToggle() {
-    return workspaceController.renderToggle();
-  }
-
-  function toggleLearningMode() {
-    return workspaceController.toggleLearningMode();
-  }
-
-  function ensureWorkspace() {
-    return workspaceController.ensureWorkspace();
-  }
-
-  function ensureAudioFilmsRoot() {
-    return workspaceController.ensureAudioFilmsRoot();
-  }
-
-  function installShadowLayerFocus(root) {
-    return workspaceController.installShadowLayerFocus(root);
-  }
-
-  function installShadowScrollGuard(root) {
-    return workspaceController.installShadowScrollGuard(root);
-  }
-
-  function ensureShadowContainer(root) {
-    return workspaceController.ensureShadowContainer(root);
-  }
-
-  function ensureShadowStyles(root) {
-    return workspaceController.ensureShadowStyles(root);
-  }
-
-  function createRibbonPanel() {
-    return ribbonPanelController.createRibbonPanel();
-  }
-
-  function createIssueReportDialog(panel) {
-    return ribbonPanelController.createIssueReportDialog(panel);
-  }
-
   function createDebugPanel() {
     return workspaceDomApi.createDebugPanel({
       onBringToFront: bringDebugPanelToFrontFromEvent,
@@ -762,18 +801,6 @@
       onDrag: beginDebugPanelDrag,
       onResize: beginDebugPanelResize,
     });
-  }
-
-  function createAccountControl(parent) {
-    return ribbonPanelController.createAccountControl(parent);
-  }
-
-  function mountWorkspace(container, dictionaryPanel, ribbonPanel, debugPanel) {
-    return workspaceController.mountWorkspace(container, dictionaryPanel, ribbonPanel, debugPanel);
-  }
-
-  function removeWorkspace() {
-    return workspaceController.removeWorkspace();
   }
 
   function appendElement(parent, tagName, className = "") {
@@ -889,170 +916,6 @@
     ribbonDomApi.positionIssueReportDialog(panel, issueDialog, state.issueDialogOpen, window.requestAnimationFrame);
   }
 
-  function hasCustomPanelLayout() {
-    return panelLayoutController.hasCustomPanelLayout();
-  }
-
-  function toggleLayoutLock(event) {
-    return panelLayoutController.toggleLayoutLock(event);
-  }
-
-  function resetPanelLayout(event) {
-    return panelLayoutController.resetPanelLayout(event);
-  }
-
-  function applyPanelLayout(ribbonPanel, dictionaryPanel) {
-    return panelLayoutController.applyPanelLayout(ribbonPanel, dictionaryPanel);
-  }
-
-  function scheduleViewportLayoutClamp() {
-    return panelLayoutController.scheduleViewportLayoutClamp();
-  }
-
-  function applyPanelGeometry(panel, panelKey, overrideGeometry = null) {
-    return panelLayoutController.applyPanelGeometry(panel, panelKey, overrideGeometry);
-  }
-
-  function applyDebugPanelGeometry(panel, overrideGeometry = null) {
-    return panelLayoutController.applyDebugPanelGeometry(panel, overrideGeometry);
-  }
-
-  function applyDebugPanelLayer(panel = debugPanelElement()) {
-    return panelLayoutController.applyDebugPanelLayer(panel);
-  }
-
-  function bringDebugPanelToFrontFromEvent(event) {
-    return panelLayoutController.bringDebugPanelToFrontFromEvent(event);
-  }
-
-  function handleShadowLayerFocus(event) {
-    return panelLayoutController.handleShadowLayerFocus(event);
-  }
-
-  function bringDebugPanelBehindFromPanel(event) {
-    return panelLayoutController.bringDebugPanelBehindFromPanel(event);
-  }
-
-  function bringDebugPanelToFront() {
-    return panelLayoutController.bringDebugPanelToFront();
-  }
-
-  function bringDebugPanelBehind() {
-    return panelLayoutController.bringDebugPanelBehind();
-  }
-
-  function beginDebugPanelDrag(event) {
-    return panelLayoutController.beginDebugPanelDrag(event);
-  }
-
-  function beginDebugPanelResize(event) {
-    return panelLayoutController.beginDebugPanelResize(event);
-  }
-
-  function installPanelGestureFallback() {
-    return panelLayoutController.installPanelGestureFallback();
-  }
-
-  function beginPanelGestureFromHost(event) {
-    return panelLayoutController.beginPanelGestureFromHost(event);
-  }
-
-  function resolvePanelGestureAt(x, y) {
-    return panelLayoutController.resolvePanelGestureAt(x, y);
-  }
-
-  function beginPanelDrag(event, forcedPanelKey = "", options = {}) {
-    return panelLayoutController.beginPanelDrag(event, forcedPanelKey, options);
-  }
-
-  function isInteractiveDragTarget(target) {
-    return panelLayoutController.isInteractiveDragTarget(target);
-  }
-
-  function beginPanelResize(event, forcedPanelKey = "") {
-    return panelLayoutController.beginPanelResize(event, forcedPanelKey);
-  }
-
-  function clampPanelGeometry(panelKey, geometry) {
-    return panelLayoutController.clampPanelGeometry(panelKey, geometry);
-  }
-
-  function clampDebugPanelGeometry(geometry) {
-    return panelLayoutController.clampDebugPanelGeometry(geometry);
-  }
-
-  function viewportBounds() {
-    return panelLayoutController.viewportBounds();
-  }
-
-  function savePanelGeometry(panelKey, geometry) {
-    return panelLayoutController.savePanelGeometry(panelKey, geometry);
-  }
-
-  function saveDebugPanelGeometry(geometry) {
-    return panelLayoutController.saveDebugPanelGeometry(geometry);
-  }
-
-  function bringPanelToFront(panelKey, persist = true) {
-    return panelLayoutController.bringPanelToFront(panelKey, persist);
-  }
-
-  function panelElement(panelKey) {
-    return panelLayoutController.panelElement(panelKey);
-  }
-
-  function debugPanelElement() {
-    return panelLayoutController.debugPanelElement();
-  }
-
-  function toggleUtilityMenu(event) {
-    return displayStateController.toggleUtilityMenu(event);
-  }
-
-  function toggleSettingsMenu(event) {
-    return displayStateController.toggleSettingsMenu(event);
-  }
-
-  function toggleShortcutHelp(event) {
-    return displayStateController.toggleShortcutHelp(event);
-  }
-
-  function toggleAccountMenu(event) {
-    return displayStateController.toggleAccountMenu(event);
-  }
-
-  function cycleThemePreference(event) {
-    return displayStateController.cycleThemePreference(event);
-  }
-
-  function adjustLearnerTextScale(delta) {
-    return displayStateController.adjustLearnerTextScale(delta);
-  }
-
-  function resetLearnerTextScale() {
-    return displayStateController.resetLearnerTextScale();
-  }
-
-  function adjustPanelBackgroundAlpha(delta) {
-    return displayStateController.adjustPanelBackgroundAlpha(delta);
-  }
-
-  function resetPanelBackgroundAlpha() {
-    return displayStateController.resetPanelBackgroundAlpha();
-  }
-
-  function adjustSlowReplaySpeed(delta) {
-    return displayStateController.adjustSlowReplaySpeed(delta);
-  }
-
-  function adjustVideoPlaybackRate(delta) {
-    return displayStateController.adjustVideoPlaybackRate(delta);
-  }
-
-  function setVideoPlaybackRate(rate, reason = "playback-rate") {
-    return displayStateController.setVideoPlaybackRate(rate, reason);
-  }
-
   function syncPlaybackRateFromVideo(video = getVideoElement()) {
     return playbackSessionApi.syncPlaybackRateFromVideo(state, video, playbackRateOptions());
   }
@@ -1076,40 +939,12 @@
     };
   }
 
-  function applyThemeAttributes() {
-    return displayStateController.applyThemeAttributes();
-  }
-
-  function toggleAllExamples(event) {
-    return displayStateController.toggleAllExamples(event);
-  }
-
   function toggleCardExamples(cardId) {
     toggleCardExpanded(cardId);
   }
 
-  function toggleCardExpanded(cardId) {
-    return displayStateController.toggleCardExpanded(cardId);
-  }
-
   function exampleSectionExpanded(cardId) {
     return cardExpanded(cardId);
-  }
-
-  function cardExpanded(cardId) {
-    return displayStateController.cardExpanded(cardId);
-  }
-
-  function closeOpenMenus() {
-    return displayStateController.closeOpenMenus();
-  }
-
-  function focusMenuTrigger(trigger) {
-    return displayStateController.focusMenuTrigger(trigger);
-  }
-
-  function onDocumentPointerDown(event) {
-    return displayStateController.onDocumentPointerDown(event);
   }
 
   function onDocumentPointerUp(event) {
@@ -1124,10 +959,6 @@
       element instanceof Element
       && element.matches?.(".af-ribbon-word[data-af-phrase-index][data-af-token-index]")
     ));
-  }
-
-  function toggleDebug() {
-    return diagnosticsController.toggleDebug();
   }
 
   function togglePhraseJumpMenu(event) {
@@ -1151,18 +982,6 @@
       jumpToPhrase,
       render,
     };
-  }
-
-  function closeDebug() {
-    return diagnosticsController.closeDebug();
-  }
-
-  async function copyDebug() {
-    return diagnosticsController.copyDebug();
-  }
-
-  function clearDiagnostics() {
-    return diagnosticsController.clearDiagnostics();
   }
 
   async function refreshSelectedSourceCache() {
@@ -1258,10 +1077,6 @@
     textarea.remove();
   }
 
-  function formatDebugState() {
-    return diagnosticsController.formatDebugState();
-  }
-
   function recordDebugEvent(type, detail) {
     diagnosticsStateController.recordDebugEvent(type, detail);
   }
@@ -1272,10 +1087,6 @@
 
   function publishDiagnosticsSnapshot() {
     diagnosticsStateController.publishSnapshot();
-  }
-
-  function formatIssueReport(options = {}) {
-    return diagnosticsController.formatIssueReport(options);
   }
 
   function practiceReadiness() {
@@ -1306,20 +1117,12 @@
     });
   }
 
-  function getPlaybackSnapshot() {
-    return diagnosticsController.getPlaybackSnapshot();
-  }
-
   function describePhraseAtIndex(index) {
     return diagnosticsReportApi.describePhraseAtIndex(state.phrases, index);
   }
 
   function roundTime(value) {
     return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
-  }
-
-  function renderSourceSelector(track, sourceToggle, sourceMenu) {
-    return ribbonContentController.renderSourceSelector(track, sourceToggle, sourceMenu);
   }
 
   function toggleSourceMenu(event) {
@@ -1332,10 +1135,6 @@
   function appendRibbonMessage(parent, text) {
     const message = appendElement(parent, "div", "af-ribbon-message");
     message.textContent = text;
-  }
-
-  function appendPhraseRow(parent, phrase, index) {
-    return ribbonContentController.appendPhraseRow(parent, phrase, index);
   }
 
   function isTokenInSelectedSpan(phraseIndex, tokenIndex) {
