@@ -11,7 +11,7 @@ function loadBrowserModule(relativePath, exportName, globals = {}) {
   const sandbox = { window: { ...globals }, URL, ...globals };
   const source = fs.readFileSync(path.join(extensionRoot, relativePath), "utf8");
   vm.runInNewContext(source, sandbox, { filename: relativePath });
-  return sandbox.window[exportName];
+  return sandbox.window[exportName] || sandbox[exportName];
 }
 
 function assertManifestOrderRegistersContentNamespaces() {
@@ -163,9 +163,53 @@ function assertDictionaryMocksStayRuntimeGated() {
   assert.ok(commandClientIndex > mocksIndex, "dictionaryMocks load before the command client gate");
 
   const commandClientSource = fs.readFileSync(path.join(extensionRoot, "src/extensionCommandClient.js"), "utf8");
-  assert.match(commandClientSource, /storage\?\.getItem\("afShadowingDictionaryMock"\)/);
-  assert.match(commandClientSource, /mockMode !== "cards" && mockMode !== "generated"/);
-  assert.match(commandClientSource, /if \(mockResponse\) return Promise\.resolve\(mockResponse\)/);
+  const serviceWorkerSource = fs.readFileSync(path.join(extensionRoot, "src/serviceWorker.js"), "utf8");
+  const smokeSource = fs.readFileSync(path.join(extensionRoot, "scripts/smoke-chrome.mjs"), "utf8");
+  const optionsSource = fs.readFileSync(path.join(extensionRoot, "src/options.js"), "utf8");
+  const optionsHtml = fs.readFileSync(path.join(extensionRoot, "src/options.html"), "utf8");
+  assert.equal(commandClientSource.includes('"afShadowingDictionaryMock"'), false);
+  assert.equal(commandClientSource.includes('"afShadowingIssueReportMock"'), false);
+  assert.match(serviceWorkerSource, /DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks"/);
+  assert.match(serviceWorkerSource, /chromeStorageGet\(DEV_MOCKS_STORAGE_KEY\)/);
+  assert.match(serviceWorkerSource, /dictionaryMockResponse\(operation, body\)/);
+  assert.match(serviceWorkerSource, /issueReportMockResponse\(body\)/);
+  assert.match(smokeSource, /DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks"/);
+  assert.match(smokeSource, /saveDevMocks/);
+  assert.match(optionsSource, /DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks"/);
+  assert.match(optionsHtml, /id="saveDevMocks"/);
+}
+
+function assertServiceWorkerMessageSecurityBoundary() {
+  const source = fs.readFileSync(path.join(extensionRoot, "src/serviceWorker.js"), "utf8");
+  assert.match(source, /validateRuntimeMessage\(message, sender\)/);
+  assert.match(source, /isTrustedRuntimeSender\(sender\)/);
+  assert.match(source, /sender\.id && sender\.id !== chrome\.runtime\.id/);
+  assert.match(source, /BACKEND_COMMAND_OPERATIONS = new Set/);
+  assert.match(source, /DICTIONARY_COMMAND_OPERATIONS = new Set/);
+  assert.match(source, /isPlainObject\(message\.body\)/);
+  assert.match(source, /Untrusted extension message sender/);
+}
+
+function assertPageBridgeCommandContract() {
+  const pageBridgeSource = fs.readFileSync(path.join(extensionRoot, "src/pageBridge.js"), "utf8");
+  const transcriptSource = fs.readFileSync(path.join(extensionRoot, "src/transcriptRetrieval.js"), "utf8");
+  assert.match(pageBridgeSource, /ENABLED_DATASET_KEY = "afShadowingPageBridgeEnabled"/);
+  assert.match(pageBridgeSource, /command\?\.source === "audiofilms-content-script"/);
+  assert.match(pageBridgeSource, /\^af_page_bridge_\[a-z0-9_-\]\+\$/);
+  assert.match(pageBridgeSource, /delete document\.documentElement\.dataset\[COMMAND_DATASET_KEY\]/);
+  assert.match(transcriptSource, /source: "audiofilms-content-script"/);
+  assert.match(transcriptSource, /Page bridge command id mismatch/);
+  assert.match(transcriptSource, /delete document\.documentElement\.dataset\.afShadowingPageBridgeResult/);
+}
+
+function assertContentFacadesReceiveScopedModuleBundles() {
+  const source = fs.readFileSync(path.join(extensionRoot, "src/content.js"), "utf8");
+  assert.equal(/createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
+  assert.equal(/createPhraseTranslationController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
+  assert.equal(/createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
+  assert.equal(/createRibbonRuntimeController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
+  assert.match(source, /createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules: \{/m);
+  assert.match(source, /createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules: \{/m);
 }
 
 function createManifestOrderSandbox() {
@@ -684,10 +728,8 @@ function assertSupportContentFacadeComposesSupportBoundary() {
     },
     chrome: {},
     fetch: () => {},
-    storage: {},
     document: {},
     dictionaryCommands: {},
-    dictionaryMocks: {},
     backendCommands: {},
     issueReports: {},
     accountSession: {},
@@ -704,7 +746,9 @@ function assertSupportContentFacadeComposesSupportBoundary() {
     setTimeout: () => 0,
   });
 
-  assert.equal(commandOptions.getIssueCategory(), "timing");
+  assert.equal("storage" in commandOptions, false);
+  assert.equal("dictionaryMocks" in commandOptions, false);
+  assert.equal("issueReports" in commandOptions, false);
   assert.equal(accountOptions.sendRuntimeMessage, commandClient.sendRuntimeMessage);
   assert.equal(accountOptions.fetchDictionarySession, commandClient.fetchDictionarySession);
   accountOptions.onLookupRefresh({ word: "bouwen", phraseIndex: 2 });
@@ -766,11 +810,11 @@ async function assertBackendRuntimeContentFacadeOwnsBackendPorts() {
     setSessionState: (session, error) => events.push(["set-session", session.status, error]),
   };
   const ports = controller.createSupportCommandPorts({ commandClient, accountSessionWorkflow });
-  await ports.syncTwoThousandNlAccount();
-  await ports.connectTwoThousandNlAccount();
-  await ports.disconnectTwoThousandNlAccount();
-  assert.deepEqual(await ports.getFreshTwoThousandNlSession(), { status: "signed-in" });
-  ports.setTwoThousandNlSessionState({ status: "guest" }, "");
+  await ports.syncLinkedAccount();
+  await ports.connectLinkedAccount();
+  await ports.disconnectLinkedAccount();
+  assert.deepEqual(await ports.getFreshLinkedAccountSession(), { status: "signed-in" });
+  ports.setLinkedAccountSessionState({ status: "guest" }, "");
   assert.equal(await ports.fetchDictionarySession(), "session");
   ports.sendRuntimeMessage({ type: "ping" });
   ports.requestDictionaryCommand("dict-lookup", { word: "klein" });
@@ -1467,6 +1511,9 @@ function assertLearningBoundaryTermsStayOutOfContentScript() {
 
 assertManifestOrderRegistersContentNamespaces();
 assertDictionaryMocksStayRuntimeGated();
+assertServiceWorkerMessageSecurityBoundary();
+assertPageBridgeCommandContract();
+assertContentFacadesReceiveScopedModuleBundles();
 assertSourceContentFacadeComposesSourceBoundary();
 await assertYoutubeRuntimeContentFacadeOwnsYoutubeBoundary();
 assertPlaybackContentFacadeComposesPlaybackBoundary();
@@ -6145,7 +6192,6 @@ assert.equal(
   "http://localhost:3000/api/dict",
 );
 const commandClientDocument = { documentElement: { dataset: {} } };
-const commandClientStorage = new Map();
 const commandClientFetches = [];
 const commandClient = extensionCommandClient.createExtensionCommandClient({
   chrome: undefined,
@@ -6159,17 +6205,11 @@ const commandClient = extensionCommandClient.createExtensionCommandClient({
     }
     return { ok: true, status: 201, text: async () => JSON.stringify({ id: "backend-1" }) };
   },
-  storage: {
-    getItem: (key) => commandClientStorage.get(key) || "",
-  },
   document: commandClientDocument,
   dictionaryCommands,
-  dictionaryMocks,
   backendCommands,
-  issueReports,
   dictionaryEndpoint: () => "https://audiofilms-api.dilum.io/api/dict",
   apiBase: () => "https://audiofilms-api.dilum.io",
-  getIssueCategory: () => "timing",
   now: () => "2026-06-30T10:00:00.000Z",
 });
 const commandClientLookup = await commandClient.postDictionaryCommand("dict-lookup", { clickedForm: "oog" });
@@ -6180,13 +6220,37 @@ const commandClientSession = await commandClient.fetchDictionarySession();
 assert.equal(commandClientSession.authenticated, true);
 const commandClientBackend = await commandClient.postBackendJson("practice-timing-create", { payload: { videoId: "video-1" } });
 assert.equal(commandClientBackend.id, "backend-1");
-commandClientStorage.set("afShadowingDictionaryMock", "cards");
-const mockedDictionaryResponse = await commandClient.requestDictionaryCommand("dict-lookup", { clickedForm: "appel" });
+const runtimeMessages = [];
+const runtimeCommandClient = extensionCommandClient.createExtensionCommandClient({
+  chrome: {
+    runtime: {
+      sendMessage: (message, callback) => {
+        runtimeMessages.push(message);
+        callback({
+          ok: true,
+          status: 200,
+          text: JSON.stringify({ cards: [{ id: "mock-card" }] }),
+          mockCommand: {
+            operation: message.operation,
+            mockMode: "cards",
+            body: message.body,
+            at: "2026-06-30T10:00:00.000Z",
+          },
+        });
+      },
+    },
+  },
+  document: commandClientDocument,
+  dictionaryCommands,
+  backendCommands,
+  dictionaryEndpoint: () => "https://audiofilms-api.dilum.io/api/dict",
+  apiBase: () => "https://audiofilms-api.dilum.io",
+  now: () => "2026-06-30T10:00:00.000Z",
+});
+const mockedDictionaryResponse = await runtimeCommandClient.requestDictionaryCommand("dict-lookup", { clickedForm: "appel" });
 assert.equal(mockedDictionaryResponse.ok, true);
+assert.equal(runtimeMessages[0].type, "af-dictionary-command");
 assert.equal(JSON.parse(commandClientDocument.documentElement.dataset.afShadowingDictionaryMockCommands)[0].operation, "dict-lookup");
-commandClientStorage.set("afShadowingIssueReportMock", "success");
-const mockedIssueResponse = await commandClient.requestBackendCommand("issue-report-submit", {});
-assert.equal(JSON.parse(mockedIssueResponse.text).category, "timing");
 
 const mergedAccountSession = accountSession.mergeBackendSession(
   { user: { email: "old@example.test" }, preferences: { theme: "old" } },

@@ -411,7 +411,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - `src/youtubeAdapter.js`: watch-page URL helpers, player metadata extraction, balanced JSON extraction, and video element lookup.
 - `src/transcriptRetrieval.js`: timedtext, transcript API, transcript panel fallback/state diagnostics, cue parsers, and transcript quality metadata.
 - `src/content.js`: composition entrypoint that resolves extension modules, creates state/controllers, installs listeners, and wires the YouTube page lifecycle.
-- `src/dictionaryMocks.js`: dictionary fixture responses for local smoke and geometry scenarios. It is shipped with the unpacked dev extension so the normal Chrome-profile smoke can opt in through `localStorage.afShadowingDictionaryMock`; the default runtime path stays the service-worker `/api/dict*` command bridge.
+- `src/dictionaryMocks.js`: dictionary fixture responses for local smoke and geometry scenarios. It is shipped with the unpacked dev extension so normal Chrome-profile smoke can opt in through extension-owned `chrome.storage.local.afShadowingDevMocks`; the default runtime path stays the service-worker `/api/dict*` command bridge.
 - `src/content.css`: minimal injected global helper styles for the toggle and transcript debug/highlight state.
 - `src/shadow.css`: shadow-loaded panel styles for the AudioFilms learning layer.
 

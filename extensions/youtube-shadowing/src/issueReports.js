@@ -1,4 +1,4 @@
-(function audioFilmsIssueReports() {
+(function audioFilmsIssueReports(root) {
   const ISSUE_REPORT_CATEGORIES = [
     { value: "phrase-boundary", label: "Incorrect phrase split / merged sentences" },
     { value: "timing", label: "Wrong timing / pause point" },
@@ -261,7 +261,7 @@
     };
   }
 
-  window.__afShadowingIssueReports = {
+  root.__afShadowingIssueReports = {
     issueReportCategories,
     issueReportPayload,
     formatNavigationIssueReport,
@@ -276,4 +276,4 @@
     dictionaryCardIssueDescription,
     issueReportMockResponse,
   };
-})();
+})(typeof globalThis !== "undefined" ? globalThis : window);

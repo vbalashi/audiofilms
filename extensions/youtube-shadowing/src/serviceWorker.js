@@ -1,8 +1,10 @@
 try { importScripts("config.js"); } catch (_error) {}
+try { importScripts("dictionaryMocks.js", "issueReports.js"); } catch (_error) {}
 const CONNECT_SESSION_STORAGE_KEY = "af2000nlConnectSession";
 const ASR_TESTER_TOKEN_STORAGE_KEY = "afAsrTesterToken";
 const DISPLAY_PREFERENCES_STORAGE_KEY = "afShadowingDisplayPreferences";
 const PHRASE_PROGRESS_STORAGE_KEY = "afShadowingPhraseProgress";
+const DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks";
 const DEFAULT_API_BASE = globalThis.__afShadowingConfig?.defaults?.apiBase || "https://audiofilms-api.dilum.io";
 const DEFAULT_CONNECT_BASE_URL = globalThis.__afShadowingConfig?.defaults?.connectBase || "https://2000.dilum.io";
 const DEFAULT_CONNECT_CLIENT_ID = "audiofilms_chrome_dev";
@@ -20,7 +22,14 @@ if (chrome.action?.onClicked) {
   });
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const validation = validateRuntimeMessage(message, sender);
+  if (!validation.handled) return false;
+  if (!validation.ok) {
+    sendResponse(errorResponse(400, validation.error || "Invalid AudioFilms extension message."));
+    return false;
+  }
+
   if (message?.type === "af-fetch-backend-subtitles") {
     sendResponse({
       ok: false,
@@ -203,7 +212,134 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
+function validateRuntimeMessage(message, sender = {}) {
+  if (!message || typeof message !== "object" || typeof message.type !== "string") {
+    return { handled: false, ok: false };
+  }
+  if (!isKnownRuntimeMessageType(message.type)) {
+    return { handled: false, ok: false };
+  }
+  if (!isTrustedRuntimeSender(sender)) {
+    return { handled: true, ok: false, error: "Untrusted extension message sender." };
+  }
+  if (message.type === "af-fetch-backend-subtitles" || message.type === "af-fetch-dictionary-lookup") {
+    return { handled: true, ok: true };
+  }
+  if (message.type === "af-backend-command") {
+    if (!BACKEND_COMMAND_OPERATIONS.has(message.operation)) {
+      return { handled: true, ok: false, error: "Unsupported backend command." };
+    }
+    if (!isPlainObject(message.body)) {
+      return { handled: true, ok: false, error: "Invalid backend command body." };
+    }
+    return { handled: true, ok: true };
+  }
+  if (message.type === "af-dictionary-command") {
+    if (!DICTIONARY_COMMAND_OPERATIONS.has(message.operation)) {
+      return { handled: true, ok: false, error: "Unsupported dictionary command." };
+    }
+    if (message.body !== null && message.body !== undefined && !isPlainObject(message.body)) {
+      return { handled: true, ok: false, error: "Invalid dictionary command body." };
+    }
+    return { handled: true, ok: true };
+  }
+  if (message.type === "af-set-display-preferences") {
+    return {
+      handled: true,
+      ok: isPlainObject(message.preferences),
+      error: "Invalid display preferences payload.",
+    };
+  }
+  if (message.type === "af-get-phrase-progress" || message.type === "af-clear-phrase-progress") {
+    const key = message.keyPrefix || message.key || "";
+    return {
+      handled: true,
+      ok: typeof key === "string" && key.length <= 512,
+      error: "Invalid phrase progress key.",
+    };
+  }
+  if (message.type === "af-set-phrase-progress") {
+    return {
+      handled: true,
+      ok: typeof message.key === "string" && message.key.length <= 512 && isPlainObject(message.progress),
+      error: "Invalid phrase progress payload.",
+    };
+  }
+  return { handled: true, ok: true };
+}
+
+const BACKEND_COMMAND_OPERATIONS = new Set([
+  "get-subs",
+  "practice-captions",
+  "local-asr-practice",
+  "asr-create",
+  "practice-timing-create",
+  "issue-report-submit",
+  "practice-operation",
+  "asr-status",
+  "asr-result",
+]);
+
+const DICTIONARY_COMMAND_OPERATIONS = new Set([
+  "dict-lookup",
+  "dict-search",
+  "dict-action",
+  "dict-translation",
+  "dict-generated-draft",
+  "dict-generated-save",
+  "dict-session",
+  "audio-resolve",
+  "phrase-translation",
+]);
+
+function isKnownRuntimeMessageType(type) {
+  return type === "af-fetch-backend-subtitles" ||
+    type === "af-backend-command" ||
+    type === "af-fetch-dictionary-lookup" ||
+    type === "af-dictionary-command" ||
+    type === "af-get-2000nl-session" ||
+    type === "af-get-display-preferences" ||
+    type === "af-set-display-preferences" ||
+    type === "af-get-phrase-progress" ||
+    type === "af-set-phrase-progress" ||
+    type === "af-clear-phrase-progress" ||
+    type === "af-connect-2000nl" ||
+    type === "af-disconnect-2000nl";
+}
+
+function isTrustedRuntimeSender(sender = {}) {
+  if (sender.id && sender.id !== chrome.runtime.id) return false;
+  const url = sender.url || sender.origin || "";
+  if (!url) return true;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "chrome-extension:" && parsed.host === chrome.runtime.id) return true;
+    return parsed.protocol === "https:" &&
+      (parsed.hostname === "www.youtube.com" || parsed.hostname === "youtube.com");
+  } catch (_error) {
+    return false;
+  }
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function errorResponse(status, error) {
+  return {
+    ok: false,
+    status,
+    text: "",
+    error,
+  };
+}
+
 async function fetchBackendCommand(operation, body = {}) {
+  if (operation === "issue-report-submit") {
+    const mockResponse = await issueReportMockResponse(body);
+    if (mockResponse) return mockResponse;
+  }
+
   const command = backendCommand(operation, body || {});
   const headers = {
     accept: "application/json",
@@ -319,6 +455,9 @@ function backendCommandNeedsTesterToken(operation) {
 }
 
 async function fetchDictionaryCommand(operation, body = null) {
+  const mockResponse = await dictionaryMockResponse(operation, body);
+  if (mockResponse) return mockResponse;
+
   const command = dictionaryCommand(operation);
   const startedAt = Date.now();
   const headers = {
@@ -357,6 +496,51 @@ async function fetchDictionaryCommand(operation, body = null) {
       platformServerTiming: response.headers.get("x-af-platform-server-timing") || "",
     },
   };
+}
+
+async function dictionaryMockResponse(operation, body = null) {
+  const mode = (await readDevMockConfig()).dictionary;
+  if (mode !== "cards" && mode !== "generated") return null;
+  const mocks = globalThis.__afShadowingDictionaryMocks;
+  if (!mocks?.dictionaryMockResponse) return null;
+  const response = mocks.dictionaryMockResponse(operation, body, mode);
+  if (!response) return null;
+  return {
+    ...response,
+    mockCommand: {
+      operation,
+      mockMode: mode,
+      body,
+      at: new Date().toISOString(),
+    },
+  };
+}
+
+async function issueReportMockResponse(body = {}) {
+  const mode = (await readDevMockConfig()).issueReport;
+  const issueReports = globalThis.__afShadowingIssueReports;
+  if (!issueReports?.issueReportMockResponse) return null;
+  return issueReports.issueReportMockResponse(mode, {
+    category: body?.payload?.category || "",
+  });
+}
+
+async function readDevMockConfig() {
+  const configured = normalizeDevMockConfig(globalThis.__afShadowingConfig?.defaults?.devMocks);
+  if (configured.dictionary || configured.issueReport) return configured;
+  try {
+    const values = await chromeStorageGet(DEV_MOCKS_STORAGE_KEY);
+    return normalizeDevMockConfig(values?.[DEV_MOCKS_STORAGE_KEY]);
+  } catch (_error) {
+    return { dictionary: "", issueReport: "" };
+  }
+}
+
+function normalizeDevMockConfig(value) {
+  const config = value && typeof value === "object" ? value : {};
+  const dictionary = ["cards", "generated"].includes(config.dictionary) ? config.dictionary : "";
+  const issueReport = ["success", "failure", "error"].includes(config.issueReport) ? config.issueReport : "";
+  return { dictionary, issueReport };
 }
 
 function trustedBackendApiBase(value) {

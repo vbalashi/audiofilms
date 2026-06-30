@@ -29,19 +29,19 @@
 
     function createSupportCommandPorts({ commandClient, accountSessionWorkflow } = {}) {
       return {
-        async syncTwoThousandNlAccount() {
+        async syncLinkedAccount() {
           await accountSessionWorkflow.sync();
         },
-        async connectTwoThousandNlAccount() {
+        async connectLinkedAccount() {
           await accountSessionWorkflow.connect();
         },
-        async disconnectTwoThousandNlAccount() {
+        async disconnectLinkedAccount() {
           await accountSessionWorkflow.disconnect();
         },
-        async getFreshTwoThousandNlSession() {
+        async getFreshLinkedAccountSession() {
           return accountSessionWorkflow.getFreshSession();
         },
-        setTwoThousandNlSessionState(session, error) {
+        setLinkedAccountSessionState(session, error) {
           accountSessionWorkflow.setSessionState(session, error);
         },
         fetchDictionarySession() {

@@ -3,15 +3,11 @@
     const commandClient = deps.extensionCommandClient.createExtensionCommandClient({
       chrome: deps.chrome,
       fetch: deps.fetch,
-      storage: deps.storage,
       document: deps.document,
       dictionaryCommands: deps.dictionaryCommands,
-      dictionaryMocks: deps.dictionaryMocks,
       backendCommands: deps.backendCommands,
-      issueReports: deps.issueReports,
       dictionaryEndpoint: deps.dictionaryEndpoint,
       apiBase: deps.apiBaseForBackendCommands,
-      getIssueCategory: () => deps.getState().issueCategory,
     });
 
     const accountSessionWorkflow = deps.accountSessionWorkflow.createAccountSessionWorkflow({

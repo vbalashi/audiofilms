@@ -1,4 +1,4 @@
-(function audioFilmsDictionaryMocks() {
+(function audioFilmsDictionaryMocks(root) {
   function dictionaryMockResponse(operation, body = null, mockMode = "", options = {}) {
     if (mockMode !== "cards" && mockMode !== "generated") return null;
     if (operation === "dict-lookup") {
@@ -399,11 +399,11 @@
     };
   }
 
-  window.__afShadowingDictionaryMocks = {
+  root.__afShadowingDictionaryMocks = {
     dictionaryMockResponse,
     jsonCommandResponse,
     mockDictionaryLookup,
     mockDictionarySearch,
     mockGeneratedDraftCard,
   };
-})();
+})(typeof globalThis !== "undefined" ? globalThis : window);

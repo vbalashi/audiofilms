@@ -1,8 +1,12 @@
 (function audioFilmsOptions() {
   const ASR_TESTER_TOKEN_STORAGE_KEY = "afAsrTesterToken";
+  const DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks";
   const tokenInput = document.getElementById("asrTesterToken");
   const saveButton = document.getElementById("saveToken");
   const clearButton = document.getElementById("clearToken");
+  const devDictionaryMock = document.getElementById("devDictionaryMock");
+  const devIssueReportMock = document.getElementById("devIssueReportMock");
+  const saveDevMocks = document.getElementById("saveDevMocks");
   const status = document.getElementById("status");
 
   function setStatus(message) {
@@ -74,7 +78,25 @@
     setStatus("ASR tester token cleared.");
   });
 
+  saveDevMocks?.addEventListener("click", async () => {
+    await chromeStorageSet({
+      [DEV_MOCKS_STORAGE_KEY]: {
+        dictionary: normalizeDictionaryMock(devDictionaryMock?.value),
+        issueReport: normalizeIssueReportMock(devIssueReportMock?.value),
+      },
+    });
+    setStatus("Dev mock settings saved.");
+  });
+
   loadStatus().catch((error) => {
     setStatus(error instanceof Error ? error.message : "Could not read extension storage.");
   });
+
+  function normalizeDictionaryMock(value) {
+    return ["cards", "generated"].includes(value) ? value : "";
+  }
+
+  function normalizeIssueReportMock(value) {
+    return ["success", "failure", "error"].includes(value) ? value : "";
+  }
 })();
