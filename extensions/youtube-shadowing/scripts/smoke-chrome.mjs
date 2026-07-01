@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 
 const EXTENSION_ID = "hhdkchoccmikoefhenobdjipgdppdpoc";
-const SMOKE_ARTIFACT_DIR = "extensions/youtube-shadowing/.smoke-artifacts";
+const SMOKE_ARTIFACT_DIR = "app/.extension-smoke-artifacts";
 const DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks";
 
 const FIXTURES = [

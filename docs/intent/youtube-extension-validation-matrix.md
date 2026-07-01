@@ -82,7 +82,8 @@ For extension smoke checks:
   `node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry`
   after changes to layout, cards, generated drafts, span selection, popovers, or
   visual layering. It saves local screenshot evidence under
-  `extensions/youtube-shadowing/.smoke-artifacts/`.
+  `app/.extension-smoke-artifacts/`, outside the unpacked extension directory
+  so Chrome does not count generated screenshots in the extension size.
 - Source-aware dictionary actions use a frozen `DictionarySourceBinding`
   captured at word click. Manual smoke should cover backend captions, direct
   timed-text fallback, transcript-panel fallback, source switch after lookup,
@@ -138,7 +139,7 @@ For local app API checks:
 | Failed source switch | `4EE7m94mJpk` manual -> auto with unavailable backend URL | A working source is already loaded, but the newly selected source fails | Keep previous source, count, and phrase visible; record error on failed source option | Passing in normal Chrome smoke |
 | SPA navigation | `4EE7m94mJpk` -> `ZNQWWW-vvfM` -> `4EE7m94mJpk` | YouTube watch-page navigation reset | Video id, tracks, phrases, and selected source reset | Passing in normal Chrome smoke |
 | Logged-out clean Chrome profile | Temporary Chrome for Testing profile | Boot reproducibility without existing profile state | Boot marker and toggle appear after extension load and tab reload | Passing in CDP smoke |
-| Viewport and mocked dictionary UI variants | `4EE7m94mJpk` with mocked dictionary cards | Compact UI responsiveness plus controlled dictionary-card, generated-draft, span-selection, and popover states | No overlap at narrow/wide widths; panels stay in viewport; mocked dictionary card actions/translations render without layout regression | Full smoke and focused `--only-geometry`; local screenshots saved under `.smoke-artifacts/`; not a backend dictionary test |
+| Viewport and mocked dictionary UI variants | `4EE7m94mJpk` with mocked dictionary cards | Compact UI responsiveness plus controlled dictionary-card, generated-draft, span-selection, and popover states | No overlap at narrow/wide widths; panels stay in viewport; mocked dictionary card actions/translations render without layout regression | Full smoke and focused `--only-geometry`; local screenshots saved under `app/.extension-smoke-artifacts/`; not a backend dictionary test |
 
 ## Latest Run
 
