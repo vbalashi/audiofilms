@@ -1,4 +1,5 @@
 .DS_Store
+*.pen
 
 # Local subtitle/video caches are disposable artifacts.
 .subtitle-cache/
