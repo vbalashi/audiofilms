@@ -172,6 +172,7 @@
   let shadowLayerFocusInstalled = false;
   let shadowScrollGuardInstalled = false;
   let viewportLayoutFrame = 0;
+  let bootDiagnosticsPublishFrame = 0;
 
   const state = bootStateApi.createInitialState({
     bootDiagnostics,
@@ -1020,11 +1021,25 @@
       updatedAt: new Date().toISOString(),
       url: window.location.href,
     });
-    bootDiagnosticsApi.publish(state.bootDiagnostics);
     if (updates.lastError) {
       document.documentElement.dataset.afShadowingLastError = String(updates.lastError).slice(0, 180);
+      publishBootDiagnosticsNow();
+      return;
     }
+    scheduleBootDiagnosticsPublish();
+  }
+
+  function publishBootDiagnosticsNow() {
+    bootDiagnosticsPublishFrame = 0;
+    bootDiagnosticsApi.publish(state.bootDiagnostics);
     publishDiagnosticsSnapshot();
+  }
+
+  function scheduleBootDiagnosticsPublish() {
+    if (bootDiagnosticsPublishFrame) return;
+    bootDiagnosticsPublishFrame = requestAnimationFrame(() => {
+      publishBootDiagnosticsNow();
+    });
   }
 
   function updateDisplayPreferences(updater) {

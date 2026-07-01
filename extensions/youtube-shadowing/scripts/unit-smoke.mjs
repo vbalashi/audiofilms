@@ -295,6 +295,8 @@ function assertContentFacadesReceiveScopedModuleBundles() {
   assert.equal(source.includes("chrome.runtime.sendMessage"), false, "content.js must use the shared runtime message client");
   const composerSource = fs.readFileSync(path.join(extensionRoot, "src/contentRuntimeComposer.js"), "utf8");
   assert.match(composerSource, /createRuntimeMessageClient\(\{/);
+  assert.match(composerSource, /scheduleBootDiagnosticsPublish\(\)/);
+  assert.match(composerSource, /publishBootDiagnosticsNow\(\)/);
   assert.equal(/createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules,/m.test(composerSource), false);
   assert.equal(/createPhraseTranslationController\(\{\s+getState: \(\) => state,\s+modules,/m.test(composerSource), false);
   assert.equal(/createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules,/m.test(composerSource), false);
