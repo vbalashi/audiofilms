@@ -2509,6 +2509,10 @@ function createKeyboardWorkflowDeps(state, calls, options = {}) {
       calls.push(["closeOpenMenus"]);
       return Boolean(options.closeMenus);
     },
+    closeIssueReportDialog: () => {
+      calls.push(["closeIssueReportDialog"]);
+      state.issueDialogOpen = false;
+    },
     toggleShortcutHelp: () => calls.push(["toggleShortcutHelp"]),
     nextPhrase: () => calls.push(["nextPhrase"]),
     previousPhrase: () => calls.push(["previousPhrase"]),
@@ -2540,6 +2544,39 @@ assert.deepEqual(keyboardWorkflowCalls.at(-1), ["adjustVideoPlaybackRate", -0.25
 const modeEvent = createKeyboardWorkflowEvent("Digit2");
 keyboardWorkflow.handleKeyboardEvent(modeEvent, createKeyboardWorkflowDeps(keyboardWorkflowState, keyboardWorkflowCalls));
 assert.deepEqual(keyboardWorkflowCalls.at(-1), ["setPracticeMode", "recall"]);
+const issueDialogTypingState = { learningEnabled: true, issueDialogOpen: true };
+const issueDialogTypingCalls = [];
+const issueDialogTextarea = { tagName: "TEXTAREA" };
+const issueDialogTypingEvent = createKeyboardWorkflowEvent("KeyF", {
+  key: "f",
+  target: issueDialogTextarea,
+});
+issueDialogTypingEvent.composedPath = () => [issueDialogTextarea];
+assert.equal(keyboardWorkflow.handleKeyboardEvent(
+  issueDialogTypingEvent,
+  createKeyboardWorkflowDeps(issueDialogTypingState, issueDialogTypingCalls),
+), true);
+assert.equal(issueDialogTypingEvent.prevented, false);
+assert.equal(issueDialogTypingEvent.immediateStopped, true);
+assert.equal(issueDialogTypingCalls.length, 0);
+const issueDialogShortcutState = { learningEnabled: true, issueDialogOpen: true };
+const issueDialogShortcutEvent = createKeyboardWorkflowEvent("KeyF", { key: "f" });
+assert.equal(keyboardWorkflow.handleKeyboardEvent(
+  issueDialogShortcutEvent,
+  createKeyboardWorkflowDeps(issueDialogShortcutState, []),
+), true);
+assert.equal(issueDialogShortcutEvent.prevented, true);
+assert.equal(issueDialogShortcutEvent.immediateStopped, true);
+const issueDialogEscapeCalls = [];
+const issueDialogEscapeState = { learningEnabled: true, issueDialogOpen: true };
+const issueDialogEscapeEvent = createKeyboardWorkflowEvent("Escape");
+keyboardWorkflow.handleKeyboardEvent(
+  issueDialogEscapeEvent,
+  createKeyboardWorkflowDeps(issueDialogEscapeState, issueDialogEscapeCalls),
+);
+assert.equal(issueDialogEscapeEvent.prevented, true);
+assert.equal(issueDialogEscapeCalls.at(-1)[0], "closeIssueReportDialog");
+assert.equal(issueDialogEscapeState.issueDialogOpen, false);
 const escapeDraftState = { learningEnabled: true, spanSelectionDraft: { text: "draft" } };
 const escapeCalls = [];
 const escapeEvent = createKeyboardWorkflowEvent("Escape");

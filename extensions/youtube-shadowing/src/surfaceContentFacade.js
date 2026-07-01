@@ -108,6 +108,7 @@
       toggleContinuousPlayback: commands.playback.toggleContinuousPlayback,
       clearSpanSelectionDraft: commands.dictionary.clearSpanSelectionDraft,
       closeOpenMenus: commands.display.closeOpenMenus,
+      closeIssueReportDialog: commands.issue.closeIssueReportDialog,
       toggleShortcutHelp: commands.display.toggleShortcutHelp,
       nextPhrase: commands.playback.nextPhrase,
       previousPhrase: commands.playback.previousPhrase,

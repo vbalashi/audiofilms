@@ -3,6 +3,9 @@
     const state = deps.getState();
     const shortcuts = deps.keyboardShortcuts;
     if (!deps.isWatchPage()) return false;
+    if (state.issueDialogOpen) {
+      return handleIssueDialogKeyboardEvent(event, deps);
+    }
     if (!state.learningEnabled) return false;
     if (shortcuts.shouldIgnoreKeyEvent(event)) return false;
 
@@ -42,6 +45,29 @@
     return true;
   }
 
+  function handleIssueDialogKeyboardEvent(event, deps = {}) {
+    const shortcuts = deps.keyboardShortcuts;
+    const isTextEntry = isKeyboardInputEvent(event, shortcuts);
+    if (!isTextEntry) {
+      event.preventDefault();
+    }
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+
+    if (event.type === "keydown" && event.code === "Escape") {
+      deps.closeIssueReportDialog?.();
+    }
+
+    return true;
+  }
+
+  function isKeyboardInputEvent(event, shortcuts) {
+    if (!shortcuts || typeof shortcuts.isKeyboardInputElement !== "function") return false;
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    return path.some((element) => shortcuts.isKeyboardInputElement(element))
+      || shortcuts.isKeyboardInputElement(event.target);
+  }
+
   function commandForEvent(event, shortcuts) {
     if (event.code === "ArrowRight") return "next";
     if (event.code === "ArrowLeft") return "previous";
@@ -79,6 +105,7 @@
 
   window.__afShadowingKeyboardWorkflow = {
     handleKeyboardEvent,
+    handleIssueDialogKeyboardEvent,
     commandForEvent,
   };
 })();

@@ -8,6 +8,7 @@
         toggleContinuousPlayback: deps.toggleContinuousPlayback,
         clearSpanSelectionDraft: deps.clearSpanSelectionDraft,
         closeOpenMenus: deps.closeOpenMenus,
+        closeIssueReportDialog: deps.closeIssueReportDialog,
         toggleShortcutHelp: deps.toggleShortcutHelp,
         nextPhrase: deps.nextPhrase,
         previousPhrase: deps.previousPhrase,
