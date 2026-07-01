@@ -1046,8 +1046,12 @@
   }
 
   function requestPageBridgeTextClick(needles) {
+    const commandId = `af_page_bridge_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     try {
+      document.documentElement.dataset.afShadowingPageBridgeEnabled = "1";
       document.documentElement.dataset.afShadowingPageBridgeCommand = JSON.stringify({
+        id: commandId,
+        source: "audiofilms-content-script",
         type: "click-text",
         needles,
         at: new Date().toISOString(),
@@ -1055,8 +1059,15 @@
       document.documentElement.dataset.afShadowingPageBridgeResult = "";
       document.dispatchEvent(new Event("af-shadowing-page-click"));
       const rawResult = document.documentElement.dataset.afShadowingPageBridgeResult || "";
-      return rawResult ? JSON.parse(rawResult) : null;
+      delete document.documentElement.dataset.afShadowingPageBridgeResult;
+      const result = rawResult ? JSON.parse(rawResult) : null;
+      return result?.id && result.id !== commandId
+        ? { ok: false, error: "Page bridge command id mismatch." }
+        : result;
     } catch (error) {
+      delete document.documentElement.dataset.afShadowingPageBridgeEnabled;
+      delete document.documentElement.dataset.afShadowingPageBridgeCommand;
+      delete document.documentElement.dataset.afShadowingPageBridgeResult;
       return {
         ok: false,
         error: error instanceof Error ? error.message : String(error),

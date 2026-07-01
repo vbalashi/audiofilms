@@ -18,6 +18,47 @@
     };
   }
 
+  function debugState(input = {}) {
+    const phrases = Array.isArray(input.phrases) ? input.phrases : [];
+    return {
+      extensionBuild: input.extensionBuild || null,
+      backendBuild: input.backendBuild || null,
+      backendBuildError: input.backendBuildError || "",
+      boot: input.boot || null,
+      videoId: input.videoId || "",
+      selectedSource: input.selectedSource || null,
+      cueSource: input.cueSource || "",
+      transcriptResult: input.transcriptResult || null,
+      phrases: phrases.length,
+      currentPhrase: input.currentPhrase || describePhraseAtIndex(phrases, input.currentIndex),
+      phraseProgressRestore: input.phraseProgressRestore || null,
+      diagnosticsClearedAt: input.diagnosticsClearedAt || "",
+      error: input.error || "",
+      sources: Array.isArray(input.sources) ? input.sources : [],
+      navigationEvents: tail(input.navigationEvents, 12),
+      lastWordReplay: input.lastWordReplay || null,
+      lastIssueReport: input.lastIssueReport || null,
+      events: tail(input.debugEvents, 8),
+    };
+  }
+
+  function debugPanelState(input = {}) {
+    const inFront = Boolean(input.debugPanelInFront);
+    return {
+      open: Boolean(input.debugVisible),
+      inFront,
+      behind: !inFront,
+      copyText: input.debugCopied ? "Copied" : "Copy",
+      showDebugText: Boolean(input.debugVisible),
+    };
+  }
+
+  function appendCappedEvent(events, event, maxSize) {
+    const next = Array.isArray(events) ? [...events, event] : [event];
+    const size = Number.isInteger(maxSize) && maxSize > 0 ? maxSize : 30;
+    return next.length > size ? next.slice(next.length - size) : next;
+  }
+
   function issueReport(input = {}) {
     const phrases = Array.isArray(input.phrases) ? input.phrases : [];
     return {
@@ -63,6 +104,12 @@
       startSec: roundTime(phrase.startMs / 1000),
       endSec: roundTime(phrase.endMs / 1000),
       text: phrase.text,
+      displayText: phrase.displayText || phrase.text || "",
+      translationText: phrase.translationText || phrase.displayText || phrase.text || "",
+      displayStartChar: finiteInteger(phrase.displayStartChar),
+      displayEndChar: finiteInteger(phrase.displayEndChar),
+      displaySegmentId: phrase.displaySegmentId || "",
+      segmentRole: phrase.segmentRole || "",
     };
   }
 
@@ -78,8 +125,15 @@
     return Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null;
   }
 
+  function finiteInteger(value) {
+    return Number.isFinite(value) ? Math.round(value) : null;
+  }
+
   window.__afShadowingDiagnosticsReport = {
     diagnosticsSnapshot,
+    debugState,
+    debugPanelState,
+    appendCappedEvent,
     issueReport,
     describePhraseAtIndex,
   };

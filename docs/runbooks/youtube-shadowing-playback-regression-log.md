@@ -238,6 +238,11 @@ Automated focused smoke:
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-asr-edge
 ```
 
+If the current Chrome profile does not expose the cached `ASR transcript`
+source for `SJvlUB4F-G0`, the focused smoke reports the fixture as quarantined
+and skips timing assertions. Treat that as "cache fixture unavailable", not as
+proof that ASR replay timing is green.
+
 Manual fallback:
 
 1. Open `https://www.youtube.com/watch?v=SJvlUB4F-G0`.

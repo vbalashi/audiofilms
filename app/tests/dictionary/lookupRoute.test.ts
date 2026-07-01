@@ -106,7 +106,7 @@ describe('/api/dict/lookup', () => {
     });
     expect(payload.cards[0].displayActions).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'learn', label: 'Learn', group: 'progress' }),
+        expect.objectContaining({ id: 'learn', label: 'Start Learning', group: 'progress' }),
         expect.objectContaining({ id: 'known', label: 'Known', group: 'progress' }),
         expect.objectContaining({ id: 'translate', label: 'Translate', group: 'translation' }),
       ]),

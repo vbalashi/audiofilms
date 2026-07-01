@@ -94,6 +94,20 @@
         This token is stored in extension storage and is used only for
         AudioFilms ASR timing jobs.
       </p>
+      <div hidden>
+        <select id="devDictionaryMock">
+          <option value="">Dictionary live</option>
+          <option value="cards">Dictionary cards mock</option>
+          <option value="generated">Dictionary generated mock</option>
+        </select>
+        <select id="devIssueReportMock">
+          <option value="">Issue reports live</option>
+          <option value="success">Issue report success mock</option>
+          <option value="failure">Issue report failure mock</option>
+          <option value="error">Issue report error mock</option>
+        </select>
+        <button id="saveDevMocks" type="button">Save dev mocks</button>
+      </div>
       <p class="status" id="status" role="status"></p>
     </main>
     <script src="options.js"></script>

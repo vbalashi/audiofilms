@@ -53,6 +53,30 @@ This is the source of truth for playback mode, current phrase index, video id, a
 
 This is an isolated MVP experiment. It may duplicate small pieces of subtitle parsing or phrase-building logic while validating feasibility. Shared contracts or modules should only be extracted after the extension behavior proves useful.
 
+The extension boundary is split into explicit runtime surfaces:
+
+- `src/serviceWorker.js` is the trust boundary for extension-owned storage,
+  2000NL Connect tokens, backend fetches, dictionary commands, and dev/smoke
+  mock gates. It validates message sender/type/body before dispatching
+  privileged commands.
+- `src/content.js` is the YouTube entrypoint and should stay a composer rather
+  than owning domain behavior. Facades should receive scoped dependency bundles
+  or ports, not the full manifest-resolved module graph.
+- `src/pageBridge.js` is a narrow main-world bridge for YouTube controls that
+  do not respond from the isolated content-script world. Commands must be
+  one-shot, bounded, and cleared from DOM-visible dataset fields after use.
+- Extension smoke mocks are extension-owned dev configuration
+  (`chrome.storage.local.afShadowingDevMocks`) set through the extension
+  options context. YouTube page `localStorage` must not enable dictionary or
+  issue-report mocks.
+- `manifest.json` is the unpacked-dev manifest and may keep localhost
+  permissions for local smoke testing. Tester/release packaging must go through
+  `scripts/write-release-manifest.mjs`, which strips localhost host permissions
+  and rejects dirty build stamps by default.
+- 2000NL-specific account/session/card semantics stay behind account/backend
+  adapters and service-worker message types. The content boundary should use
+  neutral names such as linked account, account, or platform action.
+
 ### Subtitle Retrieval
 
 - `app/src/app/api/get-subs/route.ts`

@@ -363,7 +363,7 @@ function displayActionsForCapabilities(
       });
     }
     if ((phase === 'not-started' || phase === 'encountered') && actions.has('start-learning')) {
-      displayActions.push(progressAction('learn', 'Learn', 'start-learning'));
+      displayActions.push(progressAction('learn', 'Start Learning', 'start-learning'));
     }
     if ((phase === 'not-started' || phase === 'encountered') && actions.has('mark-known')) {
       displayActions.push(progressAction('known', 'Known', 'mark-known', undefined, true));
@@ -387,7 +387,7 @@ function displayActionsForCapabilities(
 
 function progressAction(
   id: Extract<OverlayDisplayAction['id'], 'learn' | 'known' | 'again' | 'hard' | 'good' | 'easy'>,
-  label: Extract<OverlayDisplayAction['label'], 'Learn' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy'>,
+  label: Extract<OverlayDisplayAction['label'], 'Start Learning' | 'Known' | 'Again' | 'Hard' | 'Good' | 'Easy'>,
   action: 'start-learning' | 'mark-known' | 'review-card',
   result?: 'fail' | 'hard' | 'success' | 'easy',
   turnIdRequired = false,

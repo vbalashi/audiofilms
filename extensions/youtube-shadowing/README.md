@@ -136,6 +136,21 @@ comment, and regenerates `src/buildInfo.js`. Chrome still needs a manual reload
 of the unpacked extension, but after reload the extension details/debug report
 show which build actually ran.
 
+For PR validation, a stamped unpacked-dev build may say `dirty` because the
+stamp is generated before committing the code it validates. Treat that as a
+local validation marker, not a production release claim.
+
+For tester/release packaging, generate a release manifest instead of shipping
+the unpacked-dev manifest directly:
+
+```bash
+node extensions/youtube-shadowing/scripts/write-release-manifest.mjs --out /tmp/audiofilms-release-manifest.json
+```
+
+The release manifest strips `localhost` / `127.0.0.1` host permissions and
+refuses a `dirty` `version_name` unless `--allow-dirty` is passed for local
+inspection only.
+
 1. Open Chrome extensions.
 2. Enable Developer mode.
 3. Choose Load unpacked.
@@ -400,12 +415,14 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - `src/serviceWorker.js`: extension-origin backend fetch bridge for AudioFilms API calls and 2000NL Connect session management.
 - `src/pageBridge.js`: minimal main-world bridge for YouTube UI clicks that do not respond reliably from the isolated content-script world.
 - `src/bootDiagnostics.js`: boot sentinel, page-readable diagnostics, and visible boot failure badge.
+- `src/moduleRegistry.js`: manifest-order module resolver and required namespace validator used by `content.js` during boot.
 - `src/phrases.js`: cue-to-phrase builder used by the content script.
 - `src/captionTracks.js`: YouTube caption track extraction, source labels, source grouping, and source debug formatting.
 - `src/sourceLabels.js`: learner-facing text source labels and timing enrichment labels for the source selector.
 - `src/youtubeAdapter.js`: watch-page URL helpers, player metadata extraction, balanced JSON extraction, and video element lookup.
 - `src/transcriptRetrieval.js`: timedtext, transcript API, transcript panel fallback/state diagnostics, cue parsers, and transcript quality metadata.
-- `src/content.js`: YouTube page integration, retrieval orchestration, playback controls, dictionary panel rendering, and temporary UI state.
+- `src/content.js`: composition entrypoint that resolves extension modules, creates state/controllers, installs listeners, and wires the YouTube page lifecycle.
+- `src/dictionaryMocks.js`: dictionary fixture responses for local smoke and geometry scenarios. It is shipped with the unpacked dev extension so normal Chrome-profile smoke can opt in through extension-owned `chrome.storage.local.afShadowingDevMocks`; the default runtime path stays the service-worker `/api/dict*` command bridge.
 - `src/content.css`: minimal injected global helper styles for the toggle and transcript debug/highlight state.
 - `src/shadow.css`: shadow-loaded panel styles for the AudioFilms learning layer.
 

@@ -120,6 +120,8 @@ export function projectPhraseTranslation(
     sourceLanguageCode: platform.sourceLanguageCode || input.sourceLanguageCode,
     targetLanguageCode: platform.targetLanguageCode,
     translatedText: platform.translatedText,
+    literalTranslatedText: platform.literalTranslatedText,
+    translatorComment: platform.translatorComment,
     translationPolicyVersion: platform.translationPolicyVersion,
     cached: platform.cached,
   };
@@ -177,6 +179,8 @@ export function publicPhraseTranslationFromStored(
     sourceLanguageCode: stored.sourceLanguageCode,
     targetLanguageCode: stored.targetLanguageCode,
     translatedText: stored.translatedText,
+    literalTranslatedText: stored.literalTranslatedText,
+    translatorComment: stored.translatorComment,
     translationPolicyVersion: stored.translationPolicyVersion,
     cached: stored.cached,
     error: stored.error,

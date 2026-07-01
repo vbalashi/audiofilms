@@ -82,7 +82,8 @@ For extension smoke checks:
   `node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry`
   after changes to layout, cards, generated drafts, span selection, popovers, or
   visual layering. It saves local screenshot evidence under
-  `extensions/youtube-shadowing/.smoke-artifacts/`.
+  `app/.extension-smoke-artifacts/`, outside the unpacked extension directory
+  so Chrome does not count generated screenshots in the extension size.
 - Source-aware dictionary actions use a frozen `DictionarySourceBinding`
   captured at word click. Manual smoke should cover backend captions, direct
   timed-text fallback, transcript-panel fallback, source switch after lookup,
@@ -108,7 +109,9 @@ For extension smoke checks:
   `node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-asr-edge`;
   it is intentionally excluded from both default smoke and `--full` because it
   depends on one specific cached ASR transcript shape rather than broad extension
-  readiness.
+  readiness. If the cached `ASR transcript` option is absent, the focused smoke
+  now reports the fixture as quarantined and skips timing assertions rather than
+  accidentally validating YouTube auto-captions.
 
 For local app API checks:
 
@@ -129,14 +132,14 @@ For local app API checks:
 | Dictionary source binding action | `4EE7m94mJpk` with mocked dictionary cards | Focused frontend provenance check: click word, press a progress action, then switch source | `dict-action.sourceContext` references the frozen video, caption artifact, phrase locator, clicked form, and token offsets captured at word click; source switch closes stale dictionary cards | Focused opt-in smoke: `--only-dictionary-source-binding`; not a backend persistence test |
 | Legacy extension NOS fixture | `ZNQWWW-vvfM` | Earlier extension target with manual Dutch and auto/original Dutch tracks | Extension should prefer first non-ASR Dutch track and show source metadata | Extension smoke passing with 139 manual phrase units |
 | Dutch auto-caption-only video | `xymyDvCgWDA` | Ensure auto captions are selected and labeled as degraded only if quality flags say so | Shows auto captions with degraded/rough readiness when appropriate | Extension smoke passing with 26 rough auto-caption phrase units |
-| ASR playback edge-case video | `SJvlUB4F-G0` | Pure ASR source; cached timing job has suspicious leading-word gap, exact zero-gap boundary, and normal post-roll cases | ASR source appears from timing cache; phrase 8 uses `playbackStartSec`; phrase 14 does not clip the final word at an exact boundary; phrase 16 keeps normal post-roll | Focused opt-in smoke: `--only-asr-edge`; see `docs/runbooks/youtube-shadowing-playback-regression-log.md` |
+| ASR playback edge-case video | `SJvlUB4F-G0` | Pure ASR source; cached timing job has suspicious leading-word gap, exact zero-gap boundary, and normal post-roll cases | ASR source appears from timing cache; phrase 8 uses `playbackStartSec`; phrase 14 does not clip the final word at an exact boundary; phrase 16 keeps normal post-roll | Focused opt-in smoke: `--only-asr-edge`; quarantined when the cached `ASR transcript` source is absent; see `docs/runbooks/youtube-shadowing-playback-regression-log.md` |
 | Manual/ASR divergence video | `RJrjzCuCHpo` | YouTube exposes manual Dutch plus auto Dutch; manual has a 22s long cue, ASR has rolling captions/word timing, and backend provider can return the same 138-cue transcript for both | Treat manual as degraded via `long-cues`; do not assume backend `sourceKind=auto` proves that the actual YouTube ASR track was loaded unless provider/origin and cue shape confirm it | Diagnostic case, not in full smoke yet |
 | No captions video | `EColTNIbOko` | Empty-state behavior | Clear no-subtitles error, no fake transcript fallback, compact empty UI without playback controls | API and extension smoke passing |
 | Backend failed degraded state | `4EE7m94mJpk` with unavailable backend URL | Caption tracks exist, YouTube timedtext is empty, and backend provider cannot be reached | Clear provider-failed error, `0 / 0`, hidden playback controls, no stale phrases | Passing in normal Chrome smoke |
 | Failed source switch | `4EE7m94mJpk` manual -> auto with unavailable backend URL | A working source is already loaded, but the newly selected source fails | Keep previous source, count, and phrase visible; record error on failed source option | Passing in normal Chrome smoke |
 | SPA navigation | `4EE7m94mJpk` -> `ZNQWWW-vvfM` -> `4EE7m94mJpk` | YouTube watch-page navigation reset | Video id, tracks, phrases, and selected source reset | Passing in normal Chrome smoke |
 | Logged-out clean Chrome profile | Temporary Chrome for Testing profile | Boot reproducibility without existing profile state | Boot marker and toggle appear after extension load and tab reload | Passing in CDP smoke |
-| Viewport and mocked dictionary UI variants | `4EE7m94mJpk` with mocked dictionary cards | Compact UI responsiveness plus controlled dictionary-card, generated-draft, span-selection, and popover states | No overlap at narrow/wide widths; panels stay in viewport; mocked dictionary card actions/translations render without layout regression | Full smoke and focused `--only-geometry`; local screenshots saved under `.smoke-artifacts/`; not a backend dictionary test |
+| Viewport and mocked dictionary UI variants | `4EE7m94mJpk` with mocked dictionary cards | Compact UI responsiveness plus controlled dictionary-card, generated-draft, span-selection, and popover states | No overlap at narrow/wide widths; panels stay in viewport; mocked dictionary card actions/translations render without layout regression | Full smoke and focused `--only-geometry`; local screenshots saved under `app/.extension-smoke-artifacts/`; not a backend dictionary test |
 
 ## Latest Run
 

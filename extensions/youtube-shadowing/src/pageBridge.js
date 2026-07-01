@@ -1,34 +1,58 @@
 (function audioFilmsPageBridge() {
   const COMMAND_DATASET_KEY = "afShadowingPageBridgeCommand";
   const RESULT_DATASET_KEY = "afShadowingPageBridgeResult";
+  const ENABLED_DATASET_KEY = "afShadowingPageBridgeEnabled";
   const CLICK_EVENT = "af-shadowing-page-click";
 
   document.addEventListener(CLICK_EVENT, () => {
+    if (document.documentElement.dataset[ENABLED_DATASET_KEY] !== "1") {
+      return;
+    }
+
     let command = null;
     try {
       command = JSON.parse(document.documentElement.dataset[COMMAND_DATASET_KEY] || "{}");
     } catch (error) {
       writeResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      clearCommand();
       return;
     }
 
-    if (command.type !== "click-text" || !Array.isArray(command.needles)) {
+    if (!validCommand(command)) {
       writeResult({ ok: false, error: "Unsupported page bridge command." });
+      clearCommand();
       return;
     }
 
     const button = findVisibleButtonByText(command.needles);
     if (!button) {
       writeResult({ ok: false, error: "No matching visible button.", needles: command.needles });
+      clearCommand();
       return;
     }
 
     activateElement(button);
     writeResult({
       ok: true,
+      id: command.id,
       text: visibleText(button).slice(0, 120),
     });
+    clearCommand();
   });
+
+  function validCommand(command) {
+    return command?.source === "audiofilms-content-script" &&
+      typeof command.id === "string" &&
+      /^af_page_bridge_[a-z0-9_-]+$/i.test(command.id) &&
+      command.type === "click-text" &&
+      Array.isArray(command.needles) &&
+      command.needles.length > 0 &&
+      command.needles.length <= 5 &&
+      command.needles.every((needle) => {
+        const text = String(needle || "");
+        return text.length > 0 && text.length <= 80;
+      });
+  }
 
   function findVisibleButtonByText(needles) {
     const normalizedNeedles = needles.map((needle) => String(needle || "").toLowerCase()).filter(Boolean);
@@ -85,5 +109,10 @@
       ...result,
       at: new Date().toISOString(),
     });
+  }
+
+  function clearCommand() {
+    delete document.documentElement.dataset[COMMAND_DATASET_KEY];
+    delete document.documentElement.dataset[ENABLED_DATASET_KEY];
   }
 })();

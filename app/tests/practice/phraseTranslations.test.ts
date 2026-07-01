@@ -61,6 +61,8 @@ describe('phrase translation projection and association cache', () => {
       sourceLanguageCode: 'nl',
       targetLanguageCode: 'en',
       translatedText: 'He walks home.',
+      literalTranslatedText: 'He is walking to house.',
+      translatorComment: 'Context makes this a normal motion phrase.',
       translationPolicyVersion: 'platform-text-translation-v1',
       cached: false,
     });
@@ -72,6 +74,8 @@ describe('phrase translation projection and association cache', () => {
       sourceLanguageCode: 'nl',
       targetLanguageCode: 'en',
       translatedText: 'He walks home.',
+      literalTranslatedText: 'He is walking to house.',
+      translatorComment: 'Context makes this a normal motion phrase.',
     });
   });
 
@@ -89,6 +93,8 @@ describe('phrase translation projection and association cache', () => {
       sourceLanguageCode: 'nl',
       targetLanguageCode: 'en',
       translatedText: 'He walks home.',
+      literalTranslatedText: 'He is walking to house.',
+      translatorComment: 'Context makes this a normal motion phrase.',
       translationPolicyVersion: 'platform-text-translation-v1',
       cached: false,
     });
@@ -106,6 +112,8 @@ describe('phrase translation projection and association cache', () => {
       translationId: 'translation-id',
       sourceTextHash: 'source-hash',
       contextTextHash: sha256('Hij is moe en loopt naar huis.'),
+      literalTranslatedText: 'He is walking to house.',
+      translatorComment: 'Context makes this a normal motion phrase.',
     });
   });
 });
