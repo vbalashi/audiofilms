@@ -148,6 +148,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingRibbonRuntimeContentFacade",
     "__afShadowingInteractionRuntimeContentFacade",
     "__afShadowingRenderSchedulerContentFacade",
+    "__afShadowingContentRuntimeComposer",
     "__afShadowingModuleRegistry",
     "__afShadowingBuildInfo",
   ];
@@ -288,14 +289,18 @@ async function assertRuntimeMessageClientNormalizesRuntimeMessaging() {
 
 function assertContentFacadesReceiveScopedModuleBundles() {
   const source = fs.readFileSync(path.join(extensionRoot, "src/content.js"), "utf8");
+  const contentLineCount = source.split("\n").length;
+  assert.ok(contentLineCount < 100, `content.js entrypoint stays compact (${contentLineCount} lines)`);
+  assert.match(source, /__afShadowingContentRuntimeComposer\.bootAudioFilmsYouTubeShadowing/);
   assert.equal(source.includes("chrome.runtime.sendMessage"), false, "content.js must use the shared runtime message client");
-  assert.match(source, /createRuntimeMessageClient\(\{/);
-  assert.equal(/createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
-  assert.equal(/createPhraseTranslationController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
-  assert.equal(/createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
-  assert.equal(/createRibbonRuntimeController\(\{\s+getState: \(\) => state,\s+modules,/m.test(source), false);
-  assert.match(source, /createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules: \{/m);
-  assert.match(source, /createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules: \{/m);
+  const composerSource = fs.readFileSync(path.join(extensionRoot, "src/contentRuntimeComposer.js"), "utf8");
+  assert.match(composerSource, /createRuntimeMessageClient\(\{/);
+  assert.equal(/createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules,/m.test(composerSource), false);
+  assert.equal(/createPhraseTranslationController\(\{\s+getState: \(\) => state,\s+modules,/m.test(composerSource), false);
+  assert.equal(/createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules,/m.test(composerSource), false);
+  assert.equal(/createRibbonRuntimeController\(\{\s+getState: \(\) => state,\s+modules,/m.test(composerSource), false);
+  assert.match(composerSource, /createDictionaryOperationsController\(\{\s+getState: \(\) => state,\s+modules: \{/m);
+  assert.match(composerSource, /createSurfaceControllers\(\{\s+getState: \(\) => state,\s+modules: \{/m);
 }
 
 function createManifestOrderSandbox() {
