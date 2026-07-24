@@ -14,6 +14,10 @@ state locally.
   `Dictionary Panel Refinement Intent`.
 - Contract source: `docs/exec-plans/active/youtube-extension-backend-ui-contracts.md`.
 - Boundary source: `docs/adr/0002-2000nl-dictionary-platform-boundary.md`.
+- Wave 0 seam, fixture, evidence, and pinning inventory:
+  `docs/intent/audiofilms-dictionary-wave-0-contract-evidence.md`. It preserves
+  the verified slices below and defines the go conditions for the next
+  presentation-only narrow SenseCard slice after shared Track B3.
 - 2000NL visual source: `/Users/khrustal/dev/2000nl/apps/ui/docs/design-guide.md`.
 - MCP 21st.dev scan: useful patterns were compact icon+text buttons, loading
   feedback, and flat-edge controls; avoid pill morphing and circular controls
