@@ -1842,6 +1842,7 @@ const dictionaryAudioWorkflow = loadBrowserModule("src/dictionaryAudioWorkflow.j
 });
 const dictionaryMocks = loadBrowserModule("src/dictionaryMocks.js", "__afShadowingDictionaryMocks");
 const dictionaryPresentation = loadBrowserModule("src/dictionaryPresentation.js", "__afShadowingDictionaryPresentation");
+const senseCardPresentation = loadBrowserModule("src/senseCardPresentation.js", "__afShadowingSenseCardPresentation");
 const dictionaryDom = loadBrowserModule("src/dictionaryDom.js", "__afShadowingDictionaryDom", {
   __afShadowingDictionaryPresentation: dictionaryPresentation,
   document: testDocument,
@@ -4475,6 +4476,22 @@ assert.equal(mockLookupResponse.ok, true);
 assert.equal(mockLookup.cards.length, 3);
 assert.equal(mockLookup.cards[0].displayActions[0].label, "Start Learning");
 assert.equal(mockLookup.cards[0].progress.lastSeenAt, "2026-06-29T12:00:00.000Z");
+const semanticMockResponse = dictionaryMocks.dictionaryMockResponse(
+  "dict-lookup",
+  {
+    clickedForm: "bank",
+    sourceLanguageCode: "nl",
+    translationTargetLanguageCode: "ru",
+  },
+  "sense-card",
+);
+const semanticMockLookup = JSON.parse(semanticMockResponse.text);
+assert.equal(semanticMockLookup.contractVersion, "dict-sense-card-v1");
+assert.equal(semanticMockLookup.cards[0].entry.summaryContentNodeId, "definition:bank:1");
+assert.equal(
+  semanticMockLookup.cards[0].entry.capabilities[0].target.stateRevision,
+  "state:bank:1",
+);
 
 const generatedNoMatchResponse = dictionaryMocks.dictionaryMockResponse(
   "dict-lookup",
@@ -4832,6 +4849,69 @@ await dictionaryActionWorkflow.performDictionaryCardAction(
   },
 );
 assert.equal(startLearningReloaded, true);
+const semanticActionPayload = dictionaryActions.frozenDictionaryActionPayload({
+  selectedWord: {
+    sourceBinding: { videoId: "video-1" },
+  },
+  card: {
+    id: "entry:bank:1",
+    entryId: "entry:bank:1",
+  },
+  actionPayload: {
+    contractVersion: "dict-sense-card-action-v1",
+    actionId: "undo-known",
+    target: {
+      kind: "sense-card",
+      entryId: "entry:bank:1",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:2",
+      activeKnownMarkId: "known:1",
+      knownMarkRevision: "known-revision:1",
+    },
+  },
+  currentVideoId: "video-1",
+  createMutationTurnId: () => "event-semantic-1",
+  isUuid: () => false,
+  buildSourceContext: () => ({ source: { externalId: "video-1" } }),
+});
+assert.equal(semanticActionPayload.ok, true);
+assert.equal(JSON.stringify(semanticActionPayload.value), JSON.stringify({
+  contractVersion: "dict-sense-card-action-v1",
+  actionId: "undo-known",
+  clientEventId: "event-semantic-1",
+  target: {
+    kind: "sense-card",
+    entryId: "entry:bank:1",
+    cardTypeId: "word-to-definition",
+    stateRevision: "state:2",
+    activeKnownMarkId: "known:1",
+    knownMarkRevision: "known-revision:1",
+  },
+  sourceContext: { source: { externalId: "video-1" } },
+}));
+let performedSemanticAction = null;
+assert.equal(
+  dictionaryOverlayWorkflow.performDisplayAction(
+    { id: "entry:bank:1", entryId: "entry:bank:1" },
+    {
+      id: "undo-known",
+      command: {
+        kind: "platform-action-v2",
+        contractVersion: "dict-sense-card-action-v1",
+        actionId: "undo-known",
+        target: semanticActionPayload.value.target,
+      },
+    },
+    {
+      performDictionaryCardAction: (_card, _displayAction, payload) => {
+        performedSemanticAction = payload;
+      },
+    },
+  ),
+  "platform-action-v2",
+);
+assert.equal(performedSemanticAction.actionId, "undo-known");
+assert.deepEqual(performedSemanticAction.target, semanticActionPayload.value.target);
 let failedActionSelectedWord = { word: "bouwen", lookupSeq: 2 };
 const failedActionFeedback = {};
 await dictionaryActionWorkflow.performDictionaryCardAction(
@@ -4882,6 +4962,190 @@ const presentedCard = {
     { kind: "list", label: "2k", value: "nt2-2000" },
   ],
 };
+const semanticSenseCard = {
+  contractVersion: "dict-sense-card-entry-v1",
+  id: "entry:bank:1",
+  entryId: "entry:bank:1",
+  group: {
+    headwordGroupId: "headword:bank",
+    header: {
+      text: "bank",
+      displayPronunciation: "bank",
+      article: "de",
+      partOfSpeech: {
+        termId: "part-of-speech:noun",
+        messageKey: "partOfSpeech.noun",
+        sourceValue: "zn",
+      },
+    },
+    senseCount: 1,
+    indicators: [{ indicatorId: "nt2-2000", value: "2k", messageKey: "indicator.nt2_2000" }],
+  },
+  entry: {
+    kind: "sense-card",
+    entryId: "entry:bank:1",
+    meaningOrdinal: 1,
+    card: {
+      scheduler: { phase: "learning", repeatCount: 3 },
+      knownMark: null,
+      stateRevision: "state:1",
+    },
+    summaryContentNodeId: "definition:1",
+    contentNodes: [
+      {
+        contentNodeId: "definition:1",
+        parentContentNodeId: null,
+        kind: "definition",
+        order: 0,
+        text: "een meubelstuk waarop je kunt zitten",
+        translations: [
+          {
+            translationId: "translation:def:ru",
+            targetLanguageCode: "ru",
+            status: "ready",
+            text: "предмет мебели, на котором можно сидеть",
+          },
+        ],
+      },
+      {
+        contentNodeId: "example:1",
+        parentContentNodeId: null,
+        kind: "example",
+        order: 1,
+        text: "Margriet zat op de bank.",
+        translations: [
+          {
+            translationId: "translation:example:ru",
+            targetLanguageCode: "ru",
+            status: "ready",
+            text: "Маргрит сидела на скамье.",
+          },
+        ],
+      },
+    ],
+    translation: {
+      targetLanguageCode: "ru",
+      status: "ready",
+      text: "скамья",
+    },
+    capabilities: [
+      {
+        actionId: "review-card",
+        elementId: "review:fail",
+        messageKey: "action.review.fail",
+        reviewResult: "fail",
+        target: {
+          kind: "sense-card",
+          entryId: "entry:bank:1",
+          cardTypeId: "word-to-definition",
+          stateRevision: "state:1",
+        },
+      },
+      {
+        actionId: "mark-known",
+        elementId: "known",
+        messageKey: "action.markKnown",
+        target: {
+          kind: "sense-card",
+          entryId: "entry:bank:1",
+          cardTypeId: "word-to-definition",
+          stateRevision: "state:1",
+        },
+      },
+    ],
+  },
+};
+assert.equal(senseCardPresentation.isSenseCard(semanticSenseCard), true);
+assert.equal(
+  senseCardPresentation.interfaceLanguageCode(
+    { interfaceLanguageCode: "ru" },
+    "nl-NL",
+  ),
+  "ru",
+);
+const semanticCardHiddenTranslation = senseCardPresentation.cardViewModel(semanticSenseCard, {
+  interfaceLanguageCode: "nl",
+  translationTargetLanguageCode: "ru",
+  translationVisible: false,
+});
+assert.equal(semanticCardHiddenTranslation.headword, "bank");
+assert.equal(semanticCardHiddenTranslation.partOfSpeechLabel, "zn");
+assert.equal(semanticCardHiddenTranslation.senseCountLabel, "1 betekenis");
+assert.equal(semanticCardHiddenTranslation.headwordTranslation, "");
+assert.equal(semanticCardHiddenTranslation.definition.translation, "");
+assert.equal(semanticCardHiddenTranslation.repeatLabel, "3×");
+assert.equal(semanticCardHiddenTranslation.reviewActions[0].label, "Opnieuw");
+assert.deepEqual(semanticCardHiddenTranslation.reviewActions[0].command.target, {
+  kind: "sense-card",
+  entryId: "entry:bank:1",
+  cardTypeId: "word-to-definition",
+  stateRevision: "state:1",
+});
+const semanticCardVisibleTranslation = senseCardPresentation.cardViewModel(semanticSenseCard, {
+  interfaceLanguageCode: "ru",
+  translationTargetLanguageCode: "ru",
+  translationVisible: true,
+});
+assert.equal(semanticCardVisibleTranslation.headwordTranslation, "скамья");
+assert.equal(
+  semanticCardVisibleTranslation.definition.translation,
+  "предмет мебели, на котором можно сидеть",
+);
+assert.equal(semanticCardVisibleTranslation.examples[0].translation, "Маргрит сидела на скамье.");
+assert.equal(semanticCardVisibleTranslation.labels.examples, "ПРИМЕРЫ");
+const semanticNewCard = JSON.parse(JSON.stringify(semanticSenseCard));
+semanticNewCard.entry.card.scheduler.phase = "encountered";
+semanticNewCard.entry.card.scheduler.repeatCount = 0;
+semanticNewCard.entry.capabilities = [
+  {
+    actionId: "start-learning",
+    elementId: "start-learning",
+    messageKey: "action.startLearning",
+    target: {
+      kind: "sense-card",
+      entryId: "entry:bank:1",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:1",
+    },
+  },
+  semanticSenseCard.entry.capabilities[1],
+];
+const semanticNewView = senseCardPresentation.cardViewModel(semanticNewCard, {
+  interfaceLanguageCode: "ru",
+  translationTargetLanguageCode: "ru",
+  translationVisible: false,
+});
+assert.equal(semanticNewView.startAction.label, "Учить");
+assert.equal(semanticNewView.markKnownAction.label, "Отметить как знакомое");
+const semanticKnownCard = JSON.parse(JSON.stringify(semanticSenseCard));
+semanticKnownCard.entry.card.knownMark = {
+  markId: "known:1",
+  revision: "known-revision:1",
+  markedAt: "2026-07-30T08:00:00.000Z",
+};
+semanticKnownCard.entry.capabilities = [
+  {
+    actionId: "undo-known",
+    elementId: "undo-known",
+    messageKey: "action.undoKnown",
+    target: {
+      kind: "sense-card",
+      entryId: "entry:bank:1",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:2",
+      activeKnownMarkId: "known:1",
+      knownMarkRevision: "known-revision:1",
+    },
+  },
+];
+const semanticKnownView = senseCardPresentation.cardViewModel(semanticKnownCard, {
+  interfaceLanguageCode: "nl",
+  translationTargetLanguageCode: "ru",
+  translationVisible: true,
+});
+assert.equal(semanticKnownView.known, true);
+assert.equal(semanticKnownView.undoKnownAction.label, "Ongedaan maken");
+assert.equal(semanticKnownView.undoKnownAction.command.target.activeKnownMarkId, "known:1");
 assert.equal(
   dictionaryPresentation.overlayChips(presentedCard).map((chip) => `${chip.kind}:${chip.label}`).join("|"),
   "part-of-speech:ww|part-of-speech:idiom|definition-index:#2|dictionary:vandale",

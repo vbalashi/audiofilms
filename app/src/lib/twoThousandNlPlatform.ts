@@ -57,6 +57,46 @@ export async function postTwoThousandNlPlatformJson(
   };
 }
 
+export async function postTwoThousandNlPlatformV2Json(
+  path: 'actions',
+  body: unknown,
+  accessToken: string,
+): Promise<PlatformProxyOutcome> {
+  if (!accessToken) {
+    return {
+      status: 401,
+      body: {
+        error: 'missing_2000nl_user_token',
+        detail: 'A forwarded 2000NL user Bearer token is required for this platform write.',
+      },
+    };
+  }
+
+  const configured = process.env.DICTIONARY_2000NL_V2_API_BASE?.trim();
+  const v1Base = (
+    process.env.DICTIONARY_2000NL_API_BASE?.trim() || DEFAULT_2000NL_API_BASE
+  ).replace(/\/+$/, '');
+  const apiBase = (configured || v1Base.replace(/\/platform\/v1$/, '/platform/v2')).replace(
+    /\/+$/,
+    '',
+  );
+  const response = await fetch(`${apiBase}/${path}`, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${accessToken}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const payload = await response.json().catch(() => null);
+
+  return {
+    status: response.status,
+    body: payload || { error: `2000NL ${path} returned HTTP ${response.status}` },
+  };
+}
+
 export async function getTwoThousandNlPlatformJson(
   path: 'session',
   accessToken: string,

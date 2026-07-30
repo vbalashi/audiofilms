@@ -217,7 +217,8 @@ export type DictionarySessionResponse = {
     email: string | null;
   } | null;
   preferences: {
-    translationTargetLanguageCode: string;
+    translationTargetLanguageCode: string | null;
+    interfaceLanguageCode?: string | null;
     source: string;
     updatedAt: string | null;
   } | null;

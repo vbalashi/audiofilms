@@ -86,11 +86,13 @@
     selectedWord,
     source,
     context = "",
+    preferences = null,
   } = {}) {
     return {
       word: selectedWord?.word || "",
       language: selectedWordSourceLanguage(selectedWord, source),
       context: context || "",
+      translationTargetLanguageCode: preferences?.translationTargetLanguageCode || "",
     };
   }
 

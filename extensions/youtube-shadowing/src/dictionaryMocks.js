@@ -1,6 +1,6 @@
 (function audioFilmsDictionaryMocks(root) {
   function dictionaryMockResponse(operation, body = null, mockMode = "", options = {}) {
-    if (mockMode !== "cards" && mockMode !== "generated") return null;
+    if (!["cards", "generated", "sense-card"].includes(mockMode)) return null;
     if (operation === "dict-lookup") {
       if (mockMode === "generated") {
         return jsonCommandResponse({
@@ -12,6 +12,9 @@
           code: "no_match",
           meta: { provider: "mock", responseVersion: "overlay-v2" },
         }, false, 404);
+      }
+      if (mockMode === "sense-card") {
+        return jsonCommandResponse(mockSenseCardLookup(body));
       }
       return jsonCommandResponse(mockDictionaryLookup(body, options));
     }
@@ -92,6 +95,172 @@
       });
     }
     return null;
+  }
+
+  function mockSenseCardLookup(body = {}) {
+    const clickedForm = body?.clickedForm || "bank";
+    const targetLanguageCode = body?.translationTargetLanguageCode || "ru";
+    const target = {
+      kind: "sense-card",
+      entryId: "entry:bank:1",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:bank:1",
+    };
+    const entry = {
+      kind: "sense-card",
+      entryId: "entry:bank:1",
+      meaningOrdinal: 1,
+      partOfSpeech: {
+        termId: "part-of-speech:noun",
+        messageKey: "partOfSpeech.noun",
+        sourceValue: "zn",
+      },
+      card: {
+        cardTypeId: "word-to-definition",
+        scheduler: {
+          phase: "learning",
+          repeatCount: 3,
+          lastSeenAt: "2026-07-30T08:00:00.000Z",
+        },
+        knownMark: null,
+        stateRevision: "state:bank:1",
+      },
+      contentRevision: "content:bank:1",
+      summaryContentNodeId: "definition:bank:1",
+      contentNodes: [
+        {
+          contentNodeId: "definition:bank:1",
+          parentContentNodeId: null,
+          kind: "definition",
+          order: 0,
+          text: "een meubelstuk waarop je met meer personen kunt zitten",
+          sourceTextFingerprint: "sha256:definition:bank:1",
+          translations: [mockNodeTranslation(
+            "translation:definition:bank:1",
+            targetLanguageCode,
+            "предмет мебели, на котором могут сидеть несколько человек",
+            "sha256:definition:bank:1",
+          )],
+        },
+        {
+          contentNodeId: "example:bank:1",
+          parentContentNodeId: null,
+          kind: "example",
+          order: 1,
+          text: "Margriet en Ellie zaten op de bank televisie te kijken.",
+          sourceTextFingerprint: "sha256:example:bank:1",
+          translations: [mockNodeTranslation(
+            "translation:example:bank:1",
+            targetLanguageCode,
+            "Маргрит и Элли сидели на диване и смотрели телевизор.",
+            "sha256:example:bank:1",
+          )],
+        },
+      ],
+      translation: {
+        translationId: "translation:entry:bank:1",
+        entryId: "entry:bank:1",
+        targetLanguageCode,
+        status: "ready",
+        text: "скамья · диван",
+        sourceContentFingerprint: "sha256:entry:bank:1",
+        translationPolicyVersion: "mock-v1",
+        isFresh: true,
+      },
+      capabilities: [
+        reviewCapability("fail", "review:fail", target),
+        reviewCapability("hard", "review:hard", target),
+        reviewCapability("success", "review:success", target),
+        reviewCapability("easy", "review:easy", target),
+        {
+          actionId: "mark-known",
+          elementId: "mark-known",
+          messageKey: "action.markKnown",
+          target,
+        },
+      ],
+    };
+    const group = {
+      headwordGroupId: "headword:bank",
+      dictionary: {
+        dictionaryId: "vandale",
+        sourceLanguageCode: "nl",
+        displayName: "Van Dale",
+        messageKey: "dictionary.vandale",
+      },
+      header: {
+        text: "bank",
+        displayPronunciation: "bank",
+        article: "de",
+        partOfSpeech: entry.partOfSpeech,
+        audio: {
+          audioId: "audio:bank:nl",
+          actionId: "play-audio",
+          contentLanguageCode: "nl",
+        },
+      },
+      senseCount: 1,
+      entryCount: 1,
+      indicators: [
+        {
+          indicatorId: "nt2-2000",
+          value: "2k",
+          messageKey: "indicator.nt2_2000",
+        },
+      ],
+      entries: [entry],
+    };
+    return {
+      contractVersion: "dict-sense-card-v1",
+      clickedForm,
+      query: clickedForm,
+      request: {
+        contentLanguageCode: body?.sourceLanguageCode || "nl",
+        translationTargetLanguageCode: targetLanguageCode,
+        cardTypeId: "word-to-definition",
+        intent: "external-click",
+      },
+      groups: [group],
+      cards: [
+        {
+          contractVersion: "dict-sense-card-entry-v1",
+          id: entry.entryId,
+          entryId: entry.entryId,
+          group,
+          entry,
+        },
+      ],
+      page: {
+        selectedTierComplete: true,
+        nextGroupCursor: null,
+      },
+      meta: {
+        provider: "mock",
+        responseVersion: "sense-card-v1",
+        tracerEligible: true,
+      },
+    };
+  }
+
+  function mockNodeTranslation(translationId, targetLanguageCode, text, sourceTextFingerprint) {
+    return {
+      translationId,
+      targetLanguageCode,
+      status: "ready",
+      text,
+      sourceTextFingerprint,
+      translationPolicyVersion: "mock-v1",
+    };
+  }
+
+  function reviewCapability(reviewResult, elementId, target) {
+    return {
+      actionId: "review-card",
+      elementId,
+      messageKey: `action.review.${reviewResult}`,
+      target,
+      reviewResult,
+    };
   }
 
   function jsonCommandResponse(body, ok = true, status = 200) {
@@ -403,6 +572,7 @@
     dictionaryMockResponse,
     jsonCommandResponse,
     mockDictionaryLookup,
+    mockSenseCardLookup,
     mockDictionarySearch,
     mockGeneratedDraftCard,
   };

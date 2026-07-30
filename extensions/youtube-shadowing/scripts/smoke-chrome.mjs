@@ -3256,7 +3256,7 @@ function clearDictionaryMockState() {
 }
 
 function setDictionaryMockMode(mode) {
-  setExtensionDevMocks({ dictionary: mode === "cards" || mode === "generated" ? mode : "" });
+  setExtensionDevMocks({ dictionary: ["cards", "sense-card", "generated"].includes(mode) ? mode : "" });
 }
 
 function clearDictionaryMockMode() {
@@ -3613,7 +3613,7 @@ function printFixtureList() {
   console.log("\nFocused opt-in scenarios:");
   console.log(`  - ${ASR_EDGE_FIXTURE.name} (${ASR_EDGE_FIXTURE.videoId}) via --only-asr-edge`);
   console.log(`  - ${DICTIONARY_SOURCE_BINDING_FIXTURE.name} (${DICTIONARY_SOURCE_BINDING_FIXTURE.videoId}) via --only-dictionary-source-binding`);
-  console.log("  - dictionary-ui-focused via --only-dictionary-ui [--dictionary-video=<id>] [--dictionary-word=<word>] [--dictionary-mock=cards|off]");
+  console.log("  - dictionary-ui-focused via --only-dictionary-ui [--dictionary-video=<id>] [--dictionary-word=<word>] [--dictionary-mock=cards|sense-card|off]");
   console.log("  - dictionary-behavior-regression via --only-dictionary-behavior [--dictionary-video=<id>]");
 }
 

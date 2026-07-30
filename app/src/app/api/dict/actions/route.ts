@@ -1,6 +1,7 @@
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import {
   postTwoThousandNlPlatformJson,
+  postTwoThousandNlPlatformV2Json,
   requireBearerToken,
 } from '@/lib/twoThousandNlPlatform';
 
@@ -21,6 +22,9 @@ export async function OPTIONS(request: Request) {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
+  if (body?.contractVersion === 'dict-sense-card-action-v1') {
+    return postSenseCardAction(request, body);
+  }
   const action = typeof body?.action === 'string' ? body.action : '';
   const entryId = typeof body?.entryId === 'string' ? body.entryId : '';
   const clientEventId = normalizedMutationId(body?.clientEventId);
@@ -93,6 +97,61 @@ export async function POST(request: Request) {
   });
 }
 
+async function postSenseCardAction(request: Request, body: Record<string, unknown>) {
+  const actionId = typeof body.actionId === 'string' ? body.actionId : '';
+  const clientEventId = normalizedMutationId(body.clientEventId);
+  const target = normalizedSenseCardTarget(body.target, actionId);
+  const sourceContext = normalizedSourceContext(body.sourceContext);
+  const supported = new Set(['start-learning', 'mark-known', 'undo-known', 'review-card']);
+
+  if (!supported.has(actionId)) {
+    return jsonResponse(request, { error: 'unsupported_action' }, { status: 400 });
+  }
+  if (!clientEventId) {
+    return jsonResponse(request, { error: 'invalid_client_event_id' }, { status: 400 });
+  }
+  if (!target) {
+    return jsonResponse(request, { error: 'invalid_action_target' }, { status: 400 });
+  }
+  if (body.sourceContext !== undefined && !sourceContext) {
+    return jsonResponse(request, { error: 'invalid_source_context' }, { status: 400 });
+  }
+  const reviewResult =
+    typeof body.reviewResult === 'string' &&
+    ['fail', 'hard', 'success', 'easy'].includes(body.reviewResult)
+      ? body.reviewResult
+      : undefined;
+  if (actionId === 'review-card' && !reviewResult) {
+    return jsonResponse(request, { error: 'invalid_review_result' }, { status: 400 });
+  }
+
+  const bearerToken = requireBearerToken(request);
+  if (!bearerToken) {
+    return jsonResponse(
+      request,
+      { error: 'missing_2000nl_user_token' },
+      { status: 401, headers: { 'Cache-Control': 'private, no-store' } },
+    );
+  }
+
+  const platformBody = {
+    actionId,
+    clientEventId,
+    target,
+    ...(reviewResult ? { reviewResult } : {}),
+    ...(sourceContext ? { sourceContext } : {}),
+  };
+  const outcome = await postTwoThousandNlPlatformV2Json(
+    'actions',
+    platformBody,
+    bearerToken,
+  );
+  return jsonResponse(request, outcome.body, {
+    status: outcome.status,
+    headers: { 'Cache-Control': 'private, no-store' },
+  });
+}
+
 function normalizedTurnId(value: unknown) {
   return normalizedMutationId(value);
 }
@@ -107,4 +166,29 @@ function normalizedSourceContext(value: unknown) {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'object' || Array.isArray(value)) return undefined;
   return value as Record<string, unknown>;
+}
+
+function normalizedSenseCardTarget(value: unknown, actionId: string) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const target = value as Record<string, unknown>;
+  if (
+    target.kind !== 'sense-card' ||
+    typeof target.entryId !== 'string' ||
+    !target.entryId ||
+    target.cardTypeId !== CARD_TYPE_ID ||
+    typeof target.stateRevision !== 'string' ||
+    !target.stateRevision
+  ) {
+    return undefined;
+  }
+  if (
+    actionId === 'undo-known' &&
+    (typeof target.activeKnownMarkId !== 'string' ||
+      !target.activeKnownMarkId ||
+      typeof target.knownMarkRevision !== 'string' ||
+      !target.knownMarkRevision)
+  ) {
+    return undefined;
+  }
+  return target;
 }

@@ -98,6 +98,30 @@
   }
 
   function renderOverlayCard(parent, card, cardOptions = {}, options = {}) {
+    if (options.senseCardPresentation?.isSenseCard(card)) {
+      const translationVisible = Boolean(
+        card?.id && options.state.visibleTranslationsByCardId?.[card.id] === true
+      );
+      const preferences = options.state.accountPreferences || {};
+      const view = options.senseCardPresentation.cardViewModel(card, {
+        interfaceLanguageCode: options.senseCardPresentation.interfaceLanguageCode(
+          preferences,
+          options.browserLanguage,
+        ),
+        browserLanguage: options.browserLanguage,
+        translationTargetLanguageCode: preferences.translationTargetLanguageCode || "",
+        translationVisible,
+      });
+      return options.senseCardDom.renderSenseCard(parent, view, {
+        iconSvg: options.iconSvg,
+        onTranslation: () => options.performDisplayAction(card, {
+          id: "translate",
+          label: translationVisible ? view.labels.hideTranslation : view.labels.showTranslation,
+          command: { kind: "card-translation" },
+        }),
+        onAction: (action) => options.performDisplayAction(card, action),
+      });
+    }
     return options.dictionaryOverlayWorkflow.renderOverlayCard(parent, card, {
       state: options.state,
       collapseAction: cardOptions.collapseAction,

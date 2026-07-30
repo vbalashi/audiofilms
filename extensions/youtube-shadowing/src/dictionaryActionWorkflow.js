@@ -5,7 +5,7 @@
     if (!card?.entryId || !options.getSelectedWord?.()) return;
 
     const selectedWord = options.getSelectedWord();
-    const action = actionPayload?.action || "";
+    const action = actionPayload?.action || actionPayload?.actionId || "";
     const payload = options.buildPayload?.(selectedWord, card, actionPayload);
     if (!payload?.ok) {
       options.setSelectedWord?.({

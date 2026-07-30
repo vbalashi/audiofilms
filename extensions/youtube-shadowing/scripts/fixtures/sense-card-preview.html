@@ -1,0 +1,126 @@
+<!doctype html>
+<html class="af-shadowing-workspace" data-af-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AudioFilms narrow SenseCard visual fixture</title>
+    <link rel="stylesheet" href="../../src/shadow.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 28px;
+        color: var(--af-text);
+        background: var(--af-bg);
+        font-family: Roboto, Arial, Helvetica, sans-serif;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: repeat(3, 340px);
+        gap: 28px;
+        align-items: start;
+      }
+
+      .fixture-title {
+        margin: 0 0 8px;
+        color: var(--af-dim);
+        font-family: var(--af-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          grid-template-columns: 340px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h1 class="fixture-title">TRANSLATION OFF · LEARNING</h1>
+        <div id="translation-off"></div>
+      </section>
+      <section>
+        <h1 class="fixture-title">TRANSLATION ON · LEARNING</h1>
+        <div id="translation-on"></div>
+      </section>
+      <section>
+        <h1 class="fixture-title">TRANSLATION ON · KNOWN</h1>
+        <div id="known"></div>
+      </section>
+    </main>
+    <script src="../../src/uiIcons.js"></script>
+    <script src="../../src/dictionaryMocks.js"></script>
+    <script src="../../src/senseCardPresentation.js"></script>
+    <script src="../../src/senseCardDom.js"></script>
+    <script>
+      const response = window.__afShadowingDictionaryMocks.mockSenseCardLookup({
+        clickedForm: "bank",
+        sourceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+      });
+      const card = response.cards[0];
+      const common = {
+        interfaceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+      };
+      for (const [targetId, translationVisible] of [
+        ["translation-off", false],
+        ["translation-on", true],
+      ]) {
+        const view = window.__afShadowingSenseCardPresentation.cardViewModel(card, {
+          ...common,
+          translationVisible,
+        });
+        window.__afShadowingSenseCardDom.renderSenseCard(
+          document.getElementById(targetId),
+          view,
+          {
+            iconSvg: window.__afShadowingUiIcons.iconSvg,
+            onTranslation: () => {},
+            onAction: () => {},
+          },
+        );
+      }
+      const knownCard = structuredClone(card);
+      knownCard.id = "entry:bank:known";
+      knownCard.entryId = "entry:bank:known";
+      knownCard.entry.entryId = "entry:bank:known";
+      knownCard.entry.card.knownMark = {
+        markId: "known:bank:1",
+        revision: "known-revision:1",
+        markedAt: "2026-07-30T08:10:00.000Z",
+      };
+      knownCard.entry.capabilities = [
+        {
+          actionId: "undo-known",
+          elementId: "undo-known",
+          messageKey: "action.undoKnown",
+          target: {
+            kind: "sense-card",
+            entryId: "entry:bank:known",
+            cardTypeId: "word-to-definition",
+            stateRevision: "state:bank:1",
+            activeKnownMarkId: "known:bank:1",
+            knownMarkRevision: "known-revision:1",
+          },
+        },
+      ];
+      const knownView = window.__afShadowingSenseCardPresentation.cardViewModel(knownCard, {
+        ...common,
+        translationVisible: true,
+      });
+      window.__afShadowingSenseCardDom.renderSenseCard(
+        document.getElementById("known"),
+        knownView,
+        {
+          iconSvg: window.__afShadowingUiIcons.iconSvg,
+          onTranslation: () => {},
+          onAction: () => {},
+        },
+      );
+    </script>
+  </body>
+</html>

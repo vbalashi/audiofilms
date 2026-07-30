@@ -73,6 +73,8 @@
       dictionaryAudioWorkflowApi: requiredModule(target, "__afShadowingDictionaryAudioWorkflow"),
       dictionaryMockApi: requiredModule(target, "__afShadowingDictionaryMocks"),
       dictionaryPresentationApi: requiredModule(target, "__afShadowingDictionaryPresentation"),
+      senseCardPresentationApi: requiredModule(target, "__afShadowingSenseCardPresentation"),
+      senseCardDomApi: requiredModule(target, "__afShadowingSenseCardDom"),
       dictionaryDomApi: requiredModule(target, "__afShadowingDictionaryDom"),
       dictionaryOverlayWorkflowApi: requiredModule(target, "__afShadowingDictionaryOverlayWorkflow"),
       dictionaryPanelWorkflowApi: requiredModule(target, "__afShadowingDictionaryPanelWorkflow"),

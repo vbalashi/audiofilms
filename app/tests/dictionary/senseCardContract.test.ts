@@ -1,0 +1,152 @@
+import { describe, expect, it } from 'vitest';
+import {
+  projectSenseCardLookup,
+  type PlatformLookupV2Response,
+} from '../../src/lib/dictionary/senseCardContract';
+
+const response = {
+  contractVersion: 'platform-lookup-v2',
+  query: 'bank',
+  request: {
+    contentLanguageCode: 'nl',
+    translationTargetLanguageCode: 'ru',
+    cardTypeId: 'word-to-definition',
+    intent: 'external-click',
+  },
+  groups: [
+    {
+      headwordGroupId: 'headword:bank',
+      dictionary: {
+        dictionaryId: 'vandale',
+        sourceLanguageCode: 'nl',
+        displayName: 'Van Dale',
+        messageKey: 'dictionary.vandale',
+      },
+      header: {
+        text: 'bank',
+        article: 'de',
+        displayPronunciation: 'bank',
+        partOfSpeech: {
+          termId: 'part-of-speech:noun',
+          messageKey: 'partOfSpeech.noun',
+          sourceValue: 'zn',
+        },
+      },
+      senseCount: 1,
+      entryCount: 1,
+      indicators: [
+        {
+          indicatorId: 'nt2-2000',
+          value: '2k',
+          messageKey: 'indicator.nt2_2000',
+        },
+      ],
+      entries: [
+        {
+          kind: 'sense-card',
+          entryId: 'entry:bank:1',
+          meaningOrdinal: 1,
+          partOfSpeech: {
+            termId: 'part-of-speech:noun',
+            messageKey: 'partOfSpeech.noun',
+            sourceValue: 'zn',
+          },
+          card: {
+            cardTypeId: 'word-to-definition',
+            scheduler: { phase: 'encountered', repeatCount: 3 },
+            knownMark: null,
+            stateRevision: 'state:1',
+          },
+          contentRevision: 'content:1',
+          summaryContentNodeId: 'definition:1',
+          contentNodes: [
+            {
+              contentNodeId: 'definition:1',
+              parentContentNodeId: null,
+              kind: 'definition',
+              order: 0,
+              text: 'een meubelstuk waarop je kunt zitten',
+              sourceTextFingerprint: 'sha256:def',
+              translations: [
+                {
+                  translationId: 'translation:def:ru',
+                  targetLanguageCode: 'ru',
+                  status: 'ready',
+                  text: 'предмет мебели, на котором можно сидеть',
+                  sourceTextFingerprint: 'sha256:def',
+                  translationPolicyVersion: 'v1',
+                },
+              ],
+            },
+          ],
+          translation: {
+            translationId: 'translation:entry:ru',
+            entryId: 'entry:bank:1',
+            targetLanguageCode: 'ru',
+            status: 'ready',
+            text: 'скамья',
+            sourceContentFingerprint: 'sha256:entry',
+            translationPolicyVersion: 'v1',
+            isFresh: true,
+          },
+          capabilities: [
+            {
+              actionId: 'mark-known',
+              elementId: 'known',
+              messageKey: 'action.markKnown',
+              target: {
+                kind: 'sense-card',
+                entryId: 'entry:bank:1',
+                cardTypeId: 'word-to-definition',
+                stateRevision: 'state:1',
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  page: {
+    selectedTierComplete: true,
+    nextGroupCursor: null,
+  },
+} satisfies PlatformLookupV2Response;
+
+describe('AudioFilms semantic SenseCard projection', () => {
+  it('preserves stable semantic IDs, translations, state and exact capability targets', () => {
+    const projected = projectSenseCardLookup(response, 'bank');
+
+    expect(projected.contractVersion).toBe('dict-sense-card-v1');
+    expect(projected.clickedForm).toBe('bank');
+    expect(projected.groups[0].header.partOfSpeech?.messageKey).toBe('partOfSpeech.noun');
+    expect(projected.groups[0].entries[0].contentNodes[0].contentNodeId).toBe('definition:1');
+    expect(projected.groups[0].entries[0].contentNodes[0].translations[0].text).toBe(
+      'предмет мебели, на котором можно сидеть',
+    );
+    expect(projected.groups[0].entries[0].capabilities[0].target).toEqual({
+      kind: 'sense-card',
+      entryId: 'entry:bank:1',
+      cardTypeId: 'word-to-definition',
+      stateRevision: 'state:1',
+    });
+    expect(projected.cards[0]).toMatchObject({
+      contractVersion: 'dict-sense-card-entry-v1',
+      id: 'entry:bank:1',
+      entryId: 'entry:bank:1',
+    });
+  });
+
+  it('does not manufacture a single-sense card when the platform has no groups', () => {
+    const projected = projectSenseCardLookup(
+      {
+        ...response,
+        groups: [],
+      },
+      'missing',
+    );
+
+    expect(projected.groups).toEqual([]);
+    expect(projected.cards).toEqual([]);
+    expect(projected.meta.tracerEligible).toBe(false);
+  });
+});

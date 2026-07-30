@@ -55,6 +55,15 @@
       });
       return "platform-action";
     }
+    if (command?.kind === "platform-action-v2") {
+      options.performDictionaryCardAction?.(card, displayAction, {
+        contractVersion: command.contractVersion,
+        actionId: command.actionId,
+        target: command.target,
+        ...(command.reviewResult ? { reviewResult: command.reviewResult } : {}),
+      });
+      return "platform-action-v2";
+    }
     if (command?.kind === "generated-save-and-start-learning") {
       options.saveGeneratedDictionaryDraft?.(options.getSelectedWord?.(), card);
       return "generated-save-and-start-learning";

@@ -34,6 +34,7 @@
       selectedWord,
       source: options.getSelectedPracticeSource(),
       context: options.phraseTranslations.phraseDisplayText(phrase),
+      preferences: options.getState?.().accountPreferences || null,
     });
     const startedAt = options.nowMs?.() ?? Date.now();
 

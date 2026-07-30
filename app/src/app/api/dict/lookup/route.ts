@@ -4,6 +4,10 @@ import {
   type PlatformLookupResponse,
 } from '@/lib/dictionary/overlayProjection';
 import { createAudioResolveToken } from '@/lib/audio/resolveToken';
+import {
+  isPlatformLookupV2Response,
+  projectSenseCardLookup,
+} from '@/lib/dictionary/senseCardContract';
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import { getBearerToken } from '@/lib/twoThousandNlPlatform';
 
@@ -41,6 +45,10 @@ export async function POST(request: Request) {
   const sourceLanguageCode =
     typeof body?.sourceLanguageCode === 'string' ? body.sourceLanguageCode.trim() : '';
   const contextText = typeof body?.contextText === 'string' ? body.contextText : undefined;
+  const translationTargetLanguageCode =
+    typeof body?.translationTargetLanguageCode === 'string'
+      ? body.translationTargetLanguageCode.trim()
+      : '';
 
   if (!clickedForm) {
     return jsonResponse(request, { error: 'missing_clicked_form' }, { status: 400, headers: timingHeaders(startedAt, null) });
@@ -61,6 +69,17 @@ export async function POST(request: Request) {
       },
       { status: 401, headers: timingHeaders(startedAt, null) },
     );
+  }
+
+  if (senseCardV2Enabled()) {
+    return fetchSenseCardLookup({
+      request,
+      clickedForm,
+      sourceLanguageCode,
+      translationTargetLanguageCode,
+      lookupMode,
+      startedAt,
+    });
   }
 
   const platformAttempt = await fetchPlatformLookup(
@@ -206,6 +225,103 @@ export async function POST(request: Request) {
   );
 }
 
+async function fetchSenseCardLookup({
+  request,
+  clickedForm,
+  sourceLanguageCode,
+  translationTargetLanguageCode,
+  lookupMode,
+  startedAt,
+}: {
+  request: Request;
+  clickedForm: string;
+  sourceLanguageCode: string;
+  translationTargetLanguageCode: string;
+  lookupMode: LookupMode;
+  startedAt: number;
+}) {
+  const platformStartedAt = Date.now();
+  try {
+    const response = await fetch(`${platformV2ApiBase()}/${lookupMode.endpoint}`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        authorization: `Bearer ${lookupMode.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: clickedForm,
+        contentLanguageCode: sourceLanguageCode,
+        translationTargetLanguageCode:
+          lookupMode.includeTranslations && translationTargetLanguageCode
+            ? translationTargetLanguageCode
+            : null,
+        cardTypeId: 'word-to-definition',
+        intent: 'external-click',
+      }),
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : null;
+    const timing = {
+      platformDurationMs: Date.now() - platformStartedAt,
+      platformStatus: response.status,
+      platformServerTiming: response.headers.get('server-timing') || '',
+    };
+
+    if (!response.ok) {
+      return jsonResponse(
+        request,
+        {
+          error: mapPlatformError(response.status),
+          code: mapPlatformError(response.status),
+          detail: payload?.error || payload?.detail || safePlatformErrorDetail(text),
+        },
+        {
+          status: response.status === 429 ? 429 : 502,
+          headers: responseHeaders(lookupMode, timingHeaders(startedAt, lookupMode, timing)),
+        },
+      );
+    }
+    if (!isPlatformLookupV2Response(payload)) {
+      return jsonResponse(
+        request,
+        {
+          error: 'invalid_platform_contract',
+          code: 'platform_unavailable',
+          detail: '2000NL did not return platform-lookup-v2.',
+        },
+        {
+          status: 502,
+          headers: responseHeaders(lookupMode, timingHeaders(startedAt, lookupMode, timing)),
+        },
+      );
+    }
+
+    return jsonResponse(request, projectSenseCardLookup(payload, clickedForm), {
+      status: 200,
+      headers: responseHeaders(lookupMode, timingHeaders(startedAt, lookupMode, timing)),
+    });
+  } catch (error) {
+    return jsonResponse(
+      request,
+      {
+        error: 'platform_unavailable',
+        code: 'platform_unavailable',
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      {
+        status: 502,
+        headers: responseHeaders(
+          lookupMode,
+          timingHeaders(startedAt, lookupMode, {
+            platformDurationMs: Date.now() - platformStartedAt,
+          }),
+        ),
+      },
+    );
+  }
+}
+
 async function fetchPlatformLookup(
   clickedForm: string,
   sourceLanguageCode: string,
@@ -270,6 +386,16 @@ function platformApiBase() {
     /\/+$/,
     '',
   );
+}
+
+function senseCardV2Enabled() {
+  return process.env.DICTIONARY_2000NL_SENSE_CARD_V2 === 'true';
+}
+
+function platformV2ApiBase() {
+  const configured = process.env.DICTIONARY_2000NL_V2_API_BASE?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return platformApiBase().replace(/\/platform\/v1$/, '/platform/v2');
 }
 
 function platformAudioBase() {

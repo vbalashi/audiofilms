@@ -71,6 +71,8 @@
         "src/dictionaryAudioWorkflow.js",
         "src/dictionaryMocks.js",
         "src/dictionaryPresentation.js",
+        "src/senseCardPresentation.js",
+        "src/senseCardDom.js",
         "src/dictionaryDom.js",
         "src/dictionaryOverlayWorkflow.js",
         "src/dictionaryPanelWorkflow.js",
