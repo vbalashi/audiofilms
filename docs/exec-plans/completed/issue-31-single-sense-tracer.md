@@ -1,11 +1,12 @@
 # AudioFilms Extension Single-Sense SenseCard Tracer
 
-Status: active
+Status: integrated
 Issue: `vbalashi/audiofilms#31`
 Branch: `codex/audiofilms-31-single-sense`
 Worktree: `/Users/khrustal/adhoc/audiofilms-issue-31-sensecard-tracer`
 Base: `978e7c97d2ac5502a84b0bc7ef2ce78325d1ed8a`
-Stack dependency: draft PR `vbalashi/audiofilms#28`
+Integrated SHA: `2da36add68ac8248a398cfbb38dd5d89f27341b1`
+Stack dependency: integrated with `vbalashi/audiofilms#28`
 
 ## Goal
 
@@ -133,3 +134,7 @@ Exit: real Chrome behavior passes and `design-qa.md` says `final result: passed`
   `interfaceLanguageCode` independently from the translation target. Until
   2000NL issue #52 exposes that preference in production, the extension uses
   the browser language fallback rather than creating a second local preference.
+- 2026-07-30: rebased onto the reviewed PR #28 fixes, revalidated with 57 app
+  tests, extension unit smoke, lint, production build, and the static visual
+  fixture, then fast-forward integrated at exact SHA
+  `2da36add68ac8248a398cfbb38dd5d89f27341b1`.
