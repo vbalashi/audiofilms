@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AudioFilms narrow SenseCard visual fixture</title>
+    <title>AudioFilms SenseCard visual fixture</title>
     <link rel="stylesheet" href="../../src/shadow.css" />
     <style>
       body {
@@ -15,10 +15,22 @@
       }
 
       main {
-        display: grid;
-        grid-template-columns: repeat(3, 340px);
+        display: flex;
+        flex-wrap: wrap;
         gap: 28px;
         align-items: start;
+      }
+
+      main > section {
+        width: 340px;
+      }
+
+      main > section.is-full {
+        width: 520px;
+      }
+
+      .af-sense-fixture-container {
+        width: 100%;
       }
 
       .fixture-title {
@@ -31,24 +43,30 @@
 
       @media (max-width: 760px) {
         main {
-          grid-template-columns: 340px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        main > section,
+        main > section.is-full {
+          width: min(100%, 520px);
         }
       }
     </style>
   </head>
   <body>
     <main>
-      <section>
-        <h1 class="fixture-title">TRANSLATION OFF · LEARNING</h1>
-        <div id="translation-off"></div>
+      <section class="is-full">
+        <h1 class="fixture-title">MULTI-SENSE · FULL · TRANSLATION ON</h1>
+        <div class="af-sense-fixture-container" id="multi-full"></div>
       </section>
       <section>
-        <h1 class="fixture-title">TRANSLATION ON · LEARNING</h1>
-        <div id="translation-on"></div>
+        <h1 class="fixture-title">MULTI-SENSE · NARROW · TRANSLATION ON</h1>
+        <div class="af-sense-fixture-container" id="multi-narrow"></div>
       </section>
       <section>
-        <h1 class="fixture-title">TRANSLATION ON · KNOWN</h1>
-        <div id="known"></div>
+        <h1 class="fixture-title">SINGLE-SENSE · NARROW · TRANSLATION OFF</h1>
+        <div class="af-sense-fixture-container" id="single-narrow"></div>
       </section>
     </main>
     <script src="../../src/uiIcons.js"></script>
@@ -66,55 +84,43 @@
         interfaceLanguageCode: "nl",
         translationTargetLanguageCode: "ru",
       };
-      for (const [targetId, translationVisible] of [
-        ["translation-off", false],
-        ["translation-on", true],
-      ]) {
-        const view = window.__afShadowingSenseCardPresentation.cardViewModel(card, {
+      for (const targetId of ["multi-full", "multi-narrow"]) {
+        const view = window.__afShadowingSenseCardPresentation.groupViewModel(response.cards, {
           ...common,
-          translationVisible,
+          expandedByEntryId: {
+            "entry:bank:1": true,
+            "entry:bank:2": false,
+          },
+          translationVisibleByEntryId: {
+            "entry:bank:1": true,
+            "entry:bank:2": true,
+          },
         });
-        window.__afShadowingSenseCardDom.renderSenseCard(
+        window.__afShadowingSenseCardDom.renderSenseCardGroup(
           document.getElementById(targetId),
           view,
           {
             iconSvg: window.__afShadowingUiIcons.iconSvg,
             onTranslation: () => {},
+            onToggleExpanded: () => {},
             onAction: () => {},
+            onAudio: () => {},
           },
         );
       }
-      const knownCard = structuredClone(card);
-      knownCard.id = "entry:bank:known";
-      knownCard.entryId = "entry:bank:known";
-      knownCard.entry.entryId = "entry:bank:known";
-      knownCard.entry.card.knownMark = {
-        markId: "known:bank:1",
-        revision: "known-revision:1",
-        markedAt: "2026-07-30T08:10:00.000Z",
-      };
-      knownCard.entry.capabilities = [
-        {
-          actionId: "undo-known",
-          elementId: "undo-known",
-          messageKey: "action.undoKnown",
-          target: {
-            kind: "sense-card",
-            entryId: "entry:bank:known",
-            cardTypeId: "word-to-definition",
-            stateRevision: "state:bank:1",
-            activeKnownMarkId: "known:bank:1",
-            knownMarkRevision: "known-revision:1",
-          },
-        },
-      ];
-      const knownView = window.__afShadowingSenseCardPresentation.cardViewModel(knownCard, {
+      const singleResponse = window.__afShadowingDictionaryMocks.mockSenseCardLookup({
+        clickedForm: "bank",
+        sourceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+        singleSense: true,
+      });
+      const singleView = window.__afShadowingSenseCardPresentation.cardViewModel(singleResponse.cards[0], {
         ...common,
-        translationVisible: true,
+        translationVisible: false,
       });
       window.__afShadowingSenseCardDom.renderSenseCard(
-        document.getElementById("known"),
-        knownView,
+        document.getElementById("single-narrow"),
+        singleView,
         {
           iconSvg: window.__afShadowingUiIcons.iconSvg,
           onTranslation: () => {},

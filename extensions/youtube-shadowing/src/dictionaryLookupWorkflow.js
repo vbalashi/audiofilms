@@ -183,6 +183,39 @@
     return true;
   }
 
+  function toggleSenseCardGroupTranslation(cards, options = {}) {
+    const selectedWord = options.getSelectedWord?.();
+    if (!selectedWord) return false;
+    const eligibleCards = (cards || []).filter(
+      (card) =>
+        card?.id &&
+        options.dictionaryPresentation.cardCanRequestTranslation(card),
+    );
+    if (!eligibleCards.length) return false;
+
+    const visibleTranslationsByCardId = options.getVisibleTranslationsByCardId();
+    const allVisible = eligibleCards.every(
+      (card) => visibleTranslationsByCardId[card.id] === true,
+    );
+    const nextVisible = !allVisible;
+    const next = { ...visibleTranslationsByCardId };
+    for (const card of eligibleCards) next[card.id] = nextVisible;
+    options.setVisibleTranslationsByCardId(next);
+    options.render?.();
+
+    if (nextVisible) {
+      for (const card of eligibleCards) {
+        if (
+          !options.dictionaryPresentation.cardHasLookupTranslations(card) &&
+          !selectedWord.translationsByCardId?.[card.id]
+        ) {
+          options.requestDictionaryCardTranslation?.(card);
+        }
+      }
+    }
+    return true;
+  }
+
   function setCardTranslationPending(cardId, pending, options = {}) {
     if (!cardId) return false;
     const next = { ...options.getTranslationPendingByCardId() };
@@ -246,6 +279,7 @@
     loadDictionarySearchItemCard,
     toggleDictionarySearchItem,
     toggleCardTranslation,
+    toggleSenseCardGroupTranslation,
     setCardTranslationPending,
     requestDictionaryCardTranslation,
   };

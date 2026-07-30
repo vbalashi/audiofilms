@@ -89,8 +89,10 @@
         controller("displayStateController").setVideoPlaybackRate(rate, reason),
       applyThemeAttributes: () => controller("displayStateController").applyThemeAttributes(),
       toggleAllExamples: (event) => controller("displayStateController").toggleAllExamples(event),
-      toggleCardExpanded: (cardId) => controller("displayStateController").toggleCardExpanded(cardId),
-      cardExpanded: (cardId) => controller("displayStateController").cardExpanded(cardId),
+      toggleCardExpanded: (cardId, defaultExpanded = false) =>
+        controller("displayStateController").toggleCardExpanded(cardId, defaultExpanded),
+      cardExpanded: (cardId, defaultExpanded = false) =>
+        controller("displayStateController").cardExpanded(cardId, defaultExpanded),
       closeOpenMenus: () => controller("displayStateController").closeOpenMenus(),
       focusMenuTrigger: (trigger) => controller("displayStateController").focusMenuTrigger(trigger),
       onDocumentPointerDown: (event) => controller("displayStateController").onDocumentPointerDown(event),

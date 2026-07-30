@@ -202,17 +202,13 @@ export function projectSenseCardLookup(
     const senseEntries = group.entries.filter(
       (entry): entry is PlatformSenseCardEntryV2 => entry.kind === 'sense-card',
     );
-    if (group.senseCount !== 1 || senseEntries.length !== 1) return [];
-    const entry = senseEntries[0];
-    return [
-      {
+    return senseEntries.map((entry) => ({
         contractVersion: 'dict-sense-card-entry-v1' as const,
         id: entry.entryId,
         entryId: entry.entryId,
         group,
         entry,
-      },
-    ];
+      }));
   });
   return {
     contractVersion: 'dict-sense-card-v1',

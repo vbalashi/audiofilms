@@ -135,13 +135,24 @@
     });
   }
 
-  function reportCardDictionaryIssue(card, options = {}) {
+  function reportCardDictionaryIssue(card, options = {}, reportAction = null) {
     options.state.cardMenuOpenId = "";
     options.openIssueReportDialog({
-      source: "dictionary-card-menu",
+      source: reportAction ? "sense-card-report" : "dictionary-card-menu",
       category: "dictionary",
       description: options.issueReports.dictionaryCardIssueDescription(card, "dictionary"),
       expectedBehavior: "Definition, context, examples, and idioms should match the intended dictionary sense.",
+      ...(reportAction ? {
+        reportOptions: {
+          extraDiagnostics: {
+            senseCardReport: {
+              entryId: card?.entryId || "",
+              actionId: reportAction.actionId || "",
+              target: reportAction.target || null,
+            },
+          },
+        },
+      } : {}),
     });
   }
 

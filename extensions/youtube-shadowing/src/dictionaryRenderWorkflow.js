@@ -50,6 +50,7 @@
       dictionarySearchDom: options.dictionarySearchDom,
       renderOverlayCard: options.renderOverlayCard,
       renderGeneratedFallback: options.renderGeneratedFallback,
+      renderSenseCardGroup: (parent, cards) => renderSenseCardGroup(parent, cards, options),
       selectLookupWord: options.selectLookupWord,
       toggleDictionarySearchItem: options.toggleDictionarySearchItem,
       loadGroupedDictionarySearch: options.loadGroupedDictionarySearch,
@@ -111,6 +112,8 @@
         browserLanguage: options.browserLanguage,
         translationTargetLanguageCode: preferences.translationTargetLanguageCode || "",
         translationVisible,
+        overlayTranslation: options.state.selectedWord?.translationsByCardId?.[card.id] || null,
+        canRequestTranslation: options.dictionaryPresentation.cardCanRequestTranslation(card),
       });
       return options.senseCardDom.renderSenseCard(parent, view, {
         iconSvg: options.iconSvg,
@@ -120,6 +123,7 @@
           command: { kind: "card-translation" },
         }),
         onAction: (action) => options.performDisplayAction(card, action),
+        onReport: (reportAction) => options.reportCardDictionaryIssue?.(card, reportAction),
       });
     }
     return options.dictionaryOverlayWorkflow.renderOverlayCard(parent, card, {
@@ -135,6 +139,65 @@
       renderCardActionMenu: options.renderCardActionMenu,
       renderOverlaySections: options.renderOverlaySections,
       renderReviewActions: options.renderReviewActions,
+    });
+  }
+
+  function renderSenseCardGroup(parent, cards, options = {}) {
+    const semanticCards = (cards || []).filter(
+      (card) => options.senseCardPresentation?.isSenseCard(card),
+    );
+    if (!semanticCards.length) return null;
+    const preferences = options.state.accountPreferences || {};
+    const expansionOverrides = options.state.exampleExpansionOverrides || {};
+    const expandedByEntryId = Object.fromEntries(
+      semanticCards
+        .filter((card) =>
+          Object.prototype.hasOwnProperty.call(expansionOverrides, card.entryId))
+        .map((card) => [card.entryId, expansionOverrides[card.entryId] === true]),
+    );
+    const translationVisibleByEntryId = Object.fromEntries(
+      semanticCards.map((card) => [
+        card.entryId,
+        options.state.visibleTranslationsByCardId?.[card.entryId] === true,
+      ]),
+    );
+    const overlayTranslationByEntryId = Object.fromEntries(
+      semanticCards.map((card) => [
+        card.entryId,
+        options.state.selectedWord?.translationsByCardId?.[card.id] || null,
+      ]),
+    );
+    const view = options.senseCardPresentation.groupViewModel(semanticCards, {
+      interfaceLanguageCode: options.senseCardPresentation.interfaceLanguageCode(
+        preferences,
+        options.browserLanguage,
+      ),
+      browserLanguage: options.browserLanguage,
+      translationTargetLanguageCode: preferences.translationTargetLanguageCode || "",
+      expandedByEntryId,
+      translationVisibleByEntryId,
+      overlayTranslationByEntryId,
+      canRequestTranslation: true,
+    });
+    const cardsByEntryId = new Map(semanticCards.map((card) => [card.entryId, card]));
+    return options.senseCardDom.renderSenseCardGroup(parent, view, {
+      iconSvg: options.iconSvg,
+      onTranslation: () => options.toggleSenseCardGroupTranslation?.(semanticCards),
+      onToggleExpanded: (entryId) => {
+        const meaning = view.meanings.find((candidate) => candidate.entryId === entryId);
+        options.toggleCardExpanded?.(entryId, meaning?.expanded === true);
+      },
+      onAction: (entryId, action) => {
+        const card = cardsByEntryId.get(entryId);
+        if (card) options.performDisplayAction(card, action);
+      },
+      onReport: (entryId, reportAction) => {
+        const card = cardsByEntryId.get(entryId);
+        if (card) options.reportCardDictionaryIssue?.(card, reportAction);
+      },
+      onAudio: options.playHeadwordAudio
+        ? () => options.playHeadwordAudio(semanticCards[0])
+        : null,
     });
   }
 
@@ -193,6 +256,7 @@
     renderSelectedSpanLookupPrompt,
     renderGeneratedFallback,
     renderOverlayCard,
+    renderSenseCardGroup,
     renderOverlayCardTitle,
     renderOverlaySections,
     renderReviewActions,

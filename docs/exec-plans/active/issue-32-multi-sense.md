@@ -4,7 +4,7 @@ Status: active
 Issue: `vbalashi/audiofilms#32`
 Branch: `codex/audiofilms-32-multi-sense`
 Worktree: `/Users/khrustal/adhoc/audiofilms-issue-32-multisense`
-Base: `2da36add68ac8248a398cfbb38dd5d89f27341b1`
+Base: `4b6e4e2e0ae4760971edbfc565aa54d5455d77e3`
 
 ## Goal
 
@@ -75,3 +75,27 @@ overlay. Legacy cards and generated drafts remain on their current renderers.
 - 2026-07-30: issue claimed in an isolated worktree after #28 and #31 were
   integrated. Claimed resources are the AudioFilms Platform V2 shallow
   projection and approved Pen components `10.16.01`/`10.16.02`.
+- 2026-07-30: projection, presentation, grouped DOM, independent expansion,
+  group translation, and exact entry action seams implemented test-first.
+- 2026-07-30: approved Pen components compared against Full and Narrow static
+  fixtures in normal Chrome. A fixture-only width leak was found visually and
+  corrected before runtime validation.
+- 2026-07-30: focused installed-extension Chrome smoke passed with one semantic
+  group, two stable entry ids, first-expanded/second-collapsed initial state,
+  group translation for both entries, and independent expansion exposing the
+  second entry's own learning actions. The unpacked extension source was
+  restored to `/Users/khrustal/dev/audiofilms/extensions/youtube-shadowing`
+  after the check.
+- 2026-07-30: independent review caught three pre-commit gaps. The single-sense
+  renderer regression was fixed first. Runtime translation overlays are now
+  joined by stable card/entry id, `report-content` opens the existing issue
+  dialog with the exact capability target in diagnostics, and Full/Narrow use
+  their approved responsive tool and review-button layouts.
+- 2026-07-30: post-fix validation passed: extension unit smoke, 14 dictionary
+  test files / 58 tests, ESLint, Next production build, and `git diff --check`.
+  Browser geometry evidence confirms Full at 520 px uses 36 px tools and one
+  review row; Narrow at 340 px uses 28 px tools and two review rows.
+- 2026-07-30: final visual QA caught and closed one footer alignment issue.
+  `Melden` and `Markeer als bekend` now share one quiet footer row in both
+  layouts; `Melden` remains absent from collapsed meanings. Independent final
+  visual QA and Spec re-review both returned PASS with no P0-P2 findings.

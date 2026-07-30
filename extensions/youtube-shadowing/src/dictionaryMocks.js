@@ -178,8 +178,105 @@
           messageKey: "action.markKnown",
           target,
         },
+        {
+          actionId: "report-content",
+          elementId: "report-content:1",
+          messageKey: "action.reportContent",
+          target: {
+            ...target,
+            contentNodeId: "definition:bank:1",
+          },
+        },
       ],
     };
+    const secondTarget = {
+      kind: "sense-card",
+      entryId: "entry:bank:2",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:bank:2",
+    };
+    const secondEntry = {
+      kind: "sense-card",
+      entryId: "entry:bank:2",
+      meaningOrdinal: 2,
+      partOfSpeech: entry.partOfSpeech,
+      card: {
+        cardTypeId: "word-to-definition",
+        scheduler: {
+          phase: "encountered",
+          repeatCount: 0,
+          lastSeenAt: null,
+        },
+        knownMark: null,
+        stateRevision: "state:bank:2",
+      },
+      contentRevision: "content:bank:2",
+      summaryContentNodeId: "definition:bank:2",
+      contentNodes: [
+        {
+          contentNodeId: "definition:bank:2",
+          parentContentNodeId: null,
+          kind: "definition",
+          order: 0,
+          text: "een bedrijf dat geld bewaart, leent en betalingen regelt",
+          sourceTextFingerprint: "sha256:definition:bank:2",
+          translations: [mockNodeTranslation(
+            "translation:definition:bank:2",
+            targetLanguageCode,
+            "организация, которая хранит деньги, выдаёт кредиты и проводит платежи",
+            "sha256:definition:bank:2",
+          )],
+        },
+        {
+          contentNodeId: "example:bank:2",
+          parentContentNodeId: null,
+          kind: "example",
+          order: 1,
+          text: "Bij welke bank hebt u een rekening?",
+          sourceTextFingerprint: "sha256:example:bank:2",
+          translations: [mockNodeTranslation(
+            "translation:example:bank:2",
+            targetLanguageCode,
+            "В каком банке у вас открыт счёт?",
+            "sha256:example:bank:2",
+          )],
+        },
+      ],
+      translation: {
+        translationId: "translation:entry:bank:2",
+        entryId: "entry:bank:2",
+        targetLanguageCode,
+        status: "ready",
+        text: "банк · финансовое учреждение",
+        sourceContentFingerprint: "sha256:entry:bank:2",
+        translationPolicyVersion: "mock-v1",
+        isFresh: true,
+      },
+      capabilities: [
+        {
+          actionId: "start-learning",
+          elementId: "start-learning:2",
+          messageKey: "action.startLearning",
+          target: secondTarget,
+        },
+        {
+          actionId: "mark-known",
+          elementId: "mark-known:2",
+          messageKey: "action.markKnown",
+          target: secondTarget,
+        },
+        {
+          actionId: "report-content",
+          elementId: "report-content:2",
+          messageKey: "action.reportContent",
+          target: {
+            ...secondTarget,
+            contentNodeId: "definition:bank:2",
+          },
+        },
+      ],
+    };
+    const entries = body?.singleSense === true ? [entry] : [entry, secondEntry];
     const group = {
       headwordGroupId: "headword:bank",
       dictionary: {
@@ -199,8 +296,8 @@
           contentLanguageCode: "nl",
         },
       },
-      senseCount: 1,
-      entryCount: 1,
+      senseCount: entries.length,
+      entryCount: entries.length,
       indicators: [
         {
           indicatorId: "nt2-2000",
@@ -208,7 +305,7 @@
           messageKey: "indicator.nt2_2000",
         },
       ],
-      entries: [entry],
+      entries,
     };
     return {
       contractVersion: "dict-sense-card-v1",
@@ -221,15 +318,13 @@
         intent: "external-click",
       },
       groups: [group],
-      cards: [
-        {
+      cards: entries.map((senseEntry) => ({
           contractVersion: "dict-sense-card-entry-v1",
-          id: entry.entryId,
-          entryId: entry.entryId,
+          id: senseEntry.entryId,
+          entryId: senseEntry.entryId,
           group,
-          entry,
-        },
-      ],
+          entry: senseEntry,
+        })),
       page: {
         selectedTierComplete: true,
         nextGroupCursor: null,
