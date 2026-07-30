@@ -2,12 +2,9 @@
   function createSupportControllers(deps = {}) {
     const commandClient = deps.extensionCommandClient.createExtensionCommandClient({
       chrome: deps.chrome,
-      fetch: deps.fetch,
       document: deps.document,
       dictionaryCommands: deps.dictionaryCommands,
       backendCommands: deps.backendCommands,
-      dictionaryEndpoint: deps.dictionaryEndpoint,
-      apiBase: deps.apiBaseForBackendCommands,
     });
 
     const accountSessionWorkflow = deps.accountSessionWorkflow.createAccountSessionWorkflow({

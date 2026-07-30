@@ -43,34 +43,15 @@
 
   function createExtensionCommandClient({
     chrome,
-    fetch,
     document,
     dictionaryCommands,
     backendCommands,
-    dictionaryEndpoint,
-    apiBase,
     now = () => new Date().toISOString(),
   } = {}) {
     const runtimeMessageClient = createRuntimeMessageClient({ chrome });
     const { sendRuntimeMessage } = runtimeMessageClient;
 
     function requestDictionaryCommand(operation, body = null) {
-      if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-        const endpoint = dictionaryEndpoint();
-        if (!endpoint) {
-          return Promise.resolve(dictionaryCommands.disabledDictionaryResponse());
-        }
-        const url = dictionaryCommands.dictionaryCommandUrl(endpoint, operation);
-        if (!url) {
-          return Promise.resolve(dictionaryCommands.disabledDictionaryResponse());
-        }
-        return fetch(url.toString(), dictionaryCommands.dictionaryRequestInit(operation, body)).then(async (response) => ({
-          ok: response.ok,
-          status: response.status,
-          text: await response.text(),
-        }));
-      }
-
       return sendRuntimeMessage({
         type: "af-dictionary-command",
         operation,
@@ -132,24 +113,11 @@
     }
 
     function requestBackendCommand(operation, body = {}) {
-      if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-        return requestBackendCommandDirect(operation, body);
-      }
       return sendRuntimeMessage({
         type: "af-backend-command",
         operation,
         body,
       });
-    }
-
-    function requestBackendCommandDirect(operation, body = {}) {
-      const request = backendCommands.backendCommandRequest(apiBase(), operation, body);
-      if (request.response) return Promise.resolve(request.response);
-      return fetch(request.url.toString(), request.fetchOptions).then(async (response) => ({
-        ok: response.ok,
-        status: response.status,
-        text: await response.text(),
-      }));
     }
 
     return {
@@ -161,7 +129,6 @@
       getBackendJson,
       backendJson,
       requestBackendCommand,
-      requestBackendCommandDirect,
     };
   }
 

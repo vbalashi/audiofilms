@@ -6523,34 +6523,29 @@ assert.equal(
   "http://localhost:3000/api/dict",
 );
 const commandClientDocument = { documentElement: { dataset: {} } };
-const commandClientFetches = [];
-const commandClient = extensionCommandClient.createExtensionCommandClient({
+const unavailableRuntimeCommandClient = extensionCommandClient.createExtensionCommandClient({
   chrome: undefined,
-  fetch: async (url, init) => {
-    commandClientFetches.push({ url, init });
-    if (String(url).includes("/dict/session")) {
-      return { ok: true, status: 200, text: async () => JSON.stringify({ authenticated: true }) };
-    }
-    if (String(url).includes("/dict/lookup")) {
-      return { ok: true, status: 200, text: async () => JSON.stringify({ cards: [{ id: "card-1" }] }) };
-    }
-    return { ok: true, status: 201, text: async () => JSON.stringify({ id: "backend-1" }) };
-  },
   document: commandClientDocument,
   dictionaryCommands,
   backendCommands,
-  dictionaryEndpoint: () => "https://audiofilms-api.dilum.io/api/dict",
-  apiBase: () => "https://audiofilms-api.dilum.io",
   now: () => "2026-06-30T10:00:00.000Z",
 });
-const commandClientLookup = await commandClient.postDictionaryCommand("dict-lookup", { clickedForm: "oog" });
-assert.equal(commandClientLookup.cards[0].id, "card-1");
-assert.equal(commandClientFetches[0].init.method, "POST");
+await assert.rejects(
+  () => unavailableRuntimeCommandClient.postDictionaryCommand("dict-lookup", { clickedForm: "oog" }),
+  /Chrome runtime messaging is unavailable/,
+);
+await assert.rejects(
+  () => unavailableRuntimeCommandClient.fetchDictionarySession(),
+  /Chrome runtime messaging is unavailable/,
+);
+await assert.rejects(
+  () => unavailableRuntimeCommandClient.postBackendJson(
+    "practice-timing-create",
+    { payload: { videoId: "video-1" } },
+  ),
+  /Chrome runtime messaging is unavailable/,
+);
 assert.equal(commandClientDocument.documentElement.dataset.afShadowingDictionaryMockCommands, undefined);
-const commandClientSession = await commandClient.fetchDictionarySession();
-assert.equal(commandClientSession.authenticated, true);
-const commandClientBackend = await commandClient.postBackendJson("practice-timing-create", { payload: { videoId: "video-1" } });
-assert.equal(commandClientBackend.id, "backend-1");
 const runtimeMessages = [];
 const runtimeCommandClient = extensionCommandClient.createExtensionCommandClient({
   chrome: {
