@@ -4802,6 +4802,36 @@ assert.equal(actionWorkflowFeedback["card-1"].status, "saved");
 assert.equal(actionWorkflowFeedback["card-1"].message, "Marked known");
 assert.equal(actionWorkflowReloaded, true);
 assert.equal(actionWorkflowRenderCount, 2);
+let startLearningSelectedWord = {
+  word: "bouwen",
+  lookupSeq: 2,
+  sourceBinding: { videoId: "video-1" },
+};
+let startLearningReloaded = false;
+await dictionaryActionWorkflow.performDictionaryCardAction(
+  { id: "card-learn", entryId: "entry-learn" },
+  { id: "learn", label: "Learn" },
+  { action: "start-learning" },
+  {
+    getSelectedWord: () => startLearningSelectedWord,
+    setSelectedWord: (selectedWord) => {
+      startLearningSelectedWord = selectedWord;
+    },
+    setCardFeedback: () => {},
+    buildPayload: () => ({
+      ok: true,
+      value: { action: "start-learning", entryId: "entry-learn" },
+    }),
+    postDictionaryCommand: async () => ({ ok: true }),
+    isCurrentLookup: (selectedWord) =>
+      selectedWord.lookupSeq === startLearningSelectedWord.lookupSeq,
+    reloadLookup: async () => {
+      startLearningReloaded = true;
+    },
+    render: () => {},
+  },
+);
+assert.equal(startLearningReloaded, true);
 let failedActionSelectedWord = { word: "bouwen", lookupSeq: 2 };
 const failedActionFeedback = {};
 await dictionaryActionWorkflow.performDictionaryCardAction(

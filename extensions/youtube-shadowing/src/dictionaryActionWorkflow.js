@@ -35,9 +35,7 @@
         cardActionError: "",
       });
       options.render?.();
-      if (action !== "start-learning") {
-        await options.reloadLookup?.(options.getSelectedWord());
-      }
+      await options.reloadLookup?.(options.getSelectedWord());
     } catch (error) {
       if (!options.isCurrentLookup?.(selectedWord)) return;
       const failedFeedback = dictionaryActionApi.errorFeedback(card, displayAction, action, error);
