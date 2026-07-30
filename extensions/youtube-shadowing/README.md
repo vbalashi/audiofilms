@@ -260,6 +260,26 @@ The smoke check expects:
   test target. The default smoke follows the extension's configured API path,
   which is remote for the tester build.
 
+## Semantic SenseCard Tracer
+
+The additive narrow single-sense tracer is selected by the AudioFilms backend
+flag `DICTIONARY_2000NL_SENSE_CARD_V2=true`. It consumes the shared Platform V2
+semantic DTO and keeps the legacy card renderer when the flag is off.
+
+For extension-owned local UI smoke, choose `Semantic SenseCard mock` on the
+extension options page, or run:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs \
+  --only-dictionary-ui --dictionary-mock=sense-card --reload-extension
+```
+
+Pure contract/presentation coverage is part of
+`node extensions/youtube-shadowing/scripts/unit-smoke.mjs`. The matching static
+visual fixture is `scripts/fixtures/sense-card-preview.html`; it covers
+translation off/on, learning/review actions, known, and undo at the approved
+340px narrow density.
+
 ## Local ASR Dogfood
 
 For local ASR testing in the extension, use the YouTube watch page rather than
@@ -411,7 +431,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 ## Files
 
 - `manifest.json`: Chrome extension manifest.
-- `scripts/smoke-chrome.mjs`: local Chrome multi-video smoke checker for manual, auto-only, no-captions, recovery, SPA, backend-off, backend-failed, failed source-switch, multilingual source-switch, and viewport geometry cases.
+- `scripts/smoke-chrome.mjs`: local Chrome multi-video smoke checker for manual, auto-only, no-captions, recovery, SPA, backend-off, backend-failed, failed source-switch, multilingual source-switch, viewport geometry, and the semantic SenseCard mock.
 - `src/serviceWorker.js`: extension-origin backend fetch bridge for AudioFilms API calls and 2000NL Connect session management.
 - `src/pageBridge.js`: minimal main-world bridge for YouTube UI clicks that do not respond reliably from the isolated content-script world.
 - `src/bootDiagnostics.js`: boot sentinel, page-readable diagnostics, and visible boot failure badge.
@@ -423,6 +443,8 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - `src/transcriptRetrieval.js`: timedtext, transcript API, transcript panel fallback/state diagnostics, cue parsers, and transcript quality metadata.
 - `src/content.js`: composition entrypoint that resolves extension modules, creates state/controllers, installs listeners, and wires the YouTube page lifecycle.
 - `src/dictionaryMocks.js`: dictionary fixture responses for local smoke and geometry scenarios. It is shipped with the unpacked dev extension so normal Chrome-profile smoke can opt in through extension-owned `chrome.storage.local.afShadowingDevMocks`; the default runtime path stays the service-worker `/api/dict*` command bridge.
+- `src/senseCardPresentation.js` and `src/senseCardDom.js`: pure semantic
+  presentation and narrow DOM rendering for `dict-sense-card-entry-v1`.
 - `src/content.css`: minimal injected global helper styles for the toggle and transcript debug/highlight state.
 - `src/shadow.css`: shadow-loaded panel styles for the AudioFilms learning layer.
 

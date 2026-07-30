@@ -27,6 +27,23 @@ export async function postTwoThousandNlPlatformJson(
   body: unknown,
   accessToken: string,
 ): Promise<PlatformProxyOutcome> {
+  return postPlatformJson(platformV1ApiBase(), path, body, accessToken);
+}
+
+export async function postTwoThousandNlPlatformV2Json(
+  path: 'actions',
+  body: unknown,
+  accessToken: string,
+): Promise<PlatformProxyOutcome> {
+  return postPlatformJson(twoThousandNlPlatformV2ApiBase(), path, body, accessToken);
+}
+
+async function postPlatformJson(
+  apiBase: string,
+  path: string,
+  body: unknown,
+  accessToken: string,
+): Promise<PlatformProxyOutcome> {
   if (!accessToken) {
     return {
       status: 401,
@@ -37,9 +54,6 @@ export async function postTwoThousandNlPlatformJson(
     };
   }
 
-  const apiBase = (
-    process.env.DICTIONARY_2000NL_API_BASE?.trim() || DEFAULT_2000NL_API_BASE
-  ).replace(/\/+$/, '');
   const response = await fetch(`${apiBase}/${path}`, {
     method: 'POST',
     headers: {
@@ -57,44 +71,18 @@ export async function postTwoThousandNlPlatformJson(
   };
 }
 
-export async function postTwoThousandNlPlatformV2Json(
-  path: 'actions',
-  body: unknown,
-  accessToken: string,
-): Promise<PlatformProxyOutcome> {
-  if (!accessToken) {
-    return {
-      status: 401,
-      body: {
-        error: 'missing_2000nl_user_token',
-        detail: 'A forwarded 2000NL user Bearer token is required for this platform write.',
-      },
-    };
-  }
-
-  const configured = process.env.DICTIONARY_2000NL_V2_API_BASE?.trim();
-  const v1Base = (
+function platformV1ApiBase() {
+  return (
     process.env.DICTIONARY_2000NL_API_BASE?.trim() || DEFAULT_2000NL_API_BASE
   ).replace(/\/+$/, '');
-  const apiBase = (configured || v1Base.replace(/\/platform\/v1$/, '/platform/v2')).replace(
+}
+
+export function twoThousandNlPlatformV2ApiBase() {
+  const configured = process.env.DICTIONARY_2000NL_V2_API_BASE?.trim();
+  return (configured || platformV1ApiBase().replace(/\/platform\/v1$/, '/platform/v2')).replace(
     /\/+$/,
     '',
   );
-  const response = await fetch(`${apiBase}/${path}`, {
-    method: 'POST',
-    headers: {
-      accept: 'application/json',
-      authorization: `Bearer ${accessToken}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json().catch(() => null);
-
-  return {
-    status: response.status,
-    body: payload || { error: `2000NL ${path} returned HTTP ${response.status}` },
-  };
 }
 
 export async function getTwoThousandNlPlatformJson(
@@ -111,9 +99,7 @@ export async function getTwoThousandNlPlatformJson(
     };
   }
 
-  const apiBase = (
-    process.env.DICTIONARY_2000NL_API_BASE?.trim() || DEFAULT_2000NL_API_BASE
-  ).replace(/\/+$/, '');
+  const apiBase = platformV1ApiBase();
   const response = await fetch(`${apiBase}/${path}`, {
     method: 'GET',
     headers: {

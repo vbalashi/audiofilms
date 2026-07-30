@@ -111,8 +111,8 @@
       entryId: "entry:bank:1",
       meaningOrdinal: 1,
       partOfSpeech: {
-        termId: "part-of-speech:noun",
-        messageKey: "partOfSpeech.noun",
+        termId: "part-of-speech.zn",
+        messageKey: "partOfSpeech.zn",
         sourceValue: "zn",
       },
       card: {

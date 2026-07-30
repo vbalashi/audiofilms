@@ -686,12 +686,13 @@ the translated text element.
 Do not render the word `Progress` above action buttons. The buttons themselves
 are the progress controls.
 
-New cards should show the backend-provided/current contract labels `Learn` and
-`Known`. Learning/review cards should show the backend-provided/current contract
-labels `Again`, `Hard`, `Good`, `Easy`. Do not localize these labels in the
-YouTube overlay in this slice. The UI may support interface-language-dependent
-labels later, but submitted platform action and result ids must remain the 2000NL
-contract values.
+V1 overlay cards show the backend-provided/current contract labels `Learn`,
+`Known`, `Again`, `Hard`, `Good`, and `Easy`. The approved semantic SenseCard
+slice supersedes the earlier English-only restriction: its extension-owned
+message catalog localizes those labels from `interfaceLanguageCode` (with a
+browser-language fallback until 2000NL #52 is available). Submitted platform
+action and result IDs remain the 2000NL contract values and must never be
+translated.
 
 Every action click must visibly register:
 

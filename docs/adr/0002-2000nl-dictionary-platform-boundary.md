@@ -6,6 +6,14 @@ AudioFilms will treat 2000NL as the dictionary, progress, action, and translatio
 
 The YouTube overlay still has its own presentation needs. AudioFilms backend owns the shallow overlay projection from 2000NL lookup results into display-oriented dictionary meaning cards. The extension should render that backend-provided shape and should not parse 2000NL `entry.raw` directly.
 
+The additive Platform V2 SenseCard path is a deliberate refinement of this
+boundary. AudioFilms may pass through the approved shared semantic DTO after
+validating its contract version and wrapping eligible entries as
+`dict-sense-card-entry-v1`. This is not permission to expose `entry.raw` or
+vendor-specific source structures. The extension renders stable semantic IDs,
+content nodes, message keys, and exact capability targets; it does not derive
+identity or actions from display labels or array positions.
+
 The first overlay card model follows these rules:
 
 - one AudioFilms overlay card maps to one top-level 2000NL `lookup.items[]` result;

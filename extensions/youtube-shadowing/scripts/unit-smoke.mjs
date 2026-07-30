@@ -4973,8 +4973,8 @@ const semanticSenseCard = {
       displayPronunciation: "bank",
       article: "de",
       partOfSpeech: {
-        termId: "part-of-speech:noun",
-        messageKey: "partOfSpeech.noun",
+        termId: "part-of-speech.zn",
+        messageKey: "partOfSpeech.zn",
         sourceValue: "zn",
       },
     },
@@ -5093,6 +5093,13 @@ assert.equal(
 );
 assert.equal(semanticCardVisibleTranslation.examples[0].translation, "Маргрит сидела на скамье.");
 assert.equal(semanticCardVisibleTranslation.labels.examples, "ПРИМЕРЫ");
+assert.equal(semanticCardVisibleTranslation.partOfSpeechLabel, "сущ.");
+const semanticCardEnglish = senseCardPresentation.cardViewModel(semanticSenseCard, {
+  interfaceLanguageCode: "en",
+  translationTargetLanguageCode: "ru",
+  translationVisible: false,
+});
+assert.equal(semanticCardEnglish.partOfSpeechLabel, "n");
 const semanticNewCard = JSON.parse(JSON.stringify(semanticSenseCard));
 semanticNewCard.entry.card.scheduler.phase = "encountered";
 semanticNewCard.entry.card.scheduler.repeatCount = 0;

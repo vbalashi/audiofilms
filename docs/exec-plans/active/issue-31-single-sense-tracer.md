@@ -126,7 +126,7 @@ Exit: real Chrome behavior passes and `design-qa.md` says `final result: passed`
   forwarding, narrow extension renderer, EN/NL/RU locale catalog, and the
   approved translation/learning/known/undo states implemented behind the
   additive lookup flag.
-- 2026-07-30: real-Chrome fixture comparison converged after four visual
+- 2026-07-30: real-Chrome fixture comparison converged after three recorded visual
   iterations. Independent visual QA reported no P0/P1/P2 findings; evidence is
   recorded in `design-qa.md`.
 - 2026-07-30: the AudioFilms session bridge now preserves an optional

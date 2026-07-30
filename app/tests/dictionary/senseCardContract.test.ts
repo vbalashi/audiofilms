@@ -27,8 +27,8 @@ const response = {
         article: 'de',
         displayPronunciation: 'bank',
         partOfSpeech: {
-          termId: 'part-of-speech:noun',
-          messageKey: 'partOfSpeech.noun',
+          termId: 'part-of-speech.zn',
+          messageKey: 'partOfSpeech.zn',
           sourceValue: 'zn',
         },
       },
@@ -47,8 +47,8 @@ const response = {
           entryId: 'entry:bank:1',
           meaningOrdinal: 1,
           partOfSpeech: {
-            termId: 'part-of-speech:noun',
-            messageKey: 'partOfSpeech.noun',
+            termId: 'part-of-speech.zn',
+            messageKey: 'partOfSpeech.zn',
             sourceValue: 'zn',
           },
           card: {
@@ -118,7 +118,7 @@ describe('AudioFilms semantic SenseCard projection', () => {
 
     expect(projected.contractVersion).toBe('dict-sense-card-v1');
     expect(projected.clickedForm).toBe('bank');
-    expect(projected.groups[0].header.partOfSpeech?.messageKey).toBe('partOfSpeech.noun');
+    expect(projected.groups[0].header.partOfSpeech?.messageKey).toBe('partOfSpeech.zn');
     expect(projected.groups[0].entries[0].contentNodes[0].contentNodeId).toBe('definition:1');
     expect(projected.groups[0].entries[0].contentNodes[0].translations[0].text).toBe(
       'предмет мебели, на котором можно сидеть',

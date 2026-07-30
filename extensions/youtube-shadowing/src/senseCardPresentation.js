@@ -1,10 +1,18 @@
 (function audioFilmsSenseCardPresentation() {
   const MESSAGES = {
     en: {
-      "partOfSpeech.noun": "noun",
-      "partOfSpeech.verb": "verb",
-      "partOfSpeech.adjective": "adjective",
-      "partOfSpeech.adverb": "adverb",
+      "partOfSpeech.afk": "abbreviation",
+      "partOfSpeech.bn": "adjective",
+      "partOfSpeech.bw": "adverb",
+      "partOfSpeech.lidw": "article",
+      "partOfSpeech.tsw": "interjection",
+      "partOfSpeech.tw": "numeral",
+      "partOfSpeech.vnw": "pronoun",
+      "partOfSpeech.vv": "prefix",
+      "partOfSpeech.vw": "conjunction",
+      "partOfSpeech.vz": "preposition",
+      "partOfSpeech.ww": "verb",
+      "partOfSpeech.zn": "noun",
       meaning: "MEANING",
       meanings: "MEANINGS",
       oneMeaning: "1 meaning",
@@ -25,10 +33,18 @@
       report: "Report",
     },
     nl: {
-      "partOfSpeech.noun": "zelfstandig naamwoord",
-      "partOfSpeech.verb": "werkwoord",
-      "partOfSpeech.adjective": "bijvoeglijk naamwoord",
-      "partOfSpeech.adverb": "bijwoord",
+      "partOfSpeech.afk": "afkorting",
+      "partOfSpeech.bn": "bijvoeglijk naamwoord",
+      "partOfSpeech.bw": "bijwoord",
+      "partOfSpeech.lidw": "lidwoord",
+      "partOfSpeech.tsw": "tussenwerpsel",
+      "partOfSpeech.tw": "telwoord",
+      "partOfSpeech.vnw": "voornaamwoord",
+      "partOfSpeech.vv": "voorvoegsel",
+      "partOfSpeech.vw": "voegwoord",
+      "partOfSpeech.vz": "voorzetsel",
+      "partOfSpeech.ww": "werkwoord",
+      "partOfSpeech.zn": "zelfstandig naamwoord",
       meaning: "BETEKENIS",
       meanings: "BETEKENISSEN",
       oneMeaning: "1 betekenis",
@@ -49,10 +65,18 @@
       report: "Melden",
     },
     ru: {
-      "partOfSpeech.noun": "существительное",
-      "partOfSpeech.verb": "глагол",
-      "partOfSpeech.adjective": "прилагательное",
-      "partOfSpeech.adverb": "наречие",
+      "partOfSpeech.afk": "аббревиатура",
+      "partOfSpeech.bn": "прилагательное",
+      "partOfSpeech.bw": "наречие",
+      "partOfSpeech.lidw": "артикль",
+      "partOfSpeech.tsw": "междометие",
+      "partOfSpeech.tw": "числительное",
+      "partOfSpeech.vnw": "местоимение",
+      "partOfSpeech.vv": "приставка",
+      "partOfSpeech.vw": "союз",
+      "partOfSpeech.vz": "предлог",
+      "partOfSpeech.ww": "глагол",
+      "partOfSpeech.zn": "существительное",
       meaning: "ЗНАЧЕНИЕ",
       meanings: "ЗНАЧЕНИЯ",
       oneMeaning: "1 значение",
@@ -75,6 +99,20 @@
   };
 
   const REVIEW_ORDER = ["fail", "hard", "success", "easy"];
+  const PART_OF_SPEECH_SHORT_LABELS = {
+    "partOfSpeech.afk": { en: "abbr.", nl: "afk.", ru: "аббр." },
+    "partOfSpeech.bn": { en: "adj", nl: "bn", ru: "прил." },
+    "partOfSpeech.bw": { en: "adv", nl: "bw", ru: "нар." },
+    "partOfSpeech.lidw": { en: "art", nl: "lidw", ru: "арт." },
+    "partOfSpeech.tsw": { en: "int", nl: "tsw", ru: "межд." },
+    "partOfSpeech.tw": { en: "num", nl: "tw", ru: "числ." },
+    "partOfSpeech.vnw": { en: "pron", nl: "vnw", ru: "мест." },
+    "partOfSpeech.vv": { en: "pref", nl: "vv", ru: "прист." },
+    "partOfSpeech.vw": { en: "conj", nl: "vw", ru: "союз" },
+    "partOfSpeech.vz": { en: "prep", nl: "vz", ru: "предл." },
+    "partOfSpeech.ww": { en: "v", nl: "ww", ru: "гл." },
+    "partOfSpeech.zn": { en: "n", nl: "zn", ru: "сущ." },
+  };
 
   function isSenseCard(card) {
     return card?.contractVersion === "dict-sense-card-entry-v1" &&
@@ -189,14 +227,8 @@
 
   function semanticTermLabel(term, languageCode) {
     if (!term) return "";
-    const shortLabels = {
-      "partOfSpeech.noun": { en: "n", nl: "zn", ru: "сущ." },
-      "partOfSpeech.verb": { en: "v", nl: "ww", ru: "гл." },
-      "partOfSpeech.adjective": { en: "adj", nl: "bn", ru: "прил." },
-      "partOfSpeech.adverb": { en: "adv", nl: "bw", ru: "нар." },
-    };
-    if (shortLabels[term.messageKey]?.[languageCode]) {
-      return shortLabels[term.messageKey][languageCode];
+    if (PART_OF_SPEECH_SHORT_LABELS[term.messageKey]?.[languageCode]) {
+      return PART_OF_SPEECH_SHORT_LABELS[term.messageKey][languageCode];
     }
     return message(term.messageKey, languageCode) !== term.messageKey
       ? message(term.messageKey, languageCode)

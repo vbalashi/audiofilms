@@ -84,6 +84,15 @@ For extension smoke checks:
   visual layering. It saves local screenshot evidence under
   `app/.extension-smoke-artifacts/`, outside the unpacked extension directory
   so Chrome does not count generated screenshots in the extension size.
+- The feature-gated semantic SenseCard tracer has a separate
+  `sense-card` dictionary mock. It must preserve stable content-node IDs and
+  exact capability targets, localize canonical Platform V2 message keys in
+  EN/NL/RU, and cover translation off/on, Learn, four review grades, Known, and
+  Undo. Run
+  `node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-dictionary-ui --dictionary-mock=sense-card --reload-extension`.
+  The static comparison fixture is
+  `extensions/youtube-shadowing/scripts/fixtures/sense-card-preview.html`; it
+  complements, but does not replace, the installed-extension smoke.
 - Source-aware dictionary actions use a frozen `DictionarySourceBinding`
   captured at word click. Manual smoke should cover backend captions, direct
   timed-text fallback, transcript-panel fallback, source switch after lookup,
@@ -140,6 +149,7 @@ For local app API checks:
 | SPA navigation | `4EE7m94mJpk` -> `ZNQWWW-vvfM` -> `4EE7m94mJpk` | YouTube watch-page navigation reset | Video id, tracks, phrases, and selected source reset | Passing in normal Chrome smoke |
 | Logged-out clean Chrome profile | Temporary Chrome for Testing profile | Boot reproducibility without existing profile state | Boot marker and toggle appear after extension load and tab reload | Passing in CDP smoke |
 | Viewport and mocked dictionary UI variants | `4EE7m94mJpk` with mocked dictionary cards | Compact UI responsiveness plus controlled dictionary-card, generated-draft, span-selection, and popover states | No overlap at narrow/wide widths; panels stay in viewport; mocked dictionary card actions/translations render without layout regression | Full smoke and focused `--only-geometry`; local screenshots saved under `app/.extension-smoke-artifacts/`; not a backend dictionary test |
+| Semantic single-sense card | `4EE7m94mJpk` with `sense-card` dictionary mock | Approved narrow Platform V2 tracer with localized message keys and exact actions | Translation off/on, learning/review, known, and undo render without positional or display-label inference | Unit smoke and real-Chrome static comparison passing; installed-extension smoke requires loading this worktree |
 
 ## Latest Run
 
