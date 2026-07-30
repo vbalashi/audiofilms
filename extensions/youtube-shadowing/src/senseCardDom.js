@@ -4,12 +4,16 @@
     const card = append(parent, "article", "af-sense-card");
     card.classList.add(`is-phase-${view.phase || "guest"}`);
     card.classList.toggle("is-known", Boolean(view.known));
+    card.dataset.afContractVersion = view.contractVersion || "";
+    card.dataset.afEntryId = view.entryId || "";
 
     const meta = append(card, "div", "af-sense-meta");
     const metaLeft = append(meta, "div", "af-sense-meta-left");
     if (view.partOfSpeechLabel) {
       append(metaLeft, "span", "af-sense-pos-dot");
-      append(metaLeft, "span", "af-sense-pos-label").textContent = view.partOfSpeechLabel;
+      const partOfSpeech = append(metaLeft, "span", "af-sense-pos-label");
+      partOfSpeech.dataset.afTermId = view.partOfSpeechTermId || "";
+      partOfSpeech.textContent = view.partOfSpeechLabel;
     }
     for (const indicator of view.indicators || []) {
       append(metaLeft, "span", "af-sense-indicator").textContent = indicator.value || "";

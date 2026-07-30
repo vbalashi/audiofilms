@@ -182,6 +182,7 @@
     const partOfSpeech = entry.partOfSpeech || header.partOfSpeech || null;
 
     return {
+      contractVersion: card.contractVersion,
       id: card.id,
       entryId: entry.entryId,
       phase: entry.card?.scheduler?.phase || "guest",
@@ -191,6 +192,7 @@
       headwordTranslation: translationVisible
         ? readyEntryTranslation(entry.translation, targetLanguageCode)?.text || ""
         : "",
+      partOfSpeechTermId: partOfSpeech?.termId || "",
       partOfSpeechLabel: semanticTermLabel(partOfSpeech, languageCode),
       senseCountLabel: group.senseCount === 1 ? message("oneMeaning", languageCode) : "",
       indicators: group.indicators || [],

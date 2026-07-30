@@ -690,12 +690,12 @@ function runDictionaryUiScenario() {
     const previewWidths = beforeTranslate.dictionaryUi?.searchItemTextWidths || [];
     const minPreviewWidth = previewWidths.length ? Math.min(...previewWidths) : null;
     const translationStyles = afterTranslate.dictionaryUi?.inlineTranslationStyles || [];
+    const semanticMode = dictionaryUiMock === "sense-card";
 
     assertions.push(
       assertion("dictionary ui panel loaded", initial.panel === true, JSON.stringify({ source: initial.source, count: initial.count, error: initial.error })),
       assertion("dictionary ui lookup word clicked", clicked.clicked === true, clicked.detail),
       assertion("dictionary ui lookup ready", lookupSnapshot.dictionary?.present === true && lookupSnapshot.dictionary?.loading === false, JSON.stringify(lookupSnapshot.dictionary || {})),
-      assertion("dictionary ui renders overlay cards", ready.dictionaryUi?.overlayCardCount > 0, JSON.stringify(ready.dictionaryUi || {})),
       assertion("dictionary ui omits search previews heading", beforeTranslate.dictionaryUi?.searchHeadingPresent === false, JSON.stringify(beforeTranslate.dictionaryUi || {})),
       assertion("dictionary ui search preview text keeps usable width", minPreviewWidth === null || minPreviewWidth >= 120, JSON.stringify({ widths: previewWidths, samples: beforeTranslate.dictionaryUi?.searchItemTextSamples || [] })),
       assertion("dictionary ui does not show translation loading copy", !/loading translation/i.test(beforeTranslate.dictionaryUi?.actionStatus || ""), beforeTranslate.dictionaryUi?.actionStatus || ""),
@@ -703,14 +703,34 @@ function runDictionaryUiScenario() {
       assertion("dictionary ui screenshot evidence is non-blank", screenshotEvidenceIsNonBlank(evidencePaths), JSON.stringify(screenshotEvidenceStats(evidencePaths))),
     );
 
-    if (translateClick === "clicked" && translationStyles.length) {
+    if (semanticMode) {
+      const beforeCard = beforeTranslate.dictionaryUi?.senseCards?.[0] || {};
+      const afterCard = afterTranslate.dictionaryUi?.senseCards?.[0] || {};
+      assertions.push(
+        assertion("dictionary ui renders exactly one semantic SenseCard", ready.dictionaryUi?.senseCardCount === 1, JSON.stringify(ready.dictionaryUi || {})),
+        assertion("dictionary ui does not fall back to legacy overlay cards", ready.dictionaryUi?.overlayCardCount === 0, JSON.stringify(ready.dictionaryUi || {})),
+        assertion("dictionary ui preserves semantic entry contract", beforeCard.contractVersion === "dict-sense-card-entry-v1", JSON.stringify(beforeCard)),
+        assertion("dictionary ui renders semantic headword and definition", beforeCard.headword === "bank" && /meubelstuk/i.test(beforeCard.definition || ""), JSON.stringify(beforeCard)),
+        assertion("dictionary ui renders canonical part-of-speech term", beforeCard.partOfSpeechTermId === "part-of-speech.zn" && Boolean(beforeCard.partOfSpeech), JSON.stringify(beforeCard)),
+        assertion("dictionary ui renders four semantic review actions", JSON.stringify(beforeCard.reviewResults) === JSON.stringify(["fail", "hard", "success", "easy"]), JSON.stringify(beforeCard)),
+        assertion("dictionary ui starts with semantic translations hidden", beforeCard.translationCount === 0, JSON.stringify(beforeCard)),
+        assertion("dictionary ui semantic translate action clicked", translateClick === "clicked", translateClick),
+        assertion("dictionary ui reveals entry and node translations", afterCard.translationCount >= 2 && /скамья/.test(afterCard.headwordTranslation || "") && /предмет мебели/.test(afterCard.translations?.join(" ") || ""), JSON.stringify(afterCard)),
+      );
+    } else {
+      assertions.push(
+        assertion("dictionary ui renders overlay cards", ready.dictionaryUi?.overlayCardCount > 0, JSON.stringify(ready.dictionaryUi || {})),
+      );
+    }
+
+    if (!semanticMode && translateClick === "clicked" && translationStyles.length) {
       assertions.push(
         assertion("dictionary ui translate action clicked", true, translateClick),
         assertion("dictionary ui translations render italic", translationStyles.every((style) => style.fontStyle === "italic"), JSON.stringify(translationStyles)),
         assertion("dictionary ui translations use normal weight", translationStyles.every((style) => Number(style.fontWeight) <= 600), JSON.stringify(translationStyles)),
         assertion("dictionary ui translation stays inline", afterTranslate.dictionaryUi?.translationBlocks === 0, JSON.stringify(afterTranslate.dictionaryUi || {})),
       );
-    } else {
+    } else if (!semanticMode) {
       assertions.push(assertion("dictionary ui translate action optional", true, translateClick));
     }
 
@@ -2477,7 +2497,28 @@ function readGeometrySnapshot() {
         hasContext: Boolean(dictionary.querySelector(".af-context-text")?.textContent?.trim()),
         lookupState: dictionary.querySelector(".af-lookup-placeholder")?.className || "",
         overlayCardCount: dictionary.querySelectorAll(".af-overlay-card").length,
+        senseCardCount: dictionary.querySelectorAll(".af-sense-card").length,
         generatedFallbackCardCount: dictionary.querySelectorAll(".af-generated-fallback-card").length,
+        senseCards: Array.from(dictionary.querySelectorAll(".af-sense-card")).map((card) => ({
+          contractVersion: card.dataset.afContractVersion || "",
+          entryId: card.dataset.afEntryId || "",
+          article: card.querySelector(".af-sense-article")?.textContent.trim() || "",
+          headword: card.querySelector(".af-sense-headword")?.textContent.trim() || "",
+          headwordTranslation: card.querySelector(".af-sense-headword-translation")?.textContent.trim() || "",
+          partOfSpeechTermId: card.querySelector(".af-sense-pos-label")?.dataset.afTermId || "",
+          partOfSpeech: card.querySelector(".af-sense-pos-label")?.textContent.trim() || "",
+          definition: card.querySelector(".af-sense-definition .af-sense-copy")?.textContent.trim() || "",
+          translations: Array.from(card.querySelectorAll(".af-sense-translation")).map((item) => item.textContent.trim()),
+          translationCount: card.querySelectorAll(".af-sense-headword-translation, .af-sense-translation").length,
+          reviewResults: Array.from(card.querySelectorAll(".af-sense-review")).map((button) =>
+            ["fail", "hard", "success", "easy"].find((result) => button.classList.contains("is-" + result)) || ""
+          ),
+          reviewLabels: Array.from(card.querySelectorAll(".af-sense-review")).map((button) => button.textContent.trim()),
+          translateActions: Array.from(card.querySelectorAll(".af-sense-translate")).map((button) => ({
+            label: button.getAttribute("aria-label") || "",
+            pressed: button.getAttribute("aria-pressed") || "",
+          })),
+        })),
         cards: Array.from(dictionary.querySelectorAll(".af-overlay-card")).map((card) => ({
           title: card.querySelector(".af-overlay-card-headword")?.textContent ||
             card.querySelector(".af-overlay-card-title")?.textContent || "",
@@ -2968,7 +3009,10 @@ function clickDictionaryTranslate(index) {
   return chromeEval(`
 (() => {
   const root = document.querySelector("#audiofilms-root")?.shadowRoot;
-  const buttons = Array.from(root?.querySelectorAll("#af-shadowing-dictionary-panel .af-overlay-card .af-card-translate") || []);
+  const buttons = Array.from(root?.querySelectorAll(
+    "#af-shadowing-dictionary-panel .af-overlay-card .af-card-translate, " +
+    "#af-shadowing-dictionary-panel .af-sense-card .af-sense-translate"
+  ) || []);
   const button = buttons[${Number(index)}];
   if (!button) return "not-found";
   for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {

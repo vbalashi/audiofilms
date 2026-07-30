@@ -176,6 +176,7 @@ function assertDictionaryMocksStayRuntimeGated() {
   assert.match(serviceWorkerSource, /DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks"/);
   assert.match(serviceWorkerSource, /chromeStorageGet\(DEV_MOCKS_STORAGE_KEY\)/);
   assert.match(serviceWorkerSource, /dictionaryMockResponse\(operation, body\)/);
+  assert.match(serviceWorkerSource, /\["cards", "generated", "sense-card"\]\.includes/);
   assert.match(serviceWorkerSource, /issueReportMockResponse\(body\)/);
   assert.match(smokeSource, /DEV_MOCKS_STORAGE_KEY = "afShadowingDevMocks"/);
   assert.match(smokeSource, /saveDevMocks/);
@@ -4487,6 +4488,7 @@ const semanticMockResponse = dictionaryMocks.dictionaryMockResponse(
 );
 const semanticMockLookup = JSON.parse(semanticMockResponse.text);
 assert.equal(semanticMockLookup.contractVersion, "dict-sense-card-v1");
+assert.equal(semanticMockLookup.cards[0].contractVersion, "dict-sense-card-entry-v1");
 assert.equal(semanticMockLookup.cards[0].entry.summaryContentNodeId, "definition:bank:1");
 assert.equal(
   semanticMockLookup.cards[0].entry.capabilities[0].target.stateRevision,
@@ -5069,6 +5071,7 @@ const semanticCardHiddenTranslation = senseCardPresentation.cardViewModel(semant
   translationVisible: false,
 });
 assert.equal(semanticCardHiddenTranslation.headword, "bank");
+assert.equal(semanticCardHiddenTranslation.partOfSpeechTermId, "part-of-speech.zn");
 assert.equal(semanticCardHiddenTranslation.partOfSpeechLabel, "zn");
 assert.equal(semanticCardHiddenTranslation.senseCountLabel, "1 betekenis");
 assert.equal(semanticCardHiddenTranslation.headwordTranslation, "");
