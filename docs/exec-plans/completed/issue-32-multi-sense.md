@@ -1,6 +1,6 @@
 # AudioFilms Extension Multi-Sense SenseCard
 
-Status: active
+Status: completed
 Issue: `vbalashi/audiofilms#32`
 Branch: `codex/audiofilms-32-multi-sense`
 Worktree: `/Users/khrustal/adhoc/audiofilms-issue-32-multisense`
@@ -99,3 +99,8 @@ overlay. Legacy cards and generated drafts remain on their current renderers.
   `Melden` and `Markeer als bekend` now share one quiet footer row in both
   layouts; `Melden` remains absent from collapsed meanings. Independent final
   visual QA and Spec re-review both returned PASS with no P0-P2 findings.
+- 2026-08-05: exact feature SHA `8c98a9ee0a82f82f1bd8688d45527648ad13574a`
+  was revalidated (58/58 dictionary tests, extension unit smoke, syntax, lint,
+  and production build) and squash-merged through PR #38. Merge SHA
+  `eae9c9fd9bb0fc521d748f1d868448b9753f75c5` has the exact reviewed feature
+  tree. Issue #32 is closed; cross-product rollout remains owned by 2000NL #79.
