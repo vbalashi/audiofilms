@@ -547,6 +547,14 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   line-height: 0.98;
 }
 
+.af-sense-headword.is-segmented {
+  overflow-wrap: normal;
+}
+
+.af-sense-headword-segment {
+  white-space: nowrap;
+}
+
 .af-sense-headword-translation {
   margin-top: -2px;
   color: var(--af-translation);

@@ -42,7 +42,7 @@
 
     const title = append(card, "div", "af-sense-title");
     if (view.article) append(title, "span", "af-sense-article").textContent = view.article;
-    append(title, "span", "af-sense-headword").textContent = view.headword;
+    appendHeadword(title, view.headword);
     if (view.headwordTranslation) {
       append(card, "div", "af-sense-headword-translation").textContent = view.headwordTranslation;
     }
@@ -124,7 +124,7 @@
 
     const title = append(group, "div", "af-sense-title");
     if (view.article) append(title, "span", "af-sense-article").textContent = view.article;
-    append(title, "span", "af-sense-headword").textContent = view.headword;
+    appendHeadword(title, view.headword);
 
     const meaningHeader = sectionHeader(group, view.labels.meanings, String(view.senseCount));
     meaningHeader.classList.add("af-sense-group-header");
@@ -285,6 +285,25 @@
     button.type = "button";
     button.textContent = label;
     return button;
+  }
+
+  function appendHeadword(parent, text) {
+    const headword = append(parent, "span", "af-sense-headword");
+    headword.setAttribute("aria-label", String(text || ""));
+    const segments = String(text || "").split("·");
+    if (segments.length === 1) {
+      headword.textContent = text || "";
+      return headword;
+    }
+
+    headword.classList.add("is-segmented");
+    segments.forEach((segment, index) => {
+      const hasNext = index < segments.length - 1;
+      const syllable = append(headword, "span", "af-sense-headword-segment");
+      syllable.textContent = `${segment}${hasNext ? "·" : ""}`;
+      if (hasNext) append(headword, "wbr");
+    });
+    return headword;
   }
 
   function escapeHtml(value) {

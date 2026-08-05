@@ -5316,6 +5316,26 @@ assert.equal(renderedMeanings[0].dataset.afEntryId, "entry:bank:1");
 assert.equal(renderedMeanings[0].dataset.afExpanded, "true");
 assert.equal(renderedMeanings[1].dataset.afEntryId, "entry:bank:2");
 assert.equal(renderedMeanings[1].dataset.afExpanded, "false");
+const longHeadwordParent = testDocument.createElement("div");
+const longHeadwordElement = senseCardDom.renderSenseCardGroup(
+  longHeadwordParent,
+  {
+    ...semanticMultiSenseView,
+    headword: "ar·beids·on·ge·schikt·heids·ver·ze·ke·ring",
+  },
+  { iconSvg: () => "" },
+);
+const longHeadwordTitle = longHeadwordElement.children.find(
+  (child) => child.className === "af-sense-title",
+);
+const longHeadword = longHeadwordTitle.children.find(
+  (child) => child.className === "af-sense-headword",
+);
+assert.equal(
+  longHeadword.children.filter((child) => child.className === "af-sense-headword-segment").length,
+  10,
+);
+assert.equal(longHeadword.children.filter((child) => child.tagName === "wbr").length, 9);
 renderedMeanings[1].listeners.click[0].listener({ target: renderedMeanings[1] });
 assert.deepEqual(toggledSenseEntries, ["entry:bank:2"]);
 const firstSenseFooter = renderedMeanings[0].children[1].children.at(-1);
