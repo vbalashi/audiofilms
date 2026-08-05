@@ -136,6 +136,55 @@ describe('AudioFilms semantic SenseCard projection', () => {
     });
   });
 
+  it('projects every meaning in a multi-sense group as an independent stable card', () => {
+    const multiSenseResponse = structuredClone(response) as PlatformLookupV2Response;
+    const group = multiSenseResponse.groups[0];
+    const firstEntry = group.entries[0];
+    if (firstEntry.kind !== 'sense-card') throw new Error('expected sense-card fixture');
+    const secondEntry = structuredClone(firstEntry);
+    secondEntry.entryId = 'entry:bank:2';
+    secondEntry.meaningOrdinal = 2;
+    secondEntry.card = {
+      ...secondEntry.card!,
+      scheduler: { phase: 'learning', repeatCount: 1 },
+      stateRevision: 'state:2',
+    };
+    secondEntry.summaryContentNodeId = 'definition:2';
+    secondEntry.contentNodes = secondEntry.contentNodes.map((node) => ({
+      ...node,
+      contentNodeId: 'definition:2',
+      text: 'een bedrijf dat geld bewaart, leent en betalingen regelt',
+    }));
+    secondEntry.capabilities = secondEntry.capabilities.map((capability) => ({
+      ...capability,
+      target: {
+        ...capability.target,
+        entryId: 'entry:bank:2',
+        stateRevision: 'state:2',
+      },
+    }));
+    group.senseCount = 2;
+    group.entryCount = 2;
+    group.entries = [firstEntry, secondEntry];
+
+    const projected = projectSenseCardLookup(multiSenseResponse, 'bank');
+
+    expect(projected.cards.map((card) => card.entryId)).toEqual([
+      'entry:bank:1',
+      'entry:bank:2',
+    ]);
+    expect(projected.cards.map((card) => card.group.headwordGroupId)).toEqual([
+      'headword:bank',
+      'headword:bank',
+    ]);
+    expect(projected.cards[0].entry.card?.stateRevision).toBe('state:1');
+    expect(projected.cards[1].entry.card?.stateRevision).toBe('state:2');
+    expect(projected.cards[1].entry.capabilities[0].target).toMatchObject({
+      entryId: 'entry:bank:2',
+      stateRevision: 'state:2',
+    });
+  });
+
   it('does not manufacture a single-sense card when the platform has no groups', () => {
     const projected = projectSenseCardLookup(
       {

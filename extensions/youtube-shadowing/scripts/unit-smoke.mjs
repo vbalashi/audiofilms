@@ -473,7 +473,11 @@ Object.defineProperty(TestHTMLElement, Symbol.hasInstance, {
 });
 
 const testDocument = {
-  createElement: createTestElement,
+  createElement: (tagName) => {
+    const element = createTestElement(tagName);
+    element.ownerDocument = testDocument;
+    return element;
+  },
   createTextNode: (text) => ({ nodeType: 3, textContent: text }),
 };
 
@@ -971,6 +975,14 @@ async function assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary() {
     },
     dictionaryOverlayWorkflowApi: {
       renderCardActionMenu: () => "menu",
+      reportCardDictionaryIssue: (card, options, reportAction) => {
+        events.push([
+          "report",
+          card.entryId,
+          reportAction.target.contentNodeId,
+          Boolean(options.openIssueReportDialog),
+        ]);
+      },
       performDisplayAction: (_card, _displayAction, options) => options.performDictionaryCardAction({ entryId: "entry-1" }, {}, { action: "start-learning" }),
     },
     dictionaryDomApi: {},
@@ -1057,6 +1069,10 @@ async function assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary() {
   await controller.generateDictionaryDraft(state.selectedWord);
   await controller.playHeadwordAudio({ id: "card-1", title: "kop" });
   await controller.performDisplayAction({ entryId: "entry-1" }, { command: { kind: "display-action" } });
+  controller.reportCardDictionaryIssue(
+    { entryId: "entry-2" },
+    { target: { contentNodeId: "definition:2" } },
+  );
   await controller.fetchDictionaryResult({ word: "klein" });
   await controller.postDictionaryCommand("dict-action", { action: "start-learning" });
   assert.deepEqual(controller.createDictionarySourceBinding("klein", 0).sourceId, "source-1");
@@ -1067,6 +1083,12 @@ async function assertDictionaryOperationsContentFacadeOwnsDictionaryBoundary() {
   assert.ok(events.some((event) => event[0] === "span-context" && event[1] === "start-learning"));
   assert.ok(events.some((event) => event[0] === "fetch-endpoint" && event[1] === "https://dict.test"));
   assert.ok(events.some((event) => event[0] === "post" && event[1] === "dict-action"));
+  assert.deepEqual(events.find((event) => event[0] === "report"), [
+    "report",
+    "entry-2",
+    "definition:2",
+    true,
+  ]);
 }
 
 async function assertDictionaryRuntimeContentFacadeOwnsControllerBindings() {
@@ -1844,6 +1866,9 @@ const dictionaryAudioWorkflow = loadBrowserModule("src/dictionaryAudioWorkflow.j
 const dictionaryMocks = loadBrowserModule("src/dictionaryMocks.js", "__afShadowingDictionaryMocks");
 const dictionaryPresentation = loadBrowserModule("src/dictionaryPresentation.js", "__afShadowingDictionaryPresentation");
 const senseCardPresentation = loadBrowserModule("src/senseCardPresentation.js", "__afShadowingSenseCardPresentation");
+const senseCardDom = loadBrowserModule("src/senseCardDom.js", "__afShadowingSenseCardDom", {
+  document: testDocument,
+});
 const dictionaryDom = loadBrowserModule("src/dictionaryDom.js", "__afShadowingDictionaryDom", {
   __afShadowingDictionaryPresentation: dictionaryPresentation,
   document: testDocument,
@@ -2427,10 +2452,16 @@ assert.equal(uiStateWorkflow.toggleAllExamples(uiStateState, { preventDefault() 
 assert.equal(uiStateUpdatedPreferences.examplesExpanded, true);
 assert.equal(uiStateWorkflow.toggleCardExpanded(uiStateState, "card-1", uiStateOptions), true);
 assert.equal(uiStateWorkflow.cardExpanded(uiStateState, "card-1"), true);
+assert.equal(uiStateWorkflow.cardExpanded(uiStateState, "default-expanded", true), true);
+assert.equal(uiStateWorkflow.toggleCardExpanded(uiStateState, "default-expanded", {
+  ...uiStateOptions,
+  defaultExpanded: true,
+}), false);
+assert.equal(uiStateWorkflow.cardExpanded(uiStateState, "default-expanded", true), false);
 assert.equal(uiStateWorkflow.closeOpenMenus(uiStateState, uiStateOptions), true);
 assert.equal(uiStateState.settingsMenuOpen, false);
 assert.equal(uiStateFocused, true);
-assert.equal(uiStateRenderCount, 3);
+assert.equal(uiStateRenderCount, 4);
 const menuInteractionElement = createTestElement("button");
 menuInteractionElement.matches = (selector) => selector.includes("[data-af-settings-toggle]");
 assert.equal(menuState.isMenuInteractionEvent({
@@ -4488,11 +4519,18 @@ const semanticMockResponse = dictionaryMocks.dictionaryMockResponse(
 );
 const semanticMockLookup = JSON.parse(semanticMockResponse.text);
 assert.equal(semanticMockLookup.contractVersion, "dict-sense-card-v1");
+assert.equal(semanticMockLookup.cards.length, 2);
 assert.equal(semanticMockLookup.cards[0].contractVersion, "dict-sense-card-entry-v1");
 assert.equal(semanticMockLookup.cards[0].entry.summaryContentNodeId, "definition:bank:1");
 assert.equal(
   semanticMockLookup.cards[0].entry.capabilities[0].target.stateRevision,
   "state:bank:1",
+);
+assert.equal(semanticMockLookup.cards[1].entryId, "entry:bank:2");
+assert.equal(semanticMockLookup.cards[1].entry.summaryContentNodeId, "definition:bank:2");
+assert.equal(
+  semanticMockLookup.cards[1].entry.capabilities[0].target.entryId,
+  "entry:bank:2",
 );
 
 const generatedNoMatchResponse = dictionaryMocks.dictionaryMockResponse(
@@ -4685,6 +4723,32 @@ assert.equal(dictionaryLookupWorkflow.toggleCardTranslation(
 ), true);
 assert.equal(visibleTranslationsByCardId["card-with-lookup"], true);
 assert.equal(postedTranslationCommand, null);
+let groupTranslationRenderCount = 0;
+assert.equal(dictionaryLookupWorkflow.toggleSenseCardGroupTranslation(
+  [
+    {
+      id: "entry:bank:1",
+      entryId: "entry:bank:1",
+      contractVersion: "dict-sense-card-entry-v1",
+      entry: { translation: { status: "ready", text: "скамья" }, contentNodes: [] },
+    },
+    {
+      id: "entry:bank:2",
+      entryId: "entry:bank:2",
+      contractVersion: "dict-sense-card-entry-v1",
+      entry: { translation: { status: "ready", text: "банк" }, contentNodes: [] },
+    },
+  ],
+  {
+    ...translationWorkflowOptions,
+    render: () => {
+      groupTranslationRenderCount += 1;
+    },
+  },
+), true);
+assert.equal(visibleTranslationsByCardId["entry:bank:1"], true);
+assert.equal(visibleTranslationsByCardId["entry:bank:2"], true);
+assert.equal(groupTranslationRenderCount, 1);
 await dictionaryLookupWorkflow.requestDictionaryCardTranslation(
   { id: "card-needs-command", entryId: "entry-4" },
   translationWorkflowOptions,
@@ -5054,6 +5118,18 @@ const semanticSenseCard = {
           stateRevision: "state:1",
         },
       },
+      {
+        actionId: "report-content",
+        elementId: "report:definition:1",
+        messageKey: "action.reportContent",
+        target: {
+          kind: "sense-card",
+          entryId: "entry:bank:1",
+          cardTypeId: "word-to-definition",
+          stateRevision: "state:1",
+          contentNodeId: "definition:1",
+        },
+      },
     ],
   },
 };
@@ -5078,6 +5154,11 @@ assert.equal(semanticCardHiddenTranslation.headwordTranslation, "");
 assert.equal(semanticCardHiddenTranslation.definition.translation, "");
 assert.equal(semanticCardHiddenTranslation.repeatLabel, "3×");
 assert.equal(semanticCardHiddenTranslation.reviewActions[0].label, "Opnieuw");
+assert.equal(semanticCardHiddenTranslation.reportAction.label, "Melden");
+assert.equal(
+  semanticCardHiddenTranslation.reportAction.target.contentNodeId,
+  "definition:1",
+);
 assert.deepEqual(semanticCardHiddenTranslation.reviewActions[0].command.target, {
   kind: "sense-card",
   entryId: "entry:bank:1",
@@ -5103,6 +5184,148 @@ const semanticCardEnglish = senseCardPresentation.cardViewModel(semanticSenseCar
   translationVisible: false,
 });
 assert.equal(semanticCardEnglish.partOfSpeechLabel, "n");
+const semanticOverlayOnlyCard = JSON.parse(JSON.stringify(semanticSenseCard));
+semanticOverlayOnlyCard.entry.translation = null;
+for (const node of semanticOverlayOnlyCard.entry.contentNodes) node.translations = [];
+const semanticOverlayOnlyView = senseCardPresentation.cardViewModel(semanticOverlayOnlyCard, {
+  interfaceLanguageCode: "nl",
+  translationTargetLanguageCode: "ru",
+  translationVisible: true,
+  canRequestTranslation: true,
+  overlayTranslation: {
+    status: "ready",
+    overlay: {
+      headword: "диван",
+      meanings: [{
+        definition: "предмет мебели",
+        examples: ["Маргрит сидела на диване."],
+      }],
+    },
+  },
+});
+assert.equal(semanticOverlayOnlyView.canToggleTranslation, true);
+assert.equal(semanticOverlayOnlyView.headwordTranslation, "диван");
+assert.equal(semanticOverlayOnlyView.definition.translation, "предмет мебели");
+assert.equal(semanticOverlayOnlyView.examples[0].translation, "Маргрит сидела на диване.");
+const semanticSecondSenseCard = JSON.parse(JSON.stringify(semanticSenseCard));
+semanticSecondSenseCard.id = "entry:bank:2";
+semanticSecondSenseCard.entryId = "entry:bank:2";
+semanticSecondSenseCard.group.senseCount = 2;
+semanticSecondSenseCard.group.entryCount = 2;
+semanticSecondSenseCard.entry.entryId = "entry:bank:2";
+semanticSecondSenseCard.entry.meaningOrdinal = 2;
+semanticSecondSenseCard.entry.card.scheduler.phase = "encountered";
+semanticSecondSenseCard.entry.card.scheduler.repeatCount = 0;
+semanticSecondSenseCard.entry.card.stateRevision = "state:2";
+semanticSecondSenseCard.entry.summaryContentNodeId = "definition:2";
+semanticSecondSenseCard.entry.contentNodes[0].contentNodeId = "definition:2";
+semanticSecondSenseCard.entry.contentNodes[0].text =
+  "een bedrijf dat geld bewaart, leent en betalingen regelt";
+semanticSecondSenseCard.entry.contentNodes[0].translations[0].text =
+  "организация, которая хранит деньги, выдаёт кредиты и проводит платежи";
+semanticSecondSenseCard.entry.translation.entryId = "entry:bank:2";
+semanticSecondSenseCard.entry.translation.text = "банк · финансовое учреждение";
+semanticSecondSenseCard.entry.capabilities = [
+  {
+    actionId: "start-learning",
+    elementId: "start-learning:2",
+    messageKey: "action.startLearning",
+    target: {
+      kind: "sense-card",
+      entryId: "entry:bank:2",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:2",
+    },
+  },
+  {
+    actionId: "mark-known",
+    elementId: "mark-known:2",
+    messageKey: "action.markKnown",
+    target: {
+      kind: "sense-card",
+      entryId: "entry:bank:2",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:2",
+    },
+  },
+  {
+    actionId: "report-content",
+    elementId: "report:definition:2",
+    messageKey: "action.reportContent",
+    target: {
+      kind: "sense-card",
+      entryId: "entry:bank:2",
+      cardTypeId: "word-to-definition",
+      stateRevision: "state:2",
+      contentNodeId: "definition:2",
+    },
+  },
+];
+semanticSenseCard.group.senseCount = 2;
+semanticSenseCard.group.entryCount = 2;
+const semanticMultiSenseView = senseCardPresentation.groupViewModel(
+  [semanticSecondSenseCard, semanticSenseCard],
+  {
+    interfaceLanguageCode: "nl",
+    translationTargetLanguageCode: "ru",
+    translationVisibleByEntryId: {
+      "entry:bank:1": true,
+      "entry:bank:2": false,
+    },
+    expandedByEntryId: {
+      "entry:bank:1": true,
+      "entry:bank:2": false,
+    },
+  },
+);
+assert.equal(semanticMultiSenseView.groupId, "headword:bank");
+assert.equal(semanticMultiSenseView.senseCount, 2);
+assert.equal(semanticMultiSenseView.labels.meanings, "BETEKENISSEN");
+assert.equal(semanticMultiSenseView.translationVisible, false);
+assert.equal(semanticMultiSenseView.labels.expandMeaning, "Betekenis uitklappen");
+assert.equal(semanticMultiSenseView.labels.collapseMeaning, "Betekenis inklappen");
+assert.deepEqual(
+  semanticMultiSenseView.meanings.map((meaning) => meaning.entryId),
+  ["entry:bank:1", "entry:bank:2"],
+);
+assert.equal(semanticMultiSenseView.meanings[0].expanded, true);
+assert.equal(semanticMultiSenseView.meanings[0].headwordTranslation, "скамья");
+assert.equal(semanticMultiSenseView.meanings[0].reviewActions[0].command.target.entryId, "entry:bank:1");
+assert.equal(semanticMultiSenseView.meanings[1].expanded, false);
+assert.equal(semanticMultiSenseView.meanings[1].headwordTranslation, "");
+assert.equal(semanticMultiSenseView.meanings[1].startAction.command.target.entryId, "entry:bank:2");
+const multiSenseParent = testDocument.createElement("div");
+const toggledSenseEntries = [];
+const reportedSenseEntries = [];
+const multiSenseElement = senseCardDom.renderSenseCardGroup(
+  multiSenseParent,
+  semanticMultiSenseView,
+  {
+    iconSvg: () => "",
+    onTranslation: () => {},
+    onAction: () => {},
+    onToggleExpanded: (entryId) => toggledSenseEntries.push(entryId),
+    onReport: (entryId, reportAction) =>
+      reportedSenseEntries.push(`${entryId}:${reportAction.target.contentNodeId}`),
+  },
+);
+assert.equal(multiSenseElement.dataset.afHeadwordGroupId, "headword:bank");
+const renderedMeanings = multiSenseElement.querySelectorAll("[data-af-sense-entry]");
+assert.equal(renderedMeanings.length, 2);
+assert.equal(renderedMeanings[0].dataset.afEntryId, "entry:bank:1");
+assert.equal(renderedMeanings[0].dataset.afExpanded, "true");
+assert.equal(renderedMeanings[1].dataset.afEntryId, "entry:bank:2");
+assert.equal(renderedMeanings[1].dataset.afExpanded, "false");
+renderedMeanings[1].listeners.click[0].listener({ target: renderedMeanings[1] });
+assert.deepEqual(toggledSenseEntries, ["entry:bank:2"]);
+const firstSenseFooter = renderedMeanings[0].children[1].children.at(-1);
+assert.equal(firstSenseFooter.className, "af-sense-footer");
+assert.deepEqual(
+  firstSenseFooter.children.map((child) => child.textContent),
+  ["Melden", "✓ Markeer als bekend"],
+);
+firstSenseFooter.children[0].listeners.click[0].listener({ stopPropagation() {} });
+assert.deepEqual(reportedSenseEntries, ["entry:bank:1:definition:1"]);
 const semanticNewCard = JSON.parse(JSON.stringify(semanticSenseCard));
 semanticNewCard.entry.card.scheduler.phase = "encountered";
 semanticNewCard.entry.card.scheduler.repeatCount = 0;
@@ -5600,6 +5823,85 @@ dictionaryRenderWorkflow.renderGeneratedFallback(dictionaryRenderFallbackHost, {
 assert.equal(dictionaryRenderConnected, false);
 dictionaryRenderFallbackHost.children[0].children.at(-1).listeners.click[0].listener();
 assert.equal(dictionaryRenderGenerated, "bouwen");
+const dictionaryRenderMultiSenseHost = createTestElement("div");
+const dictionaryRenderMultiSenseCalls = [];
+const semanticSecondDeferredCard = JSON.parse(JSON.stringify(semanticSecondSenseCard));
+semanticSecondDeferredCard.entry.translation = null;
+for (const node of semanticSecondDeferredCard.entry.contentNodes) node.translations = [];
+dictionaryRenderWorkflow.renderSenseCardGroup(
+  dictionaryRenderMultiSenseHost,
+  [semanticSenseCard, semanticSecondDeferredCard],
+  {
+    state: {
+      accountPreferences: {
+        interfaceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+      },
+      visibleTranslationsByCardId: {
+        "entry:bank:1": true,
+        "entry:bank:2": true,
+      },
+      exampleExpansionOverrides: {
+        "entry:bank:1": true,
+      },
+      selectedWord: {
+        translationsByCardId: {
+          "entry:bank:2": {
+            status: "ready",
+            overlay: {
+              headword: "банк из runtime",
+              meanings: [{
+                definition: "финансовая организация",
+                examples: ["В каком банке у вас открыт счёт?"],
+              }],
+            },
+          },
+        },
+      },
+    },
+    senseCardPresentation,
+    senseCardDom: {
+      renderSenseCardGroup(_parent, view, handlers) {
+        dictionaryRenderMultiSenseCalls.push(
+          `render:${view.meanings.map((meaning) => `${meaning.entryId}:${meaning.expanded}`).join(",")}`,
+        );
+        dictionaryRenderMultiSenseCalls.push(
+          `translations:${view.meanings.map((meaning) => meaning.headwordTranslation).join("|")}`,
+        );
+        handlers.onToggleExpanded("entry:bank:2");
+        handlers.onAction("entry:bank:1", view.meanings[0].reviewActions[0]);
+        handlers.onReport("entry:bank:2", view.meanings[1].reportAction);
+        handlers.onTranslation();
+        return view;
+      },
+    },
+    browserLanguage: "nl-NL",
+    iconSvg: () => "",
+    toggleCardExpanded: (entryId, defaultExpanded) =>
+      dictionaryRenderMultiSenseCalls.push(`expand:${entryId}:${defaultExpanded}`),
+    performDisplayAction: (card, action) => {
+      dictionaryRenderMultiSenseCalls.push(`action:${card.entryId}:${action.id}`);
+    },
+    reportCardDictionaryIssue: (card, reportAction) => {
+      dictionaryRenderMultiSenseCalls.push(
+        `report:${card.entryId}:${reportAction.target.contentNodeId}`,
+      );
+    },
+    toggleSenseCardGroupTranslation: (cards) => {
+      dictionaryRenderMultiSenseCalls.push(
+        `translation:${cards.map((card) => card.entryId).join(",")}`,
+      );
+    },
+  },
+);
+assert.deepEqual(dictionaryRenderMultiSenseCalls, [
+  "render:entry:bank:1:true,entry:bank:2:false",
+  "translations:скамья|банк из runtime",
+  "expand:entry:bank:2:false",
+  "action:entry:bank:1:review:fail",
+  "report:entry:bank:2:definition:2",
+  "translation:entry:bank:1,entry:bank:2",
+]);
 const dictionaryRenderReviewHost = createTestElement("div");
 let dictionaryRenderAccountAction = false;
 dictionaryRenderWorkflow.renderReviewActions(dictionaryRenderReviewHost, null, {
@@ -6241,6 +6543,68 @@ dictionarySearchWorkflow.renderSelectedWordCard(createTestElement("div"), {
   render: () => {},
 });
 assert.equal(readyWordWorkflowCalls.join("|"), "card:card-1|message:Partial result.|fallback:bouw");
+const readyMultiSenseState = {
+  selectedWord: {
+    word: "bank",
+    phraseIndex: 0,
+    lookupStatus: "ready",
+    lookupResult: {
+      contractVersion: "dict-sense-card-v1",
+      cards: [
+        { id: "entry:bank:1", entryId: "entry:bank:1", group: { headwordGroupId: "headword:bank" } },
+        { id: "entry:bank:2", entryId: "entry:bank:2", group: { headwordGroupId: "headword:bank" } },
+      ],
+      meta: {},
+    },
+  },
+  phrases: [],
+};
+const readyMultiSenseCalls = [];
+dictionarySearchWorkflow.renderSelectedWordCard(createTestElement("div"), {
+  getState: () => readyMultiSenseState,
+  dictionaryDom: {
+    renderLookupMessages() {},
+  },
+  dictionarySearchDom: {
+    renderGroupedSearchPreviews() {},
+  },
+  renderOverlayCard: (_parent, card) => readyMultiSenseCalls.push(`card:${card.id}`),
+  renderSenseCardGroup: (_parent, cards) => {
+    readyMultiSenseCalls.push(`group:${cards.map((card) => card.entryId).join(",")}`);
+  },
+  toggleDictionarySearchItem: () => {},
+  loadGroupedDictionarySearch: () => {},
+  render: () => {},
+});
+assert.deepEqual(readyMultiSenseCalls, ["group:entry:bank:1,entry:bank:2"]);
+const readySingleSenseState = {
+  selectedWord: {
+    ...readyMultiSenseState.selectedWord,
+    lookupResult: {
+      ...readyMultiSenseState.selectedWord.lookupResult,
+      cards: [readyMultiSenseState.selectedWord.lookupResult.cards[0]],
+    },
+  },
+  phrases: [],
+};
+const readySingleSenseCalls = [];
+dictionarySearchWorkflow.renderSelectedWordCard(createTestElement("div"), {
+  getState: () => readySingleSenseState,
+  dictionaryDom: {
+    renderLookupMessages() {},
+  },
+  dictionarySearchDom: {
+    renderGroupedSearchPreviews() {},
+  },
+  renderOverlayCard: (_parent, card) => readySingleSenseCalls.push(`card:${card.entryId}`),
+  renderSenseCardGroup: (_parent, cards) => {
+    readySingleSenseCalls.push(`group:${cards.length}`);
+  },
+  toggleDictionarySearchItem: () => {},
+  loadGroupedDictionarySearch: () => {},
+  render: () => {},
+});
+assert.deepEqual(readySingleSenseCalls, ["card:entry:bank:1"]);
 const retryWordWorkflowState = {
   selectedWord: {
     word: "lopen",
@@ -6651,6 +7015,27 @@ assert.equal(overlayMenuReports.at(-1).category, "translation");
 assert.equal(overlayMenuReports.at(-1).reportOptions.extraDiagnostics.dictionaryCardTranslationIssue.lookup.contextText, "Current phrase");
 overlayMenuOptions.onDictionaryIssue();
 assert.equal(overlayMenuReports.at(-1).category, "dictionary");
+dictionaryOverlayWorkflow.reportCardDictionaryIssue({
+  id: "entry:bank:2",
+  entryId: "entry:bank:2",
+  headword: "bank",
+}, {
+  state: overlayMenuState,
+  issueReports,
+  openIssueReportDialog: (report) => overlayMenuReports.push(report),
+}, {
+  actionId: "report-content",
+  target: {
+    kind: "sense-card",
+    entryId: "entry:bank:2",
+    contentNodeId: "definition:2",
+  },
+});
+assert.equal(
+  overlayMenuReports.at(-1).reportOptions.extraDiagnostics.senseCardReport.target.contentNodeId,
+  "definition:2",
+);
+assert.equal(overlayMenuReports.at(-1).source, "sense-card-report");
 assert.equal(overlayMenuCalls.join("|"), "feedback:Previous feedback|debug:dictionary-card-translation-ok:card-menu|render");
 assert.equal(dictionaryPresentation.overlaySectionTranslation({
   card: { id: "card-1" },

@@ -22,6 +22,7 @@
       learn: "Learn",
       markKnown: "Mark as known",
       markedKnown: "Marked as known",
+      new: "New",
       undo: "Undo",
       again: "Again",
       hard: "Hard",
@@ -30,6 +31,8 @@
       showTranslation: "Show translation",
       hideTranslation: "Hide translation",
       playAudio: "Play pronunciation",
+      expandMeaning: "Expand meaning",
+      collapseMeaning: "Collapse meaning",
       report: "Report",
     },
     nl: {
@@ -54,6 +57,7 @@
       learn: "Leren",
       markKnown: "Markeer als bekend",
       markedKnown: "Gemarkeerd als bekend",
+      new: "Nieuw",
       undo: "Ongedaan maken",
       again: "Opnieuw",
       hard: "Lastig",
@@ -62,6 +66,8 @@
       showTranslation: "Vertaling tonen",
       hideTranslation: "Vertaling verbergen",
       playAudio: "Uitspraak afspelen",
+      expandMeaning: "Betekenis uitklappen",
+      collapseMeaning: "Betekenis inklappen",
       report: "Melden",
     },
     ru: {
@@ -86,6 +92,7 @@
       learn: "Учить",
       markKnown: "Отметить как знакомое",
       markedKnown: "Отмечено как знакомое",
+      new: "Новое",
       undo: "Отменить",
       again: "Снова",
       hard: "Трудно",
@@ -94,6 +101,8 @@
       showTranslation: "Показать перевод",
       hideTranslation: "Скрыть перевод",
       playAudio: "Воспроизвести произношение",
+      expandMeaning: "Раскрыть значение",
+      collapseMeaning: "Свернуть значение",
       report: "Сообщить",
     },
   };
@@ -139,6 +148,7 @@
     );
     const targetLanguageCode = options.translationTargetLanguageCode || "";
     const translationVisible = Boolean(options.translationVisible);
+    const overlayTranslation = readyOverlayTranslation(options.overlayTranslation);
     const group = card.group || {};
     const entry = card.entry || {};
     const header = group.header || {};
@@ -151,10 +161,20 @@
       null;
     const examples = nodes
       .filter((node) => node.kind === "example")
-      .map((node) => contentNodeView(node, targetLanguageCode, translationVisible));
+      .map((node, index) => contentNodeView(
+        node,
+        targetLanguageCode,
+        translationVisible,
+        overlayExampleTranslation(overlayTranslation, index),
+      ));
     const usage = nodes
       .filter((node) => node.kind === "usage-pattern" || node.kind === "usage-note")
-      .map((node) => contentNodeView(node, targetLanguageCode, translationVisible));
+      .map((node, index) => contentNodeView(
+        node,
+        targetLanguageCode,
+        translationVisible,
+        overlayUsageTranslation(overlayTranslation, index),
+      ));
     const capabilities = entry.capabilities || [];
     const reviewActions = capabilities
       .filter((capability) => capability.actionId === "review-card")
@@ -177,7 +197,8 @@
     );
     const hasReadyTranslation = Boolean(
       readyEntryTranslation(entry.translation, targetLanguageCode) ||
-      nodes.some((node) => readyNodeTranslation(node, targetLanguageCode)),
+      nodes.some((node) => readyNodeTranslation(node, targetLanguageCode)) ||
+      overlayTranslation,
     );
     const partOfSpeech = entry.partOfSpeech || header.partOfSpeech || null;
 
@@ -190,7 +211,8 @@
       article: header.article || "",
       headword: header.displayPronunciation || header.text || "",
       headwordTranslation: translationVisible
-        ? readyEntryTranslation(entry.translation, targetLanguageCode)?.text || ""
+        ? readyEntryTranslation(entry.translation, targetLanguageCode)?.text ||
+          cleanText(overlayTranslation?.headword)
         : "",
       partOfSpeechTermId: partOfSpeech?.termId || "",
       partOfSpeechLabel: semanticTermLabel(partOfSpeech, languageCode),
@@ -198,12 +220,17 @@
       indicators: group.indicators || [],
       repeatLabel: entry.card?.scheduler?.repeatCount
         ? `${entry.card.scheduler.repeatCount}×`
-        : "",
+        : message("new", languageCode),
       audio: header.audio || null,
-      canToggleTranslation: hasReadyTranslation,
+      canToggleTranslation: hasReadyTranslation || options.canRequestTranslation === true,
       translationVisible,
       definition: definitionNode
-        ? contentNodeView(definitionNode, targetLanguageCode, translationVisible)
+        ? contentNodeView(
+          definitionNode,
+          targetLanguageCode,
+          translationVisible,
+          overlayDefinitionTranslation(overlayTranslation),
+        )
         : { id: "", text: "", translation: "" },
       examples,
       usage,
@@ -211,7 +238,10 @@
       markKnownAction,
       undoKnownAction,
       reviewActions,
-      reportCapability: capabilities.find((capability) => capability.actionId === "report-content") || null,
+      reportAction: reportView(
+        capabilities.find((capability) => capability.actionId === "report-content"),
+        languageCode,
+      ),
       labels: {
         meanings: message(group.senseCount === 1 ? "meaning" : "meanings", languageCode),
         examples: message("examples", languageCode),
@@ -222,8 +252,63 @@
         showTranslation: message("showTranslation", languageCode),
         hideTranslation: message("hideTranslation", languageCode),
         playAudio: message("playAudio", languageCode),
+        expandMeaning: message("expandMeaning", languageCode),
+        collapseMeaning: message("collapseMeaning", languageCode),
         report: message("report", languageCode),
       },
+    };
+  }
+
+  function groupViewModel(cards, options = {}) {
+    const semanticCards = (cards || [])
+      .filter(isSenseCard)
+      .sort((left, right) => {
+        const leftOrdinal = Number.isFinite(left?.entry?.meaningOrdinal)
+          ? left.entry.meaningOrdinal
+          : Number.MAX_SAFE_INTEGER;
+        const rightOrdinal = Number.isFinite(right?.entry?.meaningOrdinal)
+          ? right.entry.meaningOrdinal
+          : Number.MAX_SAFE_INTEGER;
+        return leftOrdinal - rightOrdinal ||
+          String(left?.entryId || "").localeCompare(String(right?.entryId || ""));
+      });
+    if (!semanticCards.length) return null;
+    const groupId = semanticCards[0]?.group?.headwordGroupId || "";
+    const groupCards = semanticCards.filter(
+      (card) => (card?.group?.headwordGroupId || "") === groupId,
+    );
+    const expandedByEntryId = options.expandedByEntryId || {};
+    const translationVisibleByEntryId = options.translationVisibleByEntryId || {};
+    const overlayTranslationByEntryId = options.overlayTranslationByEntryId || {};
+    const meanings = groupCards.map((card, index) => ({
+      ...cardViewModel(card, {
+        ...options,
+        translationVisible: translationVisibleByEntryId[card.entryId] === true,
+        overlayTranslation: overlayTranslationByEntryId[card.entryId] || null,
+      }),
+      meaningOrdinal: card.entry.meaningOrdinal,
+      numberLabel: String(card.entry.meaningOrdinal || index + 1),
+      expanded: Object.prototype.hasOwnProperty.call(expandedByEntryId, card.entryId)
+        ? expandedByEntryId[card.entryId] === true
+        : index === 0,
+    }));
+    const first = meanings[0];
+    const group = groupCards[0].group || {};
+    return {
+      contractVersion: "dict-sense-card-group-v1",
+      groupId,
+      article: first.article,
+      headword: first.headword,
+      partOfSpeechTermId: first.partOfSpeechTermId,
+      partOfSpeechLabel: first.partOfSpeechLabel,
+      indicators: first.indicators,
+      audio: first.audio,
+      senseCount: group.senseCount || meanings.length,
+      canToggleTranslation: meanings.some((meaning) => meaning.canToggleTranslation),
+      translationVisible: meanings.length > 0 &&
+        meanings.every((meaning) => meaning.translationVisible),
+      meanings,
+      labels: first.labels,
     };
   }
 
@@ -237,14 +322,51 @@
       : term.sourceValue || term.termId || "";
   }
 
-  function contentNodeView(node, targetLanguageCode, translationVisible) {
+  function contentNodeView(
+    node,
+    targetLanguageCode,
+    translationVisible,
+    overlayTranslation = "",
+  ) {
     return {
       id: node.contentNodeId || "",
       text: node.text || "",
       translation: translationVisible
-        ? readyNodeTranslation(node, targetLanguageCode)?.text || ""
+        ? readyNodeTranslation(node, targetLanguageCode)?.text || cleanText(overlayTranslation)
         : "",
     };
+  }
+
+  function readyOverlayTranslation(translation) {
+    if (!translation || translation.error || typeof translation.overlay !== "object") return null;
+    return translation.overlay;
+  }
+
+  function overlayDefinitionTranslation(overlay) {
+    return cleanText(overlayMeanings(overlay)[0]?.definition);
+  }
+
+  function overlayExampleTranslation(overlay, exampleIndex = 0) {
+    const examples = overlayMeanings(overlay).flatMap((meaning) =>
+      Array.isArray(meaning?.examples) ? meaning.examples : [],
+    );
+    return cleanText(examples[exampleIndex]);
+  }
+
+  function overlayUsageTranslation(overlay, usageIndex = 0) {
+    const usage = overlayMeanings(overlay).flatMap((meaning) => [
+      meaning?.context,
+      meaning?.note,
+    ].filter(Boolean));
+    return cleanText(usage[usageIndex]);
+  }
+
+  function overlayMeanings(overlay) {
+    return Array.isArray(overlay?.meanings) ? overlay.meanings : [];
+  }
+
+  function cleanText(value) {
+    return typeof value === "string" ? value.trim() : "";
   }
 
   function readyEntryTranslation(translation, targetLanguageCode) {
@@ -288,10 +410,21 @@
     };
   }
 
+  function reportView(capability, languageCode) {
+    if (!capability) return null;
+    return {
+      id: capability.elementId,
+      label: message("report", languageCode),
+      actionId: capability.actionId,
+      target: capability.target,
+    };
+  }
+
   window.__afShadowingSenseCardPresentation = {
     isSenseCard,
     interfaceLanguageCode,
     message,
     cardViewModel,
+    groupViewModel,
   };
 })();

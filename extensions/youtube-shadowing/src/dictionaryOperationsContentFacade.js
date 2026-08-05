@@ -73,6 +73,14 @@
       });
     }
 
+    function reportCardDictionaryIssue(card, reportAction = null) {
+      return modules.dictionaryOverlayWorkflowApi.reportCardDictionaryIssue(card, {
+        state: state(),
+        issueReports: modules.issueReportsApi,
+        openIssueReportDialog: commands.openIssueReportDialog,
+      }, reportAction);
+    }
+
     function cardAudioPlayable(card) {
       return modules.dictionaryAudioApi.cardAudioPlayable(card);
     }
@@ -322,6 +330,7 @@
       saveSelectedSpanCard,
       selectedSpanSourceBinding,
       renderCardActionMenu,
+      reportCardDictionaryIssue,
       cardAudioPlayable,
       playHeadwordAudio,
       resolveHeadwordAudioUrl,

@@ -682,15 +682,20 @@ function runDictionaryUiScenario() {
     const previewEvidence = captureChromeScreenshot("dictionary-ui-focused-previews");
     scrollDictionaryToTop();
     sleep(300);
+    const semanticMode = dictionaryUiMock === "sense-card";
     const translateClick = clickDictionaryTranslate(0);
     sleep(900);
     const afterTranslate = readGeometrySnapshot();
     const translatedEvidence = captureChromeScreenshot("dictionary-ui-focused-translated");
+    const secondMeaningExpandClick = semanticMode
+      ? clickSenseMeaningDisclosure(1)
+      : "not-applicable";
+    if (semanticMode) sleep(500);
+    const afterSecondMeaningExpand = semanticMode ? readGeometrySnapshot() : null;
     const evidencePaths = [focusedEvidence, detailsEvidence, previewEvidence, translatedEvidence].filter(Boolean);
     const previewWidths = beforeTranslate.dictionaryUi?.searchItemTextWidths || [];
     const minPreviewWidth = previewWidths.length ? Math.min(...previewWidths) : null;
     const translationStyles = afterTranslate.dictionaryUi?.inlineTranslationStyles || [];
-    const semanticMode = dictionaryUiMock === "sense-card";
 
     assertions.push(
       assertion("dictionary ui panel loaded", initial.panel === true, JSON.stringify({ source: initial.source, count: initial.count, error: initial.error })),
@@ -704,18 +709,26 @@ function runDictionaryUiScenario() {
     );
 
     if (semanticMode) {
-      const beforeCard = beforeTranslate.dictionaryUi?.senseCards?.[0] || {};
-      const afterCard = afterTranslate.dictionaryUi?.senseCards?.[0] || {};
+      const beforeGroup = beforeTranslate.dictionaryUi?.senseGroups?.[0] || {};
+      const afterGroup = afterTranslate.dictionaryUi?.senseGroups?.[0] || {};
+      const afterExpandedGroup = afterSecondMeaningExpand?.dictionaryUi?.senseGroups?.[0] || {};
+      const beforeMeanings = beforeGroup.meanings || [];
+      const afterMeanings = afterGroup.meanings || [];
+      const afterExpandedMeanings = afterExpandedGroup.meanings || [];
       assertions.push(
-        assertion("dictionary ui renders exactly one semantic SenseCard", ready.dictionaryUi?.senseCardCount === 1, JSON.stringify(ready.dictionaryUi || {})),
+        assertion("dictionary ui renders exactly one semantic SenseCard group", ready.dictionaryUi?.senseGroupCount === 1, JSON.stringify(ready.dictionaryUi || {})),
+        assertion("dictionary ui renders two independently addressed meanings", beforeMeanings.length === 2 && beforeMeanings[0]?.entryId === "entry:bank:1" && beforeMeanings[1]?.entryId === "entry:bank:2", JSON.stringify(beforeGroup)),
         assertion("dictionary ui does not fall back to legacy overlay cards", ready.dictionaryUi?.overlayCardCount === 0, JSON.stringify(ready.dictionaryUi || {})),
-        assertion("dictionary ui preserves semantic entry contract", beforeCard.contractVersion === "dict-sense-card-entry-v1", JSON.stringify(beforeCard)),
-        assertion("dictionary ui renders semantic headword and definition", beforeCard.headword === "bank" && /meubelstuk/i.test(beforeCard.definition || ""), JSON.stringify(beforeCard)),
-        assertion("dictionary ui renders canonical part-of-speech term", beforeCard.partOfSpeechTermId === "part-of-speech.zn" && Boolean(beforeCard.partOfSpeech), JSON.stringify(beforeCard)),
-        assertion("dictionary ui renders four semantic review actions", JSON.stringify(beforeCard.reviewResults) === JSON.stringify(["fail", "hard", "success", "easy"]), JSON.stringify(beforeCard)),
-        assertion("dictionary ui starts with semantic translations hidden", beforeCard.translationCount === 0, JSON.stringify(beforeCard)),
+        assertion("dictionary ui preserves semantic group contract", beforeGroup.contractVersion === "dict-sense-card-group-v1", JSON.stringify(beforeGroup)),
+        assertion("dictionary ui renders semantic headword and definitions", beforeGroup.headword === "bank" && beforeMeanings.every((meaning) => Boolean(meaning.definition)), JSON.stringify(beforeGroup)),
+        assertion("dictionary ui renders canonical part-of-speech term", beforeGroup.partOfSpeechTermId === "part-of-speech.zn" && Boolean(beforeGroup.partOfSpeech), JSON.stringify(beforeGroup)),
+        assertion("dictionary ui starts with first meaning expanded and second collapsed", beforeMeanings[0]?.expanded === true && beforeMeanings[1]?.expanded === false, JSON.stringify(beforeMeanings)),
+        assertion("dictionary ui keeps review actions on the expanded meaning only", JSON.stringify(beforeMeanings[0]?.reviewResults) === JSON.stringify(["fail", "hard", "success", "easy"]) && beforeMeanings[1]?.reviewResults?.length === 0, JSON.stringify(beforeMeanings)),
+        assertion("dictionary ui starts with semantic translations hidden", beforeGroup.translationCount === 0, JSON.stringify(beforeGroup)),
         assertion("dictionary ui semantic translate action clicked", translateClick === "clicked", translateClick),
-        assertion("dictionary ui reveals entry and node translations", afterCard.translationCount >= 2 && /скамья/.test(afterCard.headwordTranslation || "") && /предмет мебели/.test(afterCard.translations?.join(" ") || ""), JSON.stringify(afterCard)),
+        assertion("dictionary ui reveals translations for both meanings", afterGroup.translationCount >= 4 && /скамья/.test(afterMeanings[0]?.headwordTranslation || "") && /банк/.test(afterMeanings[1]?.headwordTranslation || "") && /предмет мебели/.test(afterMeanings[0]?.translations?.join(" ") || ""), JSON.stringify(afterGroup)),
+        assertion("dictionary ui expands the second meaning independently", secondMeaningExpandClick === "clicked" && afterExpandedMeanings[0]?.expanded === true && afterExpandedMeanings[1]?.expanded === true, JSON.stringify(afterExpandedMeanings)),
+        assertion("dictionary ui exposes the second meaning's own learning actions", afterExpandedMeanings[1]?.progressActions?.some((label) => /learn|leren|учить/i.test(label)), JSON.stringify(afterExpandedMeanings[1] || {})),
       );
     } else {
       assertions.push(
@@ -2498,6 +2511,7 @@ function readGeometrySnapshot() {
         lookupState: dictionary.querySelector(".af-lookup-placeholder")?.className || "",
         overlayCardCount: dictionary.querySelectorAll(".af-overlay-card").length,
         senseCardCount: dictionary.querySelectorAll(".af-sense-card").length,
+        senseGroupCount: dictionary.querySelectorAll(".af-sense-card-group").length,
         generatedFallbackCardCount: dictionary.querySelectorAll(".af-generated-fallback-card").length,
         senseCards: Array.from(dictionary.querySelectorAll(".af-sense-card")).map((card) => ({
           contractVersion: card.dataset.afContractVersion || "",
@@ -2519,6 +2533,30 @@ function readGeometrySnapshot() {
             pressed: button.getAttribute("aria-pressed") || "",
           })),
         })),
+        senseGroups: Array.from(dictionary.querySelectorAll(".af-sense-card-group")).map((group) => {
+          const meanings = Array.from(group.querySelectorAll(".af-sense-meaning")).map((meaning) => ({
+            entryId: meaning.dataset.afEntryId || "",
+            expanded: meaning.dataset.afExpanded === "true",
+            headwordTranslation: meaning.querySelector(".af-sense-headword-translation")?.textContent.trim() || "",
+            definition: meaning.querySelector(".af-sense-meaning-copy .af-sense-copy")?.textContent.trim() || "",
+            translations: Array.from(meaning.querySelectorAll(".af-sense-translation")).map((item) => item.textContent.trim()),
+            reviewResults: Array.from(meaning.querySelectorAll(".af-sense-review")).map((button) =>
+              ["fail", "hard", "success", "easy"].find((result) => button.classList.contains("is-" + result)) || ""
+            ),
+            progressActions: Array.from(meaning.querySelectorAll(".af-sense-progress button")).map((button) =>
+              button.textContent.trim()
+            ),
+          }));
+          return {
+            contractVersion: group.dataset.afContractVersion || "",
+            groupId: group.dataset.afHeadwordGroupId || "",
+            headword: group.querySelector(".af-sense-title .af-sense-headword")?.textContent.trim() || "",
+            partOfSpeechTermId: group.querySelector(".af-sense-pos-label")?.dataset.afTermId || "",
+            partOfSpeech: group.querySelector(".af-sense-pos-label")?.textContent.trim() || "",
+            translationCount: group.querySelectorAll(".af-sense-headword-translation, .af-sense-translation").length,
+            meanings,
+          };
+        }),
         cards: Array.from(dictionary.querySelectorAll(".af-overlay-card")).map((card) => ({
           title: card.querySelector(".af-overlay-card-headword")?.textContent ||
             card.querySelector(".af-overlay-card-title")?.textContent || "",
@@ -3011,7 +3049,8 @@ function clickDictionaryTranslate(index) {
   const root = document.querySelector("#audiofilms-root")?.shadowRoot;
   const buttons = Array.from(root?.querySelectorAll(
     "#af-shadowing-dictionary-panel .af-overlay-card .af-card-translate, " +
-    "#af-shadowing-dictionary-panel .af-sense-card .af-sense-translate"
+    "#af-shadowing-dictionary-panel .af-sense-card .af-sense-translate, " +
+    "#af-shadowing-dictionary-panel .af-sense-card-group .af-sense-translate"
   ) || []);
   const button = buttons[${Number(index)}];
   if (!button) return "not-found";
@@ -3045,6 +3084,21 @@ function clickDictionaryCardMenu(index) {
       buttons: type === "pointerdown" || type === "mousedown" ? 1 : 0,
     }));
   }
+  return "clicked";
+})()
+  `);
+}
+
+function clickSenseMeaningDisclosure(index) {
+  return chromeEval(`
+(() => {
+  const root = document.querySelector("#audiofilms-root")?.shadowRoot;
+  const buttons = Array.from(root?.querySelectorAll(
+    "#af-shadowing-dictionary-panel .af-sense-card-group .af-sense-disclosure"
+  ) || []);
+  const button = buttons[${Number(index)}];
+  if (!button) return "not-found";
+  button.click();
   return "clicked";
 })()
   `);
@@ -3140,7 +3194,7 @@ function scrollDictionaryToCardDetails() {
 (() => {
   const root = document.querySelector("#audiofilms-root")?.shadowRoot;
   const panel = root?.querySelector("#af-shadowing-dictionary-panel");
-  const details = panel?.querySelector(".af-overlay-details-content");
+  const details = panel?.querySelector(".af-overlay-details-content, .af-sense-meaning.is-expanded");
   if (!panel || !details) return "not-found";
   details.scrollIntoView({ block: "start", inline: "nearest" });
   return "scrolled";
