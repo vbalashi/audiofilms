@@ -5088,6 +5088,21 @@ const semanticSenseCard = {
           },
         ],
       },
+      {
+        contentNodeId: "usage-pattern:1",
+        parentContentNodeId: null,
+        kind: "usage-pattern",
+        order: 2,
+        text: "op de bank zitten",
+        translations: [
+          {
+            translationId: "translation:usage:ru",
+            targetLanguageCode: "ru",
+            status: "ready",
+            text: "сидеть на диване",
+          },
+        ],
+      },
     ],
     translation: {
       targetLanguageCode: "ru",
@@ -5178,6 +5193,7 @@ assert.equal(
   "предмет мебели, на котором можно сидеть",
 );
 assert.equal(semanticCardVisibleTranslation.examples[0].translation, "Маргрит сидела на скамье.");
+assert.equal(semanticCardVisibleTranslation.usage[0].translation, "сидеть на диване");
 assert.equal(semanticCardVisibleTranslation.labels.examples, "ПРИМЕРЫ");
 assert.equal(semanticCardVisibleTranslation.partOfSpeechLabel, "сущ.");
 const semanticCardEnglish = senseCardPresentation.cardViewModel(semanticSenseCard, {
@@ -5377,6 +5393,11 @@ assert.deepEqual(
   singlePartOfSpeech.children.map((child) => child.textContent),
   ["zelfstandig naamwoord", "zn"],
 );
+const singleSectionIcons = singleSenseElement.children
+  .filter((child) => child.className === "af-sense-section-header")
+  .map((header) => header.children[0]?.dataset?.afIcon)
+  .filter(Boolean);
+assert.deepEqual(singleSectionIcons, ["braces", "quote"]);
 assert.equal(
   singleSenseElement.children.some((child) =>
     child.className === "af-sense-section-header" && child.children[0]?.textContent === "BETEKENIS"

@@ -573,6 +573,21 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   letter-spacing: 0.09em;
 }
 
+.af-sense-section-icon {
+  display: inline-grid;
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  place-items: center;
+  color: var(--af-dim);
+  opacity: 0.86;
+}
+
+.af-sense-section-icon .af-button-icon {
+  width: 12px;
+  height: 12px;
+}
+
 .af-sense-section-line {
   height: 1px;
   flex: 1 1 auto;

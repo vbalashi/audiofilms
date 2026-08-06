@@ -51,7 +51,7 @@
     }
 
     if (view.usage?.length) {
-      sectionHeader(card, view.labels.usage);
+      sectionHeader(card, view.labels.usage, "", "braces", options.iconSvg);
       const usageList = append(card, "div", "af-sense-usage-list");
       for (const usage of view.usage) {
         renderTextPair(usageList, usage, "af-sense-usage");
@@ -59,7 +59,7 @@
     }
 
     if (view.examples?.length) {
-      sectionHeader(card, view.labels.examples, String(view.examples.length));
+      sectionHeader(card, view.labels.examples, String(view.examples.length), "quote", options.iconSvg);
       const examples = append(card, "div", "af-sense-examples");
       for (const example of view.examples) {
         renderTextPair(examples, example, "af-sense-example");
@@ -164,14 +164,14 @@
     if (!view.expanded) return wrapper;
 
     if (view.usage?.length) {
-      sectionHeader(surface, view.labels.usage);
+      sectionHeader(surface, view.labels.usage, "", "braces", options.iconSvg);
       const usageList = append(surface, "div", "af-sense-usage-list");
       for (const usage of view.usage) {
         renderTextPair(usageList, usage, "af-sense-usage");
       }
     }
     if (view.examples?.length) {
-      sectionHeader(surface, view.labels.examples, String(view.examples.length));
+      sectionHeader(surface, view.labels.examples, String(view.examples.length), "quote", options.iconSvg);
       const examples = append(surface, "div", "af-sense-examples");
       for (const example of view.examples) {
         renderTextPair(examples, example, "af-sense-example");
@@ -233,8 +233,13 @@
     return footer;
   }
 
-  function sectionHeader(parent, label, count = "") {
+  function sectionHeader(parent, label, count = "", icon = "", iconSvg = null) {
     const header = append(parent, "div", "af-sense-section-header");
+    if (icon) {
+      const sectionIcon = append(header, "span", "af-sense-section-icon");
+      sectionIcon.innerHTML = iconSvg?.(icon) || "";
+      sectionIcon.dataset.afIcon = icon;
+    }
     append(header, "span", "af-sense-section-label").textContent = label;
     append(header, "span", "af-sense-section-line");
     if (count) append(header, "span", "af-sense-section-count").textContent = count;
