@@ -484,14 +484,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   gap: 6px;
 }
 
-.af-sense-count-label {
-  margin-right: 2px;
-  color: var(--af-dim);
-  font-size: 10px;
-  font-weight: 680;
-  white-space: nowrap;
-}
-
 .af-sense-icon-button {
   display: grid;
   width: 30px;

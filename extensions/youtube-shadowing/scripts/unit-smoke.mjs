@@ -5149,7 +5149,7 @@ const semanticCardHiddenTranslation = senseCardPresentation.cardViewModel(semant
 assert.equal(semanticCardHiddenTranslation.headword, "bank");
 assert.equal(semanticCardHiddenTranslation.partOfSpeechTermId, "part-of-speech.zn");
 assert.equal(semanticCardHiddenTranslation.partOfSpeechLabel, "zn");
-assert.equal(semanticCardHiddenTranslation.senseCountLabel, "1 betekenis");
+assert.equal(semanticCardHiddenTranslation.senseCountLabel, undefined);
 assert.equal(semanticCardHiddenTranslation.headwordTranslation, "");
 assert.equal(semanticCardHiddenTranslation.definition.translation, "");
 assert.equal(semanticCardHiddenTranslation.repeatLabel, "3×");

@@ -20,9 +20,6 @@
     }
 
     const tools = append(meta, "div", "af-sense-tools");
-    if (view.senseCountLabel) {
-      append(tools, "span", "af-sense-count-label").textContent = view.senseCountLabel;
-    }
     if (view.canToggleTranslation) {
       const translate = iconButton(
         tools,

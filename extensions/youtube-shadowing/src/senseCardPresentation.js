@@ -15,7 +15,6 @@
       "partOfSpeech.zn": "noun",
       meaning: "MEANING",
       meanings: "MEANINGS",
-      oneMeaning: "1 meaning",
       examples: "EXAMPLES",
       usage: "USAGE",
       prompt: "HOW WELL DID YOU KNOW THIS MEANING?",
@@ -50,7 +49,6 @@
       "partOfSpeech.zn": "zelfstandig naamwoord",
       meaning: "BETEKENIS",
       meanings: "BETEKENISSEN",
-      oneMeaning: "1 betekenis",
       examples: "VOORBEELDEN",
       usage: "GEBRUIK",
       prompt: "HOE GOED KEN JE DEZE BETEKENIS?",
@@ -85,7 +83,6 @@
       "partOfSpeech.zn": "существительное",
       meaning: "ЗНАЧЕНИЕ",
       meanings: "ЗНАЧЕНИЯ",
-      oneMeaning: "1 значение",
       examples: "ПРИМЕРЫ",
       usage: "УПОТРЕБЛЕНИЕ",
       prompt: "НАСКОЛЬКО ХОРОШО ВЫ ЗНАЛИ ЭТО ЗНАЧЕНИЕ?",
@@ -216,7 +213,6 @@
         : "",
       partOfSpeechTermId: partOfSpeech?.termId || "",
       partOfSpeechLabel: semanticTermLabel(partOfSpeech, languageCode),
-      senseCountLabel: group.senseCount === 1 ? message("oneMeaning", languageCode) : "",
       indicators: group.indicators || [],
       repeatLabel: entry.card?.scheduler?.repeatCount
         ? `${entry.card.scheduler.repeatCount}×`
