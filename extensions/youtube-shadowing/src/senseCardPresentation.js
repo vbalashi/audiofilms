@@ -15,9 +15,9 @@
       "partOfSpeech.zn": "noun",
       meaning: "MEANING",
       meanings: "MEANINGS",
-      oneMeaning: "1 meaning",
       examples: "EXAMPLES",
       usage: "USAGE",
+      idioms: "IDIOMS",
       prompt: "HOW WELL DID YOU KNOW THIS MEANING?",
       learn: "Learn",
       markKnown: "Mark as known",
@@ -50,9 +50,9 @@
       "partOfSpeech.zn": "zelfstandig naamwoord",
       meaning: "BETEKENIS",
       meanings: "BETEKENISSEN",
-      oneMeaning: "1 betekenis",
       examples: "VOORBEELDEN",
       usage: "GEBRUIK",
+      idioms: "UITDRUKKINGEN",
       prompt: "HOE GOED KEN JE DEZE BETEKENIS?",
       learn: "Leren",
       markKnown: "Markeer als bekend",
@@ -85,9 +85,9 @@
       "partOfSpeech.zn": "существительное",
       meaning: "ЗНАЧЕНИЕ",
       meanings: "ЗНАЧЕНИЯ",
-      oneMeaning: "1 значение",
       examples: "ПРИМЕРЫ",
       usage: "УПОТРЕБЛЕНИЕ",
+      idioms: "ВЫРАЖЕНИЯ",
       prompt: "НАСКОЛЬКО ХОРОШО ВЫ ЗНАЛИ ЭТО ЗНАЧЕНИЕ?",
       learn: "Учить",
       markKnown: "Отметить как знакомое",
@@ -175,6 +175,13 @@
         translationVisible,
         overlayUsageTranslation(overlayTranslation, index),
       ));
+    const idioms = nodes
+      .filter((node) => node.kind === "idiom" || node.kind === "idiom-explanation")
+      .map((node) => contentNodeView(
+        node,
+        targetLanguageCode,
+        translationVisible,
+      ));
     const capabilities = entry.capabilities || [];
     const reviewActions = capabilities
       .filter((capability) => capability.actionId === "review-card")
@@ -216,8 +223,9 @@
         : "",
       partOfSpeechTermId: partOfSpeech?.termId || "",
       partOfSpeechLabel: semanticTermLabel(partOfSpeech, languageCode),
-      senseCountLabel: group.senseCount === 1 ? message("oneMeaning", languageCode) : "",
+      partOfSpeechFullLabel: semanticTermFullLabel(partOfSpeech, languageCode),
       indicators: group.indicators || [],
+      repeatCount: Number(entry.card?.scheduler?.repeatCount || 0),
       repeatLabel: entry.card?.scheduler?.repeatCount
         ? `${entry.card.scheduler.repeatCount}×`
         : message("new", languageCode),
@@ -234,6 +242,7 @@
         : { id: "", text: "", translation: "" },
       examples,
       usage,
+      idioms,
       startAction,
       markKnownAction,
       undoKnownAction,
@@ -244,8 +253,10 @@
       ),
       labels: {
         meanings: message(group.senseCount === 1 ? "meaning" : "meanings", languageCode),
+        new: message("new", languageCode),
         examples: message("examples", languageCode),
         usage: message("usage", languageCode),
+        idioms: message("idioms", languageCode),
         prompt: message("prompt", languageCode),
         markedKnown: message("markedKnown", languageCode),
         undo: message("undo", languageCode),
@@ -301,6 +312,7 @@
       headword: first.headword,
       partOfSpeechTermId: first.partOfSpeechTermId,
       partOfSpeechLabel: first.partOfSpeechLabel,
+      partOfSpeechFullLabel: first.partOfSpeechFullLabel,
       indicators: first.indicators,
       audio: first.audio,
       senseCount: group.senseCount || meanings.length,
@@ -317,6 +329,13 @@
     if (PART_OF_SPEECH_SHORT_LABELS[term.messageKey]?.[languageCode]) {
       return PART_OF_SPEECH_SHORT_LABELS[term.messageKey][languageCode];
     }
+    return message(term.messageKey, languageCode) !== term.messageKey
+      ? message(term.messageKey, languageCode)
+      : term.sourceValue || term.termId || "";
+  }
+
+  function semanticTermFullLabel(term, languageCode) {
+    if (!term) return "";
     return message(term.messageKey, languageCode) !== term.messageKey
       ? message(term.messageKey, languageCode)
       : term.sourceValue || term.termId || "";

@@ -56,17 +56,25 @@
   </head>
   <body>
     <main>
-      <section class="is-full">
+      <section class="is-full" data-gate-scenario="SC-03-full">
         <h1 class="fixture-title">MULTI-SENSE · FULL · TRANSLATION ON</h1>
         <div class="af-sense-fixture-container" id="multi-full"></div>
       </section>
-      <section>
+      <section data-gate-scenario="SC-03-narrow">
         <h1 class="fixture-title">MULTI-SENSE · NARROW · TRANSLATION ON</h1>
         <div class="af-sense-fixture-container" id="multi-narrow"></div>
       </section>
-      <section>
+      <section data-gate-scenario="SC-01-narrow">
         <h1 class="fixture-title">SINGLE-SENSE · NARROW · TRANSLATION OFF</h1>
         <div class="af-sense-fixture-container" id="single-narrow"></div>
+      </section>
+      <section data-gate-scenario="SC-02-ru">
+        <h1 class="fixture-title">SINGLE-SENSE · NARROW · RU · TRANSLATION ON</h1>
+        <div class="af-sense-fixture-container" id="single-ru"></div>
+      </section>
+      <section data-gate-scenario="SC-06-long">
+        <h1 class="fixture-title">LONG HEADWORD · NARROW · TRANSLATION OFF</h1>
+        <div class="af-sense-fixture-container" id="long-narrow"></div>
       </section>
     </main>
     <script src="../../src/uiIcons.js"></script>
@@ -124,6 +132,51 @@
         {
           iconSvg: window.__afShadowingUiIcons.iconSvg,
           onTranslation: () => {},
+          onAction: () => {},
+        },
+      );
+      const singleRussianView = window.__afShadowingSenseCardPresentation.cardViewModel(
+        singleResponse.cards[0],
+        {
+          ...common,
+          interfaceLanguageCode: "ru",
+          translationVisible: true,
+        },
+      );
+      window.__afShadowingSenseCardDom.renderSenseCard(
+        document.getElementById("single-ru"),
+        singleRussianView,
+        {
+          iconSvg: window.__afShadowingUiIcons.iconSvg,
+          onTranslation: () => {},
+          onAudio: () => {},
+          onAction: () => {},
+        },
+      );
+
+      const longResponse = window.__afShadowingDictionaryMocks.mockSenseCardLookup({
+        clickedForm: "arbeidsongeschiktheidsverzekering",
+        sourceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+        singleSense: true,
+      });
+      longResponse.cards[0].group.header.text = "arbeidsongeschiktheidsverzekering";
+      longResponse.cards[0].group.header.displayPronunciation =
+        "ar·beids·on·ge·schikt·heids·ver·ze·ke·ring";
+      const longView = window.__afShadowingSenseCardPresentation.cardViewModel(
+        longResponse.cards[0],
+        {
+          ...common,
+          translationVisible: false,
+        },
+      );
+      window.__afShadowingSenseCardDom.renderSenseCard(
+        document.getElementById("long-narrow"),
+        longView,
+        {
+          iconSvg: window.__afShadowingUiIcons.iconSvg,
+          onTranslation: () => {},
+          onAudio: () => {},
           onAction: () => {},
         },
       );
