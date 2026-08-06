@@ -59,7 +59,7 @@
     }
 
     if (view.examples?.length) {
-      sectionHeader(card, view.labels.examples, String(view.examples.length), "quote", options.iconSvg);
+      sectionHeader(card, view.labels.examples, String(view.examples.length), "list", options.iconSvg);
       const examples = append(card, "div", "af-sense-examples");
       for (const example of view.examples) {
         renderTextPair(examples, example, "af-sense-example");
@@ -171,7 +171,7 @@
       }
     }
     if (view.examples?.length) {
-      sectionHeader(surface, view.labels.examples, String(view.examples.length), "quote", options.iconSvg);
+      sectionHeader(surface, view.labels.examples, String(view.examples.length), "list", options.iconSvg);
       const examples = append(surface, "div", "af-sense-examples");
       for (const example of view.examples) {
         renderTextPair(examples, example, "af-sense-example");

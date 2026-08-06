@@ -5397,7 +5397,7 @@ const singleSectionIcons = singleSenseElement.children
   .filter((child) => child.className === "af-sense-section-header")
   .map((header) => header.children[0]?.dataset?.afIcon)
   .filter(Boolean);
-assert.deepEqual(singleSectionIcons, ["braces", "quote"]);
+assert.deepEqual(singleSectionIcons, ["braces", "list"]);
 assert.equal(
   singleSenseElement.children.some((child) =>
     child.className === "af-sense-section-header" && child.children[0]?.textContent === "BETEKENIS"
