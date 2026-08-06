@@ -213,7 +213,9 @@
         : "",
       partOfSpeechTermId: partOfSpeech?.termId || "",
       partOfSpeechLabel: semanticTermLabel(partOfSpeech, languageCode),
+      partOfSpeechFullLabel: semanticTermFullLabel(partOfSpeech, languageCode),
       indicators: group.indicators || [],
+      repeatCount: Number(entry.card?.scheduler?.repeatCount || 0),
       repeatLabel: entry.card?.scheduler?.repeatCount
         ? `${entry.card.scheduler.repeatCount}×`
         : message("new", languageCode),
@@ -240,6 +242,7 @@
       ),
       labels: {
         meanings: message(group.senseCount === 1 ? "meaning" : "meanings", languageCode),
+        new: message("new", languageCode),
         examples: message("examples", languageCode),
         usage: message("usage", languageCode),
         prompt: message("prompt", languageCode),
@@ -297,6 +300,7 @@
       headword: first.headword,
       partOfSpeechTermId: first.partOfSpeechTermId,
       partOfSpeechLabel: first.partOfSpeechLabel,
+      partOfSpeechFullLabel: first.partOfSpeechFullLabel,
       indicators: first.indicators,
       audio: first.audio,
       senseCount: group.senseCount || meanings.length,
@@ -313,6 +317,13 @@
     if (PART_OF_SPEECH_SHORT_LABELS[term.messageKey]?.[languageCode]) {
       return PART_OF_SPEECH_SHORT_LABELS[term.messageKey][languageCode];
     }
+    return message(term.messageKey, languageCode) !== term.messageKey
+      ? message(term.messageKey, languageCode)
+      : term.sourceValue || term.termId || "";
+  }
+
+  function semanticTermFullLabel(term, languageCode) {
+    if (!term) return "";
     return message(term.messageKey, languageCode) !== term.messageKey
       ? message(term.messageKey, languageCode)
       : term.sourceValue || term.termId || "";

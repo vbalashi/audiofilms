@@ -156,6 +156,20 @@
             "sha256:example:bank:1",
           )],
         },
+        {
+          contentNodeId: "usage-pattern:bank:1",
+          parentContentNodeId: null,
+          kind: "usage-pattern",
+          order: 2,
+          text: "op de bank zitten",
+          sourceTextFingerprint: "sha256:usage-pattern:bank:1",
+          translations: [mockNodeTranslation(
+            "translation:usage-pattern:bank:1",
+            targetLanguageCode,
+            "сидеть на диване",
+            "sha256:usage-pattern:bank:1",
+          )],
+        },
       ],
       translation: {
         translationId: "translation:entry:bank:1",

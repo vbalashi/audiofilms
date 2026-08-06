@@ -5149,10 +5149,12 @@ const semanticCardHiddenTranslation = senseCardPresentation.cardViewModel(semant
 assert.equal(semanticCardHiddenTranslation.headword, "bank");
 assert.equal(semanticCardHiddenTranslation.partOfSpeechTermId, "part-of-speech.zn");
 assert.equal(semanticCardHiddenTranslation.partOfSpeechLabel, "zn");
+assert.equal(semanticCardHiddenTranslation.partOfSpeechFullLabel, "zelfstandig naamwoord");
 assert.equal(semanticCardHiddenTranslation.senseCountLabel, undefined);
 assert.equal(semanticCardHiddenTranslation.headwordTranslation, "");
 assert.equal(semanticCardHiddenTranslation.definition.translation, "");
 assert.equal(semanticCardHiddenTranslation.repeatLabel, "3×");
+assert.equal(semanticCardHiddenTranslation.repeatCount, 3);
 assert.equal(semanticCardHiddenTranslation.reviewActions[0].label, "Opnieuw");
 assert.equal(semanticCardHiddenTranslation.reportAction.label, "Melden");
 assert.equal(
@@ -5301,7 +5303,7 @@ const multiSenseElement = senseCardDom.renderSenseCardGroup(
   multiSenseParent,
   semanticMultiSenseView,
   {
-    iconSvg: () => "",
+    iconSvg: (kind) => `<svg data-kind="${kind}"></svg>`,
     onTranslation: () => {},
     onAction: () => {},
     onToggleExpanded: (entryId) => toggledSenseEntries.push(entryId),
@@ -5310,12 +5312,18 @@ const multiSenseElement = senseCardDom.renderSenseCardGroup(
   },
 );
 assert.equal(multiSenseElement.dataset.afHeadwordGroupId, "headword:bank");
+assert.equal(
+  multiSenseElement.children.some((child) => child.className === "af-sense-group-header"),
+  false,
+);
 const renderedMeanings = multiSenseElement.querySelectorAll("[data-af-sense-entry]");
 assert.equal(renderedMeanings.length, 2);
 assert.equal(renderedMeanings[0].dataset.afEntryId, "entry:bank:1");
 assert.equal(renderedMeanings[0].dataset.afExpanded, "true");
 assert.equal(renderedMeanings[1].dataset.afEntryId, "entry:bank:2");
 assert.equal(renderedMeanings[1].dataset.afExpanded, "false");
+const firstSenseRepeat = renderedMeanings[0].children[1].children[0].children[1];
+assert.match(firstSenseRepeat.innerHTML, /data-kind="replay"/);
 const longHeadwordParent = testDocument.createElement("div");
 const longHeadwordElement = senseCardDom.renderSenseCardGroup(
   longHeadwordParent,
@@ -5344,8 +5352,37 @@ assert.deepEqual(
   firstSenseFooter.children.map((child) => child.textContent),
   ["Melden", "✓ Markeer als bekend"],
 );
+assert.match(firstSenseFooter.children[0].innerHTML, /data-kind="flag"/);
 firstSenseFooter.children[0].listeners.click[0].listener({ stopPropagation() {} });
 assert.deepEqual(reportedSenseEntries, ["entry:bank:1:definition:1"]);
+const singleSenseParent = testDocument.createElement("div");
+const singleSenseElement = senseCardDom.renderSenseCard(
+  singleSenseParent,
+  { ...semanticCardHiddenTranslation, audio: { audioId: "audio:bank" } },
+  {
+    iconSvg: (kind) => `<svg data-kind="${kind}"></svg>`,
+    onAudio: () => {},
+  },
+);
+const singleMetaTools = singleSenseElement.children[0].children[1];
+assert.match(singleMetaTools.children[0].innerHTML, /data-kind="replay"/);
+assert.equal(
+  singleMetaTools.children.some((child) => child.title === "Uitspraak afspelen"),
+  false,
+);
+const singleTitle = singleSenseElement.children[1];
+assert.equal(singleTitle.children.at(-1).classList.contains("af-sense-title-audio"), true);
+const singlePartOfSpeech = singleSenseElement.children[0].children[0].children[1];
+assert.deepEqual(
+  singlePartOfSpeech.children.map((child) => child.textContent),
+  ["zelfstandig naamwoord", "zn"],
+);
+assert.equal(
+  singleSenseElement.children.some((child) =>
+    child.className === "af-sense-section-header" && child.children[0]?.textContent === "BETEKENIS"
+  ),
+  false,
+);
 const semanticNewCard = JSON.parse(JSON.stringify(semanticSenseCard));
 semanticNewCard.entry.card.scheduler.phase = "encountered";
 semanticNewCard.entry.card.scheduler.repeatCount = 0;

@@ -282,17 +282,17 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-sense-card-group > .af-sense-meta > .af-sense-meta-left {
   grid-row: 1;
-  grid-column: 1 / -1;
+  grid-column: 1;
 }
 
 .af-sense-card-group > .af-sense-meta > .af-sense-tools {
-  grid-row: 2;
+  grid-row: 1;
   grid-column: 2;
 }
 
 .af-sense-card-group .af-sense-title {
   grid-row: 2;
-  grid-column: 1;
+  grid-column: 1 / -1;
   margin-top: -2px;
 }
 
@@ -300,14 +300,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   font-size: clamp(31px, 10vw, 44px);
 }
 
-.af-sense-card-group .af-sense-group-header {
-  grid-row: 3;
-  grid-column: 1 / -1;
-  margin-top: -2px;
-}
-
 .af-sense-meanings {
-  grid-row: 4;
+  grid-row: 3;
   grid-column: 1 / -1;
   display: grid;
   gap: 14px;
@@ -398,6 +392,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   min-height: 24px;
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   padding: 0 7px;
   color: var(--af-muted);
   background: #17191f;
@@ -465,6 +460,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   white-space: nowrap;
 }
 
+.af-sense-pos-short {
+  display: none;
+}
+
 .af-sense-indicator {
   flex: 0 0 auto;
   padding: 2px 5px;
@@ -517,6 +516,14 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   line-height: 1;
 }
 
+.af-sense-title-audio.af-sense-icon-button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin-left: 2px;
+  border: 0;
+}
+
 .af-sense-article {
   flex: 0 0 auto;
   color: var(--af-muted);
@@ -561,8 +568,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   flex: 0 0 auto;
   color: var(--af-dim);
   font-family: var(--af-mono);
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 9px;
+  font-weight: 720;
   letter-spacing: 0.09em;
 }
 
@@ -570,6 +577,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   height: 1px;
   flex: 1 1 auto;
   background: var(--af-border);
+  opacity: 0.52;
+  transform: scaleY(0.5);
 }
 
 .af-sense-section-count,
@@ -589,6 +598,24 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   border: 1px solid var(--af-border);
   border-radius: 999px;
   line-height: 1;
+}
+
+.af-sense-repeat .af-button-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.af-sense-tools > .af-sense-repeat {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  color: var(--af-muted);
+  background: #17191f;
+  border: 1px solid var(--af-border);
+  border-radius: 7px;
+  white-space: nowrap;
 }
 
 .af-sense-definition,
@@ -753,6 +780,14 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-sense-report {
   justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.af-sense-report .af-button-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .af-sense-mark-known:hover,
@@ -795,10 +830,13 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 @container (max-width: 380px) {
   .af-sense-meta-left,
-  .af-sense-section-label,
   .af-sense-section-count,
   .af-sense-repeat {
     font-size: clamp(8px, 2.6cqi, 10px);
+  }
+
+  .af-sense-section-label {
+    font-size: clamp(7.5px, 2.35cqi, 9px);
   }
 
   .af-sense-section-header {
@@ -807,7 +845,7 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
   .af-sense-progress > .af-sense-section-header .af-sense-section-label {
     min-width: 0;
-    font-size: clamp(7px, 2.4cqi, 10px);
+    font-size: clamp(7px, 2.25cqi, 9px);
     letter-spacing: 0.05em;
     white-space: nowrap;
   }
@@ -839,13 +877,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
     grid-column: 1 / -1;
   }
 
-  .af-sense-card-group .af-sense-group-header {
-    grid-row: 3;
-    grid-column: 1 / -1;
-  }
-
   .af-sense-card-group .af-sense-meanings {
-    grid-row: 4;
+    grid-row: 3;
     grid-column: 1 / -1;
   }
 
@@ -889,6 +922,14 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   .af-sense-meaning .af-sense-repeat {
     padding: 0 5px;
     font-size: 9px;
+  }
+
+  .af-sense-pos-full {
+    display: none;
+  }
+
+  .af-sense-pos-short {
+    display: inline;
   }
 }
 

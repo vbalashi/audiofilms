@@ -13,13 +13,16 @@
       append(metaLeft, "span", "af-sense-pos-dot");
       const partOfSpeech = append(metaLeft, "span", "af-sense-pos-label");
       partOfSpeech.dataset.afTermId = view.partOfSpeechTermId || "";
-      partOfSpeech.textContent = view.partOfSpeechLabel;
+      append(partOfSpeech, "span", "af-sense-pos-full").textContent =
+        view.partOfSpeechFullLabel || view.partOfSpeechLabel;
+      append(partOfSpeech, "span", "af-sense-pos-short").textContent = view.partOfSpeechLabel;
     }
     for (const indicator of view.indicators || []) {
       append(metaLeft, "span", "af-sense-indicator").textContent = indicator.value || "";
     }
 
     const tools = append(meta, "div", "af-sense-tools");
+    renderRepeatChip(tools, view, options.iconSvg);
     if (view.canToggleTranslation) {
       const translate = iconButton(
         tools,
@@ -31,23 +34,14 @@
       translate.setAttribute("aria-pressed", String(view.translationVisible));
       translate.addEventListener("click", () => options.onTranslation?.());
     }
-    if (view.audio) {
-      const audio = iconButton(tools, "audio", view.labels.playAudio, options.iconSvg);
-      audio.disabled = !options.onAudio;
-      audio.addEventListener("click", () => options.onAudio?.());
-    }
-
     const title = append(card, "div", "af-sense-title");
     if (view.article) append(title, "span", "af-sense-article").textContent = view.article;
     appendHeadword(title, view.headword);
+    renderTitleAudio(title, view, options);
     if (view.headwordTranslation) {
       append(card, "div", "af-sense-headword-translation").textContent = view.headwordTranslation;
     }
 
-    const meaningHeader = sectionHeader(card, view.labels.meanings);
-    if (view.repeatLabel) {
-      append(meaningHeader, "span", "af-sense-repeat").textContent = view.repeatLabel;
-    }
     if (view.definition?.text) {
       const definition = append(card, "div", "af-sense-definition");
       append(definition, "p", "af-sense-copy").textContent = view.definition.text;
@@ -89,7 +83,9 @@
       append(metaLeft, "span", "af-sense-pos-dot");
       const partOfSpeech = append(metaLeft, "span", "af-sense-pos-label");
       partOfSpeech.dataset.afTermId = view.partOfSpeechTermId || "";
-      partOfSpeech.textContent = view.partOfSpeechLabel;
+      append(partOfSpeech, "span", "af-sense-pos-full").textContent =
+        view.partOfSpeechFullLabel || view.partOfSpeechLabel;
+      append(partOfSpeech, "span", "af-sense-pos-short").textContent = view.partOfSpeechLabel;
     }
     for (const indicator of view.indicators || []) {
       append(metaLeft, "span", "af-sense-indicator").textContent = indicator.value || "";
@@ -110,21 +106,11 @@
         options.onTranslation?.();
       });
     }
-    if (view.audio) {
-      const audio = iconButton(tools, "audio", view.labels.playAudio, options.iconSvg);
-      audio.disabled = !options.onAudio;
-      audio.addEventListener("click", (event) => {
-        event?.stopPropagation?.();
-        options.onAudio?.();
-      });
-    }
-
     const title = append(group, "div", "af-sense-title");
     if (view.article) append(title, "span", "af-sense-article").textContent = view.article;
     appendHeadword(title, view.headword);
+    renderTitleAudio(title, view, options, true);
 
-    const meaningHeader = sectionHeader(group, view.labels.meanings, String(view.senseCount));
-    meaningHeader.classList.add("af-sense-group-header");
     const meanings = append(group, "div", "af-sense-meanings");
     for (const meaning of view.meanings || []) {
       renderGroupMeaning(meanings, meaning, options);
@@ -161,7 +147,7 @@
       append(copy, "p", "af-sense-translation").textContent = view.definition.translation;
     }
     if (view.repeatLabel) {
-      append(lead, "span", "af-sense-repeat").textContent = view.repeatLabel;
+      renderRepeatChip(lead, view, options.iconSvg);
     }
     const disclosure = iconButton(
       lead,
@@ -234,6 +220,7 @@
     const footer = append(card, "div", "af-sense-footer");
     if (view.reportAction) {
       const report = appendButton(footer, view.labels.report, "af-sense-report");
+      report.innerHTML = `${options.iconSvg?.("flag") || ""}<span>${escapeHtml(view.labels.report)}</span>`;
       report.addEventListener("click", (event) => {
         event?.stopPropagation?.();
         options.onReport?.(view.reportAction);
@@ -252,6 +239,26 @@
     append(header, "span", "af-sense-section-line");
     if (count) append(header, "span", "af-sense-section-count").textContent = count;
     return header;
+  }
+
+  function renderRepeatChip(parent, view, iconSvg) {
+    if (!view.repeatLabel) return null;
+    const repeat = append(parent, "span", "af-sense-repeat");
+    if (view.repeatCount > 0) repeat.innerHTML = iconSvg?.("replay") || "";
+    append(repeat, "span", "af-sense-repeat-label").textContent = view.repeatLabel;
+    return repeat;
+  }
+
+  function renderTitleAudio(parent, view, options, stopPropagation = false) {
+    if (!view.audio) return null;
+    const audio = iconButton(parent, "audio", view.labels.playAudio, options.iconSvg);
+    audio.classList.add("af-sense-title-audio");
+    audio.disabled = !options.onAudio;
+    audio.addEventListener("click", (event) => {
+      if (stopPropagation) event?.stopPropagation?.();
+      options.onAudio?.();
+    });
+    return audio;
   }
 
   function renderTextPair(parent, item, className) {
