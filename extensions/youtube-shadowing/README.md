@@ -277,8 +277,9 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs \
 Pure contract/presentation coverage is part of
 `node extensions/youtube-shadowing/scripts/unit-smoke.mjs`. The matching static
 visual fixture is `scripts/fixtures/sense-card-preview.html`; it covers
-translation off/on, learning/review actions, known, and undo at the approved
-340px narrow density.
+single/multi, translation off/on, learning/review actions, known, undo, long
+headwords, and typed usage/example/idiom sections at Full, 340px Narrow, and
+the 280px regression density.
 
 ## Local ASR Dogfood
 

@@ -635,7 +635,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-sense-definition,
 .af-sense-examples,
-.af-sense-usage-list {
+.af-sense-usage-list,
+.af-sense-idioms {
   display: grid;
   gap: 8px;
 }
@@ -661,7 +662,8 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 }
 
 .af-sense-example,
-.af-sense-usage {
+.af-sense-usage,
+.af-sense-idiom {
   padding-left: 12px;
   border-left: 3px solid var(--af-accent);
 }
@@ -675,6 +677,17 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-sense-usage {
   border-left-color: var(--af-border-strong);
+}
+
+.af-sense-idiom {
+  border-left-color: var(--af-accent);
+}
+
+.af-sense-idiom .af-sense-copy {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-style: italic;
+  font-weight: 500;
 }
 
 .af-sense-progress {

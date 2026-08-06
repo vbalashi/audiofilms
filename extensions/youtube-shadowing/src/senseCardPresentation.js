@@ -17,6 +17,7 @@
       meanings: "MEANINGS",
       examples: "EXAMPLES",
       usage: "USAGE",
+      idioms: "IDIOMS",
       prompt: "HOW WELL DID YOU KNOW THIS MEANING?",
       learn: "Learn",
       markKnown: "Mark as known",
@@ -51,6 +52,7 @@
       meanings: "BETEKENISSEN",
       examples: "VOORBEELDEN",
       usage: "GEBRUIK",
+      idioms: "UITDRUKKINGEN",
       prompt: "HOE GOED KEN JE DEZE BETEKENIS?",
       learn: "Leren",
       markKnown: "Markeer als bekend",
@@ -85,6 +87,7 @@
       meanings: "ЗНАЧЕНИЯ",
       examples: "ПРИМЕРЫ",
       usage: "УПОТРЕБЛЕНИЕ",
+      idioms: "ВЫРАЖЕНИЯ",
       prompt: "НАСКОЛЬКО ХОРОШО ВЫ ЗНАЛИ ЭТО ЗНАЧЕНИЕ?",
       learn: "Учить",
       markKnown: "Отметить как знакомое",
@@ -172,6 +175,13 @@
         translationVisible,
         overlayUsageTranslation(overlayTranslation, index),
       ));
+    const idioms = nodes
+      .filter((node) => node.kind === "idiom" || node.kind === "idiom-explanation")
+      .map((node) => contentNodeView(
+        node,
+        targetLanguageCode,
+        translationVisible,
+      ));
     const capabilities = entry.capabilities || [];
     const reviewActions = capabilities
       .filter((capability) => capability.actionId === "review-card")
@@ -232,6 +242,7 @@
         : { id: "", text: "", translation: "" },
       examples,
       usage,
+      idioms,
       startAction,
       markKnownAction,
       undoKnownAction,
@@ -245,6 +256,7 @@
         new: message("new", languageCode),
         examples: message("examples", languageCode),
         usage: message("usage", languageCode),
+        idioms: message("idioms", languageCode),
         prompt: message("prompt", languageCode),
         markedKnown: message("markedKnown", languageCode),
         undo: message("undo", languageCode),

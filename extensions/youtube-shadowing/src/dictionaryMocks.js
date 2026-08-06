@@ -170,6 +170,20 @@
             "sha256:usage-pattern:bank:1",
           )],
         },
+        {
+          contentNodeId: "idiom:bank:1",
+          parentContentNodeId: null,
+          kind: "idiom",
+          order: 3,
+          text: "door de bank genomen",
+          sourceTextFingerprint: "sha256:idiom:bank:1",
+          translations: [mockNodeTranslation(
+            "translation:idiom:bank:1",
+            targetLanguageCode,
+            "в среднем · в общем и целом",
+            "sha256:idiom:bank:1",
+          )],
+        },
       ],
       translation: {
         translationId: "translation:entry:bank:1",

@@ -66,6 +66,14 @@
       }
     }
 
+    if (view.idioms?.length) {
+      sectionHeader(card, view.labels.idioms, String(view.idioms.length), "quote", options.iconSvg);
+      const idioms = append(card, "div", "af-sense-idioms");
+      for (const idiom of view.idioms) {
+        renderTextPair(idioms, idiom, "af-sense-idiom");
+      }
+    }
+
     renderProgress(card, view, options);
     renderSecondaryActions(card, view, options);
     return card;
@@ -175,6 +183,13 @@
       const examples = append(surface, "div", "af-sense-examples");
       for (const example of view.examples) {
         renderTextPair(examples, example, "af-sense-example");
+      }
+    }
+    if (view.idioms?.length) {
+      sectionHeader(surface, view.labels.idioms, String(view.idioms.length), "quote", options.iconSvg);
+      const idioms = append(surface, "div", "af-sense-idioms");
+      for (const idiom of view.idioms) {
+        renderTextPair(idioms, idiom, "af-sense-idiom");
       }
     }
     renderProgress(surface, view, {
