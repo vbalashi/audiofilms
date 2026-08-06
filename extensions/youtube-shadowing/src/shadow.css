@@ -355,16 +355,14 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 .af-sense-meaning-number {
   position: absolute;
   z-index: 1;
-  top: 0;
-  left: 0;
+  top: 1px;
+  left: 2px;
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   place-items: center;
   color: var(--af-dim);
   background: var(--af-panel);
-  border: 1px solid var(--af-border);
-  border-radius: 7px;
   font-family: var(--af-mono);
   font-size: 12px;
   font-weight: 650;
@@ -373,7 +371,6 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
 
 .af-sense-meaning.is-expanded .af-sense-meaning-number {
   color: var(--af-accent-strong);
-  border-color: var(--af-accent);
 }
 
 .af-sense-meaning-lead {
