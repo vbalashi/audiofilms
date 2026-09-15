@@ -28,6 +28,10 @@ _Avoid_: Provider, local extractor, backend provider
 The AudioFilms API layer that orchestrates subtitle providers, subtitle extractors, cache, normalization, practice phrase building, dictionary proxying, and ASR jobs. It is not a subtitle provider unless it is the actual source of authored subtitle content.
 _Avoid_: Backend provider, source
 
+**Backend Provider**:
+A concise diagnostic label meaning that AudioFilms supplied the result through its backend boundary. It may be followed by the concrete provider or extractor used inside that boundary, such as `Backend Provider · yt-dlp` or `Backend Provider · Supadata`; it is not a separate subtitle source.
+_Avoid_: Subtitle provider, source system
+
 **Retrieval Path**:
 The diagnostic route by which AudioFilms obtained timed text or metadata, such as browser caption URL, AudioFilms backend through `yt-dlp`, Supadata through the backend, transcript-panel diagnostic, or an ASR job. Retrieval path is useful for details/debug surfaces, not as the default learner-facing source label.
 _Avoid_: User source label, readiness, caption language

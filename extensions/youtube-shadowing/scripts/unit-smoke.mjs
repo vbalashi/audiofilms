@@ -3977,6 +3977,18 @@ assert.equal(noCaptionReadiness.label, "No captions");
 const preciseReadiness = sourceReadiness.practiceReadiness({ phraseCount: 2, result: { timingExactness: "word-level" } });
 assert.equal(preciseReadiness.state, "precise");
 assert.equal(preciseReadiness.label, "Precise");
+assert.equal(sourceLabels.sourceProviderLabel(
+  { track: { kind: "manual" } },
+  { fetchOrigin: "backend", provider: "yt-dlp" },
+), "Backend Provider · yt-dlp");
+assert.equal(sourceLabels.sourceProviderLabel(
+  { track: { kind: "manual" } },
+  {
+    retrievalPath: "practice-timing-cache",
+    provider: "audiofilms-practice-timing",
+    practiceSnapshot: { textSource: { provider: "yt-dlp" } },
+  },
+), "Backend Provider · yt-dlp");
 const roughReadiness = sourceReadiness.practiceReadiness({ phraseCount: 2, result: { warnings: ["fallback"] } });
 assert.equal(roughReadiness.state, "rough");
 assert.equal(roughReadiness.label, "Rough");

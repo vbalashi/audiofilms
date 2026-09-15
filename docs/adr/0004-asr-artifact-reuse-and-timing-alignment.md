@@ -41,6 +41,39 @@ The worker therefore uses `--refresh-source` for stale timing inputs. The
 smoke script keeps `--refresh` as an explicit full refresh and also supports
 separate `--refresh-audio` and `--refresh-asr` flags.
 
+## Retrieval and identity
+
+The backend boundary is the service name shown in diagnostics. The concrete
+source/extractor remains visible after the boundary, so `Backend Provider ·
+yt-dlp` means “AudioFilms backend, using yt-dlp internally.” A configured
+third-party path would be shown as `Backend Provider · Supadata`.
+
+```mermaid
+flowchart LR
+  Y[YouTube captions] --> X[yt-dlp]
+  X --> B[AudioFilms Backend]
+  B --> T[Text source + content fingerprint]
+  A[YouTube audio] --> AC[audio cache]
+  AC --> W[faster-whisper word timings]
+  W --> ASR[ASR artifact cache]
+  T --> AL[alignment]
+  ASR --> AL
+  AL --> P[practice timing snapshot]
+  P --> E[Chrome extension]
+```
+
+Reuse is determined by artifact identity, not by the display language label
+alone:
+
+```text
+ASR artifact = video + audio fingerprint + normalized language
+               + engine + model + compute settings
+Timing artifact = selected text content fingerprint + ASR artifact identity
+```
+
+Thus `nl-NL` and `nl` refer to the same normalized language for compatibility,
+while changed audio, ASR configuration, or text content creates a new artifact.
+
 ## Consequences
 
 - Re-running `Improve Timing` for the same audio can finish through the cheap
