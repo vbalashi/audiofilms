@@ -24,10 +24,9 @@
 - The practice flow now has several related caches: provider subtitles, ASR
   artifacts, manual-text alignment results, practice snapshots/phrase sets, and
   phrase translation associations.
-- These caches are not all governed by one explicit lifecycle policy. When
-  segmentation, normalization, alignment, or translation policy changes, old
-  artifacts may remain useful as evidence but should not silently drive the
-  current learner experience.
+- ASR transcript and timing/alignment reuse is now governed by
+  `docs/adr/0004-asr-artifact-reuse-and-timing-alignment.md`. Remaining work is
+  to make the artifact identity and invalidation metadata visible end to end.
 - Analyze cache keys and revision fields end to end, especially
   `textSourceRevisionId`, `timingEvidenceRevisionId`, `phraseSetRevisionId`,
   `snapshotRevisionId`, source text hashes, and translation IDs.

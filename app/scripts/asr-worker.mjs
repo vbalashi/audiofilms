@@ -143,7 +143,9 @@ function runAsrPipeline(job) {
     alignArgs.push("--duration", String(durationSec));
   }
   if (request.refresh) {
-    alignArgs.push("--refresh");
+    // A stale caption revision needs fresh alignment inputs, not a new
+    // Whisper pass. The expensive ASR artifact has its own cache identity.
+    alignArgs.push("--refresh-source");
   }
 
   execFileSync(process.execPath, alignArgs, {

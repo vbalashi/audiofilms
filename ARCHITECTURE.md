@@ -253,3 +253,5 @@ Run from `app/`:
 npm run lint
 npm run build
 ```
+
+See also [ADR-0004: ASR Artifact Reuse and Timing Alignment](docs/adr/0004-asr-artifact-reuse-and-timing-alignment.md).

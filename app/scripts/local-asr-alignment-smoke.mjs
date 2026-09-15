@@ -2,6 +2,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { asrArtifactRefreshPlan } from "./asr-cache-policy.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const appRoot = path.join(repoRoot, "app");
@@ -12,6 +13,9 @@ const videoId = valueFor("--video") || valueFor("--videoId") || "RJrjzCuCHpo";
 const language = valueFor("--lang") || "nl";
 const durationSec = Number(valueFor("--duration") || "90");
 const refresh = hasFlag("--refresh");
+const refreshSource = refresh || hasFlag("--refresh-source");
+const refreshAudio = refresh || hasFlag("--refresh-audio");
+const refreshAsr = refresh || hasFlag("--refresh-asr");
 const fullAudio = hasFlag("--full");
 const skipInstall = hasFlag("--skip-install");
 const textSource = normalizeTextSource(valueFor("--text-source") || valueFor("--textSource") || "manual");
@@ -42,17 +46,25 @@ const asrOutputPrefix = `${engineConfig.filePrefix}-${slugify(modelName)}`;
 const asrJsonPath = path.join(runDir, `${asrOutputPrefix}-words.json`);
 const manualJsonPath = path.join(runDir, "manual-captions.json");
 const reportPath = path.join(runDir, `${asrOutputPrefix}-alignment-report.md`);
+const refreshPlan = asrArtifactRefreshPlan({
+  audioExists: fs.existsSync(audioPath),
+  captionsExist: textSource === "asr" || fs.existsSync(manualJsonPath),
+  asrExists: fs.existsSync(asrJsonPath),
+  refreshSource,
+  refreshAudio,
+  refreshAsr,
+});
 
 console.log(`[local-asr] fixture=${videoId} lang=${language} duration=${fullAudio ? "full" : `${durationSec}s`} engine=${engineConfig.name} textSource=${textSource}`);
 
-if (!fs.existsSync(audioPath) || refresh) {
+if (refreshPlan.refreshAudio) {
   downloadAudio(audioPath);
 } else {
   console.log(`[local-asr] Reusing ${audioPath}`);
 }
 
 if (textSource !== "asr") {
-  if (!fs.existsSync(manualJsonPath) || refresh) {
+  if (refreshPlan.refreshCaptions) {
     const manual = fetchSourceCaptions(textSource);
     fs.writeFileSync(manualJsonPath, JSON.stringify(manual, null, 2), "utf8");
   } else {
@@ -62,7 +74,7 @@ if (textSource !== "asr") {
 
 ensureEngine();
 
-if (!fs.existsSync(asrJsonPath) || refresh) {
+if (refreshPlan.refreshAsr) {
   transcribeAudio();
 } else {
   console.log(`[local-asr] Reusing ${asrJsonPath}`);
