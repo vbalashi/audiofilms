@@ -54,9 +54,14 @@
 
     return sources.find((source) => {
       if (sourceSelectionKind(source) !== selection.sourceKind) return false;
-      if (selection.languageCode && source.languageCode !== selection.languageCode) return false;
+      if (selection.languageCode && canonicalLanguageCode(source.languageCode) !== canonicalLanguageCode(selection.languageCode)) return false;
       return true;
     }) || null;
+  }
+
+  function canonicalLanguageCode(languageCode) {
+    const base = String(languageCode || "").trim().replace(/_/g, "-").split("-")[0].toLowerCase();
+    return ({ iw: "he", in: "id", ji: "yi", jv: "jw" })[base] || base;
   }
 
   function practiceSnapshotSource({
@@ -193,6 +198,7 @@
     choosePreferredPracticeSource,
     sourceLanguageRank,
     findStoredSourceSelectionMatch,
+    canonicalLanguageCode,
     practiceSnapshotSource,
     loadedPracticeSourcePatch,
     failedPracticeSourcePatch,

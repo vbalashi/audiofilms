@@ -3971,6 +3971,17 @@ assert.equal(sourceSwitchLoadCall.source.id, "nl:manual");
 assert.equal(sourceSwitchLoadCall.options.allowPreferredSourceSwitch, false);
 assert.equal(sourceSwitchLoadCall.options.preserveVideoTime, true);
 
+const storedLocaleSelection = sourceSelection.choosePreferredPracticeSource([
+  { id: "nl:manual:0", index: 0, languageCode: "nl", track: { kind: "manual" } },
+  { id: "en:manual:1", index: 1, languageCode: "en", track: { kind: "manual" } },
+], {
+  storedSelection: { sourceId: "", sourceKind: "manual", languageCode: "nl-NL" },
+  preferredLanguageRank: (languageCode) => languageCode === "nl" ? 0 : 1,
+  preferredLanguageCodes: () => ["nl", "en"],
+});
+assert.equal(storedLocaleSelection.reason, "stored-selection");
+assert.equal(storedLocaleSelection.source.languageCode, "nl");
+
 const noCaptionReadiness = sourceReadiness.practiceReadiness({ phraseCount: 0 });
 assert.equal(noCaptionReadiness.state, "no-captions");
 assert.equal(noCaptionReadiness.label, "No captions");
