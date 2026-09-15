@@ -372,7 +372,8 @@
     const requestedLanguage = options.requestedLanguage || "auto";
     const requestedSourceKind = options.requestedSourceKind || "manual";
     const backendMode = options.backendMode || "";
-    const languageCode = payload?.language || snapshot?.textSource?.languageCode || "";
+    const rawLanguageCode = payload?.language || snapshot?.textSource?.languageCode || "";
+    const languageCode = window.__afShadowingLanguageIdentity?.normalizeLanguageCode(rawLanguageCode) || rawLanguageCode;
     const meta = payload?.meta || {};
     const provider = meta.provider || (snapshot ? "audiofilms-practice-captions" : "audiofilms-backend");
     const returnedSourceKind = backendMode === "local-asr"
@@ -390,7 +391,10 @@
     if (Array.isArray(meta.qualityFlags)) {
       qualityFlags.push(...meta.qualityFlags);
     }
-    if (languageCode && requestedLanguage !== "auto" && languageCode !== requestedLanguage) {
+    const languageComparison = languageCode && requestedLanguage !== "auto"
+      ? window.__afShadowingLanguageIdentity?.compareLanguageIdentity(languageCode, requestedLanguage) || "incompatible"
+      : "exact";
+    if (languageComparison === "incompatible") {
       qualityFlags.push("language-mismatch");
       warnings.push(`Backend provider returned ${languageCode}, requested ${requestedLanguage}.`);
     }

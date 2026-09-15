@@ -51,17 +51,18 @@
       ? sources.find((source) => source.id === selection.sourceId)
       : null;
     if (exact) return exact;
-
-    return sources.find((source) => {
-      if (sourceSelectionKind(source) !== selection.sourceKind) return false;
-      if (selection.languageCode && canonicalLanguageCode(source.languageCode) !== canonicalLanguageCode(selection.languageCode)) return false;
-      return true;
-    }) || null;
-  }
-
-  function canonicalLanguageCode(languageCode) {
-    const base = String(languageCode || "").trim().replace(/_/g, "-").split("-")[0].toLowerCase();
-    return ({ iw: "he", in: "id", ji: "yi", jv: "jw" })[base] || base;
+    const identity = window.__afShadowingLanguageIdentity;
+    const candidates = sources.filter((source) => sourceSelectionKind(source) === selection.sourceKind);
+    if (!selection.languageCode) return candidates.length === 1 ? candidates[0] : null;
+    const exactLanguage = candidates.filter((source) =>
+      identity?.compareLanguageIdentity(source.languageCode, selection.languageCode) === "exact"
+    );
+    if (exactLanguage.length === 1) return exactLanguage[0];
+    if (exactLanguage.length > 1) return null;
+    const compatible = candidates.filter((source) =>
+      identity?.compareLanguageIdentity(source.languageCode, selection.languageCode) === "compatible"
+    );
+    return compatible.length === 1 ? compatible[0] : null;
   }
 
   function practiceSnapshotSource({
@@ -198,7 +199,6 @@
     choosePreferredPracticeSource,
     sourceLanguageRank,
     findStoredSourceSelectionMatch,
-    canonicalLanguageCode,
     practiceSnapshotSource,
     loadedPracticeSourcePatch,
     failedPracticeSourcePatch,

@@ -197,8 +197,8 @@
   }
 
   function normalizeLanguageCode(languageCode) {
-    const normalized = String(languageCode || "").trim().toLowerCase().replace("_", "-");
-    return normalized === "auto" ? "" : normalized;
+    return window.__afShadowingLanguageIdentity?.normalizeLanguageCode(languageCode)
+      || String(languageCode || "").trim().toLowerCase().replace("_", "-");
   }
 
   function boundedText(value, maxLength) {

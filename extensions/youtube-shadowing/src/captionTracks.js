@@ -50,7 +50,8 @@
   }
 
   function normalizeLanguageCode(languageCode) {
-    return String(languageCode || "").trim().toLowerCase().replace("_", "-");
+    return window.__afShadowingLanguageIdentity?.normalizeLanguageCode(languageCode)
+      || String(languageCode || "").trim().toLowerCase().replace("_", "-");
   }
 
   function describeTrack(track) {

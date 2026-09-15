@@ -39,6 +39,7 @@
         "src/bootState.js",
         "src/formatUtils.js",
         "src/phrases.js",
+        "src/languageIdentity.js",
         "src/captionTracks.js",
         "src/sourceLabels.js",
         "src/sourceSelection.js",

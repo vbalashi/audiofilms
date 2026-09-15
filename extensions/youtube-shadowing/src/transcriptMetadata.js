@@ -160,7 +160,10 @@
       : snapshotFingerprint ? "practiceSnapshot.textSource.contentFingerprint" : "";
     const resultLanguage = operation?.result?.snapshot?.textSource?.languageCode || "";
     const currentLanguage = currentResult?.languageCode || currentResult?.practiceSnapshot?.textSource?.languageCode || "";
-    const languageCompatible = !resultLanguage || !currentLanguage || canonicalLanguageCode(resultLanguage) === canonicalLanguageCode(currentLanguage);
+    const languageComparison = !resultLanguage || !currentLanguage
+      ? "compatible"
+      : window.__afShadowingLanguageIdentity?.compareLanguageIdentity(resultLanguage, currentLanguage) || "incompatible";
+    const languageCompatible = languageComparison !== "incompatible";
     return {
       compatible: Boolean(resultFingerprint && currentFingerprint && resultFingerprint === currentFingerprint && languageCompatible),
       currentFingerprint,
@@ -169,11 +172,6 @@
       resultLanguage,
       currentFingerprintSource,
     };
-  }
-
-  function canonicalLanguageCode(value) {
-    const base = String(value || "").trim().replace(/_/g, "-").split("-")[0].toLowerCase();
-    return ({ iw: "he", in: "id", ji: "yi", jv: "jw" })[base] || base;
   }
 
   function transcriptResultFromPracticeSnapshot(snapshot, operation, options = {}) {

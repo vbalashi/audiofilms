@@ -34,6 +34,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingBootState",
     "__afShadowingFormatUtils",
     "__afShadowingPhrases",
+    "__afShadowingLanguageIdentity",
     "__afShadowingCaptionTracks",
     "__afShadowingSourceLabels",
     "__afShadowingSourceSelection",
@@ -1817,8 +1818,11 @@ const ribbonControls = loadBrowserModule("src/ribbonControls.js", "__afShadowing
   __afShadowingFormatUtils: formatUtils,
 });
 const phrases = loadBrowserModule("src/phrases.js", "__afShadowingPhrases");
+const languageIdentity = loadBrowserModule("src/languageIdentity.js", "__afShadowingLanguageIdentity");
 const sourceLabels = loadBrowserModule("src/sourceLabels.js", "__afShadowingSourceLabels");
-const sourceSelection = loadBrowserModule("src/sourceSelection.js", "__afShadowingSourceSelection");
+const sourceSelection = loadBrowserModule("src/sourceSelection.js", "__afShadowingSourceSelection", {
+  __afShadowingLanguageIdentity: languageIdentity,
+});
 const sourceSelectionStorage = loadBrowserModule("src/sourceSelectionStorage.js", "__afShadowingSourceSelectionStorage");
 const sourceReadiness = loadBrowserModule("src/sourceReadiness.js", "__afShadowingSourceReadiness");
 const videoLoadState = loadBrowserModule("src/videoLoadState.js", "__afShadowingVideoLoadState");
@@ -1929,6 +1933,7 @@ const issueReportsDom = loadBrowserModule("src/issueReportsDom.js", "__afShadowi
 });
 const transcriptMetadata = loadBrowserModule("src/transcriptMetadata.js", "__afShadowingTranscriptMetadata", {
   __afShadowingPhrases: phrases,
+  __afShadowingLanguageIdentity: languageIdentity,
 });
 const sourceTranscriptWorkflow = loadBrowserModule("src/sourceTranscriptWorkflow.js", "__afShadowingSourceTranscriptWorkflow");
 const transcriptPanelDom = loadBrowserModule("src/transcriptPanelDom.js", "__afShadowingTranscriptPanelDom", {
@@ -3981,6 +3986,17 @@ const storedLocaleSelection = sourceSelection.choosePreferredPracticeSource([
 });
 assert.equal(storedLocaleSelection.reason, "stored-selection");
 assert.equal(storedLocaleSelection.source.languageCode, "nl");
+assert.equal(languageIdentity.identifyLanguage("zh-Hans").canonicalTag, "zh-Hans");
+assert.equal(languageIdentity.identifyLanguage("iw-IL").canonicalTag, "he-IL");
+assert.equal(languageIdentity.compareLanguageIdentity("zh-Hans", "zh-Hant"), "incompatible");
+assert.equal(sourceSelection.choosePreferredPracticeSource([
+  { id: "pt-br", index: 0, languageCode: "pt-BR", track: { kind: "manual" } },
+  { id: "pt-pt", index: 1, languageCode: "pt-PT", track: { kind: "manual" } },
+], {
+  storedSelection: { sourceId: "", sourceKind: "manual", languageCode: "pt" },
+  preferredLanguageRank: () => 0,
+  preferredLanguageCodes: () => ["pt"],
+}).reason, "default-priority");
 
 const noCaptionReadiness = sourceReadiness.practiceReadiness({ phraseCount: 0 });
 assert.equal(noCaptionReadiness.state, "no-captions");
