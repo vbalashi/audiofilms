@@ -2889,6 +2889,10 @@ html.af-shadowing-loading-transcript #secondary > #secondary-inner {
   margin-top: 7px;
 }
 
+.af-readiness-detail-grid.is-collapsed {
+  display: none !important;
+}
+
 .af-readiness-detail {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);

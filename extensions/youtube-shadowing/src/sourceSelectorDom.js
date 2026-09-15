@@ -52,11 +52,13 @@
       event.stopPropagation?.();
       const nextOpen = details.hidden;
       details.hidden = !nextOpen;
+      details.classList.toggle("is-collapsed", !nextOpen);
       detailsToggle.setAttribute("aria-expanded", nextOpen ? "true" : "false");
       input.onDetailsToggle?.(nextOpen);
     });
     const details = appendElement(diagnostics, "div", "af-readiness-detail-grid");
     details.hidden = !detailsOpen;
+    details.classList.toggle("is-collapsed", !detailsOpen);
     for (const detail of popoverState.details?.rows || []) {
       appendReadinessDetail(details, detail.label, detail.value);
     }
