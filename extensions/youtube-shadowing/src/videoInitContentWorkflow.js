@@ -14,6 +14,7 @@
         resetTranscriptPanelState: deps.resetTranscriptPanelState,
         render: deps.render,
         waitForPlayerResponse: deps.waitForPlayerResponse,
+        audioTracks: deps.audioTracks,
         captionTracks: deps.captionTracks,
         sourceSelectionStore: deps.sourceSelectionStore,
         loadPracticeSource: deps.loadPracticeSource,

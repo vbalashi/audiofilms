@@ -24,9 +24,10 @@
     try {
       const playerResponse = await deps.waitForPlayerResponse();
       const tracks = deps.captionTracks.getCaptionTracks(playerResponse);
-      deps.applyStatePatch({ tracks });
+      const audioContext = deps.audioTracks.buildAudioContext(playerResponse);
+      deps.applyStatePatch({ tracks, audioContext });
       deps.updateBootDiagnostics?.({ captionTracksCount: tracks.length });
-      const practiceSources = deps.captionTracks.buildPracticeSources(tracks);
+      const practiceSources = deps.captionTracks.buildPracticeSources(tracks, { audioContext });
       deps.applyStatePatch({ practiceSources });
       const preferredSource = deps.sourceSelectionStore.choosePreferred(practiceSources, videoId);
       const defaultSource = preferredSource?.source || deps.captionTracks.chooseDefaultPracticeSource(practiceSources);

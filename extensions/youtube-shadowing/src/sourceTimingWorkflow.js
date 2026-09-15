@@ -78,6 +78,8 @@
     transcriptResult = null,
     transcriptMetadata,
     sourceSelection,
+    audioTracks,
+    audioContext,
     recordDebugEvent = () => {},
   } = {}) {
     if (operation?.kind !== "improve-timing" || operation.state !== "succeeded") return 0;
@@ -104,6 +106,8 @@
         practiceSources,
         transcriptMetadata,
         sourceSelection,
+        audioTracks,
+        audioContext,
       })) {
         registeredSources += 1;
       }
@@ -117,6 +121,8 @@
     practiceSources = [],
     transcriptMetadata,
     sourceSelection,
+    audioTracks,
+    audioContext,
   } = {}) {
     const snapshot = alternative?.snapshot;
     const result = transcriptMetadata.transcriptResultFromPracticeSnapshot(snapshot, operation, {
@@ -124,6 +130,9 @@
       label: alternative?.label || "",
     });
     if (!result) return false;
+    if (audioContext?.languageCode && !audioTracks?.sourceMatchesSelectedAudio(result.languageCode, audioContext)) {
+      return false;
+    }
 
     const sourceId = `practice:${operation.id || "timing"}:${alternative?.id || snapshot.snapshotRevisionId || practiceSources.length}`;
     const existing = practiceSources.find((source) => source.id === sourceId);
@@ -255,7 +264,8 @@
       !source ||
       !state.videoId ||
       deps.timingOperationState(readiness).active ||
-      readiness.state === "precise"
+      readiness.state === "precise" ||
+      deps.sourceReadiness.canRunAsrForSource?.(source, state.audioContext) === false
     ) {
       return false;
     }

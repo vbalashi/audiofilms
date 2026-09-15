@@ -21,6 +21,9 @@ const refreshAsr = refresh || hasFlag("--refresh-asr");
 const fullAudio = hasFlag("--full");
 const skipInstall = hasFlag("--skip-install");
 const textSource = normalizeTextSource(valueFor("--text-source") || valueFor("--textSource") || "manual");
+const audioTrackId = valueFor("--audio-track-id") || valueFor("--audioTrackId") || "";
+const audioTrackCount = Number(valueFor("--audio-track-count") || valueFor("--audioTrackCount") || 0);
+const audioLanguage = valueFor("--audio-language") || valueFor("--audioLanguage") || language;
 const engine = valueFor("--engine") || process.env.ASR_ENGINE || "faster-whisper";
 const engineConfig = getEngineConfig(engine);
 const modelName = valueFor("--model") || process.env.ASR_MODEL || engineConfig.defaultModel;
@@ -61,19 +64,16 @@ if (audioNeedsRefresh) {
 
 const audioFingerprint = fileFingerprint(audioPath);
 const asrIdentity = {
-  schemaVersion: 1,
-  videoId,
+  schemaVersion: 2,
   audioFingerprint,
   language,
   engine: engineConfig.name,
   model: modelName,
-  device,
-  computeType,
 };
 const storedAsrIdentity = readJson(asrManifestPath);
 const asrArtifactExists = fs.existsSync(asrJsonPath)
   && !refreshAudio
-  && JSON.stringify(storedAsrIdentity) === JSON.stringify(asrIdentity);
+  && matchesAsrArtifactIdentity(storedAsrIdentity, asrIdentity);
 const refreshPlan = asrArtifactRefreshPlan({
   audioExists: true,
   captionsExist: textSource === "asr" || fs.existsSync(manualJsonPath),
@@ -95,7 +95,10 @@ ensureEngine();
 
 if (refreshPlan.refreshAsr) {
   transcribeAudio();
-  fs.writeFileSync(asrManifestPath, JSON.stringify(asrIdentity, null, 2), "utf8");
+  fs.writeFileSync(asrManifestPath, JSON.stringify({
+    ...asrIdentity,
+    provenance: { device, computeType },
+  }, null, 2), "utf8");
 } else {
   console.log(`[local-asr] Reusing ${asrJsonPath}`);
 }
@@ -146,9 +149,18 @@ function fileFingerprint(filePath) {
 function readJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (_error) {
+  } catch {
     return null;
   }
+}
+
+function matchesAsrArtifactIdentity(stored, expected) {
+  if (!stored || typeof stored !== "object") return false;
+  const identity = stored.identity && typeof stored.identity === "object" ? stored.identity : stored;
+  return identity.audioFingerprint === expected.audioFingerprint
+    && identity.language === expected.language
+    && identity.engine === expected.engine
+    && identity.model === expected.model;
 }
 
 function findExecutable(candidates) {
@@ -194,8 +206,6 @@ function downloadAudio(outputPath) {
   console.log(`[local-asr] Downloading audio to ${outputPath}`);
   const outputTemplate = path.join(runDir, "audio.%(ext)s");
   const args = [
-    "-f",
-    "ba[ext=m4a]/ba",
     "--extract-audio",
     "--audio-format",
     "wav",
@@ -204,6 +214,9 @@ function downloadAudio(outputPath) {
     "-o",
     outputTemplate,
   ];
+
+  const formatSelector = resolveAudioFormatSelector();
+  if (formatSelector) args.splice(0, 0, "-f", formatSelector);
 
   if (!fullAudio) {
     args.push("--download-sections", `*00:00:00-${formatDuration(durationSec)}`);
@@ -217,6 +230,49 @@ function downloadAudio(outputPath) {
 
   if (!fs.existsSync(outputPath)) {
     throw new Error(`Expected audio file was not created: ${outputPath}`);
+  }
+}
+
+function resolveAudioFormatSelector() {
+  // A single provider-default track is safe to obtain with `ba`. When the
+  // provider exposes multiple tracks, require yt-dlp to identify the exact
+  // requested track instead of silently downloading another language.
+  if (!audioTrackId || audioTrackCount <= 1) return "ba[ext=m4a]/ba";
+  let metadata;
+  try {
+    metadata = JSON.parse(execFileSync(ytDlpPath, [
+      "--dump-single-json",
+      "--skip-download",
+      "--no-warnings",
+      `https://www.youtube.com/watch?v=${videoId}`,
+    ], { encoding: "utf8", maxBuffer: 100 * 1024 * 1024 }));
+  } catch (error) {
+    throw new Error(`audio_track_resolution_failed:${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const candidates = (metadata.formats || [])
+    .filter((format) => format.acodec && format.acodec !== "none")
+    .filter((format) => formatAudioTrackId(format) === audioTrackId || languageMatches(format.language, audioLanguage));
+  const exactCandidates = candidates.filter((format) => formatAudioTrackId(format) === audioTrackId);
+  const selected = (exactCandidates.length ? exactCandidates : candidates)
+    .sort((left, right) => Number(right.abr || 0) - Number(left.abr || 0))[0];
+  if (!selected?.format_id) {
+    throw new Error(`audio_track_not_resolvable:${audioTrackId}:${audioLanguage}`);
+  }
+  return String(selected.format_id);
+}
+
+function formatAudioTrackId(format) {
+  return String(format?.audio_track_id || format?.audioTrackId || format?.audio_track?.id || format?.audioTrack?.id || "");
+}
+
+function languageMatches(candidate, expected) {
+  try {
+    const candidateBase = normalizeLanguageTag(candidate || "");
+    const expectedBase = normalizeLanguageTag(expected || "");
+    return Boolean(candidateBase && expectedBase && candidateBase === expectedBase);
+  } catch {
+    return false;
   }
 }
 

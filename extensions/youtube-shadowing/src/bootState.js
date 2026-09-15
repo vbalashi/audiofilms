@@ -40,6 +40,7 @@
     return {
       videoId: null,
       tracks: [],
+      audioContext: null,
       practiceSources: [],
       selectedSourceId: "",
       sourceMenuOpen: false,

@@ -41,6 +41,21 @@
     const timingState = timingOperationState(readiness);
     const result = selectedSource?.loadedTranscriptResult || state.transcriptResult;
     const enrichment = sourceLabels.timingEnrichmentLabel(result);
+    const asrAvailable = sourceReadiness.canRunAsrForSource(selectedSource, state.audioContext);
+    const audioContext = state.audioContext || {};
+    const audioTrack = audioContext.selectedTrack || {};
+    const audioBadge = audioContext.provenance === "original"
+      ? "Original"
+      : audioContext.provenance === "auto-dubbed"
+      ? "Auto-dubbed"
+      : audioContext.provenance === "dubbed"
+      ? "Dubbed"
+      : audioTrack.isDefault
+      ? "Default"
+      : "";
+    const audioLabel = audioContext.languageCode
+      ? `${audioContext.languageCode}${audioBadge ? ` · ${audioBadge}` : ""}`
+      : "";
     const popoverState = sourceSelector.readinessPopoverState({
       cacheRefreshRequested: state.cacheRefreshRequested,
       loading: state.loading,
@@ -50,11 +65,13 @@
       result,
       enrichment,
       sourceLabel: selectedSource ? userFacingSourceLabel(selectedSource) : "No captions",
+      audioLabel,
       provider: sourceLabels.sourceProviderLabel(selectedSource, result),
       phraseCount: state.phrases?.length || 0,
       practiceSourceCount: state.practiceSources?.length || 0,
       staleReason: state.timingOperation?.result?.applicability?.staleReason,
       timingApplied: state.timingOperation?.appliedToActiveSource,
+      asrAvailable,
     });
     const sourceOptionGroups = sourceSelector.sourceOptionGroups({
       groups: captionTracks.groupPracticeSources(state.practiceSources || []),

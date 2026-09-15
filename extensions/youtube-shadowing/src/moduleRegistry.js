@@ -41,6 +41,7 @@
       bootStateApi: requiredModule(target, "__afShadowingBootState"),
       formatUtilsApi: requiredModule(target, "__afShadowingFormatUtils"),
       phraseApi: target.__afShadowingPhrases || fallbackApi.createPhraseFallback(),
+      audioTrackApi: target.__afShadowingAudioTracks,
       captionTrackApi: target.__afShadowingCaptionTracks || fallbackApi.createCaptionTracksFallback(),
       sourceLabelsApi: target.__afShadowingSourceLabels || fallbackApi.createSourceLabelsFallback(),
       sourceSelectionApi: requiredModule(target, "__afShadowingSourceSelection"),

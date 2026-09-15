@@ -82,6 +82,7 @@
   function buildPracticeTimingPayload({
     source,
     videoId = "",
+    audioContext = null,
     textSourceOverride = "",
     resultOverride = null,
   } = {}) {
@@ -91,16 +92,27 @@
     const textSource = textSourceOverride || (sourceKind === "manual" ? "manual" : "auto");
     const payload = {
       videoId,
-      lang: result.languageCode || source?.languageCode || "auto",
+      // The selected text source is authoritative. A stale result from a
+      // previously selected language must never steer ASR to another track.
+      lang: source?.languageCode || result.languageCode || "auto",
       sourceKind,
       textSource,
       fullAudio: true,
+      audioTrackId: audioContext?.selectedTrackId || "",
+      audioTrackCount: Array.isArray(audioContext?.tracks) ? audioContext.tracks.length : 0,
+      audioLanguage: audioContext?.languageCode || "",
+      audioProvenance: audioContext?.provenance || "unknown",
+      audioEvidence: audioContext?.evidence || "",
     };
     if (artifact?.snapshotRevisionId) payload.snapshotRevisionId = artifact.snapshotRevisionId;
     if (artifact?.textSourceRevisionId) payload.textSourceRevisionId = artifact.textSourceRevisionId;
     if (artifact?.textContentFingerprint) payload.textContentFingerprint = artifact.textContentFingerprint;
     if (artifact?.timingEvidenceRevisionId) payload.timingEvidenceRevisionId = artifact.timingEvidenceRevisionId;
     return payload;
+  }
+
+  function canRunAsrForSource(source, audioContext) {
+    return window.__afShadowingAudioTracks?.canRunAsrForSource(source?.languageCode, audioContext) === true;
   }
 
   function timingPayloadSourceKind(source, result = {}) {
@@ -128,6 +140,7 @@
     sourceWarningIsInformational,
     readinessCopy,
     buildPracticeTimingPayload,
+    canRunAsrForSource,
     timingPayloadSourceKind,
     readableTimingError,
   };

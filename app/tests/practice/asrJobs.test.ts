@@ -22,6 +22,11 @@ const request: AsrJobRequest = {
   model: 'mobiuslabsgmbh/faster-whisper-large-v3-turbo',
   fullAudio: true,
   refresh: false,
+  audioTrackId: 'audio:default',
+  audioTrackCount: 1,
+  audioLanguage: 'nl-NL',
+  audioProvenance: 'original',
+  audioEvidence: 'youtube-default-caption-track',
 };
 
 describe('ASR job reuse', () => {
@@ -85,5 +90,21 @@ describe('ASR job reuse', () => {
 
   it('rejects an unknown language instead of sending it to Whisper', () => {
     expect(() => normalizeWhisperLanguage('xx-YY')).toThrow('unsupported_language:xx');
+  });
+
+  it('rejects an ASR language that does not match the available audio track', () => {
+    expect(() => normalizeAsrJobRequest({
+      ...request,
+      lang: 'en',
+      audioLanguage: 'nl-NL',
+    })).toThrow('audio_language_mismatch:en:nl-NL');
+  });
+
+  it('requires audio evidence before admitting an ASR job', () => {
+    expect(() => normalizeAsrJobRequest({
+      ...request,
+      audioLanguage: undefined,
+      audioEvidence: undefined,
+    })).toThrow('missing_audio_track_evidence');
   });
 });

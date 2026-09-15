@@ -41,6 +41,7 @@
         "src/phrases.js",
         "src/languageIdentityData.js",
         "src/languageIdentity.js",
+        "src/audioTracks.js",
         "src/captionTracks.js",
         "src/sourceLabels.js",
         "src/sourceSelection.js",

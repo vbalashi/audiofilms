@@ -8,7 +8,11 @@ import {
   getAsrRuntimeConfig,
   type AsrRuntimeConfig,
 } from '@/lib/asr/asrConfig';
-import { normalizeWhisperLanguage } from '@/lib/language/languageIdentity';
+import {
+  compareLanguageIdentity,
+  identifyLanguage,
+  normalizeWhisperLanguage,
+} from '@/lib/language/languageIdentity';
 
 export { normalizeWhisperLanguage } from '@/lib/language/languageIdentity';
 
@@ -27,6 +31,11 @@ export type AsrJobRequest = {
   fullAudio: boolean;
   durationSec?: number;
   refresh: boolean;
+  audioTrackId: string;
+  audioTrackCount: number;
+  audioLanguage: string;
+  audioProvenance: 'original' | 'auto-dubbed' | 'dubbed' | 'unknown';
+  audioEvidence: string;
 };
 
 export type AsrJobRecord = {
@@ -79,10 +88,20 @@ function normalizeTextSource(value: unknown): AsrTextSource {
   return value === 'manual' ? 'manual' : 'asr';
 }
 
+function normalizeAudioProvenance(value: unknown): AsrJobRequest['audioProvenance'] {
+  if (value === 'original' || value === 'auto-dubbed' || value === 'dubbed') return value;
+  return 'unknown';
+}
+
 function parseDurationSec(value: unknown): number | undefined {
   if (value === undefined || value === null || value === '') return undefined;
   const durationSec = Number(value);
   return Number.isFinite(durationSec) && durationSec > 0 ? Math.floor(durationSec) : Number.NaN;
+}
+
+function parseAudioTrackCount(value: unknown): number {
+  const count = Number(value);
+  return Number.isInteger(count) && count > 0 ? count : 0;
 }
 
 function hashJson(value: unknown): string {
@@ -128,9 +147,21 @@ export function normalizeAsrJobRequest(body: unknown, config = getAsrRuntimeConf
   const durationSec = parseDurationSec(record.duration ?? record.durationSec);
   const fullAudio = parseBoolean(record.fullAudio) || durationSec === undefined;
   const refresh = parseBoolean(record.refresh);
+  const audioTrackId = cleanString(record.audioTrackId);
+  const audioTrackCount = parseAudioTrackCount(record.audioTrackCount);
+  const audioLanguageRaw = cleanString(record.audioLanguage);
+  const audioLanguage = audioLanguageRaw ? identifyLanguage(audioLanguageRaw).canonicalTag : '';
+  const audioProvenance = normalizeAudioProvenance(record.audioProvenance);
+  const audioEvidence = cleanString(record.audioEvidence);
 
   if (!videoId) {
     throw new Error('missing_video_id');
+  }
+  if (!audioTrackId || !audioTrackCount || !audioLanguage || !audioEvidence) {
+    throw new Error('missing_audio_track_evidence');
+  }
+  if (compareLanguageIdentity(language, audioLanguage) === 'incompatible') {
+    throw new Error(`audio_language_mismatch:${language}:${audioLanguage}`);
   }
   if (!YOUTUBE_VIDEO_ID_PATTERN.test(videoId)) {
     throw new Error('invalid_video_id');
@@ -155,6 +186,11 @@ export function normalizeAsrJobRequest(body: unknown, config = getAsrRuntimeConf
     fullAudio,
     durationSec: fullAudio ? undefined : durationSec,
     refresh,
+    audioTrackId,
+    audioTrackCount,
+    audioLanguage,
+    audioProvenance,
+    audioEvidence,
   };
 }
 

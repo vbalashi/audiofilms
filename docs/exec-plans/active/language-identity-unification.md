@@ -11,9 +11,8 @@ Owning issue: [AudioFilms #22](https://github.com/vbalashi/audiofilms/issues/22)
 ## Revised target: audio-track-bound practice (2026-09-15)
 
 This section supersedes conflicting cache and completeness claims below and
-defines the next implementation scope. It is a plan, not deployed behavior.
-ADR-0004 and ADR-0005 must be amended with the implementation; their current
-compute-dependent reuse language does not describe this revised target.
+defines the implementation target. ADR-0004 and ADR-0005 were amended to keep
+their cache and language decisions consistent with this audio-bound model.
 
 ### Evidence and product requirement
 
@@ -143,18 +142,27 @@ never silently download a different default track on resolution failure.
 ### Plan revision work record
 
 - Work reference: #22; branch `codex/audio-track-plan`, based on `36b68d0`.
-- Claimed scope: this execution plan only; semantic scope is the proposed
-  audio-track admission, grouping and reuse contract. Runtime/ADR changes are
-  follow-up implementation, not part of this documentation revision.
+- Claimed scope: audio-track admission, grouping, labels, operation lineage,
+  and worker download binding in the extension/backend vertical slice.
 - Start: inspected clean source checkout, local worktrees, branch divergence,
   open issues/reviews and local claim references. Existing parallel worktrees
   concern SenseCards/review; no conflicting plan claim was found. Used an
   isolated worktree for this revision.
 - Checkpoint: checked requirements against #22, ADR-0004/0005 and user evidence;
   explicitly separated target behavior from the earlier deployed baseline.
-- Handoff: documentation-only revision; whitespace validation via
-  `git diff --check`. Implementation and rollout remain pending. Preserve this
-  scoped branch for the next implementation pass; do not mark #22 Done.
+- Implementation checkpoint: extension now captures YouTube audio-track
+  context, filters captions to the selected audible language, unifies `nl` /
+  `nl-NL` under one parent, emits the approved text-origin/timing-origin
+  labels, and sends audio evidence with timing jobs. Backend admission rejects
+  missing evidence and incompatible ASR languages; the worker forwards the
+  selected track identity and refuses ambiguous multi-track download when
+  yt-dlp cannot resolve it.
+- Validation checkpoint: extension unit smoke and the full Vitest suite pass;
+  TypeScript no-emit still reports unrelated pre-existing errors in dictionary
+  contract tests and `tests/practice/phrases.test.ts`.
+- Handoff: implementation is complete on this branch but rollout remains
+  pending. Live multi-audio-track YouTube verification and legacy artifact
+  migration remain explicit follow-up slices; do not mark #22 Done yet.
 - Naming follow-up: applied the user's explicit text-origin/timing-origin
   labels to all three states; same plan-only scope and validation.
 
@@ -214,7 +222,8 @@ fix in a caller.
   synchronized into the no-build extension artifact.
 - The alignment script and Python adapter consume that shared data.
 - ASR artifact reuse now requires a manifest containing the audio fingerprint,
-  normalized language, engine/model/device/compute settings, and schema version.
+  normalized language, engine and model. Device and compute type are retained
+  as provenance and do not invalidate an otherwise compatible artifact.
 - Local smoke now rejects unsupported Whisper languages with the same contract
   data as backend/Python.
 - Extension source persistence now writes version 2 identity with a stable

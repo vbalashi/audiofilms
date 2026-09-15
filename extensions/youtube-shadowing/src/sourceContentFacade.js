@@ -32,6 +32,7 @@
       ensurePassivePlaybackWatcher: deps.ensurePassivePlaybackWatcher,
       syncPassivePlayback: deps.syncPassivePlayback,
       phraseProgressStore: deps.phraseProgressStore,
+      audioTracks: deps.audioTracks,
       captionTracks: deps.captionTracks,
       recordDebugEvent: deps.recordDebugEvent,
       render: deps.render,

@@ -183,6 +183,10 @@ function rejectedOperation(
 function practiceErrorMessage(code: string, detail?: string): string {
   if (code === 'missing_video_id') return 'Missing videoId.';
   if (code === 'invalid_video_id') return 'Invalid YouTube video ID.';
+  if (code === 'missing_audio_track_evidence') return 'The available audio track could not be verified for this timing job.';
+  if (code === 'audio_language_mismatch') {
+    return `The requested ASR language does not match the available audio track${detail ? ` (${detail.replace(/:/g, ' → ')})` : ''}.`;
+  }
   if (code === 'invalid_duration') return 'Invalid duration.';
   if (code === 'duration_exceeds_limit') return `Duration exceeds the configured limit of ${detail} seconds.`;
   if (code === 'full_audio_disabled') return 'Full-audio timing jobs are disabled for this deployment.';

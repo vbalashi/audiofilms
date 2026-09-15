@@ -36,6 +36,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingPhrases",
     "__afShadowingLanguageIdentityData",
     "__afShadowingLanguageIdentity",
+    "__afShadowingAudioTracks",
     "__afShadowingCaptionTracks",
     "__afShadowingSourceLabels",
     "__afShadowingSourceSelection",
@@ -1846,12 +1847,21 @@ const languageIdentityData = loadBrowserModule("src/languageIdentityData.js", "_
 const languageIdentity = loadBrowserModule("src/languageIdentity.js", "__afShadowingLanguageIdentity", {
   __afShadowingLanguageIdentityData: languageIdentityData,
 });
+const audioTracks = loadBrowserModule("src/audioTracks.js", "__afShadowingAudioTracks", {
+  __afShadowingLanguageIdentity: languageIdentity,
+});
+const captionTracksModule = loadBrowserModule("src/captionTracks.js", "__afShadowingCaptionTracks", {
+  __afShadowingLanguageIdentity: languageIdentity,
+  __afShadowingAudioTracks: audioTracks,
+});
 const sourceLabels = loadBrowserModule("src/sourceLabels.js", "__afShadowingSourceLabels");
 const sourceSelection = loadBrowserModule("src/sourceSelection.js", "__afShadowingSourceSelection", {
   __afShadowingLanguageIdentity: languageIdentity,
 });
 const sourceSelectionStorage = loadBrowserModule("src/sourceSelectionStorage.js", "__afShadowingSourceSelectionStorage");
-const sourceReadiness = loadBrowserModule("src/sourceReadiness.js", "__afShadowingSourceReadiness");
+const sourceReadiness = loadBrowserModule("src/sourceReadiness.js", "__afShadowingSourceReadiness", {
+  __afShadowingAudioTracks: audioTracks,
+});
 const videoLoadState = loadBrowserModule("src/videoLoadState.js", "__afShadowingVideoLoadState");
 const sourceSelector = loadBrowserModule("src/sourceSelector.js", "__afShadowingSourceSelector");
 const sourceSelectorDom = loadBrowserModule("src/sourceSelectorDom.js", "__afShadowingSourceSelectorDom", {
@@ -2187,6 +2197,9 @@ await videoInitWorkflow.initializeForCurrentVideo({
   resetTranscriptPanelState: (previousVideoId) => videoInitEvents.push(["reset-transcript", previousVideoId]),
   render: () => videoInitEvents.push(["render"]),
   waitForPlayerResponse: async () => ({ captions: true }),
+  audioTracks: {
+    buildAudioContext: () => null,
+  },
   captionTracks: {
     getCaptionTracks: () => [{ languageCode: "nl", kind: "manual" }],
     buildPracticeSources: () => [videoInitSource],
@@ -2223,6 +2236,9 @@ await videoInitWorkflow.initializeForCurrentVideo({
   resetTranscriptPanelState: () => {},
   render: () => {},
   waitForPlayerResponse: async () => ({}),
+  audioTracks: {
+    buildAudioContext: () => null,
+  },
   captionTracks: {
     getCaptionTracks: () => [],
     buildPracticeSources: () => [],
@@ -2731,9 +2747,9 @@ assert.equal(captionFallback.groupPracticeSources(fallbackSources)[0].sources.le
 const sourceLabelFallback = fallbacks.createSourceLabelsFallback();
 assert.equal(
   sourceLabelFallback.closedSourceLabel({ name: "Dutch (auto-generated)", track: { kind: "asr" } }, { sourceKind: "auto" }),
-  "Dutch (auto-generated)",
+  "YouTube transcript (auto-generated) · YouTube timing",
 );
-assert.equal(sourceLabelFallback.closedSourceLabel({ name: "Dutch", track: { kind: "manual" } }, { timingExactness: "word-level" }), "Dutch · ASR timing");
+assert.equal(sourceLabelFallback.closedSourceLabel({ name: "Dutch", track: { kind: "manual" } }, { timingExactness: "word-level" }), "YouTube transcript · ASR timing");
 const youtubeFallback = fallbacks.createYouTubeAdapterFallback();
 assert.equal(youtubeFallback.getVideoIdFromUrl("https://www.youtube.com/watch?v=video-1"), "video-1");
 assert.equal(
@@ -3627,28 +3643,28 @@ assert.equal(
     { name: "Dutch", languageCode: "nl", track: { kind: "manual" } },
     { sourceKind: "manual", timingExactness: "exact" },
   ),
-  "Dutch",
+  "YouTube transcript · YouTube timing",
 );
 assert.equal(
   sourceLabels.closedSourceLabel(
     { name: "Dutch", languageCode: "nl", track: { kind: "manual" } },
     { sourceKind: "manual", timingExactness: "word-level" },
   ),
-  "Dutch · ASR timing",
+  "YouTube transcript · ASR timing",
 );
 assert.equal(
   sourceLabels.closedSourceLabel(
     { name: "Dutch (auto-generated)", languageCode: "nl", track: { kind: "asr" } },
     { sourceKind: "auto", timingExactness: "exact" },
   ),
-  "Dutch (auto-generated)",
+  "YouTube transcript (auto-generated) · YouTube timing",
 );
 assert.equal(
   sourceLabels.closedSourceLabel(
     { name: "ASR transcript", languageCode: "nl", track: { kind: "asr", afPracticeSnapshotSource: true } },
     { sourceKind: "asr", timingExactness: "word-level" },
   ),
-  "ASR transcript",
+  "ASR transcript · ASR timing",
 );
 assert.equal(sourceLabels.userFacingSourceLabel({ source: null, hasTracks: true }), "Captions");
 assert.equal(sourceLabels.userFacingSourceLabel({ source: null, hasTracks: false }), "No captions");
@@ -3657,7 +3673,7 @@ assert.equal(
     source: { name: "Dutch", languageCode: "nl", track: { kind: "manual" } },
     result: { sourceKind: "manual", timingExactness: "word-level" },
   }),
-  "Dutch · ASR timing",
+  "YouTube transcript · ASR timing",
 );
 
 const practiceSources = [
@@ -4027,7 +4043,52 @@ assert.equal(storedLocaleSelection.reason, "stored-selection");
 assert.equal(storedLocaleSelection.source.languageCode, "nl");
 assert.equal(languageIdentity.identifyLanguage("zh-Hans").canonicalTag, "zh-Hans");
 assert.equal(languageIdentity.identifyLanguage("iw-IL").canonicalTag, "he-IL");
+const dutchOnlyAudioContext = audioTracks.buildAudioContext({
+  captions: {
+    playerCaptionsTracklistRenderer: {
+      defaultAudioTrackIndex: 0,
+      audioTracks: [{ captionTrackIndices: [0, 1], defaultCaptionTrackIndex: 1, hasDefaultTrack: true }],
+      captionTracks: [
+        { languageCode: "en", name: { simpleText: "English" } },
+        { languageCode: "nl-NL", name: { simpleText: "Dutch (Netherlands)" } },
+      ],
+    },
+  },
+});
+assert.equal(dutchOnlyAudioContext.languageCode, "nl-NL");
+assert.equal(dutchOnlyAudioContext.evidence, "youtube-audio-track-caption-association");
+assert.equal(audioTracks.canRunAsrForSource("nl", dutchOnlyAudioContext), true);
+assert.equal(audioTracks.canRunAsrForSource("en", dutchOnlyAudioContext), false);
+assert.equal(audioTracks.buildAudioContext({ captions: { playerCaptionsTracklistRenderer: { captionTracks: [] } } }).languageCode, "");
+const dutchPracticeSources = captionTracksModule.buildPracticeSources([
+  { languageCode: "en", vssId: ".en", name: { simpleText: "English" }, kind: "" },
+  { languageCode: "nl-NL", vssId: ".nl-NL", name: { simpleText: "Dutch (Netherlands)" }, kind: "" },
+], { audioContext: dutchOnlyAudioContext });
+assert.deepEqual(dutchPracticeSources.map((source) => source.languageCode), ["nl-NL"]);
+const groupedDutchSources = captionTracksModule.groupPracticeSources([
+  ...dutchPracticeSources,
+  {
+    id: "practice:nl",
+    index: 2,
+    name: "ASR transcript",
+    languageCode: "nl",
+    track: { kind: "asr", afPracticeSnapshotSource: true },
+  },
+]);
+assert.equal(groupedDutchSources.length, 1);
+assert.equal(groupedDutchSources[0].label, "Dutch (Netherlands) / nl-NL");
+assert.equal(groupedDutchSources[0].sources.length, 2);
 assert.equal(languageIdentity.compareLanguageIdentity("zh-Hans", "zh-Hant"), "incompatible");
+const conflictingPortugueseGroups = captionTracksModule.groupPracticeSources([
+  { languageCode: "pt-BR", name: "Portuguese (Brazil)" },
+  { languageCode: "pt-PT", name: "Portuguese (Portugal)" },
+  { languageCode: "pt", name: "Portuguese" },
+]);
+assert.equal(conflictingPortugueseGroups.map((group) => group.label).join("|"), [
+  "Portuguese (Brazil) / pt-BR",
+  "Portuguese (Portugal) / pt-PT",
+  "Portuguese / pt",
+].join("|"));
 assert.equal(sourceSelection.choosePreferredPracticeSource([
   { id: "pt-br", index: 0, languageCode: "pt-BR", track: { kind: "manual" } },
   { id: "pt-pt", index: 1, languageCode: "pt-PT", track: { kind: "manual" } },
@@ -4330,6 +4391,7 @@ assert.equal(
 );
 const manualTimingPayload = sourceReadiness.buildPracticeTimingPayload({
   videoId: "video-1",
+  audioContext: dutchOnlyAudioContext,
   source: {
     languageCode: "nl",
     track: { kind: "manual" },
@@ -4347,7 +4409,12 @@ const manualTimingPayload = sourceReadiness.buildPracticeTimingPayload({
 });
 assert.equal(manualTimingPayload.sourceKind, "manual");
 assert.equal(manualTimingPayload.textSource, "manual");
-  assert.equal(manualTimingPayload.snapshotRevisionId, "snapshot-1");
+assert.equal(manualTimingPayload.lang, "nl");
+assert.equal(manualTimingPayload.audioTrackId, dutchOnlyAudioContext.selectedTrackId);
+assert.equal(manualTimingPayload.audioTrackCount, 1);
+assert.equal(manualTimingPayload.audioLanguage, "nl-NL");
+assert.equal(manualTimingPayload.audioEvidence, "youtube-audio-track-caption-association");
+assert.equal(manualTimingPayload.snapshotRevisionId, "snapshot-1");
 assert.equal(manualTimingPayload.textContentFingerprint, "fingerprint-1");
 const autoTimingPayload = sourceReadiness.buildPracticeTimingPayload({
   videoId: "video-1",
@@ -9854,12 +9921,17 @@ const rejectedTimingPatch = sourceTimingWorkflow.activeSourceTimingApplyPatch({
 assert.equal(rejectedTimingPatch.applied, false);
 const timingWorkflowState = {
   videoId: "video-1",
+  audioContext: {
+    selectedTrackId: "audio:default",
+    languageCode: "nl-NL",
+    evidence: "youtube-audio-track-caption-association",
+  },
   timingOperation: null,
   timingOperationError: "",
   timingOperationApiBase: "",
   timingOperationPollTimer: null,
 };
-const timingWorkflowSource = { id: "source-1", loadedTranscriptResult: {} };
+const timingWorkflowSource = { id: "source-1", languageCode: "nl", loadedTranscriptResult: {} };
 const timingWorkflowEvents = [];
 let timingWorkflowRendered = 0;
 let timingWorkflowAppliedOperation = null;

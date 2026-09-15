@@ -4,6 +4,7 @@
       videoId,
       loadToken,
       tracks: [],
+      audioContext: null,
       practiceSources: [],
       selectedSourceId: "",
       sourceMenuOpen: false,

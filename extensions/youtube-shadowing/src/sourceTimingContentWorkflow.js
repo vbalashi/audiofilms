@@ -19,6 +19,7 @@
         ensurePassivePlaybackWatcher: deps.ensurePassivePlaybackWatcher,
         syncPassivePlayback: deps.syncPassivePlayback,
         phraseProgressStore: deps.phraseProgressStore,
+        audioTracks: deps.audioTracks,
         captionTracks: deps.captionTracks,
         recordDebugEvent: deps.recordDebugEvent,
         render: deps.render,
@@ -42,6 +43,7 @@
       return deps.sourceReadiness.buildPracticeTimingPayload({
         source,
         videoId: state.videoId,
+        audioContext: state.audioContext,
         textSourceOverride,
         resultOverride: resultOverride || source?.loadedTranscriptResult || state.transcriptResult || {},
       });
@@ -101,6 +103,8 @@
         transcriptResult: state.transcriptResult,
         transcriptMetadata: deps.transcriptMetadata,
         sourceSelection: deps.sourceSelection,
+        audioTracks: deps.audioTracks,
+        audioContext: state.audioContext,
         recordDebugEvent: deps.recordDebugEvent,
       });
     }

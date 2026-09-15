@@ -3,8 +3,11 @@
     return playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
   }
 
-  function buildPracticeSources(tracks) {
-    return tracks.map((track, index) => ({
+  function buildPracticeSources(tracks, options = {}) {
+    const audioContext = options.audioContext || null;
+    return tracks
+      .filter((track) => !audioContext?.languageCode || sourceMatchesSelectedAudio(track.languageCode, audioContext))
+      .map((track, index) => ({
       id: `${track.languageCode || "unknown"}:${track.vssId || index}:${index}`,
       index,
       name: trackName(track),
@@ -15,7 +18,7 @@
       lastRetrievalAttempts: [],
       loadedCueSource: "",
       loadedTranscriptResult: null,
-    }));
+      }));
   }
 
   function chooseDefaultPracticeSource(sources) {
@@ -77,13 +80,15 @@
   function groupPracticeSources(sources) {
     const groups = [];
     const byLanguage = new Map();
+    const groupKeys = languageGroupKeys(sources);
 
     for (const source of sources) {
-      const key = source.languageCode || source.name || "unknown";
+      const key = groupKeys.get(source) || source.languageCode || source.name || "unknown";
       if (!byLanguage.has(key)) {
-        const label = source.languageCode
-          ? `${languageLabelFromSource(source)} (${source.languageCode})`
-          : languageLabelFromSource(source);
+        const groupLanguage = groupLanguageForKey(sources, groupKeys, key, source);
+        const label = groupLanguage.canonicalTag
+          ? `${languageLabelFromSource(groupLanguage.source)} / ${groupLanguage.canonicalTag}`
+          : languageLabelFromSource(groupLanguage.source);
         const group = { key, label, sources: [] };
         byLanguage.set(key, group);
         groups.push(group);
@@ -100,6 +105,45 @@
     });
 
     return groups;
+  }
+
+  function languageGroupKeys(sources) {
+    const identity = window.__afShadowingLanguageIdentity;
+    const families = new Map();
+    for (const source of sources) {
+      const language = identity?.identifyLanguage(source.languageCode) || {};
+      const familyKey = [language.baseLanguage, language.script].filter(Boolean).join("-") || source.languageCode || source.name || "unknown";
+      const family = families.get(familyKey) || { regions: new Set() };
+      if (language.region) family.regions.add(language.region);
+      families.set(familyKey, family);
+    }
+
+    const keys = new Map();
+    for (const source of sources) {
+      const language = identity?.identifyLanguage(source.languageCode) || {};
+      const familyKey = [language.baseLanguage, language.script].filter(Boolean).join("-") || source.languageCode || source.name || "unknown";
+      const family = families.get(familyKey);
+      const key = family?.regions.size > 1 && language.region
+        ? language.canonicalTag
+        : familyKey;
+      keys.set(source, key);
+    }
+    return keys;
+  }
+
+  function groupLanguageForKey(sources, groupKeys, key, fallbackSource) {
+    const members = sources.filter((source) => groupKeys.get(source) === key);
+    const identity = window.__afShadowingLanguageIdentity;
+    const source = members.find((candidate) => identity?.identifyLanguage(candidate.languageCode)?.region) || members[0] || fallbackSource;
+    return {
+      source,
+      canonicalTag: identity?.identifyLanguage(source?.languageCode).canonicalTag || source?.languageCode || "",
+    };
+  }
+
+  function sourceMatchesSelectedAudio(sourceLanguage, audioContext) {
+    const audioTracks = window.__afShadowingAudioTracks;
+    return audioTracks?.sourceMatchesSelectedAudio(sourceLanguage, audioContext) !== false;
   }
 
   function languageLabelFromSource(source) {

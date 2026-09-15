@@ -11,8 +11,8 @@ Accepted. The worker implementation separates source refresh from ASR refresh.
 1. obtaining a word-timestamped transcript from the video audio with ASR;
 2. aligning the selected caption text to those word timings.
 
-The ASR pass is expensive and depends on the audio artifact, normalized
-language, engine, model, and compute settings. Alignment is comparatively cheap
+The ASR pass is expensive and depends on the selected, verifiable audio
+artifact, normalized language, engine, and model. Alignment is comparatively cheap
 and depends on the selected text source and its content revision. A changed or
 stale caption revision must not cause the same audio to be transcribed again.
 
@@ -26,16 +26,19 @@ full ASR cost again.
 AudioFilms treats ASR transcript artifacts and timing/alignment artifacts as
 separate cache layers:
 
-- the ASR word-timing artifact is reusable when the audio and ASR inputs are
-  unchanged;
+- the ASR word-timing artifact is reusable when the audio and backend-approved
+  ASR profile are unchanged;
 - the alignment artifact is reusable only when its selected text source
   revision/content fingerprint is unchanged;
 - a stale text-source revision refreshes captions and alignment inputs while
   reusing the ASR word-timing artifact;
-- a full ASR refresh is explicit and reserved for changed audio, model/engine/
-  compute configuration, corrupted artifacts, or operator action;
+- a full ASR refresh is explicit and reserved for changed audio, a backend
+  profile change, corrupted artifacts, or operator action;
 - model selection is a backend concern and is part of the ASR artifact
   identity, not a normal extension-level refresh option.
+- the extension must provide a verified audio-track binding before an ASR job
+  is admitted. The backend rejects missing evidence or a language mismatch
+  before anything is queued.
 
 The worker therefore uses `--refresh-source` for stale timing inputs. The
 smoke script keeps `--refresh` as an explicit full refresh and also supports
@@ -66,13 +69,14 @@ Reuse is determined by artifact identity, not by the display language label
 alone:
 
 ```text
-ASR artifact = video + audio fingerprint + normalized language
-               + engine + model + compute settings
+ASR artifact = audio fingerprint + normalized language + engine + model
 Timing artifact = selected text content fingerprint + ASR artifact identity
 ```
 
-Thus `nl-NL` and `nl` refer to the same normalized language for compatibility,
-while changed audio, ASR configuration, or text content creates a new artifact.
+Thus `nl-NL` and `nl` refer to the same normalized language for compatibility.
+Changed audio or an unapproved ASR profile creates a new artifact; moving the
+worker from CPU to GPU is provenance and does not invalidate an accepted
+artifact by itself.
 
 ## Consequences
 

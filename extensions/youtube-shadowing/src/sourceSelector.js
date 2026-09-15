@@ -25,11 +25,13 @@
       },
       improveTiming: {
         text: timingState.active ? "Improving Timing" : "Improve Timing",
-        disabled: Boolean(input.loading) || !hasSelectedSource || Boolean(timingState.active) || timingAlreadyPrecise,
+        disabled: Boolean(input.loading) || !hasSelectedSource || Boolean(timingState.active) || timingAlreadyPrecise || input.asrAvailable === false,
         title: timingState.active
           ? "Timing improvement is running."
           : timingAlreadyPrecise
           ? "This source already has the best available timing."
+          : input.asrAvailable === false
+          ? "Timing improvement is unavailable because the selected audio track could not be verified."
           : hasSelectedSource
           ? "Improve phrase timing with backend timing evidence."
           : "Load captions before improving timing.",
@@ -53,6 +55,7 @@
   function readinessDetails(input = {}) {
     const details = [
       ["Source", input.sourceLabel || "No captions"],
+      ["Audio track", input.audioLabel || ""],
       ["Provider", input.provider || ""],
       ["Timing enrichment", input.enrichment || ""],
       ["Readiness", input.readiness?.label || ""],
@@ -72,7 +75,9 @@
     const enrichment = input.enrichment || "";
     return {
       actions: readinessActionState(input),
-      actionHelp: "Get Captions retrieves subtitle text. Improve Timing starts ASR alignment for tighter phrase boundaries.",
+      actionHelp: input.asrAvailable === false
+        ? "Get Captions retrieves subtitle text. Improve Timing is unavailable until the audible track is verified."
+        : "Get Captions retrieves subtitle text. Improve Timing starts ASR alignment for tighter phrase boundaries.",
       operation: {
         visible: Boolean(timingState.copy),
         status: timingState.status || "",

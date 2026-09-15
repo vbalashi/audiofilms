@@ -79,6 +79,11 @@ export type PracticeTimingOperationInput = {
   model?: string;
   fullAudio?: boolean;
   durationSec?: number;
+  audioTrackId?: string;
+  audioTrackCount?: number;
+  audioLanguage?: string;
+  audioProvenance?: 'original' | 'auto-dubbed' | 'dubbed' | 'unknown';
+  audioEvidence?: string;
   snapshotRevisionId?: string;
   textSourceRevisionId?: string;
   textContentFingerprint?: string;

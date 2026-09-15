@@ -123,6 +123,12 @@ function runAsrPipeline(job) {
   const durationSec = Number(request.durationSec || 0);
   const fullAudio = Boolean(request.fullAudio) || !durationSec;
   const textSource = request.textSource || "asr";
+  const audioTrackId = request.audioTrackId || "";
+  const audioTrackCount = Number(request.audioTrackCount || 0);
+  const audioLanguage = request.audioLanguage || language;
+  if (!audioTrackId || !Number.isInteger(audioTrackCount) || audioTrackCount < 1 || !audioLanguage) {
+    throw new Error("missing_audio_track_evidence");
+  }
 
   const alignArgs = [
     path.join(appRoot, "scripts", "local-asr-alignment-smoke.mjs"),
@@ -137,6 +143,9 @@ function runAsrPipeline(job) {
     "--text-source",
     textSource,
   ];
+  if (audioTrackId) {
+    alignArgs.push("--audio-track-id", audioTrackId, "--audio-track-count", String(audioTrackCount), "--audio-language", audioLanguage);
+  }
   if (fullAudio) {
     alignArgs.push("--full");
   } else {

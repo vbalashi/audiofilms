@@ -92,6 +92,10 @@ export async function POST(request: Request) {
         status: 'rejected',
         suggestedAction: code === 'full_audio_disabled'
           ? 'Set a shorter duration for tester ASR jobs or enable ASR_ALLOW_FULL_AUDIO=true for private dogfood.'
+          : code === 'missing_audio_track_evidence'
+            ? 'Select a source whose audible YouTube track can be verified before starting ASR.'
+            : code === 'audio_language_mismatch'
+              ? 'Choose a transcript language that matches the verified audible YouTube track.'
           : undefined,
       },
       { status },

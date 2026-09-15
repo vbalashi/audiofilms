@@ -12,7 +12,9 @@ YouTube exposes caption languages as BCP-47-like tags, such as `nl-NL`,
 `pt`, or `zh`. The extension also needs to restore a user's selected caption
 track after reload. Treating all of these values as one string caused valid
 locale variants to miss the stored selection and made the extension fall back
-to another language.
+to another language. Caption language also cannot prove the language of the
+audible track: YouTube may expose captions in languages that are not available
+as audio.
 
 ## Decision
 
@@ -53,3 +55,10 @@ runtime-specific adapters. The extension artifact is regenerated with
   their behavior aligned.
 - Unknown languages can remain visible as caption sources but fail clearly at
   the Whisper boundary.
+- The practice selector is scoped to a verified available audio track. A
+  caption language may be grouped with a compatible audio language (`nl` with
+  `nl-NL`) only after the audio binding is known; an English caption does not
+  create an English ASR option when English audio is absent.
+- Audio provenance badges such as Original and Auto-dubbed are shown only when
+  YouTube provides explicit evidence. A provider default is not silently
+  relabeled as original.
