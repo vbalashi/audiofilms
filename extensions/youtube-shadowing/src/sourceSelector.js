@@ -41,16 +41,7 @@
 
   function shouldOpenReadinessDetails(input = {}) {
     if (input.detailsOpen !== null && input.detailsOpen !== undefined) return Boolean(input.detailsOpen);
-    if (!input.selectedSource) return input.readiness?.state === "no-captions";
-    const result = input.result || null;
-    return Boolean(
-      input.timingState?.status ||
-      result?.warnings?.length ||
-      result?.retrievalPath ||
-      result?.cacheStatus ||
-      result?.fallbackUsed ||
-      input.hasTimingEnrichment,
-    );
+    return false;
   }
 
   function readinessDetails(input = {}) {

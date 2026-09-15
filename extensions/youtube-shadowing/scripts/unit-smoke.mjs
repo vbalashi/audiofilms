@@ -4159,6 +4159,12 @@ assert.equal(sourceSelector.shouldOpenReadinessDetails({
   selectedSource: practiceSources[1],
   readiness: { state: "ready" },
   result: { retrievalPath: "backend-provider" },
+}), false);
+assert.equal(sourceSelector.shouldOpenReadinessDetails({
+  selectedSource: practiceSources[1],
+  readiness: { state: "ready" },
+  result: { retrievalPath: "backend-provider" },
+  detailsOpen: true,
 }), true);
 assert.equal(sourceSelector.shouldOpenReadinessDetails({
   selectedSource: practiceSources[1],
@@ -4209,7 +4215,7 @@ assert.equal(readinessPopoverState.actions.improveTiming.disabled, false);
 assert.equal(readinessPopoverState.operation.visible, true);
 assert.equal(readinessPopoverState.operation.status, "succeeded");
 assert.equal(readinessPopoverState.showSourceSelector, true);
-assert.equal(readinessPopoverState.details.open, true);
+assert.equal(readinessPopoverState.details.open, false);
 assert.equal(readinessPopoverState.details.summary, "Details");
 assert.equal(readinessPopoverState.details.rows.map((detail) => detail.label).join("|"), [
   "Source",
@@ -4304,6 +4310,10 @@ assert.equal(selectedSourceFromDom, "nl:manual");
 const detailsContainer = sourceMenu.children.at(-1);
 const detailsToggle = detailsContainer.children[0];
 const detailsGrid = detailsContainer.children[1];
+assert.equal(detailsToggle.attributes["aria-expanded"], "false");
+assert.equal(detailsGrid.hidden, true);
+detailsToggle.listeners.click[0].listener({ preventDefault() {}, stopPropagation() {} });
+assert.equal(detailsOpenFromDom, true);
 assert.equal(detailsToggle.attributes["aria-expanded"], "true");
 assert.equal(detailsGrid.hidden, false);
 detailsToggle.listeners.click[0].listener({ preventDefault() {}, stopPropagation() {} });
