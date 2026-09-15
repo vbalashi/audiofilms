@@ -8,6 +8,9 @@ import {
   getAsrRuntimeConfig,
   type AsrRuntimeConfig,
 } from '@/lib/asr/asrConfig';
+import { normalizeWhisperLanguage } from '@/lib/language/languageIdentity';
+
+export { normalizeWhisperLanguage } from '@/lib/language/languageIdentity';
 
 export type AsrJobStatus = 'queued' | 'running' | 'completed' | 'failed';
 
@@ -50,21 +53,6 @@ export type CreateAsrJobOutcome = {
 const DEFAULT_ENGINE = 'faster-whisper';
 const DEFAULT_MODEL = 'mobiuslabsgmbh/faster-whisper-large-v3-turbo';
 const YOUTUBE_VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{6,20}$/;
-const WHISPER_LANGUAGE_ALIASES: Record<string, string> = {
-  iw: 'he',
-  in: 'id',
-  ji: 'yi',
-  jv: 'jw',
-};
-const WHISPER_LANGUAGE_CODES = new Set([
-  'af', 'am', 'ar', 'as', 'az', 'ba', 'be', 'bg', 'bn', 'bo', 'br', 'bs', 'ca', 'cs', 'cy',
-  'da', 'de', 'el', 'en', 'es', 'et', 'eu', 'fa', 'fi', 'fo', 'fr', 'gl', 'gu', 'ha', 'haw',
-  'he', 'hi', 'hr', 'ht', 'hu', 'hy', 'id', 'is', 'it', 'ja', 'jw', 'ka', 'kk', 'km', 'kn',
-  'ko', 'la', 'lb', 'ln', 'lo', 'lt', 'lv', 'mg', 'mi', 'mk', 'ml', 'mn', 'mr', 'ms', 'mt',
-  'my', 'ne', 'nl', 'nn', 'no', 'oc', 'pa', 'pl', 'ps', 'pt', 'ro', 'ru', 'sa', 'sd', 'si',
-  'sk', 'sl', 'sn', 'so', 'sq', 'sr', 'su', 'sv', 'sw', 'ta', 'te', 'tg', 'th', 'tk', 'tl',
-  'tr', 'tt', 'uk', 'ur', 'uz', 'vi', 'yi', 'yo', 'yue', 'zh',
-]);
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -76,18 +64,6 @@ function cleanString(value: unknown, fallback = ''): string {
 
 function parseBoolean(value: unknown): boolean {
   return value === true || value === '1' || value === 'true';
-}
-
-export function normalizeWhisperLanguage(value: unknown): string {
-  const requested = cleanString(value, 'nl') || 'nl';
-  // The extension uses BCP-47 locale tags (for example, nl-NL), while
-  // faster-whisper expects the ISO-639-1 language code (nl).
-  const base = requested.replace(/_/g, '-').split('-')[0].toLowerCase() || 'nl';
-  const normalized = WHISPER_LANGUAGE_ALIASES[base] || base;
-  if (!WHISPER_LANGUAGE_CODES.has(normalized)) {
-    throw new Error(`unsupported_language:${normalized}`);
-  }
-  return normalized;
 }
 
 function normalizeLanguage(body: Record<string, unknown>): string {
