@@ -67,4 +67,10 @@ fix in a caller.
   data as backend/Python.
 - Extension source persistence now writes version 2 identity with a stable
   track locator and canonical language tag while still reading version 1 data.
-- Full live reload smoke and backend deployment verification remain.
+- Backend deployment verification completed on Dell at commit `5426f7c`.
+  Both `audiofilms-api` and `audiofilms-asr-worker` are healthy; the public
+  health endpoint confirms the same commit through the Cloudflare tunnel.
+- Extension unit smoke passed. Full AppleScript-driven Chrome smoke remains
+  blocked by the local harness' existing `osascript` syntax error; this is
+  separate from the deployed application and should be fixed as follow-up
+  test infrastructure work.
