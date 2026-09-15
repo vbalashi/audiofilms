@@ -8876,11 +8876,12 @@ const timingOperation = {
   },
 };
 const fingerprintDetails = transcriptMetadata.timingFingerprintCompatibilityDetails(timingOperation, {
-  languageCode: "nl",
+  languageCode: "nl-NL",
   practiceArtifact: { textContentFingerprint: "fingerprint-1" },
 });
 assert.equal(fingerprintDetails.compatible, true);
 assert.equal(fingerprintDetails.currentFingerprintSource, "practiceArtifact.textContentFingerprint");
+assert.equal(fingerprintDetails.currentLanguage, "nl-NL");
 const debugEvents = [];
 const timingTranscript = transcriptMetadata.transcriptResultFromPracticeTimingOperation(timingOperation, {
   currentResult: {
