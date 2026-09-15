@@ -23,7 +23,8 @@ ENV NODE_ENV=production \
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg python3 python3-pip python3-venv \
-  && python3 -m pip install --no-cache-dir --break-system-packages yt-dlp \
+  && python3 -m pip install --no-cache-dir --break-system-packages --upgrade 'yt-dlp[default]' \
+  && printf '%s\n' '--js-runtimes node' > /etc/yt-dlp.conf \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 1001 nodejs \
