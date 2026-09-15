@@ -41,11 +41,22 @@
       renderSourceOptions(sourceMenu, input.sourceOptionGroups || [], input.onSelectSource);
     }
 
-    const diagnostics = appendElement(sourceMenu, "details", "af-readiness-details");
-    diagnostics.open = Boolean(popoverState.details?.open);
-    diagnostics.addEventListener("toggle", () => input.onDetailsToggle?.(diagnostics.open));
-    appendElement(diagnostics, "summary", "af-readiness-details-summary").textContent = popoverState.details?.summary || "Details";
+    const detailsOpen = Boolean(popoverState.details?.open);
+    const diagnostics = appendElement(sourceMenu, "div", "af-readiness-details");
+    const detailsToggle = appendElement(diagnostics, "button", "af-readiness-details-summary");
+    detailsToggle.type = "button";
+    detailsToggle.textContent = popoverState.details?.summary || "Details";
+    detailsToggle.setAttribute("aria-expanded", detailsOpen ? "true" : "false");
+    detailsToggle.addEventListener("click", (event) => {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      const nextOpen = details.hidden;
+      details.hidden = !nextOpen;
+      detailsToggle.setAttribute("aria-expanded", nextOpen ? "true" : "false");
+      input.onDetailsToggle?.(nextOpen);
+    });
     const details = appendElement(diagnostics, "div", "af-readiness-detail-grid");
+    details.hidden = !detailsOpen;
     for (const detail of popoverState.details?.rows || []) {
       appendReadinessDetail(details, detail.label, detail.value);
     }

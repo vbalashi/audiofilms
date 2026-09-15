@@ -4266,6 +4266,7 @@ assert.equal(sourceTrack.classList.contains("is-open"), true);
 let selectedSourceFromDom = "";
 let getCaptionsClicked = false;
 let improveTimingClicked = false;
+let detailsOpenFromDom = null;
 sourceSelectorDom.renderReadinessPopover(sourceMenu, {
   readiness: { label: "Rough" },
   readinessCopy: "Captions are usable but timing can improve.",
@@ -4279,6 +4280,9 @@ sourceSelectorDom.renderReadinessPopover(sourceMenu, {
   },
   onSelectSource: (sourceId) => {
     selectedSourceFromDom = sourceId;
+  },
+  onDetailsToggle: (open) => {
+    detailsOpenFromDom = open;
   },
 });
 assert.equal(sourceMenu.children[0].children[0].textContent, "Rough");
@@ -4297,6 +4301,15 @@ const sourceOptionButton = sourceMenu.children.find((child) => child.dataset?.af
 assert.equal(sourceOptionButton.classList.contains("is-selected"), true);
 sourceOptionButton.listeners.click[0].listener();
 assert.equal(selectedSourceFromDom, "nl:manual");
+const detailsContainer = sourceMenu.children.at(-1);
+const detailsToggle = detailsContainer.children[0];
+const detailsGrid = detailsContainer.children[1];
+assert.equal(detailsToggle.attributes["aria-expanded"], "true");
+assert.equal(detailsGrid.hidden, false);
+detailsToggle.listeners.click[0].listener({ preventDefault() {}, stopPropagation() {} });
+assert.equal(detailsOpenFromDom, false);
+assert.equal(detailsToggle.attributes["aria-expanded"], "false");
+assert.equal(detailsGrid.hidden, true);
 let workflowPopoverInput = null;
 let workflowRefreshCalled = false;
 let workflowImproveCalled = false;
