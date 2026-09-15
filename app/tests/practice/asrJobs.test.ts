@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createOrGetAsrJob,
   getReusableAsrJob,
+  normalizeAsrJobRequest,
   updateAsrJob,
   type AsrJobRequest,
 } from '../../src/lib/asr/asrJobs';
@@ -58,5 +59,16 @@ describe('ASR job reuse', () => {
 
     await expect(getReusableAsrJob(request)).resolves.toBeNull();
     await expect(getReusableAsrJob({ ...request, refresh: true })).resolves.toBeNull();
+  });
+
+  it('normalizes extension locale tags to Whisper language codes', () => {
+    const normalized = normalizeAsrJobRequest({
+      ...request,
+      lang: 'nl-NL',
+      fullAudio: false,
+      duration: 30,
+    });
+
+    expect(normalized.language).toBe('nl');
   });
 });

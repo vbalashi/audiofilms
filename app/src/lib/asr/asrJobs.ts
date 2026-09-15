@@ -64,7 +64,10 @@ function parseBoolean(value: unknown): boolean {
 }
 
 function normalizeLanguage(body: Record<string, unknown>): string {
-  return cleanString(body.lang || body.language, 'nl') || 'nl';
+  const requested = cleanString(body.lang || body.language, 'nl') || 'nl';
+  // The extension uses BCP-47 locale tags (for example, nl-NL), while
+  // faster-whisper expects the ISO-639-1 language code (nl).
+  return requested.replace(/_/g, '-').split('-')[0].toLowerCase() || 'nl';
 }
 
 function normalizeSourceKind(value: unknown): AsrSourceKind {

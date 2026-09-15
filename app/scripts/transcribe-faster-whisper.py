@@ -6,6 +6,12 @@ from pathlib import Path
 from faster_whisper import WhisperModel
 
 
+def whisper_language(value: str | None) -> str | None:
+    if not value:
+        return None
+    return value.replace("_", "-").split("-", 1)[0].lower() or None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Transcribe audio with faster-whisper word timestamps.")
     parser.add_argument("--audio", required=True)
@@ -16,10 +22,11 @@ def main() -> None:
     parser.add_argument("--compute-type", default="int8")
     args = parser.parse_args()
 
+    language = whisper_language(args.language)
     model = WhisperModel(args.model, device=args.device, compute_type=args.compute_type)
     segments_iter, info = model.transcribe(
         args.audio,
-        language=args.language or None,
+        language=language,
         word_timestamps=True,
         vad_filter=True,
     )
@@ -57,7 +64,7 @@ def main() -> None:
         "model": args.model,
         "device": args.device,
         "computeType": args.compute_type,
-        "language": getattr(info, "language", args.language),
+        "language": getattr(info, "language", language),
         "languageProbability": getattr(info, "language_probability", None),
         "duration": getattr(info, "duration", None),
         "segments": segments,
