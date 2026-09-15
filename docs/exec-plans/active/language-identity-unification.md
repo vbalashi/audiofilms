@@ -29,14 +29,21 @@ For the reported Dutch-only case, its conceptual contents are:
 
 ```text
 Dutch (Netherlands) / nl-NL
-├── Dutch captions
-├── Dutch · ASR timing
-└── ASR transcript · nl
+├── YouTube transcript · YouTube timing
+├── YouTube transcript · ASR timing
+└── ASR transcript · ASR timing
 ```
 
 The first two lines are states of the same caption source, not duplicate
 selectable sources. Show its ASR timing enrichment when applicable. Keep the
 literal ASR transcript as a separate text source within the Dutch group.
+User-approved naming: each row explicitly shows text origin, then timing
+origin, separated consistently by `·`. Language belongs in the parent group.
+These labels supersede the earlier abbreviated `Dutch · ASR timing` and
+standalone `ASR transcript` labels for this selector. YouTube transcript covers
+YouTube-provided text; its manual/automatic provenance remains in source
+metadata. Label timing by its verified origin, not simply by the presence of
+an ASR job or cache entry.
 English captions remain real provider inventory, but are excluded from this
 audio-scoped practice selector when English audio is unavailable. Do not
 delete those captions or fabricate an English audio/ASR option. Secondary
@@ -148,6 +155,8 @@ never silently download a different default track on resolution failure.
 - Handoff: documentation-only revision; whitespace validation via
   `git diff --check`. Implementation and rollout remain pending. Preserve this
   scoped branch for the next implementation pass; do not mark #22 Done.
+- Naming follow-up: applied the user's explicit text-origin/timing-origin
+  labels to all three states; same plan-only scope and validation.
 
 ## Goal
 
