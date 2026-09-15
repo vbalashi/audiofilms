@@ -4160,9 +4160,16 @@ assert.equal(sourceSelector.shouldOpenReadinessDetails({
   readiness: { state: "ready" },
   result: { retrievalPath: "backend-provider" },
 }), true);
+assert.equal(sourceSelector.shouldOpenReadinessDetails({
+  selectedSource: practiceSources[1],
+  readiness: { state: "ready" },
+  result: { retrievalPath: "backend-provider" },
+  detailsOpen: false,
+}), false);
 const readinessDetails = sourceSelector.readinessDetails({
   sourceLabel: "Dutch",
-  provider: "YouTube",
+  provider: "Backend Provider · yt-dlp",
+  retrievalBackendProvider: "yt-dlp",
   enrichment: "ASR timing",
   readiness: { label: "Precise" },
   phraseCount: 165,
@@ -4177,7 +4184,8 @@ assert.equal(readinessDetails.map((detail) => detail.label).join("|"), [
   "Timing enrichment",
   "Readiness",
   "Phrases",
-  "Retrieval",
+  "Retrieval Backend Provider",
+  "Retrieval Path",
   "Timing",
   "Timing apply",
 ].join("|"));
@@ -4209,7 +4217,7 @@ assert.equal(readinessPopoverState.details.rows.map((detail) => detail.label).jo
   "Timing enrichment",
   "Readiness",
   "Phrases",
-  "Retrieval",
+  "Retrieval Path",
   "Timing",
   "Timing apply",
 ].join("|"));
@@ -9833,7 +9841,7 @@ assert.equal(sourceTimingPracticeSources[0].loadedCueSource, "practice-timing-ca
 assert.equal(sourceTimingPracticeSources[0].error, "");
 assert.equal(sourceTimingPracticeSources[1].id, "practice:operation-1:alt-asr-1");
 assert.equal(sourceTimingPracticeSources[1].track.kind, "asr");
-assert.equal(sourceTimingPracticeSources[1].loadedTranscriptResult.provider, "audiofilms-practice-timing");
+assert.equal(sourceTimingPracticeSources[1].loadedTranscriptResult.provider, "audiofilms-asr-worker");
 assert.equal(sourceTimingEvents[0].type, "timing-cache-fingerprint-match");
 
 const activeTimingPatch = sourceTimingWorkflow.activeSourceTimingApplyPatch({

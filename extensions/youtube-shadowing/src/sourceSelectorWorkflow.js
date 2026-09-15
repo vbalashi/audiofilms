@@ -56,6 +56,7 @@
     const audioLabel = audioContext.languageCode
       ? `${audioContext.languageCode}${audioBadge ? ` · ${audioBadge}` : ""}`
       : "";
+    const retrievalBackendProvider = sourceLabels.retrievalBackendProviderLabel?.(result) || "";
     const popoverState = sourceSelector.readinessPopoverState({
       cacheRefreshRequested: state.cacheRefreshRequested,
       loading: state.loading,
@@ -67,6 +68,8 @@
       sourceLabel: selectedSource ? userFacingSourceLabel(selectedSource) : "No captions",
       audioLabel,
       provider: sourceLabels.sourceProviderLabel(selectedSource, result),
+      retrievalBackendProvider,
+      detailsOpen: state.readinessDetailsOpen,
       phraseCount: state.phrases?.length || 0,
       practiceSourceCount: state.practiceSources?.length || 0,
       staleReason: state.timingOperation?.result?.applicability?.staleReason,
@@ -88,6 +91,9 @@
       onGetCaptions,
       onImproveTiming,
       onSelectSource,
+      onDetailsToggle: (open) => {
+        state.readinessDetailsOpen = Boolean(open);
+      },
     });
   }
 

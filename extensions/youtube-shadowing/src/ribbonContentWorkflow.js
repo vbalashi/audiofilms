@@ -19,6 +19,9 @@
         },
         onImproveTiming: () => deps.startImproveTiming(),
         onSelectSource: deps.selectPracticeSource,
+        onDetailsToggle: (open) => {
+          deps.getState().readinessDetailsOpen = Boolean(open);
+        },
       });
     }
 

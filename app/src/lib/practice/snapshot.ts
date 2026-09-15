@@ -132,6 +132,8 @@ export function practiceTextSourceFromSubtitleResponse(
     languageCode,
     label: textSourceLabel(kind, languageCode),
     kind,
+    provider,
+    retrievalPath,
     status: 'ready',
   };
 }

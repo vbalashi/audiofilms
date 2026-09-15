@@ -22,6 +22,8 @@ export type PracticeTextSource = {
   languageCode: string;
   label: string;
   kind: PracticeTextSourceKind;
+  provider?: string;
+  retrievalPath?: string;
   status: 'ready' | 'aligning' | 'failed';
   errorCode?: string;
 };

@@ -206,9 +206,9 @@
     return {
       cues,
       sourceKind: isAsrTextSource ? "asr" : isManualTextSource ? "manual" : "auto",
-      retrievalPath: "practice-timing-cache",
+      retrievalPath: snapshot.textSource?.retrievalPath || "practice-timing-cache",
       fetchOrigin: "backend",
-      provider: "audiofilms-practice-timing",
+      provider: snapshot.textSource?.provider || (isAsrTextSource ? "audiofilms-asr-worker" : "audiofilms-practice-timing"),
       selectedTrackId: "",
       actualTrackId: options.alternativeId || operation.result?.diagnostics?.asrJobId || "",
       languageCode: snapshot.textSource?.languageCode || operation.input?.language || "",

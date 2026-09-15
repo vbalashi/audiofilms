@@ -44,6 +44,7 @@
       practiceSources: [],
       selectedSourceId: "",
       sourceMenuOpen: false,
+      readinessDetailsOpen: null,
       selectedTrack: null,
       cueSource: "",
       transcriptResult: null,

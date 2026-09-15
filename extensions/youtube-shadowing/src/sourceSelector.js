@@ -40,6 +40,7 @@
   }
 
   function shouldOpenReadinessDetails(input = {}) {
+    if (input.detailsOpen !== null && input.detailsOpen !== undefined) return Boolean(input.detailsOpen);
     if (!input.selectedSource) return input.readiness?.state === "no-captions";
     const result = input.result || null;
     return Boolean(
@@ -61,7 +62,8 @@
       ["Readiness", input.readiness?.label || ""],
       ["Phrases", input.phraseCount ? String(input.phraseCount) : "0"],
     ];
-    if (input.result?.retrievalPath) details.push(["Retrieval", input.result.retrievalPath]);
+    if (input.retrievalBackendProvider) details.push(["Retrieval Backend Provider", input.retrievalBackendProvider]);
+    if (input.result?.retrievalPath) details.push(["Retrieval Path", input.result.retrievalPath]);
     if (input.timingState?.status) details.push(["Timing", input.timingState.status]);
     if (input.staleReason && !input.timingApplied) details.push(["Timing apply", input.staleReason]);
     return details
@@ -91,6 +93,7 @@
           timingState,
           result,
           hasTimingEnrichment: Boolean(enrichment),
+          detailsOpen: input.detailsOpen,
         }),
         summary: "Details",
         rows: readinessDetails({
@@ -100,6 +103,7 @@
           readiness: input.readiness,
           phraseCount: input.phraseCount,
           result,
+          retrievalBackendProvider: input.retrievalBackendProvider,
           timingState,
           staleReason: input.staleReason,
           timingApplied: input.timingApplied,

@@ -43,6 +43,7 @@
 
     const diagnostics = appendElement(sourceMenu, "details", "af-readiness-details");
     diagnostics.open = Boolean(popoverState.details?.open);
+    diagnostics.addEventListener("toggle", () => input.onDetailsToggle?.(diagnostics.open));
     appendElement(diagnostics, "summary", "af-readiness-details-summary").textContent = popoverState.details?.summary || "Details";
     const details = appendElement(diagnostics, "div", "af-readiness-detail-grid");
     for (const detail of popoverState.details?.rows || []) {
