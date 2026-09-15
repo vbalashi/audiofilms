@@ -2065,6 +2065,8 @@ const sourceSelectionSnapshot = storageState.sourceSelectionSnapshot({
   now: new Date("2026-06-30T10:00:00.000Z"),
 });
 assert.equal(sourceSelectionSnapshot.sourceId, "source-2");
+assert.equal(sourceSelectionSnapshot.version, 2);
+assert.equal(sourceSelectionSnapshot.trackId, "source-2");
 assert.equal(sourceSelectionSnapshot.textSourceKind, "asr");
 assert.equal(sourceSelectionSnapshot.updatedAt, "2026-06-30T10:00:00.000Z");
 const sourceSelectionStorageFixture = new Map();

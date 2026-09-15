@@ -63,4 +63,6 @@ fix in a caller.
   normalized language, engine/model/device/compute settings, and schema version.
 - Local smoke now rejects unsupported Whisper languages with the same contract
   data as backend/Python.
+- Extension source persistence now writes version 2 identity with a stable
+  track locator and canonical language tag while still reading version 1 data.
 - Full live reload smoke and backend deployment verification remain.

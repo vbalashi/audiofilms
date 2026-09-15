@@ -31,9 +31,12 @@
       const parsed = typeof value === "string" ? JSON.parse(value || "null") : value;
       if (!parsed || parsed.videoId !== videoId) return null;
       return {
+        version: Number(parsed.version || 1),
         sourceId: String(parsed.sourceId || ""),
+        trackId: String(parsed.trackId || ""),
         sourceKind: String(parsed.sourceKind || ""),
         languageCode: String(parsed.languageCode || ""),
+        canonicalTag: String(parsed.canonicalTag || ""),
         textSourceKind: String(parsed.textSourceKind || ""),
         updatedAt: String(parsed.updatedAt || ""),
       };
@@ -60,11 +63,13 @@
   } = {}) {
     if (!videoId || !source) return null;
     return {
-      version: 1,
+      version: 2,
       videoId,
       sourceId: source.id,
+      trackId: source.track?.vssId || source.track?.baseUrl || source.id,
       sourceKind,
       languageCode: source.languageCode || "",
+      canonicalTag: window.__afShadowingLanguageIdentity?.normalizeLanguageCode(source.languageCode) || source.languageCode || "",
       textSourceKind: source.loadedTranscriptResult?.practiceSnapshot?.textSource?.kind || "",
       updatedAt: now.toISOString(),
     };

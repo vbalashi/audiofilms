@@ -53,14 +53,19 @@
     if (exact) return exact;
     const identity = window.__afShadowingLanguageIdentity;
     const candidates = sources.filter((source) => sourceSelectionKind(source) === selection.sourceKind);
-    if (!selection.languageCode) return candidates.length === 1 ? candidates[0] : null;
+    const stableTrack = selection.trackId
+      ? candidates.find((source) => source.track?.vssId === selection.trackId || source.track?.baseUrl === selection.trackId)
+      : null;
+    if (stableTrack) return stableTrack;
+    const storedLanguage = selection.canonicalTag || selection.languageCode;
+    if (!storedLanguage) return candidates.length === 1 ? candidates[0] : null;
     const exactLanguage = candidates.filter((source) =>
-      identity?.compareLanguageIdentity(source.languageCode, selection.languageCode) === "exact"
+      identity?.compareLanguageIdentity(source.languageCode, storedLanguage) === "exact"
     );
     if (exactLanguage.length === 1) return exactLanguage[0];
     if (exactLanguage.length > 1) return null;
     const compatible = candidates.filter((source) =>
-      identity?.compareLanguageIdentity(source.languageCode, selection.languageCode) === "compatible"
+      identity?.compareLanguageIdentity(source.languageCode, storedLanguage) === "compatible"
     );
     return compatible.length === 1 ? compatible[0] : null;
   }
