@@ -59,4 +59,6 @@ fix in a caller.
 - Alias and Whisper support data now has one source under `app/scripts` and is
   synchronized into the no-build extension artifact.
 - The alignment script and Python adapter consume that shared data.
-- ASR artifact identity and the full live reload smoke remain to be migrated.
+- ASR artifact reuse now requires a manifest containing the audio fingerprint,
+  normalized language, engine/model/device/compute settings, and schema version.
+- Full live reload smoke and backend deployment verification remain.

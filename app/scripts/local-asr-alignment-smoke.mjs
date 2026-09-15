@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { asrArtifactRefreshPlan } from "./asr-cache-policy.mjs";
@@ -46,23 +47,40 @@ const audioPath = path.join(runDir, "audio.wav");
 const asrOutputPrefix = `${engineConfig.filePrefix}-${slugify(modelName)}`;
 const asrJsonPath = path.join(runDir, `${asrOutputPrefix}-words.json`);
 const manualJsonPath = path.join(runDir, "manual-captions.json");
+const asrManifestPath = path.join(runDir, `${asrOutputPrefix}-manifest.json`);
 const reportPath = path.join(runDir, `${asrOutputPrefix}-alignment-report.md`);
-const refreshPlan = asrArtifactRefreshPlan({
-  audioExists: fs.existsSync(audioPath),
-  captionsExist: textSource === "asr" || fs.existsSync(manualJsonPath),
-  asrExists: fs.existsSync(asrJsonPath),
-  refreshSource,
-  refreshAudio,
-  refreshAsr,
-});
 
 console.log(`[local-asr] fixture=${videoId} lang=${language} duration=${fullAudio ? "full" : `${durationSec}s`} engine=${engineConfig.name} textSource=${textSource}`);
 
-if (refreshPlan.refreshAudio) {
+const audioNeedsRefresh = !fs.existsSync(audioPath) || refreshAudio;
+if (audioNeedsRefresh) {
   downloadAudio(audioPath);
 } else {
   console.log(`[local-asr] Reusing ${audioPath}`);
 }
+
+const audioFingerprint = fileFingerprint(audioPath);
+const asrIdentity = {
+  schemaVersion: 1,
+  videoId,
+  audioFingerprint,
+  language,
+  engine: engineConfig.name,
+  model: modelName,
+  device,
+  computeType,
+};
+const storedAsrIdentity = readJson(asrManifestPath);
+const asrArtifactExists = fs.existsSync(asrJsonPath)
+  && !refreshAudio
+  && JSON.stringify(storedAsrIdentity) === JSON.stringify(asrIdentity);
+const refreshPlan = asrArtifactRefreshPlan({
+  audioExists: true,
+  captionsExist: textSource === "asr" || fs.existsSync(manualJsonPath),
+  asrExists: asrArtifactExists,
+  refreshSource,
+  refreshAsr,
+});
 
 if (textSource !== "asr") {
   if (refreshPlan.refreshCaptions) {
@@ -77,6 +95,7 @@ ensureEngine();
 
 if (refreshPlan.refreshAsr) {
   transcribeAudio();
+  fs.writeFileSync(asrManifestPath, JSON.stringify(asrIdentity, null, 2), "utf8");
 } else {
   console.log(`[local-asr] Reusing ${asrJsonPath}`);
 }
@@ -114,6 +133,18 @@ function normalizeTextSource(value) {
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
+}
+
+function fileFingerprint(filePath) {
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function readJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (_error) {
+    return null;
+  }
 }
 
 function findExecutable(candidates) {

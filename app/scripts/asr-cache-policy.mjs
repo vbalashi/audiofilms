@@ -3,9 +3,9 @@
  * word-timestamp transcript and the cheaper caption alignment.
  */
 export function asrArtifactRefreshPlan({
-  audioExists,
-  captionsExist,
-  asrExists,
+  audioExists = false,
+  captionsExist = false,
+  asrExists = false,
   refreshSource = false,
   refreshAudio = false,
   refreshAsr = false,
