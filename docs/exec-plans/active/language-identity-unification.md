@@ -4,6 +4,8 @@ Status: active
 
 Owner: AudioFilms backend and YouTube shadowing extension
 
+Architecture decision: [ADR-0005](../../adr/0005-language-identity-and-compatibility.md)
+
 ## Goal
 
 Make language handling consistent across YouTube caption tracks, the Chrome
