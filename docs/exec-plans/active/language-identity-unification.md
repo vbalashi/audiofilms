@@ -160,9 +160,13 @@ never silently download a different default track on resolution failure.
 - Validation checkpoint: extension unit smoke and the full Vitest suite pass;
   TypeScript no-emit still reports unrelated pre-existing errors in dictionary
   contract tests and `tests/practice/phrases.test.ts`.
-- Handoff: implementation is complete on this branch but rollout remains
-  pending. Live multi-audio-track YouTube verification and legacy artifact
-  migration remain explicit follow-up slices; do not mark #22 Done yet.
+- Deployment checkpoint: commit `a4ddff9` is live on Dell. Both Compose
+  services are healthy/running, the public Cloudflare health endpoint reports
+  the same commit, and the public timing route fails closed without audio
+  evidence while accepting a verified Dutch track request.
+- Handoff: implementation is deployed on this branch. Live multi-audio-track
+  YouTube verification and legacy artifact migration remain explicit follow-up
+  slices; do not mark #22 Done yet.
 - Naming follow-up: applied the user's explicit text-origin/timing-origin
   labels to all three states; same plan-only scope and validation.
 
