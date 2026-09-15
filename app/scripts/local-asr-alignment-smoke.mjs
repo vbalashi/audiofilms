@@ -115,7 +115,11 @@ function hasFlag(name) {
 
 function normalizeLanguageTag(value) {
   const base = String(value || "nl").trim().replace(/_/g, "-").split("-")[0].toLowerCase();
-  return languageIdentityData.aliases[base] || base || "nl";
+  const normalized = languageIdentityData.aliases[base] || base || "nl";
+  if (!languageIdentityData.whisperLanguages.includes(normalized)) {
+    throw new Error(`unsupported_language:${normalized}`);
+  }
+  return normalized;
 }
 
 function valueFor(name) {

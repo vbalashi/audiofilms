@@ -61,4 +61,6 @@ fix in a caller.
 - The alignment script and Python adapter consume that shared data.
 - ASR artifact reuse now requires a manifest containing the audio fingerprint,
   normalized language, engine/model/device/compute settings, and schema version.
+- Local smoke now rejects unsupported Whisper languages with the same contract
+  data as backend/Python.
 - Full live reload smoke and backend deployment verification remain.
