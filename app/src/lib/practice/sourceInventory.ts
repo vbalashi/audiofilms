@@ -7,6 +7,7 @@ import {
   readAsrJobResult,
 } from '@/lib/asr/asrJobs';
 import { practiceTextSourceFromSubtitleResponse } from '@/lib/practice/snapshot';
+import { compareLanguageIdentity } from '@/lib/language/languageIdentity';
 import { getCachedSubtitles } from '@/lib/subtitleCache';
 import type { PracticeTextSource, PracticeTextSourceKind } from '@/types/practice';
 import type {
@@ -120,7 +121,7 @@ async function readableAsrSubtitleResponses(
 }
 
 function languageMatches(requestedLanguage: SubtitleLanguagePreference, actualLanguage: string): boolean {
-  return requestedLanguage === 'auto' || requestedLanguage === actualLanguage;
+  return requestedLanguage === 'auto' || compareLanguageIdentity(requestedLanguage, actualLanguage) !== 'incompatible';
 }
 
 function dedupeEntries(entries: PracticeSourceInventoryEntry[]): PracticeSourceInventoryEntry[] {

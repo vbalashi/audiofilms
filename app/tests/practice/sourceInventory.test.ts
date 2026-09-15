@@ -113,7 +113,7 @@ describe('practice source inventory', () => {
     };
     const sources = await buildPracticeSourceInventory({
       videoId: 'video-1',
-      requestedLanguage: 'nl',
+      requestedLanguage: 'nl-NL',
       config,
     });
 
