@@ -10,7 +10,7 @@ const cacheDir = process.env.AUDIOFILMS_ASR_CACHE_DIR || path.join(appRoot, ".as
 const venvDir = path.join(cacheDir, ".venv");
 
 const videoId = valueFor("--video") || valueFor("--videoId") || "RJrjzCuCHpo";
-const language = valueFor("--lang") || "nl";
+const language = normalizeLanguageTag(valueFor("--lang") || "nl");
 const durationSec = Number(valueFor("--duration") || "90");
 const refresh = hasFlag("--refresh");
 const refreshSource = refresh || hasFlag("--refresh-source");
@@ -91,6 +91,11 @@ console.log(`[local-asr] Wrote ${reportPath}`);
 
 function hasFlag(name) {
   return process.argv.includes(name);
+}
+
+function normalizeLanguageTag(value) {
+  const base = String(value || "nl").trim().replace(/_/g, "-").split("-")[0].toLowerCase();
+  return ({ iw: "he", in: "id", ji: "yi", jv: "jw" })[base] || base || "nl";
 }
 
 function valueFor(name) {
