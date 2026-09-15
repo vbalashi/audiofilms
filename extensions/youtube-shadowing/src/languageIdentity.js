@@ -1,5 +1,5 @@
 (function audioFilmsLanguageIdentity() {
-  const aliases = { he: "he", iw: "he", id: "id", in: "id", yi: "yi", ji: "yi", jw: "jw", jv: "jw" };
+  const aliases = window.__afShadowingLanguageIdentityData?.aliases || {};
 
   function identifyLanguage(value) {
     const raw = String(value || "").trim();

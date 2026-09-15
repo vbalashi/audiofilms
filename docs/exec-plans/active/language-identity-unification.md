@@ -52,5 +52,11 @@ fix in a caller.
 - Existing locale normalization and source-selection regression are covered.
 - The first backend language identity module and its conformance matrix are
   implemented in `app/src/lib/language/languageIdentity.ts`.
-- `asrJobs.ts` now consumes that module; extension, alignment script, and
-  Python adapters remain to be migrated.
+- `asrJobs.ts` now consumes that module.
+- The extension has a matching language identity adapter, uses it for source
+  restoration and compatibility checks, and rejects ambiguous regional/script
+  fallbacks.
+- Alias and Whisper support data now has one source under `app/scripts` and is
+  synchronized into the no-build extension artifact.
+- The alignment script and Python adapter consume that shared data.
+- ASR artifact identity and the full live reload smoke remain to be migrated.

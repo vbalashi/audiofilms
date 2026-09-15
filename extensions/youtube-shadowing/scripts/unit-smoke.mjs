@@ -34,6 +34,7 @@ function assertManifestOrderRegistersContentNamespaces() {
     "__afShadowingBootState",
     "__afShadowingFormatUtils",
     "__afShadowingPhrases",
+    "__afShadowingLanguageIdentityData",
     "__afShadowingLanguageIdentity",
     "__afShadowingCaptionTracks",
     "__afShadowingSourceLabels",
@@ -1818,7 +1819,10 @@ const ribbonControls = loadBrowserModule("src/ribbonControls.js", "__afShadowing
   __afShadowingFormatUtils: formatUtils,
 });
 const phrases = loadBrowserModule("src/phrases.js", "__afShadowingPhrases");
-const languageIdentity = loadBrowserModule("src/languageIdentity.js", "__afShadowingLanguageIdentity");
+const languageIdentityData = loadBrowserModule("src/languageIdentityData.js", "__afShadowingLanguageIdentityData");
+const languageIdentity = loadBrowserModule("src/languageIdentity.js", "__afShadowingLanguageIdentity", {
+  __afShadowingLanguageIdentityData: languageIdentityData,
+});
 const sourceLabels = loadBrowserModule("src/sourceLabels.js", "__afShadowingSourceLabels");
 const sourceSelection = loadBrowserModule("src/sourceSelection.js", "__afShadowingSourceSelection", {
   __afShadowingLanguageIdentity: languageIdentity,

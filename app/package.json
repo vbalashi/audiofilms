@@ -12,6 +12,7 @@
     "subtitle:shootout": "node scripts/subtitle-source-shootout.mjs",
     "subtitle:shootout:supadata": "node scripts/subtitle-source-shootout.mjs --include-supadata",
     "asr:align:smoke": "node scripts/local-asr-alignment-smoke.mjs",
+    "language:sync": "node scripts/sync-language-identity-data.mjs",
     "asr:align:stable-smoke": "node scripts/local-asr-alignment-smoke.mjs --engine stable-ts",
     "asr:practice-preview": "node scripts/build-practice-preview.mjs",
     "asr:worker": "node scripts/asr-worker.mjs",

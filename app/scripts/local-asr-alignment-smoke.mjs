@@ -6,6 +6,7 @@ import { asrArtifactRefreshPlan } from "./asr-cache-policy.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const appRoot = path.join(repoRoot, "app");
+const languageIdentityData = JSON.parse(fs.readFileSync(path.join(appRoot, "scripts", "language-identity-data.json"), "utf8"));
 const cacheDir = process.env.AUDIOFILMS_ASR_CACHE_DIR || path.join(appRoot, ".asr-cache");
 const venvDir = path.join(cacheDir, ".venv");
 
@@ -95,7 +96,7 @@ function hasFlag(name) {
 
 function normalizeLanguageTag(value) {
   const base = String(value || "nl").trim().replace(/_/g, "-").split("-")[0].toLowerCase();
-  return ({ iw: "he", in: "id", ji: "yi", jv: "jw" })[base] || base || "nl";
+  return languageIdentityData.aliases[base] || base || "nl";
 }
 
 function valueFor(name) {
