@@ -98,6 +98,7 @@
     };
     if (artifact?.snapshotRevisionId) payload.snapshotRevisionId = artifact.snapshotRevisionId;
     if (artifact?.textSourceRevisionId) payload.textSourceRevisionId = artifact.textSourceRevisionId;
+    if (artifact?.textContentFingerprint) payload.textContentFingerprint = artifact.textContentFingerprint;
     if (artifact?.timingEvidenceRevisionId) payload.timingEvidenceRevisionId = artifact.timingEvidenceRevisionId;
     return payload;
   }

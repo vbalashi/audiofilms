@@ -4261,6 +4261,7 @@ const manualTimingPayload = sourceReadiness.buildPracticeTimingPayload({
       practiceArtifact: {
         snapshotRevisionId: "snapshot-1",
         textSourceRevisionId: "text-1",
+        textContentFingerprint: "fingerprint-1",
         timingEvidenceRevisionId: "timing-1",
       },
     },
@@ -4268,7 +4269,8 @@ const manualTimingPayload = sourceReadiness.buildPracticeTimingPayload({
 });
 assert.equal(manualTimingPayload.sourceKind, "manual");
 assert.equal(manualTimingPayload.textSource, "manual");
-assert.equal(manualTimingPayload.snapshotRevisionId, "snapshot-1");
+  assert.equal(manualTimingPayload.snapshotRevisionId, "snapshot-1");
+assert.equal(manualTimingPayload.textContentFingerprint, "fingerprint-1");
 const autoTimingPayload = sourceReadiness.buildPracticeTimingPayload({
   videoId: "video-1",
   textSourceOverride: "asr",

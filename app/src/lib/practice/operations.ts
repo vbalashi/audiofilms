@@ -136,6 +136,7 @@ export function practiceTimingInputFromBody(
     durationSec: job.request.durationSec,
     snapshotRevisionId: cleanString(body.snapshotRevisionId),
     textSourceRevisionId: cleanString(body.textSourceRevisionId),
+    textContentFingerprint: cleanString(body.textContentFingerprint),
     timingEvidenceRevisionId: cleanString(body.timingEvidenceRevisionId),
   };
 }
@@ -359,19 +360,28 @@ export function practiceOperationResultApplicability(
 ): PracticeOperationResultApplicability {
   const resultSnapshotRevisionId = snapshot?.snapshotRevisionId;
   const resultTextSourceRevisionId = snapshot?.textSource?.revisionId;
+  const resultTextContentFingerprint = snapshot?.textSource?.contentFingerprint;
   const resultTimingEvidenceRevisionId = snapshot?.timingEvidence?.revisionId;
   const applicability: PracticeOperationResultApplicability = {
     appliesToCurrentSnapshot: false,
     requestedSnapshotRevisionId: input.snapshotRevisionId,
     requestedTextSourceRevisionId: input.textSourceRevisionId,
+    requestedTextContentFingerprint: input.textContentFingerprint,
     requestedTimingEvidenceRevisionId: input.timingEvidenceRevisionId,
     resultSnapshotRevisionId,
     resultTextSourceRevisionId,
+    resultTextContentFingerprint,
     resultTimingEvidenceRevisionId,
   };
   const diagnostics: string[] = [];
 
-  if (!input.snapshotRevisionId) {
+  const contentMatches = Boolean(
+    input.textContentFingerprint &&
+    resultTextContentFingerprint &&
+    input.textContentFingerprint === resultTextContentFingerprint,
+  );
+
+  if (!input.snapshotRevisionId && !contentMatches) {
     applicability.staleReason = 'missing-requested-snapshot-revision';
     diagnostics.push('Auto-apply is unsafe because the timing job was created without a requested snapshot revision.');
   } else if (!snapshot) {
@@ -382,8 +392,13 @@ export function practiceOperationResultApplicability(
     resultTextSourceRevisionId &&
     input.textSourceRevisionId !== resultTextSourceRevisionId
   ) {
-    applicability.staleReason = 'text-source-revision-mismatch';
-    diagnostics.push('The result snapshot is based on a different text source revision than the timing job requested.');
+    if (contentMatches) {
+      applicability.appliesToCurrentSnapshot = true;
+      diagnostics.push('Text source revision differs, but its content fingerprint matches the timing result.');
+    } else {
+      applicability.staleReason = 'text-source-revision-mismatch';
+      diagnostics.push('The result snapshot is based on a different text source revision than the timing job requested.');
+    }
   } else {
     applicability.appliesToCurrentSnapshot = true;
     if (input.textSourceRevisionId && !resultTextSourceRevisionId) {

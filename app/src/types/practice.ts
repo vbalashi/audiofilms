@@ -81,6 +81,7 @@ export type PracticeTimingOperationInput = {
   durationSec?: number;
   snapshotRevisionId?: string;
   textSourceRevisionId?: string;
+  textContentFingerprint?: string;
   timingEvidenceRevisionId?: string;
 };
 
@@ -94,9 +95,11 @@ export type PracticeOperationResultApplicability = {
   staleReason?: PracticeOperationStaleReason;
   requestedSnapshotRevisionId?: string;
   requestedTextSourceRevisionId?: string;
+  requestedTextContentFingerprint?: string;
   requestedTimingEvidenceRevisionId?: string;
   resultSnapshotRevisionId?: string;
   resultTextSourceRevisionId?: string;
+  resultTextContentFingerprint?: string;
   resultTimingEvidenceRevisionId?: string;
   diagnostics?: string[];
 };

@@ -97,4 +97,49 @@ describe('practice timing jobs route', () => {
       },
     });
   });
+
+  it('reuses timing when caption revision changes but content fingerprint is unchanged', async () => {
+    const { createOrGetAsrJob, updateAsrJob } = await import('../../src/lib/asr/asrJobs');
+    const { buildPracticeSnapshot } = await import('../../src/lib/practice/snapshot');
+    const { POST } = await import('../../src/app/api/practice/timing-jobs/route');
+    const resultPath = path.join(dataRoot, 'same-content-result.json');
+    await fs.writeFile(resultPath, JSON.stringify(staleResult), 'utf8');
+
+    const created = await createOrGetAsrJob(request, 'tester');
+    await updateAsrJob(created.job.jobId, {
+      status: 'completed',
+      completedAt: '2026-06-29T12:00:00.000Z',
+      resultPath,
+    });
+    const snapshot = buildPracticeSnapshot(staleResult, {
+      videoId: request.videoId,
+      requestedLanguage: request.language,
+    });
+
+    const response = await POST(new Request('http://localhost:3000/api/practice/timing-jobs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        videoId: request.videoId,
+        lang: request.language,
+        sourceKind: request.sourceKind,
+        textSource: request.textSource,
+        fullAudio: true,
+        reuseOnly: true,
+        snapshotRevisionId: 'practice-snapshot:new-provider-revision',
+        textSourceRevisionId: 'text-source:new-provider-revision',
+        textContentFingerprint: snapshot.textSource?.contentFingerprint,
+      }),
+    }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      state: 'succeeded',
+      result: {
+        applicability: {
+          appliesToCurrentSnapshot: true,
+        },
+      },
+    });
+  });
 });
