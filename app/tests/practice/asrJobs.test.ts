@@ -6,6 +6,7 @@ import {
   createOrGetAsrJob,
   getReusableAsrJob,
   normalizeAsrJobRequest,
+  normalizeWhisperLanguage,
   updateAsrJob,
   type AsrJobRequest,
 } from '../../src/lib/asr/asrJobs';
@@ -70,5 +71,19 @@ describe('ASR job reuse', () => {
     });
 
     expect(normalized.language).toBe('nl');
+  });
+
+  it.each([
+    ['en-US', 'en'],
+    ['pt-BR', 'pt'],
+    ['zh-Hans', 'zh'],
+    ['nl_NL', 'nl'],
+    ['iw-IL', 'he'],
+  ])('normalizes supported locale or legacy code %s to %s', (input, expected) => {
+    expect(normalizeWhisperLanguage(input)).toBe(expected);
+  });
+
+  it('rejects an unknown language instead of sending it to Whisper', () => {
+    expect(() => normalizeWhisperLanguage('xx-YY')).toThrow('unsupported_language:xx');
   });
 });
