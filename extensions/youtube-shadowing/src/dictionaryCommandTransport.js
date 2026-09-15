@@ -1,12 +1,13 @@
 (function audioFilmsDictionaryCommandTransport() {
   const dictionaryCommandApi = window.__afShadowingDictionaryCommands;
 
-  async function fetchDictionaryResult({ word, language, context }, options = {}) {
+  async function fetchDictionaryResult({ word, language, context, translationTargetLanguageCode }, options = {}) {
     ensureDictionaryEndpoint(options.endpoint);
     const response = await options.requestDictionaryCommand("dict-lookup", {
       clickedForm: word,
       sourceLanguageCode: language || "auto",
       ...(context ? { contextText: context } : {}),
+      ...(translationTargetLanguageCode ? { translationTargetLanguageCode } : {}),
     });
     const { text, payload } = dictionaryCommandApi.parseCommandResponse(response);
 

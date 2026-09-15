@@ -31,20 +31,20 @@
     if (!cardId) return false;
     state.exampleExpansionOverrides = {
       ...state.exampleExpansionOverrides,
-      [cardId]: !cardExpanded(state, cardId),
+      [cardId]: !cardExpanded(state, cardId, options.defaultExpanded),
     };
     options.render?.();
     return state.exampleExpansionOverrides[cardId];
   }
 
-  function cardExpanded(state, cardId) {
+  function cardExpanded(state, cardId, defaultExpanded = false) {
     if (
       cardId
       && Object.prototype.hasOwnProperty.call(state.exampleExpansionOverrides, cardId)
     ) {
       return state.exampleExpansionOverrides[cardId] === true;
     }
-    return false;
+    return defaultExpanded === true;
   }
 
   function closeOpenMenus(state, options = {}) {

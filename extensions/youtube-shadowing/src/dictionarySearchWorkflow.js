@@ -10,13 +10,33 @@
   }
 
   function renderReadyDictionaryCards(parent, selectedWord, options = {}) {
-    for (const card of selectedWord.lookupResult.cards) {
-      options.renderOverlayCard(parent, card);
+    const lookupResult = selectedWord.lookupResult;
+    if (
+      lookupResult.contractVersion === "dict-sense-card-v1" &&
+      options.renderSenseCardGroup
+    ) {
+      const cardsByGroupId = new Map();
+      for (const card of lookupResult.cards) {
+        const groupId = card?.group?.headwordGroupId || card?.entryId || card?.id;
+        if (!cardsByGroupId.has(groupId)) cardsByGroupId.set(groupId, []);
+        cardsByGroupId.get(groupId).push(card);
+      }
+      for (const cards of cardsByGroupId.values()) {
+        if (cards.length > 1) {
+          options.renderSenseCardGroup(parent, cards);
+        } else {
+          options.renderOverlayCard(parent, cards[0]);
+        }
+      }
+    } else {
+      for (const card of lookupResult.cards) {
+        options.renderOverlayCard(parent, card);
+      }
     }
     options.dictionaryDom.renderLookupMessages(parent, {
       status: selectedWord.cardActionStatus,
       error: selectedWord.cardActionError,
-      warning: selectedWord.lookupResult?.meta?.warning,
+      warning: lookupResult?.meta?.warning,
     });
     renderGroupedSearchPreviews(parent, selectedWord, options);
   }

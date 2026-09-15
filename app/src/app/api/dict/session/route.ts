@@ -12,6 +12,7 @@ type PlatformSessionBody = {
   } | null;
   preferences?: {
     translationTargetLanguageCode?: string | null;
+    interfaceLanguageCode?: string | null;
     source?: string | null;
     updatedAt?: string | null;
   } | null;
@@ -54,7 +55,15 @@ export async function GET(request: Request) {
   }
 
   const body = outcome.body as PlatformSessionBody;
-  const targetLanguage = body?.preferences?.translationTargetLanguageCode || null;
+  const platformPreferences = body?.preferences ?? null;
+  const targetLanguage =
+    typeof platformPreferences?.translationTargetLanguageCode === 'string'
+      ? platformPreferences.translationTargetLanguageCode
+      : null;
+  const interfaceLanguage =
+    typeof platformPreferences?.interfaceLanguageCode === 'string'
+      ? platformPreferences.interfaceLanguageCode
+      : null;
   const responseBody: DictionarySessionResponse = {
     authenticated: outcome.status < 400,
     user: body?.user?.id
@@ -63,11 +72,12 @@ export async function GET(request: Request) {
           email: body.user.email || null,
         }
       : null,
-    preferences: targetLanguage
+    preferences: platformPreferences
       ? {
           translationTargetLanguageCode: targetLanguage,
-          source: body.preferences?.source || 'user-setting',
-          updatedAt: body.preferences?.updatedAt || null,
+          interfaceLanguageCode: interfaceLanguage,
+          source: platformPreferences.source || 'user-setting',
+          updatedAt: platformPreferences.updatedAt || null,
         }
       : null,
   };

@@ -784,6 +784,11 @@ type DictionaryOverlayCardV2 = {
 
 Rules:
 
+- The `displayActions` rules below describe the V1 overlay contract. The
+  feature-gated Platform V2 SenseCard tracer uses the approved shared semantic
+  DTO instead: AudioFilms validates and shallowly wraps semantic entries, while
+  the extension localizes message keys and submits exact capability targets.
+  It must not infer actions from labels or translate capability IDs.
 - The extension should not parse raw 2000NL dictionary payloads to infer lemma,
   chips, rich sections, or progress.
 - `displayActions` are the only UI source of truth. Raw platform capabilities

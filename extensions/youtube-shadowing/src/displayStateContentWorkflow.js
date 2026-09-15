@@ -85,12 +85,15 @@
       return deps.uiStateWorkflow.toggleAllExamples(deps.getState(), event, uiStateWorkflowOptions());
     }
 
-    function toggleCardExpanded(cardId) {
-      return deps.uiStateWorkflow.toggleCardExpanded(deps.getState(), cardId, uiStateWorkflowOptions());
+    function toggleCardExpanded(cardId, defaultExpanded = false) {
+      return deps.uiStateWorkflow.toggleCardExpanded(deps.getState(), cardId, {
+        ...uiStateWorkflowOptions(),
+        defaultExpanded,
+      });
     }
 
-    function cardExpanded(cardId) {
-      return deps.uiStateWorkflow.cardExpanded(deps.getState(), cardId);
+    function cardExpanded(cardId, defaultExpanded = false) {
+      return deps.uiStateWorkflow.cardExpanded(deps.getState(), cardId, defaultExpanded);
     }
 
     function closeOpenMenus() {

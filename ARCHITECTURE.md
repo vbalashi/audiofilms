@@ -102,6 +102,7 @@ This path exists to support language selection and avoid redundant provider work
 - `app/src/app/api/dict/actions/route.ts`
 - `app/src/app/api/dict/translation/route.ts`
 - `app/src/lib/dictionaryLookup.ts`
+- `app/src/lib/dictionary/senseCardService.ts`
 - `app/src/lib/twoThousandNlPlatform.ts`
 - `app/src/lib/providers/dictionary/`
 - `app/src/types/dictionary.ts`
@@ -109,6 +110,17 @@ This path exists to support language selection and avoid redundant provider work
 Dictionary lookups are server-mediated. The UI should not call third-party providers directly or understand provider-specific payloads. The route returns normalized dictionary payloads; provider execution and error-to-response mapping live in the server service layer.
 
 For 2000NL-backed lookup, AudioFilms treats 2000NL as the dictionary, progress, action, and translation authority. AudioFilms owns a shallow overlay projection (`cards[]`) for app and extension rendering. Plain lookup is read-only; mutations go through explicit card actions and are followed by refreshed lookup state instead of local progress simulation.
+
+The V1 overlay contract remains a display-oriented projection with
+`displayActions`. The feature-gated V2 SenseCard tracer instead consumes the
+approved shared semantic SenseCard DTO: stable group, entry, content-node,
+translation, state-revision, message-key, and exact capability-target fields.
+That DTO is an app-facing platform contract, not `entry.raw` or a
+provider/vendor payload. The extension may render those explicit semantic
+fields, but must not infer identity from visible labels, source paths, list
+names, or array order. AudioFilms keeps provider execution, validation, and
+error mapping in `app/src/lib/dictionary/senseCardService.ts`; the route only
+selects the gated contract and writes the HTTP response.
 
 ### Local File Caches
 
@@ -142,6 +154,8 @@ Environment selection currently happens through `app/env.example` keys:
 - `OPENAI_MODEL`
 - `OPENAI_DICTIONARY_PROMPT`
 - `DICTIONARY_2000NL_API_BASE`
+- `DICTIONARY_2000NL_V2_API_BASE`
+- `DICTIONARY_2000NL_SENSE_CARD_V2`
 - `DICTIONARY_2000NL_CATALOG_ACCESS_TOKEN`
 - `DICTIONARY_2000NL_ACCESS_TOKEN`
 - `DICTIONARY_2000NL_TIMEOUT_MS`

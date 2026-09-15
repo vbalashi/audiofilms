@@ -3,7 +3,7 @@
     const selectedWord = input.selectedWord || {};
     const card = input.card || {};
     const actionPayload = input.actionPayload || {};
-    const action = actionPayload?.action || "";
+    const action = actionPayload?.action || actionPayload?.actionId || "";
     const binding = selectedWord.sourceBinding;
 
     if (!binding?.videoId) {
@@ -19,6 +19,20 @@
         ? clientEventId
         : undefined
     );
+    if (actionPayload?.contractVersion === "dict-sense-card-action-v1") {
+      return {
+        ok: true,
+        value: {
+          contractVersion: actionPayload.contractVersion,
+          actionId: actionPayload.actionId,
+          clientEventId,
+          target: actionPayload.target,
+          ...(actionPayload.reviewResult ? { reviewResult: actionPayload.reviewResult } : {}),
+          sourceContext: input.buildSourceContext(binding, card, action),
+        },
+      };
+    }
+
     const payload = {
       ...actionPayload,
       clientEventId,
@@ -63,6 +77,7 @@
   function actionSuccessMessage(displayAction, action) {
     if (action === "start-learning") return "Started learning";
     if (action === "mark-known") return "Marked known";
+    if (action === "undo-known") return "Known mark removed";
     const label = displayAction?.label || "Progress";
     return `${label} recorded`;
   }

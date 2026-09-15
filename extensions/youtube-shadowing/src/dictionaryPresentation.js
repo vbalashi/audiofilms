@@ -498,6 +498,17 @@
 
   function cardHasLookupTranslations(card) {
     if (!card) return false;
+    if (card.contractVersion === "dict-sense-card-entry-v1") {
+      const entry = card.entry || {};
+      return Boolean(
+        (entry.translation?.status === "ready" && entry.translation?.text) ||
+        (entry.contentNodes || []).some((node) =>
+          (node.translations || []).some((translation) =>
+            translation.status === "ready" && translation.text
+          )
+        )
+      );
+    }
     const summary = card.summary || {};
     return Boolean(
       cleanTranslationText(card.headwordTranslation) ||

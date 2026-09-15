@@ -60,6 +60,7 @@ function lookupRequest() {
 describe('/api/dict/lookup', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it('falls back to untranslated authenticated lookup when inline translations fail', async () => {
@@ -116,6 +117,73 @@ describe('/api/dict/lookup', () => {
       responseVersion: 'overlay-v2',
       translationFallbackUsed: true,
       translationFallbackReason: 'translation_cache_failed',
+    });
+  });
+
+  it('uses the additive Platform V2 semantic contract when the tracer flag is enabled', async () => {
+    vi.stubEnv('DICTIONARY_2000NL_SENSE_CARD_V2', 'true');
+    vi.stubEnv('DICTIONARY_2000NL_V2_API_BASE', 'https://2000.test/api/platform/v2');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          contractVersion: 'platform-lookup-v2',
+          query: 'huis',
+          request: {
+            contentLanguageCode: 'nl',
+            translationTargetLanguageCode: 'ru',
+            cardTypeId: 'word-to-definition',
+            intent: 'external-click',
+          },
+          groups: [],
+          page: {
+            selectedTierComplete: true,
+            nextGroupCursor: null,
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await POST(
+      new Request('https://audiofilms-api.dilum.io/api/dict/lookup', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer user-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          clickedForm: 'huis',
+          sourceLanguageCode: 'nl',
+          translationTargetLanguageCode: 'ru',
+          contextText: 'het huis',
+        }),
+      }),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://2000.test/api/platform/v2/lookup',
+      expect.objectContaining({
+        body: JSON.stringify({
+          query: 'huis',
+          contentLanguageCode: 'nl',
+          translationTargetLanguageCode: 'ru',
+          cardTypeId: 'word-to-definition',
+          intent: 'external-click',
+        }),
+      }),
+    );
+    expect(payload).toMatchObject({
+      contractVersion: 'dict-sense-card-v1',
+      clickedForm: 'huis',
+      groups: [],
+      meta: {
+        provider: '2000nl',
+        responseVersion: 'sense-card-v1',
+        tracerEligible: false,
+      },
     });
   });
 });

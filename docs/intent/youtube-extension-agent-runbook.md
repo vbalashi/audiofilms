@@ -197,6 +197,19 @@ Dictionary UI smoke should verify the current learner-facing panel contract:
   `Again`, `Hard`, `Good`, `Easy`) and clicks show per-card feedback without
   replacing cards with a loading/context layout.
 
+For the feature-gated semantic SenseCard tracer, the corresponding contract is
+different by design: labels are extension-owned message keys localized from the
+interface language, and action commands preserve exact Platform V2 capability
+targets. Use the extension options value `Semantic SenseCard mock` or:
+
+```bash
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs \
+  --only-dictionary-ui --dictionary-mock=sense-card --reload-extension
+```
+
+The static real-Chrome comparison fixture is
+`extensions/youtube-shadowing/scripts/fixtures/sense-card-preview.html`.
+
 Useful local UI preference keys for manual smoke:
 
 ```js
@@ -397,6 +410,7 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-backend-failed
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-source-switch-failed --reload-extension
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-multilingual-switch --reload-extension
 node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --reload-extension
+node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-dictionary-ui --dictionary-mock=sense-card --reload-extension
 ```
 
 If a focused run changes behavior, update `docs/intent/youtube-extension-validation-matrix.md` with the exact fixture, observed source badge, count, error state, and whether it is a regression or an intentional new baseline.

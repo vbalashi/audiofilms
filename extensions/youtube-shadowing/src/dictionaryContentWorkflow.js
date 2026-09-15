@@ -5,6 +5,8 @@
         state: deps.getState(),
         dictionaryPanelWorkflow: deps.dictionaryPanelWorkflow,
         dictionaryPresentation: deps.dictionaryPresentation,
+        senseCardPresentation: deps.senseCardPresentation,
+        senseCardDom: deps.senseCardDom,
         dictionaryDom: deps.dictionaryDom,
         dictionarySearchDom: deps.dictionarySearchDom,
         dictionarySearchWorkflow: deps.dictionarySearchWorkflow,
@@ -19,6 +21,7 @@
         ribbonDom: deps.ribbonDom,
         clearElement: deps.clearElement,
         iconSvg: deps.iconSvg,
+        browserLanguage: deps.browserLanguage || "",
         renderSelectedSpanCard,
         renderSelectedWordCard,
         renderSelectedSpanLookupPrompt,
@@ -37,6 +40,8 @@
         clearSelectedSpan: deps.clearSelectedSpan,
         generateDictionaryDraft: deps.generateDictionaryDraft,
         performDisplayAction: deps.performDisplayAction,
+        reportCardDictionaryIssue: deps.reportCardDictionaryIssue,
+        toggleSenseCardGroupTranslation,
         toggleCardMenu: deps.toggleCardMenu,
         cardAudioPlayable: deps.cardAudioPlayable,
         playHeadwordAudio: deps.playHeadwordAudio,
@@ -88,6 +93,13 @@
 
     function toggleCardTranslation(card) {
       return deps.dictionaryLookupWorkflow.toggleCardTranslation(card, dictionaryLookupWorkflowOptions());
+    }
+
+    function toggleSenseCardGroupTranslation(cards) {
+      return deps.dictionaryLookupWorkflow.toggleSenseCardGroupTranslation(
+        cards,
+        dictionaryLookupWorkflowOptions(),
+      );
     }
 
     function setCardTranslationPending(cardId, pending) {
@@ -186,6 +198,7 @@
 
     return {
       toggleCardTranslation,
+      toggleSenseCardGroupTranslation,
       setCardTranslationPending,
       renderDictionary,
       renderAccountControl,

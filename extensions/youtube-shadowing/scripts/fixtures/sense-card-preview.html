@@ -1,0 +1,185 @@
+<!doctype html>
+<html class="af-shadowing-workspace" data-af-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AudioFilms SenseCard visual fixture</title>
+    <link rel="stylesheet" href="../../src/shadow.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 28px;
+        color: var(--af-text);
+        background: var(--af-bg);
+        font-family: Roboto, Arial, Helvetica, sans-serif;
+      }
+
+      main {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        align-items: start;
+      }
+
+      main > section {
+        width: 340px;
+      }
+
+      main > section.is-full {
+        width: 520px;
+      }
+
+      .af-sense-fixture-container {
+        width: 100%;
+      }
+
+      .fixture-title {
+        margin: 0 0 8px;
+        color: var(--af-dim);
+        font-family: var(--af-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+      }
+
+      @media (max-width: 760px) {
+        main {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        main > section,
+        main > section.is-full {
+          width: min(100%, 520px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="is-full" data-gate-scenario="SC-03-full">
+        <h1 class="fixture-title">MULTI-SENSE · FULL · TRANSLATION ON</h1>
+        <div class="af-sense-fixture-container" id="multi-full"></div>
+      </section>
+      <section data-gate-scenario="SC-03-narrow">
+        <h1 class="fixture-title">MULTI-SENSE · NARROW · TRANSLATION ON</h1>
+        <div class="af-sense-fixture-container" id="multi-narrow"></div>
+      </section>
+      <section data-gate-scenario="SC-01-narrow">
+        <h1 class="fixture-title">SINGLE-SENSE · NARROW · TRANSLATION OFF</h1>
+        <div class="af-sense-fixture-container" id="single-narrow"></div>
+      </section>
+      <section data-gate-scenario="SC-02-ru">
+        <h1 class="fixture-title">SINGLE-SENSE · NARROW · RU · TRANSLATION ON</h1>
+        <div class="af-sense-fixture-container" id="single-ru"></div>
+      </section>
+      <section data-gate-scenario="SC-06-long">
+        <h1 class="fixture-title">LONG HEADWORD · NARROW · TRANSLATION OFF</h1>
+        <div class="af-sense-fixture-container" id="long-narrow"></div>
+      </section>
+    </main>
+    <script src="../../src/uiIcons.js"></script>
+    <script src="../../src/dictionaryMocks.js"></script>
+    <script src="../../src/senseCardPresentation.js"></script>
+    <script src="../../src/senseCardDom.js"></script>
+    <script>
+      const response = window.__afShadowingDictionaryMocks.mockSenseCardLookup({
+        clickedForm: "bank",
+        sourceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+      });
+      const card = response.cards[0];
+      const common = {
+        interfaceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+      };
+      for (const targetId of ["multi-full", "multi-narrow"]) {
+        const view = window.__afShadowingSenseCardPresentation.groupViewModel(response.cards, {
+          ...common,
+          expandedByEntryId: {
+            "entry:bank:1": true,
+            "entry:bank:2": false,
+          },
+          translationVisibleByEntryId: {
+            "entry:bank:1": true,
+            "entry:bank:2": true,
+          },
+        });
+        window.__afShadowingSenseCardDom.renderSenseCardGroup(
+          document.getElementById(targetId),
+          view,
+          {
+            iconSvg: window.__afShadowingUiIcons.iconSvg,
+            onTranslation: () => {},
+            onToggleExpanded: () => {},
+            onAction: () => {},
+            onAudio: () => {},
+          },
+        );
+      }
+      const singleResponse = window.__afShadowingDictionaryMocks.mockSenseCardLookup({
+        clickedForm: "bank",
+        sourceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+        singleSense: true,
+      });
+      const singleView = window.__afShadowingSenseCardPresentation.cardViewModel(singleResponse.cards[0], {
+        ...common,
+        translationVisible: false,
+      });
+      window.__afShadowingSenseCardDom.renderSenseCard(
+        document.getElementById("single-narrow"),
+        singleView,
+        {
+          iconSvg: window.__afShadowingUiIcons.iconSvg,
+          onTranslation: () => {},
+          onAction: () => {},
+        },
+      );
+      const singleRussianView = window.__afShadowingSenseCardPresentation.cardViewModel(
+        singleResponse.cards[0],
+        {
+          ...common,
+          interfaceLanguageCode: "ru",
+          translationVisible: true,
+        },
+      );
+      window.__afShadowingSenseCardDom.renderSenseCard(
+        document.getElementById("single-ru"),
+        singleRussianView,
+        {
+          iconSvg: window.__afShadowingUiIcons.iconSvg,
+          onTranslation: () => {},
+          onAudio: () => {},
+          onAction: () => {},
+        },
+      );
+
+      const longResponse = window.__afShadowingDictionaryMocks.mockSenseCardLookup({
+        clickedForm: "arbeidsongeschiktheidsverzekering",
+        sourceLanguageCode: "nl",
+        translationTargetLanguageCode: "ru",
+        singleSense: true,
+      });
+      longResponse.cards[0].group.header.text = "arbeidsongeschiktheidsverzekering";
+      longResponse.cards[0].group.header.displayPronunciation =
+        "ar·beids·on·ge·schikt·heids·ver·ze·ke·ring";
+      const longView = window.__afShadowingSenseCardPresentation.cardViewModel(
+        longResponse.cards[0],
+        {
+          ...common,
+          translationVisible: false,
+        },
+      );
+      window.__afShadowingSenseCardDom.renderSenseCard(
+        document.getElementById("long-narrow"),
+        longView,
+        {
+          iconSvg: window.__afShadowingUiIcons.iconSvg,
+          onTranslation: () => {},
+          onAudio: () => {},
+          onAction: () => {},
+        },
+      );
+    </script>
+  </body>
+</html>

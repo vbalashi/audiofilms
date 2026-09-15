@@ -4,6 +4,10 @@ import {
   type PlatformLookupResponse,
 } from '@/lib/dictionary/overlayProjection';
 import { createAudioResolveToken } from '@/lib/audio/resolveToken';
+import {
+  lookupSenseCard,
+  senseCardV2Enabled,
+} from '@/lib/dictionary/senseCardService';
 import { jsonResponse, optionsResponse } from '@/lib/http/apiResponse';
 import { getBearerToken } from '@/lib/twoThousandNlPlatform';
 
@@ -41,6 +45,10 @@ export async function POST(request: Request) {
   const sourceLanguageCode =
     typeof body?.sourceLanguageCode === 'string' ? body.sourceLanguageCode.trim() : '';
   const contextText = typeof body?.contextText === 'string' ? body.contextText : undefined;
+  const translationTargetLanguageCode =
+    typeof body?.translationTargetLanguageCode === 'string'
+      ? body.translationTargetLanguageCode.trim()
+      : '';
 
   if (!clickedForm) {
     return jsonResponse(request, { error: 'missing_clicked_form' }, { status: 400, headers: timingHeaders(startedAt, null) });
@@ -61,6 +69,28 @@ export async function POST(request: Request) {
       },
       { status: 401, headers: timingHeaders(startedAt, null) },
     );
+  }
+
+  if (senseCardV2Enabled()) {
+    const outcome = await lookupSenseCard({
+      clickedForm,
+      sourceLanguageCode,
+      translationTargetLanguageCode,
+      endpoint: lookupMode.endpoint,
+      accessToken: lookupMode.accessToken,
+      includeTranslations: lookupMode.includeTranslations,
+    });
+    return jsonResponse(request, outcome.body, {
+      status: outcome.status,
+      headers: responseHeaders(
+        lookupMode,
+        timingHeaders(startedAt, lookupMode, {
+          platformDurationMs: outcome.platformDurationMs,
+          platformStatus: outcome.platformStatus,
+          platformServerTiming: outcome.platformServerTiming,
+        }),
+      ),
+    });
   }
 
   const platformAttempt = await fetchPlatformLookup(

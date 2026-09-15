@@ -359,6 +359,7 @@ export const authenticatedSessionFixture = {
   },
   preferences: {
     translationTargetLanguageCode: 'ru',
+    interfaceLanguageCode: 'nl',
     source: 'user-setting',
     updatedAt: '2026-06-18T09:00:00.000Z',
   },

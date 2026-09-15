@@ -93,7 +93,7 @@
   });
 
   function normalizeDictionaryMock(value) {
-    return ["cards", "generated"].includes(value) ? value : "";
+    return ["cards", "sense-card", "generated"].includes(value) ? value : "";
   }
 
   function normalizeIssueReportMock(value) {

@@ -55,6 +55,15 @@
       });
       return "platform-action";
     }
+    if (command?.kind === "platform-action-v2") {
+      options.performDictionaryCardAction?.(card, displayAction, {
+        contractVersion: command.contractVersion,
+        actionId: command.actionId,
+        target: command.target,
+        ...(command.reviewResult ? { reviewResult: command.reviewResult } : {}),
+      });
+      return "platform-action-v2";
+    }
     if (command?.kind === "generated-save-and-start-learning") {
       options.saveGeneratedDictionaryDraft?.(options.getSelectedWord?.(), card);
       return "generated-save-and-start-learning";
@@ -126,13 +135,24 @@
     });
   }
 
-  function reportCardDictionaryIssue(card, options = {}) {
+  function reportCardDictionaryIssue(card, options = {}, reportAction = null) {
     options.state.cardMenuOpenId = "";
     options.openIssueReportDialog({
-      source: "dictionary-card-menu",
+      source: reportAction ? "sense-card-report" : "dictionary-card-menu",
       category: "dictionary",
       description: options.issueReports.dictionaryCardIssueDescription(card, "dictionary"),
       expectedBehavior: "Definition, context, examples, and idioms should match the intended dictionary sense.",
+      ...(reportAction ? {
+        reportOptions: {
+          extraDiagnostics: {
+            senseCardReport: {
+              entryId: card?.entryId || "",
+              actionId: reportAction.actionId || "",
+              target: reportAction.target || null,
+            },
+          },
+        },
+      } : {}),
     });
   }
 

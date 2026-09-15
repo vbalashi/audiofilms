@@ -500,7 +500,7 @@ async function fetchDictionaryCommand(operation, body = null) {
 
 async function dictionaryMockResponse(operation, body = null) {
   const mode = (await readDevMockConfig()).dictionary;
-  if (mode !== "cards" && mode !== "generated") return null;
+  if (!["cards", "generated", "sense-card"].includes(mode)) return null;
   const mocks = globalThis.__afShadowingDictionaryMocks;
   if (!mocks?.dictionaryMockResponse) return null;
   const response = mocks.dictionaryMockResponse(operation, body, mode);
@@ -538,7 +538,9 @@ async function readDevMockConfig() {
 
 function normalizeDevMockConfig(value) {
   const config = value && typeof value === "object" ? value : {};
-  const dictionary = ["cards", "generated"].includes(config.dictionary) ? config.dictionary : "";
+  const dictionary = ["cards", "generated", "sense-card"].includes(config.dictionary)
+    ? config.dictionary
+    : "";
   const issueReport = ["success", "failure", "error"].includes(config.issueReport) ? config.issueReport : "";
   return { dictionary, issueReport };
 }
