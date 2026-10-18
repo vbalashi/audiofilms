@@ -1,4 +1,5 @@
 try { importScripts("config.js"); } catch (_error) {}
+importScripts("connectSessionLifecycle.js");
 try { importScripts("dictionaryMocks.js", "issueReports.js"); } catch (_error) {}
 const CONNECT_SESSION_STORAGE_KEY = "af2000nlConnectSession";
 const ASR_TESTER_TOKEN_STORAGE_KEY = "afAsrTesterToken";
@@ -11,6 +12,10 @@ const DEFAULT_CONNECT_CLIENT_ID = "audiofilms_chrome_dev";
 const CONNECT_SCOPE = "platform:read platform:write offline_access";
 const REFRESH_SKEW_SECONDS = 90;
 const ALLOW_LOCAL_BEARER_TARGETS = globalThis.__afShadowingConfig?.defaults?.allowLocalBearerTargets === true;
+
+const connectSessionLifecycle = globalThis.__afShadowingConnectSessionLifecycle.createConnectSessionLifecycle({
+  read: readConnectSession, write: storeConnectSession, remove: clearConnectSession,
+});
 
 restrictChromeStorageToTrustedContexts();
 
@@ -631,61 +636,75 @@ async function connectTwoThousandNl() {
     throw new Error("Chrome identity API is unavailable.");
   }
 
-  const baseUrl = normalizeConnectBaseUrl();
-  const clientId = normalizeClientId();
-  const redirectUri = chrome.identity.getRedirectURL();
-  const state = randomBase64Url(24);
-  const codeVerifier = randomBase64Url(48);
-  const codeChallenge = await sha256Base64Url(codeVerifier);
-  const authorizeUrl = new URL(`${baseUrl}/connect/authorize`);
-  authorizeUrl.searchParams.set("client_id", clientId);
-  authorizeUrl.searchParams.set("redirect_uri", redirectUri);
-  authorizeUrl.searchParams.set("response_type", "code");
-  authorizeUrl.searchParams.set("scope", CONNECT_SCOPE);
-  authorizeUrl.searchParams.set("state", state);
-  authorizeUrl.searchParams.set("code_challenge", codeChallenge);
-  authorizeUrl.searchParams.set("code_challenge_method", "S256");
+  const change = connectSessionLifecycle.beginChange();
+  try {
+    const baseUrl = normalizeConnectBaseUrl();
+    const clientId = normalizeClientId();
+    const redirectUri = chrome.identity.getRedirectURL();
+    const state = randomBase64Url(24);
+    const codeVerifier = randomBase64Url(48);
+    const codeChallenge = await sha256Base64Url(codeVerifier);
+    const authorizeUrl = new URL(`${baseUrl}/connect/authorize`);
+    authorizeUrl.searchParams.set("client_id", clientId);
+    authorizeUrl.searchParams.set("redirect_uri", redirectUri);
+    authorizeUrl.searchParams.set("response_type", "code");
+    authorizeUrl.searchParams.set("scope", CONNECT_SCOPE);
+    authorizeUrl.searchParams.set("state", state);
+    authorizeUrl.searchParams.set("code_challenge", codeChallenge);
+    authorizeUrl.searchParams.set("code_challenge_method", "S256");
 
-  const redirectedTo = await launchWebAuthFlow({
-    url: authorizeUrl.toString(),
-    interactive: true,
-  });
-  const redirectedUrl = new URL(redirectedTo);
-  const returnedState = redirectedUrl.searchParams.get("state");
-  const code = redirectedUrl.searchParams.get("code");
-  const error = redirectedUrl.searchParams.get("error");
+    const redirectedTo = await launchWebAuthFlow({
+      url: authorizeUrl.toString(),
+      interactive: true,
+    });
+    const redirectedUrl = new URL(redirectedTo);
+    const returnedState = redirectedUrl.searchParams.get("state");
+    const code = redirectedUrl.searchParams.get("code");
+    const error = redirectedUrl.searchParams.get("error");
 
-  if (error) {
-    throw new Error(error);
+    if (error) {
+      throw new Error(error);
+    }
+    if (!code || returnedState !== state) {
+      throw new Error("Invalid 2000NL authorization response.");
+    }
+
+    const session = await exchangeConnectToken(baseUrl, {
+      grant_type: "authorization_code",
+      client_id: clientId,
+      code,
+      redirect_uri: redirectUri,
+      code_verifier: codeVerifier,
+    });
+    if (!await connectSessionLifecycle.commitChange(change, { ...session, baseUrl, clientId })) {
+      throw new Error("2000NL account change was superseded.");
+    }
+    return { ok: true, session: publicConnectSession(session) };
+  } finally {
+    connectSessionLifecycle.endChange(change);
   }
-  if (!code || returnedState !== state) {
-    throw new Error("Invalid 2000NL authorization response.");
-  }
-
-  const session = await exchangeConnectToken(baseUrl, {
-    grant_type: "authorization_code",
-    client_id: clientId,
-    code,
-    redirect_uri: redirectUri,
-    code_verifier: codeVerifier,
-  });
-  await storeConnectSession({ ...session, baseUrl, clientId });
-  return { ok: true, session: publicConnectSession(session) };
 }
 
-async function getFreshConnectSession() {
+function getFreshConnectSession() {
+  if (connectSessionLifecycle.isChanging()) return Promise.resolve({ ok: true, session: null });
+  return connectSessionLifecycle.fresh(readAndRefreshConnectSession);
+}
+
+async function readAndRefreshConnectSession(version = connectSessionLifecycle.version()) {
+  if (connectSessionLifecycle.isChanging()) return { ok: true, session: null };
   let stored = await readConnectSession();
+  if (!connectSessionLifecycle.isCurrent(version)) return currentConnectSession();
   if (!stored?.refresh_token) {
     return { ok: true, session: null };
   }
   const pinnedSession = pinnedOrMigratedConnectSession(stored);
   if (!pinnedSession) {
-    await clearConnectSession();
+    if (!await connectSessionLifecycle.replace(version, stored, null)) return currentConnectSession();
     return { ok: true, session: null };
   }
   if (pinnedSession !== stored) {
+    if (!await connectSessionLifecycle.replace(version, stored, pinnedSession)) return currentConnectSession();
     stored = pinnedSession;
-    await storeConnectSession(stored);
   }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -694,6 +713,9 @@ async function getFreshConnectSession() {
   }
 
   try {
+    // A delayed storage callback can contain a pair already rotated by a
+    // completed account operation. Re-read before spending the one-use token.
+    if (!await connectSessionLifecycle.unchanged(version, stored)) return currentConnectSession();
     const baseUrl = normalizeConnectBaseUrl();
     const clientId = normalizeClientId();
     const refreshed = await exchangeConnectToken(baseUrl, {
@@ -701,11 +723,14 @@ async function getFreshConnectSession() {
       client_id: clientId,
       refresh_token: stored.refresh_token,
     });
-    await storeConnectSession({ ...refreshed, baseUrl, clientId });
+    if (!await connectSessionLifecycle.replace(version, stored, { ...refreshed, baseUrl, clientId })) {
+      return currentConnectSession();
+    }
     return { ok: true, session: publicConnectSession(refreshed), accessToken: refreshed.access_token };
   } catch (error) {
+    if (!connectSessionLifecycle.isCurrent(version)) return currentConnectSession();
     if (isTerminalConnectRefreshError(error)) {
-      await clearConnectSession();
+      if (!await connectSessionLifecycle.replace(version, stored, null)) return currentConnectSession();
     }
     return {
       ok: false,
@@ -715,8 +740,19 @@ async function getFreshConnectSession() {
   }
 }
 
+async function currentConnectSession() {
+  await connectSessionLifecycle.settled();
+  return readAndRefreshConnectSession();
+}
+
 async function disconnectTwoThousandNl() {
-  const stored = await readConnectSession();
+  const change = connectSessionLifecycle.beginChange();
+  let stored;
+  try {
+    stored = await connectSessionLifecycle.clearChange(change);
+  } finally {
+    connectSessionLifecycle.endChange(change);
+  }
   if (stored?.refresh_token && isPinnedConnectSession(stored)) {
     const baseUrl = normalizeConnectBaseUrl();
     const clientId = normalizeClientId();
@@ -732,7 +768,6 @@ async function disconnectTwoThousandNl() {
       }),
     }).catch(() => null);
   }
-  await clearConnectSession();
   return { ok: true };
 }
 
