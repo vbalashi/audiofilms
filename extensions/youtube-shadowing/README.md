@@ -483,3 +483,38 @@ node extensions/youtube-shadowing/scripts/smoke-chrome.mjs --only-geometry --rel
 - Uses YouTube web-player metadata, which can change.
 - Backend fallback expects `https://audiofilms-api.dilum.io/api/practice/captions` by default. Set `localStorage.afShadowingApiBase = "http://localhost:3000"` for local development, or set `localStorage.afShadowingBackendSubtitlesUrl` to a specific endpoint or `off`.
 - YouTube transcript API / DOM probing is disabled by default. Set `localStorage.afShadowingTranscriptFallback = "on"` only for diagnostics.
+
+
+## Connect refresh persistence regression (#44, 2026-10-18)
+
+The extension service worker owns one in-flight freshness operation. Expired
+concurrent account/dictionary callers share a rotating refresh; persisted storage
+is re-read before spending the old pair. The small `connectSessionLifecycle.js`
+module serializes session writes and fences refresh responses/errors against
+explicit logout/reconnect. Logout clears local storage before its best-effort
+remote revoke. Tokens remain opaque strings; refreshed pairs survive worker restart
+without another login, while terminal errors clear only the current pair and
+transient errors preserve it. No backend, provider, caption or UI contract changes.
+
+Validation uses the real service-worker message listener with synthetic Chrome
+storage/identity and controlled HTTP responses, without touching owner Chrome:
+
+```bash
+node --test extensions/youtube-shadowing/scripts/connect-refresh.test.mjs
+node extensions/youtube-shadowing/scripts/unit-smoke.mjs
+node --check extensions/youtube-shadowing/src/connectSessionLifecycle.js
+node --check extensions/youtube-shadowing/src/serviceWorker.js
+```
+
+Eleven focused checks cover concurrent expiry, late persistent reads, stale terminal
+failures, refresh success across logout/reconnect, superseded OAuth, transient
+failure, opaque-format restart a storage write already in flight, delayed logout reads and stale transient errors. The focused
+suite also runs from the existing unit-smoke gate. Red-first evidence reproduced
+the original losing-refresh disconnect and stale reconnect deletion before fixes.
+
+Local source checks do not update the installed extension. Before owner testing,
+review/merge the change, prepare/stamp the intended clean tester package with the
+new helper, then reload the unpacked extension itself and its YouTube tab using
+the existing owner-profile protocol. No browser/profile reload or package release
+was performed for this regression. A one-time reconnect for platform credential
+cutover is separate from repeated login caused by this client race.

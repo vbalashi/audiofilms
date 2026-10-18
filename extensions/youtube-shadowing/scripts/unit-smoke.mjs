@@ -1798,6 +1798,9 @@ function assertLearningBoundaryTermsStayOutOfContentScript() {
 assertManifestOrderRegistersContentNamespaces();
 assertDictionaryMocksStayRuntimeGated();
 assertServiceWorkerMessageSecurityBoundary();
+execFileSync(process.execPath, ["--test", path.join(extensionRoot, "scripts/connect-refresh.test.mjs")], {
+  stdio: "pipe",
+});
 assertPageBridgeCommandContract();
 assertReleaseManifestStripsLocalhostPermissions();
 await assertRuntimeMessageClientNormalizesRuntimeMessaging();

@@ -622,3 +622,29 @@ Category: passing.
 ## Validation Maintenance
 
 Phase 9's required fixture categories now have pinned examples and current smoke notes. Future validation should add more videos per category, but the current matrix is no longer blocked on absent auto-only or no-captions fixtures.
+
+
+## Connect credential refresh persistence (#44, 2026-10-18)
+
+Local synthetic service-worker validation: **11 focused checks passed**, plus the
+existing full extension unit smoke, JavaScript syntax and release-manifest local
+inspection. No owner Chrome, real account, backend provider or login was used.
+
+| Scenario | Expected and observed |
+| --- | --- |
+| Two expired account requests | One refresh exchange; both stay connected |
+| Delayed storage read after rotation | Re-read fresh pair; no old refresh spent |
+| Terminal failure after reconnect | New account/pair retained |
+| Late success after logout | No session resurrection |
+| Late success after reconnect | New account not overwritten |
+| OAuth response after logout | Superseded response cannot persist |
+| Transient/current terminal error | Preserve pair / clear current pair respectively |
+| Worker restart with opaque pair | Stored account restored; no refresh or login |
+| Logout during pending storage write | Serialized clear wins |
+| Delayed logout read during reconnect | New account retained; no revoke |
+| Stale transient failure after reconnect | Current account returned; no stale error |
+
+Run `node --test extensions/youtube-shadowing/scripts/connect-refresh.test.mjs`;
+the suite is included by `scripts/unit-smoke.mjs`. Manual installed-extension
+validation remains pending review, clean packaging/stamping and owner-profile
+extension + tab reload. See the agent runbook; do not substitute another profile.
